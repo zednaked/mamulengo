@@ -1,0 +1,45 @@
+{
+  "name": "mamulengo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "mcp": "tsx mcp/server.ts",
+    "cli": "tsx tools/cli.ts",
+    "gate:parse": "tsx tools/parse-all.ts",
+    "gate:roundtrip": "tsx tools/roundtrip.ts",
+    "gate:textures": "tsx tools/textures.ts",
+    "test": "tsx tests/features.ts",
+    "test:corpus": "tsx tests/corpus.ts",
+    "parity": "tsx tools/parity.ts",
+    "kit": "tsx tools/acceptance-kit.ts",
+    "compare": "tsx tools/compare-anim.ts",
+    "ficha": "tsx tools/ficha.ts"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^24.19.2",
+    "@types/pngjs": "^6.0.5",
+    "@types/ws": "^8.18.2",
+    "pngjs": "^7.0.0",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.7",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "@esotericsoftware/spine-core": "^4.3.13",
+    "@esotericsoftware/spine-webgl": "^4.3.13",
+    "ag-psd": "31.0.3",
+    "sharp": "^0.35.5"
+  }
+}

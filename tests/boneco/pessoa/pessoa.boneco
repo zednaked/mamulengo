@@ -1,0 +1,1732 @@
+{
+ "boneco": 0,
+ "nome": "pessoa",
+ "paginas": [
+  {
+   "arquivo": "pessoa.webp",
+   "tamanho": [
+    511,
+    490
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "cabeca",
+   "pagina": 0,
+   "ret": [
+    0,
+    176,
+    173,
+    168
+   ]
+  },
+  {
+   "nome": "cabelo",
+   "pagina": 0,
+   "ret": [
+    173,
+    346,
+    171,
+    130
+   ]
+  },
+  {
+   "nome": "camisa",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    153,
+    174
+   ]
+  },
+  {
+   "nome": "manga",
+   "pagina": 0,
+   "ret": [
+    0,
+    346,
+    171,
+    142
+   ]
+  },
+  {
+   "nome": "mao",
+   "pagina": 0,
+   "ret": [
+    448,
+    49,
+    61,
+    71
+   ]
+  },
+  {
+   "nome": "perna",
+   "pagina": 0,
+   "ret": [
+    155,
+    0,
+    111,
+    166
+   ]
+  },
+  {
+   "nome": "pescoco",
+   "pagina": 0,
+   "ret": [
+    346,
+    152,
+    96,
+    37
+   ]
+  },
+  {
+   "nome": "quadril",
+   "pagina": 0,
+   "ret": [
+    346,
+    0,
+    153,
+    47
+   ]
+  },
+  {
+   "nome": "rosto",
+   "pagina": 0,
+   "ret": [
+    346,
+    49,
+    100,
+    101
+   ]
+  },
+  {
+   "nome": "sapato",
+   "pagina": 0,
+   "ret": [
+    346,
+    191,
+    94,
+    42
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./images/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "quadril",
+   "pai": "root",
+   "x": 0.00000464102,
+   "y": 200
+  },
+  {
+   "nome": "tronco",
+   "pai": "quadril",
+   "comprimento": 175,
+   "rotacao": 90,
+   "x": 2.320517e-7,
+   "y": 5
+  },
+  {
+   "nome": "cabeca",
+   "pai": "tronco",
+   "comprimento": 148,
+   "rotacao": -0.000003988664,
+   "x": 187,
+   "y": -0.00001301806
+  },
+  {
+   "nome": "cabelo",
+   "pai": "cabeca",
+   "comprimento": 40,
+   "rotacao": 6.064618e-13,
+   "x": 148,
+   "y": -1.403309e-12
+  },
+  {
+   "nome": "ombro_e",
+   "pai": "tronco",
+   "comprimento": 90.04999,
+   "rotacao": 119.9816,
+   "x": 160,
+   "y": 61.99999
+  },
+  {
+   "nome": "cotovelo_e",
+   "pai": "ombro_e",
+   "comprimento": 92.19545,
+   "rotacao": 19.4171,
+   "x": 90.04999,
+   "y": 0.00005246451
+  },
+  {
+   "nome": "mao_e",
+   "pai": "cotovelo_e",
+   "comprimento": 41.76123,
+   "rotacao": 23.90205,
+   "x": 92.19544,
+   "y": 0.000001350005
+  },
+  {
+   "nome": "ombro_d",
+   "pai": "tronco",
+   "comprimento": 90.04999,
+   "rotacao": -119.9816,
+   "x": 160,
+   "y": -62.00001
+  },
+  {
+   "nome": "cotovelo_d",
+   "pai": "ombro_d",
+   "comprimento": 92.19544,
+   "rotacao": -19.41711,
+   "x": 90.04999,
+   "y": -0.0000657136
+  },
+  {
+   "nome": "mao_d",
+   "pai": "cotovelo_d",
+   "comprimento": 41.76123,
+   "rotacao": -23.90205,
+   "x": 92.19544,
+   "y": 0.000004254329
+  },
+  {
+   "nome": "perna_e",
+   "pai": "quadril",
+   "comprimento": 160.7016,
+   "rotacao": -95.35583,
+   "x": -40,
+   "y": -10
+  },
+  {
+   "nome": "pe_e",
+   "pai": "perna_e",
+   "comprimento": 36.40055,
+   "rotacao": -68.69878,
+   "x": 160.7016,
+   "y": 0.000009999383
+  },
+  {
+   "nome": "perna_d",
+   "pai": "quadril",
+   "comprimento": 160.7016,
+   "rotacao": -84.64418,
+   "x": 40,
+   "y": -10
+  },
+  {
+   "nome": "pe_d",
+   "pai": "perna_d",
+   "comprimento": 36.40055,
+   "rotacao": 68.69878,
+   "x": 160.7016,
+   "y": 0.00000979595
+  }
+ ],
+ "slots": [
+  {
+   "nome": "mao_e",
+   "osso": "mao_e",
+   "parte": "mao"
+  },
+  {
+   "nome": "mao_d",
+   "osso": "mao_d",
+   "parte": "mao"
+  },
+  {
+   "nome": "perna_e",
+   "osso": "perna_e",
+   "parte": "perna"
+  },
+  {
+   "nome": "perna_d",
+   "osso": "perna_d",
+   "parte": "perna"
+  },
+  {
+   "nome": "sapato_e",
+   "osso": "pe_e",
+   "parte": "sapato"
+  },
+  {
+   "nome": "sapato_d",
+   "osso": "pe_d",
+   "parte": "sapato"
+  },
+  {
+   "nome": "quadril",
+   "osso": "quadril",
+   "parte": "quadril"
+  },
+  {
+   "nome": "pescoco",
+   "osso": "tronco",
+   "parte": "pescoco"
+  },
+  {
+   "nome": "camisa",
+   "osso": "tronco",
+   "parte": "camisa"
+  },
+  {
+   "nome": "manga_e",
+   "osso": "ombro_e",
+   "parte": "manga"
+  },
+  {
+   "nome": "manga_d",
+   "osso": "ombro_d",
+   "parte": "manga"
+  },
+  {
+   "nome": "cabeca",
+   "osso": "cabeca",
+   "parte": "cabeca"
+  },
+  {
+   "nome": "rosto",
+   "osso": "cabeca",
+   "parte": "rosto"
+  },
+  {
+   "nome": "cabelo",
+   "osso": "cabelo",
+   "parte": "cabelo"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "mao_e": {
+     "mao": {
+      "x": 23.37096,
+      "y": -1.340958,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": 106.6992,
+      "largura": 61,
+      "altura": 71
+     }
+    },
+    "mao_d": {
+     "mao": {
+      "x": 23.37096,
+      "y": 1.340958,
+      "escala_x": 1,
+      "escala_y": -1,
+      "rotacao": -106.6992,
+      "largura": 61,
+      "altura": 71
+     }
+    },
+    "perna_e": {
+     "perna": {
+      "x": 79.83742,
+      "y": 5.475993,
+      "escala_x": 1,
+      "escala_y": -1,
+      "rotacao": -84.64417,
+      "largura": 111,
+      "altura": 166
+     }
+    },
+    "perna_d": {
+     "perna": {
+      "x": 79.83742,
+      "y": -5.475984,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": 84.64418,
+      "largura": 111,
+      "altura": 166
+     }
+    },
+    "sapato_e": {
+     "sapato": {
+      "x": 9.203153,
+      "y": 6.730657,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": 164.0546,
+      "largura": 94,
+      "altura": 42
+     }
+    },
+    "sapato_d": {
+     "sapato": {
+      "x": 9.203153,
+      "y": -6.730654,
+      "escala_x": 1,
+      "escala_y": -1,
+      "rotacao": -164.0546,
+      "largura": 94,
+      "altura": 42
+     }
+    },
+    "quadril": {
+     "quadril": {
+      "x": 6.666285e-13,
+      "y": 5.684342e-14,
+      "escala_y": 1,
+      "largura": 153,
+      "altura": 47
+     }
+    },
+    "pescoco": {
+     "pescoco": {
+      "x": 173,
+      "y": -0.00001204345,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 96,
+      "altura": 37
+     }
+    },
+    "camisa": {
+     "camisa": {
+      "x": 95,
+      "y": -0.000006613454,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 153,
+      "altura": 174
+     }
+    },
+    "manga_e": {
+     "manga": {
+      "tipo": "malha",
+      "uvs": [
+       0.004580602,
+       0,
+       0,
+       0.3441986,
+       0.1221254,
+       0.6219679,
+       0.3222377,
+       0.6511776,
+       0.5044586,
+       0.740323,
+       0.6285397,
+       0.8489932,
+       0.7403116,
+       1,
+       0.870085,
+       0.9873328,
+       0.9956753,
+       0.8436556,
+       1,
+       0.6840119,
+       0.8690537,
+       0.440591,
+       0.6841594,
+       0.2466663,
+       0.3398545,
+       0.03935592,
+       0.1,
+       0.1204225,
+       0.3,
+       0.3612676,
+       0.5,
+       0.3612676,
+       0.5,
+       0.6021127,
+       0.7,
+       0.6021127,
+       0.8021144,
+       0.9633803
+      ],
+      "triangulos": [
+       0,
+       13,
+       1,
+       12,
+       13,
+       0,
+       1,
+       14,
+       2,
+       2,
+       14,
+       3,
+       13,
+       14,
+       1,
+       12,
+       14,
+       13,
+       11,
+       15,
+       12,
+       12,
+       15,
+       14,
+       3,
+       16,
+       4,
+       14,
+       16,
+       3,
+       15,
+       16,
+       14,
+       9,
+       17,
+       10,
+       4,
+       17,
+       5,
+       16,
+       17,
+       4,
+       10,
+       17,
+       11,
+       11,
+       17,
+       15,
+       15,
+       17,
+       16,
+       5,
+       18,
+       6,
+       6,
+       18,
+       7,
+       17,
+       18,
+       5,
+       7,
+       18,
+       8,
+       8,
+       18,
+       9,
+       9,
+       18,
+       17
+      ],
+      "pesos": [
+       [
+        [
+         "ombro_e",
+         -17.47811,
+         3.156603,
+         0.9706293
+        ],
+        [
+         "cotovelo_e",
+         -100.3629,
+         38.72394,
+         0.02937074
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         6.26793,
+         45.8839,
+         0.8085925
+        ],
+        [
+         "cotovelo_e",
+         -63.76308,
+         71.12686,
+         0.1914075
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         44.06753,
+         69.61315,
+         0.5882365
+        ],
+        [
+         "cotovelo_e",
+         -20.22478,
+         80.94028,
+         0.4117635
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         75.78046,
+         56.10581,
+         0.5133745
+        ],
+        [
+         "cotovelo_e",
+         5.194018,
+         57.65846,
+         0.4866255
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         35.08368,
+         42.23835,
+         0.6253656
+        ],
+        [
+         "ombro_e",
+         109.0964,
+         51.49934,
+         0.3746344
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         60.60829,
+         36.17102,
+         0.7869565
+        ],
+        [
+         "ombro_e",
+         135.1863,
+         54.26257,
+         0.2130435
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         89.32764,
+         35.61422,
+         0.8750955
+        ],
+        [
+         "ombro_e",
+         162.4573,
+         63.28497,
+         0.1249044
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         102.4037,
+         17.59477,
+         0.9598225
+        ],
+        [
+         "ombro_e",
+         180.7801,
+         50.63746,
+         0.04017755
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         100.8897,
+         -11.98855,
+         0.9764374
+        ],
+        [
+         "ombro_e",
+         189.1869,
+         22.23339,
+         0.02356264
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         84.15898,
+         -27.30306,
+         0.908436
+        ],
+        [
+         "ombro_e",
+         178.499,
+         2.227929,
+         0.09156401
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         43.34234,
+         -32.79704,
+         0.7277427
+        ],
+        [
+         "ombro_e",
+         141.8303,
+         -16.52276,
+         0.2722573
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         1.858458,
+         -26.71274,
+         0.5011564
+        ],
+        [
+         "ombro_e",
+         100.6832,
+         -24.57553,
+         0.4988436
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         34.97463,
+         -20.65266,
+         0.8832417
+        ],
+        [
+         "cotovelo_e",
+         -58.80871,
+         -1.168661,
+         0.1167583
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         5.200442,
+         9.814559,
+         0.9842039
+        ],
+        [
+         "cotovelo_e",
+         -76.76084,
+         37.4639,
+         0.01579607
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         51.91449,
+         22.34762,
+         0.7883431
+        ],
+        [
+         "cotovelo_e",
+         -28.5372,
+         33.75438,
+         0.2116569
+        ]
+       ],
+       [
+        [
+         "ombro_e",
+         81.53805,
+         5.257129,
+         0.7518566
+        ],
+        [
+         "cotovelo_e",
+         -6.280134,
+         7.787804,
+         0.2481434
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         19.68644,
+         30.04486,
+         0.5854263
+        ],
+        [
+         "ombro_e",
+         98.62854,
+         34.88068,
+         0.4145737
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         41.94351,
+         4.078287,
+         0.9856127
+        ],
+        [
+         "ombro_e",
+         128.2521,
+         17.79019,
+         0.01438732
+        ]
+       ],
+       [
+        [
+         "cotovelo_e",
+         92.25721,
+         24.20608,
+         0.935446
+        ],
+        [
+         "ombro_e",
+         169.0128,
+         53.4996,
+         0.064554
+        ]
+       ]
+      ],
+      "contorno": 13,
+      "arestas": [
+       0,
+       2,
+       2,
+       4,
+       4,
+       6,
+       6,
+       8,
+       8,
+       10,
+       10,
+       12,
+       12,
+       14,
+       14,
+       16,
+       16,
+       18,
+       18,
+       20,
+       20,
+       22,
+       22,
+       24,
+       24,
+       0
+      ],
+      "largura": 171,
+      "altura": 142
+     }
+    },
+    "manga_d": {
+     "manga": {
+      "tipo": "malha",
+      "uvs": [
+       0.004580602,
+       0,
+       0,
+       0.3441986,
+       0.1221254,
+       0.6219679,
+       0.3222377,
+       0.6511776,
+       0.5044586,
+       0.740323,
+       0.6285397,
+       0.8489932,
+       0.7403116,
+       1,
+       0.870085,
+       0.9873328,
+       0.9956753,
+       0.8436556,
+       1,
+       0.6840119,
+       0.8690537,
+       0.440591,
+       0.6841594,
+       0.2466663,
+       0.3398545,
+       0.03935592,
+       0.1,
+       0.1204225,
+       0.3,
+       0.3612676,
+       0.5,
+       0.3612676,
+       0.5,
+       0.6021127,
+       0.7,
+       0.6021127,
+       0.8021144,
+       0.9633803
+      ],
+      "triangulos": [
+       0,
+       13,
+       1,
+       12,
+       13,
+       0,
+       1,
+       14,
+       2,
+       2,
+       14,
+       3,
+       13,
+       14,
+       1,
+       12,
+       14,
+       13,
+       11,
+       15,
+       12,
+       12,
+       15,
+       14,
+       3,
+       16,
+       4,
+       14,
+       16,
+       3,
+       15,
+       16,
+       14,
+       9,
+       17,
+       10,
+       4,
+       17,
+       5,
+       16,
+       17,
+       4,
+       10,
+       17,
+       11,
+       11,
+       17,
+       15,
+       15,
+       17,
+       16,
+       5,
+       18,
+       6,
+       6,
+       18,
+       7,
+       17,
+       18,
+       5,
+       7,
+       18,
+       8,
+       8,
+       18,
+       9,
+       9,
+       18,
+       17
+      ],
+      "pesos": [
+       [
+        [
+         "ombro_d",
+         -17.47812,
+         -3.156594,
+         0.9706292
+        ],
+        [
+         "cotovelo_d",
+         -100.3629,
+         -38.72394,
+         0.02937076
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         6.267916,
+         -45.88389,
+         0.8085926
+        ],
+        [
+         "cotovelo_d",
+         -63.76309,
+         -71.12685,
+         0.1914074
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         44.06751,
+         -69.61315,
+         0.5882365
+        ],
+        [
+         "cotovelo_d",
+         -20.22479,
+         -80.94028,
+         0.4117635
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         75.78044,
+         -56.10582,
+         0.5133744
+        ],
+        [
+         "cotovelo_d",
+         5.194005,
+         -57.65846,
+         0.4866256
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         35.08368,
+         -42.23834,
+         0.6253657
+        ],
+        [
+         "ombro_d",
+         109.0964,
+         -51.49935,
+         0.3746342
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         60.60829,
+         -36.17101,
+         0.7869567
+        ],
+        [
+         "ombro_d",
+         135.1863,
+         -54.26258,
+         0.2130433
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         89.32755,
+         -35.61423,
+         0.8750953
+        ],
+        [
+         "ombro_d",
+         162.4572,
+         -63.28498,
+         0.1249047
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         102.4037,
+         -17.59477,
+         0.9598224
+        ],
+        [
+         "ombro_d",
+         180.7801,
+         -50.63749,
+         0.04017757
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         100.8897,
+         11.98855,
+         0.9764373
+        ],
+        [
+         "ombro_d",
+         189.1869,
+         -22.23342,
+         0.02356266
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         84.15898,
+         27.30306,
+         0.908436
+        ],
+        [
+         "ombro_d",
+         178.499,
+         -2.227954,
+         0.09156402
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         43.34233,
+         32.79705,
+         0.7277426
+        ],
+        [
+         "ombro_d",
+         141.8303,
+         16.52275,
+         0.2722575
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         1.858454,
+         26.71274,
+         0.5011562
+        ],
+        [
+         "ombro_d",
+         100.6832,
+         24.57552,
+         0.4988438
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         34.97463,
+         20.65266,
+         0.8832417
+        ],
+        [
+         "cotovelo_d",
+         -58.80871,
+         1.168663,
+         0.1167583
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         5.200434,
+         -9.814553,
+         0.9842039
+        ],
+        [
+         "cotovelo_d",
+         -76.76085,
+         -37.4639,
+         0.01579605
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         51.91448,
+         -22.34762,
+         0.7883431
+        ],
+        [
+         "cotovelo_d",
+         -28.53721,
+         -33.75438,
+         0.2116569
+        ]
+       ],
+       [
+        [
+         "ombro_d",
+         81.53804,
+         -5.257137,
+         0.7518563
+        ],
+        [
+         "cotovelo_d",
+         -6.280144,
+         -7.787804,
+         0.2481437
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         19.68643,
+         -30.04487,
+         0.5854263
+        ],
+        [
+         "ombro_d",
+         98.62852,
+         -34.8807,
+         0.4145736
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         41.94351,
+         -4.078286,
+         0.9856127
+        ],
+        [
+         "ombro_d",
+         128.2521,
+         -17.79021,
+         0.01438731
+        ]
+       ],
+       [
+        [
+         "cotovelo_d",
+         92.25722,
+         -24.20608,
+         0.935446
+        ],
+        [
+         "ombro_d",
+         169.0128,
+         -53.49963,
+         0.06455397
+        ]
+       ]
+      ],
+      "contorno": 13,
+      "arestas": [
+       0,
+       2,
+       2,
+       4,
+       4,
+       6,
+       6,
+       8,
+       8,
+       10,
+       10,
+       12,
+       12,
+       14,
+       14,
+       16,
+       16,
+       18,
+       18,
+       20,
+       20,
+       22,
+       22,
+       24,
+       24,
+       0
+      ],
+      "largura": 171,
+      "altura": 142
+     }
+    },
+    "cabeca": {
+     "cabeca": {
+      "x": 78,
+      "y": -2.144242e-12,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 173,
+      "altura": 168
+     }
+    },
+    "rosto": {
+     "rosto": {
+      "x": 63,
+      "y": -2.303013e-12,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 100,
+      "altura": 101
+     }
+    },
+    "cabelo": {
+     "cabelo": {
+      "x": -20,
+      "y": -1.1e-19,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 171,
+      "altura": 130
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "idle": {
+   "ossos": {
+    "tronco": {
+     "escalar": [
+      {
+       "curva": [
+        0.3,
+        1,
+        0.9,
+        1.03,
+        0.3,
+        1,
+        0.9,
+        0.982
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "x": 1.03,
+       "y": 0.982,
+       "curva": [
+        1.5,
+        1.03,
+        2.1,
+        1,
+        1.5,
+        0.982,
+        2.1,
+        1
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "curva": [
+        2.65,
+        1,
+        3.15,
+        2,
+        2.65,
+        1,
+        3.15,
+        2
+       ]
+      }
+     ]
+    },
+    "cabeca": {
+     "girar": [
+      {
+       "valor": -3,
+       "curva": [
+        0.15,
+        -3,
+        0.45,
+        0
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "curva": [
+        0.75,
+        0,
+        1.05,
+        3
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": 3,
+       "curva": [
+        1.35,
+        3,
+        1.65,
+        3.10862e-15
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "valor": 3.03193e-15,
+       "curva": [
+        1.95,
+        3.03193e-15,
+        2.25,
+        -3
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "valor": -3,
+       "curva": [
+        2.65,
+        -3,
+        3.15,
+        -2
+       ]
+      }
+     ]
+    },
+    "ombro_e": {
+     "girar": [
+      {
+       "curva": [
+        0.15,
+        0,
+        0.45,
+        5
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "valor": 5,
+       "curva": [
+        0.75,
+        5,
+        1.05,
+        0
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "curva": [
+        1.35,
+        0,
+        1.65,
+        -5
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "valor": -5,
+       "curva": [
+        1.95,
+        -5,
+        2.25,
+        0
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "curva": [
+        2.65,
+        0,
+        3.15,
+        1
+       ]
+      }
+     ]
+    },
+    "cotovelo_e": {
+     "girar": [
+      {
+       "valor": -4.854102,
+       "curva": [
+        0.15,
+        -4.854102,
+        0.45,
+        3.526711
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "valor": 3.526711,
+       "curva": [
+        0.75,
+        3.526711,
+        1.05,
+        4.854102
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": 4.854102,
+       "curva": [
+        1.35,
+        4.854102,
+        1.65,
+        -3.526711
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "valor": -3.526711,
+       "curva": [
+        1.95,
+        -3.526711,
+        2.25,
+        -4.854102
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "valor": -4.854102,
+       "curva": [
+        2.65,
+        -4.854102,
+        3.15,
+        -3.854102
+       ]
+      }
+     ]
+    },
+    "ombro_d": {
+     "girar": [
+      {
+       "curva": [
+        0.15,
+        0,
+        0.45,
+        -5
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "valor": -5,
+       "curva": [
+        0.75,
+        -5,
+        1.05,
+        0
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "curva": [
+        1.35,
+        0,
+        1.65,
+        5
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "valor": 5,
+       "curva": [
+        1.95,
+        5,
+        2.25,
+        0
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "curva": [
+        2.65,
+        0,
+        3.15,
+        1
+       ]
+      }
+     ]
+    },
+    "cotovelo_d": {
+     "girar": [
+      {
+       "valor": 4.854102,
+       "curva": [
+        0.15,
+        4.854102,
+        0.45,
+        -3.526711
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "valor": -3.526711,
+       "curva": [
+        0.75,
+        -3.526711,
+        1.05,
+        -4.854102
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": -4.854102,
+       "curva": [
+        1.35,
+        -4.854102,
+        1.65,
+        3.526711
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "valor": 3.526711,
+       "curva": [
+        1.95,
+        3.526711,
+        2.25,
+        4.854102
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "valor": 4.854102,
+       "curva": [
+        2.65,
+        4.854102,
+        3.15,
+        5.854102
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "acenar": {
+   "ossos": {
+    "ombro_d": {
+     "girar": [
+      {
+       "curva": [
+        0.075,
+        0,
+        0.225,
+        100
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "valor": 100,
+       "curva": [
+        0.6,
+        100,
+        1.2,
+        100
+       ]
+      },
+      {
+       "tempo": 1.5,
+       "valor": 100,
+       "curva": [
+        1.575,
+        100,
+        1.725,
+        0
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "curva": [
+        2.05,
+        0,
+        2.55,
+        1
+       ]
+      }
+     ]
+    },
+    "cotovelo_d": {
+     "girar": [
+      {
+       "tempo": 0.3,
+       "curva": [
+        0.3375,
+        0,
+        0.4125,
+        25
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "valor": 25,
+       "curva": [
+        0.4875,
+        25,
+        0.5625,
+        0
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "curva": [
+        0.6375,
+        0,
+        0.7125,
+        -25
+       ]
+      },
+      {
+       "tempo": 0.75,
+       "valor": -25,
+       "curva": [
+        0.7875,
+        -25,
+        0.8625,
+        0
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "curva": [
+        0.9375,
+        0,
+        1.0125,
+        25
+       ]
+      },
+      {
+       "tempo": 1.05,
+       "valor": 25,
+       "curva": [
+        1.0875,
+        25,
+        1.1625,
+        0
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "curva": [
+        1.2375,
+        0,
+        1.3125,
+        -25
+       ]
+      },
+      {
+       "tempo": 1.35,
+       "valor": -25,
+       "curva": [
+        1.3875,
+        -25,
+        1.4625,
+        0
+       ]
+      },
+      {
+       "tempo": 1.5,
+       "curva": [
+        1.75,
+        0,
+        2.25,
+        1
+       ]
+      }
+     ]
+    }
+   }
+  }
+ },
+ "restricoes": [
+  {
+   "tipo": "fisica",
+   "nome": "cabelo_fisica",
+   "osso": "cabelo",
+   "girar": 1,
+   "forca": 80,
+   "amortecimento": 0.75
+  }
+ ],
+ "mix": {
+  "padrao": 0
+ },
+ "ficha": {
+  "texto": "# Ficha: pessoa\n\n> Ficha de exemplo do corpus livre: gerada com `npm run ficha -- draft` e completada a mao. `npx tsx tests/corpus.ts` confere as regras.\n\n## Personagem\n\n- **Quem e:** Pessoa de corpo inteiro com mangas que dobram (CC0), exemplo do corpus. Movimento natural, sem cartoon.\n- **Onde aparece no jogo:** Personagem de teste: sem jogo.\n- **Projeto:** tests/assets\n- **Transicoes no jogo:** mix padrao 0s. Poses de inicio e fim precisam combinar com isso.\n\n## Rig\n\n15 ossos, 14 slots, 1 constraints.\n\n### O que e preso a que\n\n- `cabelo_fisica` (physics): cabelo (rotacao). ligada em idle, acenar.\n\n### Gestos prontos (trocas de imagem)\n\n- nenhuma\n\n### Cuidados\n\n- mao_e passa por baixo de manga_e (osso ombro_e): se andar demais, some atras\n- mao_d passa por baixo de manga_d (osso ombro_d): se andar demais, some atras\n\n### Faixas usadas pelo animador (relativas ao setup)\n\nLimite natural do movimento. Ir alem pede motivo.\n\n- `tronco`: scale 1..1 / 1..1\n- `cabeca`: rotate -3..3\n- `ombro_e`: rotate -5..5\n- `cotovelo_e`: rotate -4.9..4.9\n- `ombro_d`: rotate -5..100\n- `cotovelo_d`: rotate -25..25\n\n```regras\n# limites (faixa do animador com folga); ajuste se o personagem permitir mais\nlimite cabeca rotate -6..6\nlimite ombro_e rotate -8..8\nlimite cotovelo_e rotate -7.9..7.9\nlimite ombro_d rotate -21..116\nlimite cotovelo_d rotate -33..33\nfisica cabelo 25\n```\n\n## Animacoes\n\nCada animacao: para que serve, quando toca, roteiro em batidas, comportamento esperado e o que nao fazer. As regras de cada secao somam com as do Rig.\n\n## Animacao: idle\n\n- **Para que serve:** Respiracao de espera.\n- **Quando toca:** Em loop.\n- **Duracao:** 2.4s; emenda em loop\n- **Mexe em:** tronco, cabeca, ombro_e, cotovelo_e, ombro_d, cotovelo_d\n- **Roteiro (batidas):** Tronco respira, cabeca balanca, bracos balancam com atraso; 2,4 s.\n- **Comportamento esperado:** Natural.\n- **Nao fazer:** Cotovelo dobrar para tras.\n\n```regras\nduracao 2.4..2.4\nloop\n```\n\n## Animacao: acenar\n\n- **Para que serve:** Acena para o jogador.\n- **Quando toca:** Uma vez ou em loop curto.\n- **Duracao:** 1.8s; emenda em loop\n- **Mexe em:** ombro_d, cotovelo_d\n- **Roteiro (batidas):** Levanta o braco direito e balanca o antebraco; 1,8 s.\n- **Comportamento esperado:** Simpatia clara.\n- **Nao fazer:** Girar o ombro alem da faixa (a manga abre).\n\n```regras\nduracao 1.8..1.8\nloop\n```\n"
+ }
+}

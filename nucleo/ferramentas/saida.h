@@ -1,0 +1,94 @@
+// Saida JSON das ferramentas de teste (o contrato do docs/NUCLEO.md): numeros, textos e a pose
+// de um esqueleto (ossos, slots na ordem de desenho, vertices).
+#pragma once
+
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+#include "mamulengo/pose.h"
+
+namespace mamulengo {
+
+inline void escreve_num(std::string& s, double v) {
+  char b[40];
+  if (!std::isfinite(v)) {
+    s += "null";
+    return;
+  }
+  int n = std::snprintf(b, sizeof b, "%.17g", v);
+  s.append(b, size_t(n));
+}
+
+inline void escreve_texto(std::string& s, const std::string& t) {
+  s += '"';
+  for (char c : t) {
+    unsigned char u = static_cast<unsigned char>(c);
+    if (c == '"' || c == '\\') {
+      s += '\\';
+      s += c;
+    } else if (u < 0x20) {
+      char b[8];
+      std::snprintf(b, sizeof b, "\\u%04x", u);
+      s += b;
+    } else {
+      s += c;
+    }
+  }
+  s += '"';
+}
+
+// "ossos":{...},"slots":[...],"vertices":{...} (sem as chaves de fora)
+inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<double>& v) {
+  const Modelo& m = e.modelo();
+  out += "\"ossos\":{";
+  for (size_t i = 0; i < m.ossos.size(); ++i) {
+    if (i) out += ',';
+    escreve_texto(out, m.ossos[i].nome);
+    const Matriz& w = e.mundo()[i];
+    out += ":[";
+    const double vals[6] = {w.a, w.b, w.c, w.d, w.x, w.y};
+    for (int k = 0; k < 6; ++k) {
+      if (k) out += ',';
+      escreve_num(out, vals[k]);
+    }
+    out += ']';
+  }
+  out += "},\"slots\":[";
+  for (size_t k = 0; k < e.ordem().size(); ++k) {
+    const int s = e.ordem()[k];
+    const EstadoSlot& st = e.slots()[size_t(s)];
+    if (k) out += ',';
+    out += "{\"nome\":";
+    escreve_texto(out, m.slots[size_t(s)].nome);
+    out += ",\"parte\":";
+    if (st.parte >= 0) escreve_texto(out, m.partes[size_t(st.parte)].nome);
+    else out += "null";
+    out += ",\"cor\":[";
+    const double c[4] = {st.cor.r, st.cor.g, st.cor.b, st.cor.a};
+    for (int j = 0; j < 4; ++j) {
+      if (j) out += ',';
+      escreve_num(out, c[j]);
+    }
+    out += "]}";
+  }
+  out += "],\"vertices\":{";
+  bool primeiro = true;
+  for (size_t k = 0; k < e.ordem().size(); ++k) {
+    const int s = e.ordem()[k];
+    if (!e.vertices(s, v)) continue;
+    if (!primeiro) out += ',';
+    primeiro = false;
+    escreve_texto(out, m.slots[size_t(s)].nome);
+    out += ":[";
+    for (size_t j = 0; j < v.size(); ++j) {
+      if (j) out += ',';
+      escreve_num(out, v[j]);
+    }
+    out += ']';
+  }
+  out += '}';
+}
+
+}  // namespace mamulengo

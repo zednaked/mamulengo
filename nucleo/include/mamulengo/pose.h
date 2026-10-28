@@ -1,0 +1,144 @@
+// Instancia de um personagem: a pose local (animada), o mundo de cada osso, o estado dos
+// slots e das restricoes (inclusive a fisica, que guarda memoria entre quadros).
+//
+// Uso tipico (o que a ferramenta nucleo-pose faz para cada instante):
+//   Esqueleto e(modelo);
+//   e.setup();                       // pose de setup, fisica reiniciada
+//   for cada passo: e.aplicar(anim, tempo); e.avancar(dt); e.atualizar_mundo();
+//   e.vertices(slot, saida);
+//
+// No jogo, com trilhas, fila e mix (mamulengo/estado.h), por quadro de `d` segundos:
+//   estado.avancar(d); estado.aplicar(e); /* o jogo muda slots */ e.avancar(d); e.atualizar_mundo();
+// O Estado aplica as timelines com peso pelas funcoes `aplicar_*` abaixo, sem voltar ao setup:
+// o que nenhuma timeline toca fica como estava (inclusive o que o jogo mudou).
+#pragma once
+
+#include <memory>
+#include <string_view>
+#include <vector>
+
+#include "mamulengo/modelo.h"
+
+namespace mamulengo {
+
+// matriz de mundo de um osso: [a b x; c d y], y para cima
+struct Matriz {
+  double a = 1, b = 0, c = 0, d = 1, x = 0, y = 0;
+};
+
+// pose local de um osso
+struct Local {
+  double x = 0, y = 0, rotacao = 0, escala_x = 1, escala_y = 1, cisalha_x = 0, cisalha_y = 0;
+};
+
+struct EstadoSlot {
+  int parte = -1;  // indice em Modelo::partes; -1 sem parte
+  Cor cor;
+  std::vector<double> deform;  // deslocamentos dos vertices (ou das entradas de peso); vazio: sem deformar
+  int marca = 0;  // uso do Estado: se a parte foi posta por uma timeline neste aplicar
+};
+
+// Como uma timeline mistura o valor dela com o que ja esta na pose, com peso `alfa`:
+// - Setup: parte do setup (setup + (valor - setup) * alfa); antes da primeira chave, o setup;
+// - Primeira: parte do valor atual; antes da primeira chave, puxa o atual para o setup;
+// - Substitui: parte do valor atual; antes da primeira chave, nao mexe;
+// - Soma: soma o valor da timeline (relativo ao setup) vezes alfa.
+enum class Mistura : uint8_t { Setup, Primeira, Substitui, Soma };
+
+// valores animaveis das restricoes (comecam nos do modelo a cada aplicar)
+struct EstadoRestricao {
+  double mix = 1, suavidade = 0;  // ik
+  int dobra = 1;
+  bool comprime = false, estica = false;
+  double mix_girar = 1, mix_x = 1, mix_y = 1, mix_escala_x = 1, mix_escala_y = 1, mix_cisalha_y = 1;  // transf, caminho
+  double posicao = 0, espacamento = 0;  // caminho
+  // fisica: parametros
+  double inercia = 1, forca = 100, amortecimento = 1, massa_inv = 1, vento = 0, gravidade = 0;
+  // fisica: memoria entre quadros
+  bool reiniciar = true;
+  double relogio = 0;   // relogio do esqueleto na ultima atualizacao
+  double sobra = 0;     // tempo acumulado ainda nao integrado
+  double ox = 0, oy = 0;          // ultima posicao do osso (origem)
+  double px = 0, py = 0;          // ultima posicao da ponta do osso
+  double dx = 0, dy = 0, vx = 0, vy = 0;  // translacao: desvio e velocidade
+  double rot = 0, vrot = 0, rot_ant = 0, saida = 0;  // rotacao (radianos), velocidade, passo anterior
+  double esc = 0, vesc = 0;       // escala
+  double ax = 0, ay = 0;          // deslocamento herdado pela inercia, ainda a aplicar
+};
+
+class Esqueleto {
+ public:
+  explicit Esqueleto(std::shared_ptr<const Modelo> modelo);
+
+  const Modelo& modelo() const { return *m_; }
+
+  // pose de setup (local, slots, ordem) e fisica reiniciada; nao recalcula o mundo
+  void setup();
+  // volta a pose local ao setup e aplica a animacao no tempo dela (em loop se `loop`)
+  void aplicar(int animacao, double tempo, bool loop = true);
+
+  // ---- timelines com peso (o Estado usa; `sai`: a animacao esta saindo de um mix)
+  void aplicar_osso(const TimelineOsso& tl, double t, double alfa, Mistura mist, bool sai);
+  void aplicar_cor(const TimelineCor& tl, double t, double alfa, Mistura mist);
+  void aplicar_deformar(const TimelineDeformar& tl, double t, double alfa, Mistura mist);
+  void aplicar_ordem(const TimelineOrdem& tl, double t, Mistura mist, bool sai);
+  void aplicar_restricao(const TimelineRestricao& tl, double t, double alfa, Mistura mist, bool sai);
+  // a parte que a timeline `parte` pede no tempo t (-1 esconde); `antes`: t antes da primeira chave
+  int parte_no_tempo(const TimelineParte& tl, double t, bool* antes) const;
+  // a parte do setup do slot (na skin ativa)
+  int parte_setup(int slot) const;
+  // troca a parte do slot (-1 esconde); o deformar se perde, a menos que a nova parte use as
+  // mesmas timelines de deformar que a anterior (malha ligada)
+  void mudar_parte(int slot, int parte);
+
+  // ---- acesso do jogo
+  // o estado do slot (cor, parte); o jogo pode mudar a cor entre aplicar e atualizar o mundo.
+  // Para trocar ou esconder a parte use mudar_parte.
+  EstadoSlot& slot(int i) { return slots_[size_t(i)]; }
+  // a parte com o nome dado para o slot, na skin ativa ou na default (-1 se nao ha)
+  int parte(int slot, std::string_view nome) const;
+  std::vector<int>& ordem_desenho() { return ordem_; }
+  // avanca o relogio do esqueleto (a fisica integra pelo relogio)
+  void avancar(double dt) { relogio_ += dt; }
+  double relogio() const { return relogio_; }
+  // recalcula o mundo: ossos, depois cada restricao na ordem
+  void atualizar_mundo();
+
+  // skin ativa (indice em Modelo::skins); nao muda as partes ja nos slots
+  void skin(int s) { skin_ = s; }
+  int skin() const { return skin_; }
+
+  std::vector<Local> local;
+  const std::vector<Matriz>& mundo() const { return mundo_; }
+  const std::vector<EstadoSlot>& slots() const { return slots_; }
+  const std::vector<int>& ordem() const { return ordem_; }
+  std::vector<EstadoRestricao>& restricoes() { return rest_; }
+
+  // vertices em mundo da parte do slot (regiao: 4 cantos; malha: 2 numeros por vertice);
+  // devolve quantos numeros escreveu (0 se o slot nao mostra regiao nem malha)
+  size_t vertices(int slot, std::vector<double>& out) const;
+  // vertices em mundo de uma parte com geometria, como o slot a mostraria (com deformar)
+  void vertices_geometria(int slot, const Parte& p, double* out) const;
+
+ private:
+  std::shared_ptr<const Modelo> m_;
+  std::vector<Matriz> mundo_;
+  std::vector<EstadoSlot> slots_;
+  std::vector<int> ordem_;
+  std::vector<EstadoRestricao> rest_;
+  // por restricao: os ossos a recalcular depois dela (descendentes dos controlados)
+  std::vector<std::vector<int>> descendentes_;
+  int skin_ = 0;
+  double relogio_ = 0;
+  std::vector<double> tmp_;
+
+  void mundo_osso(int i);
+  void restricao_ik(int r);
+  void restricao_caminho(int r);
+  void restricao_fisica(int r);
+  void restricao_transformacao(int r);
+  // pose local a partir do mundo (depois que uma restricao mexe no mundo do osso)
+  Local local_de_mundo(int i) const;
+};
+
+}  // namespace mamulengo

@@ -1,0 +1,17 @@
+monstro.webp
+size:187,494
+filter:Linear,Linear
+antena
+bounds:147,403,38,58
+boca
+bounds:81,367,70,34
+braco
+bounds:0,184,98,181
+corpo
+bounds:0,0,174,182
+olho
+bounds:81,403,64,69
+olho_fechado
+bounds:81,474,42,18
+perna
+bounds:0,367,79,124

@@ -1,0 +1,81 @@
+:root {
+  --bg: #16141b;
+  --panel: #1f1c26;
+  --panel2: #282431;
+  --line: #36313f;
+  --text: #ece8f2;
+  --dim: #9a93a8;
+  --accent: #ff2e88;
+  --accent2: #ffd166;
+  --claude: #6cc6ff;
+  --ok: #5ee0a0;
+  --err: #ff6b6b;
+  --radius: 10px;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.06s;
+}
+button:hover {
+  border-color: #4a4356;
+  background: #302b3a;
+}
+button:active {
+  transform: scale(0.97);
+}
+button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+input,
+select {
+  font: inherit;
+  color: inherit;
+  background: #14121a;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3a3444;
+  border-radius: 10px;
+  border: 2px solid var(--panel);
+}
+.dim {
+  color: var(--dim);
+}

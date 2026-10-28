@@ -1,0 +1,201 @@
+// Montagem do desenho (mamulengo/desenho.h): percorre os slots na ordem de desenho, pega os
+// vertices em mundo de cada regiao e malha visivel e junta em lotes.
+#include "mamulengo/desenho.h"
+
+#include <algorithm>
+#include <cmath>
+
+namespace mamulengo {
+
+namespace {
+
+// ---- recorte na CPU
+//
+// O poligono do recorte vira pedacos convexos (ele inteiro, se ja for convexo; senao os
+// triangulos de um corte por orelhas). Cada triangulo desenhado e cortado contra cada pedaco
+// (Sutherland-Hodgman: um semiplano por aresta) e o que sobra vira um leque. A uv de cada
+// ponto novo sai do baricentro dele no triangulo original.
+
+struct P2 {
+  double x, y;
+};
+
+double cruz(P2 o, P2 a, P2 b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
+
+double area2(const std::vector<P2>& p) {
+  double s = 0;
+  for (size_t i = 0, n = p.size(); i < n; ++i) s += p[i].x * p[(i + 1) % n].y - p[(i + 1) % n].x * p[i].y;
+  return s;
+}
+
+bool convexo(const std::vector<P2>& p) {
+  const size_t n = p.size();
+  for (size_t i = 0; i < n; ++i)
+    if (cruz(p[i], p[(i + 1) % n], p[(i + 2) % n]) < -1e-9) return false;
+  return true;
+}
+
+bool dentro_tri(P2 a, P2 b, P2 c, P2 q) { return cruz(a, b, q) >= 0 && cruz(b, c, q) >= 0 && cruz(c, a, q) >= 0; }
+
+// pedacos convexos de um poligono simples, ja no sentido anti-horario
+std::vector<std::vector<P2>> pedacos(std::vector<P2> p) {
+  std::vector<std::vector<P2>> out;
+  if (p.size() < 3) return out;
+  if (area2(p) < 0) std::reverse(p.begin(), p.end());
+  if (convexo(p)) {
+    out.push_back(p);
+    return out;
+  }
+  // corte por orelhas: tira um vertice convexo cujo triangulo nao contem outro vertice
+  std::vector<size_t> idx(p.size());
+  for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
+  size_t guarda = 0;
+  while (idx.size() > 3 && guarda++ < 10000) {
+    bool tirou = false;
+    for (size_t i = 0, n = idx.size(); i < n; ++i) {
+      const P2 a = p[idx[(i + n - 1) % n]], b = p[idx[i]], c = p[idx[(i + 1) % n]];
+      if (cruz(a, b, c) <= 1e-12) continue;
+      bool vazio = true;
+      for (size_t j = 0; j < n && vazio; ++j) {
+        if (j == i || j == (i + 1) % n || j == (i + n - 1) % n) continue;
+        if (dentro_tri(a, b, c, p[idx[j]])) vazio = false;
+      }
+      if (!vazio) continue;
+      out.push_back({a, b, c});
+      idx.erase(idx.begin() + long(i));
+      tirou = true;
+      break;
+    }
+    if (!tirou) break;  // poligono degenerado: fica o que deu
+  }
+  if (idx.size() == 3) out.push_back({p[idx[0]], p[idx[1]], p[idx[2]]});
+  return out;
+}
+
+// corta o poligono `v` pelo semiplano a esquerda de a->b
+void corta(std::vector<P2>& v, P2 a, P2 b, std::vector<P2>& tmp) {
+  tmp.clear();
+  const size_t n = v.size();
+  for (size_t i = 0; i < n; ++i) {
+    const P2 p = v[i], q = v[(i + 1) % n];
+    const double dp = cruz(a, b, p), dq = cruz(a, b, q);
+    if (dp >= 0) tmp.push_back(p);
+    if ((dp >= 0) != (dq >= 0)) {
+      const double t = dp / (dp - dq);
+      tmp.push_back({p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t});
+    }
+  }
+  v.swap(tmp);
+}
+
+}  // namespace
+
+void desenhar(const Esqueleto& e, Desenho& d) {
+  const Modelo& m = e.modelo();
+  std::vector<double> mundo;
+  std::vector<std::vector<P2>> recorte;  // pedacos convexos do recorte aberto (modo cpu)
+  std::vector<P2> poli, tmp;
+  int recorte_fim = -2;  // slot que acaba o recorte aberto (-1: o fim do desenho; -2: nenhum)
+  auto lote = [&](Comando c, int pagina, Blend blend) -> Lote& {
+    if (c == Comando::Triangulos && !d.lotes.empty()) {
+      Lote& u = d.lotes.back();
+      if (u.comando == c && u.pagina == pagina && u.blend == blend) return u;
+    }
+    Lote l;
+    l.comando = c;
+    l.pagina = pagina;
+    l.blend = blend;
+    l.inicio = uint32_t(d.indices.size());
+    d.lotes.push_back(l);
+    return d.lotes.back();
+  };
+  auto fecha_recorte = [&]() {
+    if (!d.recorte_cpu) lote(Comando::AcabaRecorte, -1, Blend::Normal);
+    recorte.clear();
+    recorte_fim = -2;
+  };
+  // acrescenta o triangulo (vertices ja em d.vertices: base + i, j, k) cortado pelo recorte
+  auto tri_cortado = [&](uint32_t i0, uint32_t i1, uint32_t i2) {
+    const float* v0 = &d.vertices[size_t(i0) * 8];
+    const float* v1 = &d.vertices[size_t(i1) * 8];
+    const float* v2 = &d.vertices[size_t(i2) * 8];
+    const P2 a{v0[0], v0[1]}, b{v1[0], v1[1]}, c{v2[0], v2[1]};
+    const double den = cruz(a, b, c);
+    if (std::fabs(den) < 1e-12) return;
+    for (const auto& pc : recorte) {
+      // atalho: o triangulo inteiro dentro do pedaco vai como esta
+      bool todo = true;
+      for (size_t e = 0, n = pc.size(); e < n && todo; ++e)
+        if (cruz(pc[e], pc[(e + 1) % n], a) < 0 || cruz(pc[e], pc[(e + 1) % n], b) < 0 || cruz(pc[e], pc[(e + 1) % n], c) < 0) todo = false;
+      if (todo) {
+        d.indices.insert(d.indices.end(), {i0, i1, i2});
+        continue;
+      }
+      poli.assign({a, b, c});
+      for (size_t e = 0, n = pc.size(); e < n && poli.size() >= 3; ++e) corta(poli, pc[e], pc[(e + 1) % n], tmp);
+      if (poli.size() < 3) continue;
+      const uint32_t base = uint32_t(d.vertices.size() / 8);
+      for (const P2& q : poli) {
+        // baricentro de q no triangulo original
+        const double wa = cruz(q, b, c) / den, wb = cruz(a, q, c) / den, wc = 1 - wa - wb;
+        d.vertices.insert(d.vertices.end(), {float(q.x), float(q.y), float(v0[2] * wa + v1[2] * wb + v2[2] * wc), float(v0[3] * wa + v1[3] * wb + v2[3] * wc), v0[4], v0[5], v0[6], v0[7]});
+      }
+      for (uint32_t k = 1; k + 1 < poli.size(); ++k) d.indices.insert(d.indices.end(), {base, base + k, base + k + 1});
+    }
+  };
+  for (int si : e.ordem()) {
+    const EstadoSlot& s = e.slots()[size_t(si)];
+    const DadosSlot& ds = m.slots[size_t(si)];
+    if (s.parte >= 0) {
+      const Parte& p = m.partes[size_t(s.parte)];
+      if (p.tipo == TipoParte::Recorte) {
+        if (recorte_fim != -2) fecha_recorte();
+        mundo.assign(size_t(p.num_vertices) * 2, 0);
+        e.vertices_geometria(si, p, mundo.data());
+        if (d.recorte_cpu) {
+          std::vector<P2> pol(size_t(p.num_vertices));
+          for (int i = 0; i < p.num_vertices; ++i) pol[size_t(i)] = {mundo[size_t(i) * 2], mundo[size_t(i) * 2 + 1]};
+          recorte = pedacos(std::move(pol));
+          recorte_fim = p.fim == si ? -1 : p.fim;
+          continue;
+        }
+        const uint32_t base = uint32_t(d.vertices.size() / 8);
+        for (int i = 0; i < p.num_vertices; ++i)
+          d.vertices.insert(d.vertices.end(), {float(mundo[size_t(i) * 2]), float(mundo[size_t(i) * 2 + 1]), 0, 0, 1, 1, 1, 1});
+        Lote& l = lote(Comando::ComecaRecorte, -1, Blend::Normal);
+        for (int i = 1; i + 1 < p.num_vertices; ++i) d.indices.insert(d.indices.end(), {base, base + uint32_t(i), base + uint32_t(i) + 1});
+        l.quantos = uint32_t(d.indices.size()) - l.inicio;
+        // o recorte vale do slot seguinte ate o slot `fim` (inclusive); acabar nele mesmo
+        // nao fecha nada, entao vale ate o fim do desenho
+        recorte_fim = p.fim == si ? -1 : p.fim;
+        continue;
+      }
+      const Cor cs = s.cor, cp = p.cor;
+      const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
+      const size_t n = e.vertices(si, mundo);
+      if (n && a > 0 && p.pagina >= 0 && p.uvs.size() == n) {
+        const uint32_t base = uint32_t(d.vertices.size() / 8);
+        for (size_t i = 0; i < n; i += 2) d.vertices.insert(d.vertices.end(), {float(mundo[i]), float(mundo[i + 1]), p.uvs[i], p.uvs[i + 1], r, g, b, a});
+        Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend);
+        const size_t li = size_t(&l - d.lotes.data());
+        if (d.recorte_cpu && recorte_fim != -2) {
+          if (p.tipo == TipoParte::Regiao) {
+            tri_cortado(base, base + 1, base + 2);
+            tri_cortado(base + 2, base + 3, base);
+          } else {
+            for (size_t t = 0; t + 2 < p.triangulos.size(); t += 3) tri_cortado(base + p.triangulos[t], base + p.triangulos[t + 1], base + p.triangulos[t + 2]);
+          }
+        } else if (p.tipo == TipoParte::Regiao) {
+          d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+        } else {
+          for (uint16_t t : p.triangulos) d.indices.push_back(base + t);
+        }
+        d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+      }
+    }
+    if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
+  }
+  if (recorte_fim != -2) fecha_recorte();
+}
+
+}  // namespace mamulengo

@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+# Modulo do motor: o no (este diretorio) e o nucleo (nucleo/src), que nao depende do Godot.
+import os
+
+Import("env")
+Import("env_modules")
+
+env_boneco = env_modules.Clone()
+nucleo = os.path.normpath(os.path.join(Dir(".").srcnode().abspath, "..", ".."))
+env_boneco.Prepend(CPPPATH=[os.path.join(nucleo, "include")])
+env_boneco.add_source_files(env.modules_sources, "*.cpp")
+# so o leitor do nucleo usa excecao (para o erro de leitura, ao carregar); o resto vai sem,
+# como o motor: no wasm, excecao ligada poe tratamento em toda funcao com destrutor e deixa a
+# pose e o estado (todo quadro) mais lentos
+src = os.path.join(nucleo, "src")
+fontes = [f for f in sorted(os.listdir(src)) if f.endswith(".cpp")]
+env_boneco.add_source_files(env.modules_sources, [File(os.path.join(src, f)) for f in fontes if f != "leitor.cpp"])
+env_leitor = env_boneco.Clone()
+if env["platform"] == "web":
+    # no web, as excecoes nativas do wasm (as do emscripten em JS conflitam com o setjmp do motor)
+    env_leitor.Append(CXXFLAGS=["-fexceptions", "-fwasm-exceptions"])
+    env.Append(LINKFLAGS=["-fwasm-exceptions"])
+else:
+    env_leitor.Append(CXXFLAGS=["-fexceptions"])
+env_leitor.add_source_files(env.modules_sources, [File(os.path.join(src, "leitor.cpp"))])

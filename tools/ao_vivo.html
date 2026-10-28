@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Mamulengo ao vivo</title>
+<style>
+html,body{margin:0;background:#16141c;color:#cfc8da;font:13px system-ui,sans-serif;height:100%}
+#bar{padding:6px 10px;display:flex;gap:12px;align-items:center}
+#bar b{color:#ff4fa3}
+img{display:block;max-width:100%;max-height:calc(100vh - 34px);margin:0 auto}
+</style></head><body>
+<div id="bar"><b>● ao vivo</b><span id="info">esperando o primeiro quadro...</span></div>
+<img id="tela" alt="">
+<script>
+// mostra o quadro mais recente da gravacao (ao_vivo.jpg), atualizando a cada segundo
+const img = document.getElementById("tela"), info = document.getElementById("info");
+let n = 0;
+function tick() {
+  const next = new Image();
+  next.onload = () => { img.src = next.src; n++; info.textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR"); };
+  next.src = "ao_vivo.jpg?t=" + Date.now();
+}
+setInterval(tick, 1000); tick();
+</script></body></html>

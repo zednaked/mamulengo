@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Palco do núcleo</title>
+    <style>
+      :root { color-scheme: dark; --fundo: #16131a; --painel: #221e28; --linha: #3a3442; --texto: #e9e4ee; --fraco: #a59cb0; --acento: #f0a35e; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--fundo); color: var(--texto); font: 14px/1.4 system-ui, sans-serif; }
+      header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: var(--painel); border-bottom: 1px solid var(--linha); }
+      header h1 { font-size: 15px; margin: 0 8px 0 0; color: var(--acento); }
+      label { display: flex; gap: 6px; align-items: center; color: var(--fraco); }
+      select, input[type="number"] { background: var(--fundo); color: var(--texto); border: 1px solid var(--linha); border-radius: 4px; padding: 3px 6px; }
+      button { background: var(--fundo); color: var(--texto); border: 1px solid var(--linha); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; padding: 12px 16px; }
+      figure { margin: 0; background: var(--painel); border: 1px solid var(--linha); border-radius: 6px; overflow: hidden; }
+      figcaption { min-height: 3.6em; align-items: flex-start; display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--linha); }
+      figcaption b { color: var(--texto); }
+      figcaption span { color: var(--fraco); font-variant-numeric: tabular-nums; }
+      canvas { display: block; width: 100%; aspect-ratio: 1; background: #2b2531; }
+      #diferenca-fig[hidden] { display: none; }
+      #erro { color: #ff8a80; padding: 0 16px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Palco do núcleo</h1>
+      <label>personagem <select id="asset"></select></label>
+      <label>animação <select id="anim"></select></label>
+      <label>velocidade <select id="vel"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option></select></label>
+      <label>cópias calculadas <input id="copias" type="number" min="1" max="200" value="1" style="width: 5em" /></label>
+      <label><input id="ref" type="checkbox" checked /> referência (spine-ts)</label>
+      <label><input id="dif" type="checkbox" /> diferença</label>
+      <button id="pausa">pausar</button>
+      <button id="reinicia">do começo</button>
+    </header>
+    <div id="erro"></div>
+    <main>
+      <figure><figcaption><b>núcleo novo (wasm + WebGL nosso)</b><span id="info-nucleo"></span></figcaption><canvas id="tela-nucleo"></canvas></figure>
+      <figure id="ref-fig"><figcaption><b>referência (spine-core + spine-webgl)</b><span id="info-ref"></span></figcaption><canvas id="tela-ref"></canvas></figure>
+      <figure id="diferenca-fig" hidden><figcaption><b>diferença (x4)</b><span id="info-dif"></span></figcaption><canvas id="tela-dif"></canvas></figure>
+    </main>
+    <script type="module" src="/src/palco/palco.ts"></script>
+  </body>
+</html>

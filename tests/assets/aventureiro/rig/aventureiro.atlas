@@ -1,0 +1,15 @@
+aventureiro.webp
+size:235,246
+filter:Linear,Linear
+braco
+bounds:191,0,42,60
+cabeca
+bounds:0,0,113,121
+cabeca_susto
+bounds:0,123,113,121
+corpo
+bounds:115,0,74,78
+mao
+bounds:115,80,37,34
+perna
+bounds:191,62,36,58

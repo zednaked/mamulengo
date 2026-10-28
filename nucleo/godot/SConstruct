@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+# GDExtension do .boneco (o mesmo codigo do modulo, pelo godot-cpp): editor e CI com o Godot
+# oficial.
+#   scons -C nucleo/godot godot_cpp=<pasta do godot-cpp> platform=linux target=template_debug disable_exceptions=no
+#   scons -C nucleo/godot ... platform=windows use_mingw=yes disable_exceptions=no
+# disable_exceptions=no: o leitor do nucleo usa excecao para o erro de leitura.
+# Linux para o CI e Linux antigos: compilar com o zig mirando o glibc 2.28 (o .so feito num
+# Linux novo pede GLIBC_2.43 e nao abre no Ubuntu 24.04). Embrulhos clang/clang++ que chamam
+# `zig c++ -target x86_64-linux-gnu.2.28` (tirando o --target do scons, trocando
+# -march=x86-64 por -mcpu=x86_64 e ligando .os por um link .o) no PATH, um godot-cpp
+# compilado com eles, e use_llvm=yes:
+#   PATH=<embrulhos>:$PATH scons ... platform=linux use_llvm=yes godot_cpp=<godot-cpp do zig>
+# Sai em nucleo/godot/bin/libboneco.<plataforma>.<alvo>.<arq>.<so|dll>.
+import os
+
+opts = Variables([], ARGUMENTS)
+opts.Add(PathVariable("godot_cpp", "pasta do godot-cpp", os.environ.get("GODOT_CPP", "godot-cpp"), PathVariable.PathIsDir))
+tmp = Environment(variables=opts)
+env = SConscript(os.path.join(tmp["godot_cpp"], "SConstruct"))
+env.Append(CPPPATH=["boneco", "../include"])
+if env["platform"] == "linux":
+    # a biblioteca fica na memoria ate o fim do processo: com o zig, os destrutores estaticos
+    # vao para o atexit e o Godot descarrega a extensao antes (segfault na saida)
+    env.Append(LINKFLAGS=["-Wl,-z,nodelete"])
+fontes = Glob("boneco/*.cpp") + [File(os.path.join("..", "src", f)) for f in sorted(os.listdir("../src")) if f.endswith(".cpp")]
+lib = env.SharedLibrary("bin/libboneco{}{}".format(env["suffix"], env["SHLIBSUFFIX"]), source=fontes)
+Default(lib)

@@ -1,0 +1,154 @@
+// Nomes dos campos do .boneco (portugues) e do JSON do Spine 4.3. A conversao troca so os
+// campos do esquema; os nomes dados pelo artista (ossos, slots, animacoes, eventos, partes)
+// ficam como estao. Campo que nao esta aqui passa com o nome original nos dois sentidos.
+
+export const CAMPOS: Record<string, string> = {
+  // cabecalho
+  skeleton: "esqueleto",
+  spine: "versao_spine",
+  width: "largura",
+  height: "altura",
+  referenceScale: "escala_ref",
+  images: "pasta_imagens",
+  audio: "audio",
+  // listas
+  bones: "ossos",
+  constraints: "restricoes",
+  events: "eventos",
+  animations: "animacoes",
+  attachments: "partes",
+  // osso
+  name: "nome",
+  parent: "pai",
+  length: "comprimento",
+  rotation: "rotacao",
+  scaleX: "escala_x",
+  scaleY: "escala_y",
+  shearX: "cisalha_x",
+  shearY: "cisalha_y",
+  inherit: "heranca",
+  color: "cor",
+  icon: "icone",
+  iconRotation: "icone_rotacao",
+  visible: "visivel",
+  // slot
+  bone: "osso",
+  attachment: "parte",
+  dark: "cor_escura",
+  light: "cor_clara",
+  // partes
+  type: "tipo",
+  path: "caminho",
+  sequence: "sequencia",
+  triangles: "triangulos",
+  hull: "contorno",
+  edges: "arestas",
+  closed: "fechado",
+  constantSpeed: "velocidade_constante",
+  lengths: "comprimentos",
+  vertexCount: "num_vertices",
+  end: "fim",
+  convex: "convexo",
+  count: "quantidade",
+  start: "inicio",
+  digits: "digitos",
+  setup: "inicial",
+  mode: "modo",
+  index: "indice",
+  delay: "atraso",
+  // restricoes
+  order: "ordem",
+  target: "alvo",
+  source: "fonte",
+  softness: "suavidade",
+  bendPositive: "dobra_positiva",
+  compress: "comprime",
+  stretch: "estica",
+  uniform: "uniforme",
+  mixRotate: "mix_girar",
+  mixX: "mix_x",
+  mixY: "mix_y",
+  mixScaleX: "mix_escala_x",
+  mixScaleY: "mix_escala_y",
+  mixShearY: "mix_cisalha_y",
+  properties: "propriedades",
+  to: "para",
+  from: "de",
+  offset: "deslocamento",
+  additive: "somar",
+  clamp: "limitar",
+  localSource: "fonte_local",
+  localTarget: "alvo_local",
+  positionMode: "modo_posicao",
+  spacingMode: "modo_espacamento",
+  rotateMode: "modo_girar",
+  position: "posicao",
+  spacing: "espacamento",
+  inertia: "inercia",
+  strength: "forca",
+  damping: "amortecimento",
+  mass: "massa",
+  wind: "vento",
+  gravity: "gravidade",
+  limit: "limite",
+  inertiaGlobal: "inercia_global",
+  strengthGlobal: "forca_global",
+  dampingGlobal: "amortecimento_global",
+  massGlobal: "massa_global",
+  windGlobal: "vento_global",
+  gravityGlobal: "gravidade_global",
+  mixGlobal: "mix_global",
+  step: "passo",
+  animation: "animacao",
+  property: "propriedade",
+  loop: "repetir",
+  local: "local_",
+  relative: "relativo",
+  // eventos
+  int: "inteiro",
+  float: "decimal",
+  string: "texto",
+  volume: "volume",
+  balance: "balanco",
+  // animacoes
+  rotate: "girar",
+  translate: "mover",
+  translatex: "mover_x",
+  translatey: "mover_y",
+  scale: "escalar",
+  scalex: "escalar_x",
+  scaley: "escalar_y",
+  shear: "cisalhar",
+  shearx: "cisalhar_x",
+  sheary: "cisalhar_y",
+  alpha: "alfa",
+  deform: "deformar",
+  drawOrder: "ordem_desenho",
+  offsets: "deslocamentos",
+  time: "tempo",
+  value: "valor",
+  curve: "curva",
+  reset: "reiniciar",
+  slider: "slider",
+};
+
+// valores de enum que mudam de nome (por campo)
+export const VALORES: Record<string, Record<string, string>> = {
+  blend: { additive: "aditivo", multiply: "multiplica", screen: "tela" },
+  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider" },
+  curve: { stepped: "degrau" },
+};
+
+export const CAMPOS_VOLTA: Record<string, string> = Object.fromEntries(Object.entries(CAMPOS).map(([a, b]) => [b, a]));
+export const VALORES_VOLTA: Record<string, Record<string, string>> = Object.fromEntries(
+  Object.entries(VALORES).map(([campo, m]) => [CAMPOS[campo] ?? campo, Object.fromEntries(Object.entries(m).map(([a, b]) => [b, a]))]),
+);
+
+// o dicionario tem de ser de mao dupla: nenhum nome portugues igual a outro, nem a um campo
+// do Spine que ficaria sem traducao
+{
+  const pt = Object.values(CAMPOS);
+  const dup = pt.filter((v, i) => pt.indexOf(v) !== i);
+  const choca = pt.filter((v) => v in CAMPOS && CAMPOS[v] !== v);
+  if (dup.length || choca.length) throw new Error(`dicionario do .boneco ambiguo: ${[...dup, ...choca].join(", ")}`);
+}

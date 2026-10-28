@@ -1,0 +1,118 @@
+{
+ "personagem|idle": {
+  "assets": 10,
+  "dur": [
+   1.5,
+   2,
+   3
+  ],
+  "corpo": [
+   1,
+   2,
+   4
+  ],
+  "silhueta": [
+   2,
+   4,
+   8
+  ],
+  "giro": [
+   5,
+   10,
+   20
+  ],
+  "giroMediano": [
+   2,
+   4,
+   8
+  ],
+  "amassa": [
+   2,
+   5,
+   10
+  ],
+  "deforma": [
+   0,
+   0,
+   2
+  ],
+  "batidas": [
+   0.5,
+   1,
+   2
+  ],
+  "pausa": [
+   0,
+   0,
+   0.2
+  ],
+  "chavesPorSeg": [
+   3,
+   6,
+   10
+  ],
+  "trocas": [
+   0,
+   0,
+   2
+  ]
+ },
+ "personagem|ganho/acao": {
+  "assets": 10,
+  "dur": [
+   1,
+   2,
+   3
+  ],
+  "corpo": [
+   5,
+   10,
+   15
+  ],
+  "silhueta": [
+   20,
+   30,
+   45
+  ],
+  "giro": [
+   30,
+   90,
+   150
+  ],
+  "giroMediano": [
+   10,
+   20,
+   40
+  ],
+  "amassa": [
+   10,
+   30,
+   50
+  ],
+  "deforma": [
+   0,
+   0,
+   5
+  ],
+  "batidas": [
+   2,
+   4,
+   6
+  ],
+  "pausa": [
+   0,
+   0,
+   0.1
+  ],
+  "chavesPorSeg": [
+   8,
+   15,
+   25
+  ],
+  "trocas": [
+   5,
+   10,
+   20
+  ]
+ }
+}
