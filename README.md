@@ -14,13 +14,11 @@ It opens and writes Spine 4.3 projects, so nothing already made gets left behind
 
 ```
 466 of 466 playback scripts match the reference runtime every frame, events too
-20 characters posed in 0.043 ms a frame, about 5x faster than the runtime it replaces
+20 characters posed in 0.043 ms a frame (native), about 5x faster than the runtime it replaces
 102 of 102 production Spine 4.3 projects round-trip through .boneco unchanged
-a slot game on staging: 1 wasm instead of 3, first frame in 3.4 s, not 6.7 s*
+a slot game on staging runs on the core: 1 wasm instead of 3
 GPU objects created per frame in that game: 160 before, 0.3 now
 ```
-
-<sub>* measured with an earlier build of the engine module; the core's module builds to the same 38.6 MB wasm.</sub>
 
 **On this page:** [what it does](#what-it-does) ·
 [Claude Code](#working-with-claude-code) ·
@@ -167,11 +165,15 @@ pixel diff.
 `BonecoSprite` keeps one mesh per batch and only rewrites vertices each frame.
 In a slot game with 17 animated characters, on staging, the engine module replaced
 the official plugin: one wasm instead of three, a 51 MB export instead of 64 MB,
-the first frame in 3.4 s instead of 6.7 s (measured with an earlier build of the
-module; the core's module builds to the same 38.6 MB wasm). Keeping the meshes
-took the GPU objects created per frame from 160 to 0.3. Out of 153 frames compared
-pixel by pixel against the previous renderer, 149 are identical; in the other 4, a
-flipbook is one step apart, and the core is the one that matches the reference.
+the first frame in 3.4 s instead of 6.7 s. Those times were measured with an
+earlier build of the module; the core's module ships the same 38.6 MB wasm and the
+same compressed download, and natively it costs the same per frame (0.63 ms for
+the 17 characters). On the web it still keeps the main thread busier than that
+earlier build, and that is being worked on. Keeping the meshes took the GPU
+objects created per frame from 160 to 0.3. Out of 153 frames compared pixel by
+pixel against the previous renderer, 142 are identical; the other 11 come from
+flipbooks one step apart (4 above 1% of pixels, 7 below 0.5%), and where checked,
+the core is the one that matches the reference.
 
 ```sh
 scons -C nucleo/godot platform=linux target=template_debug disable_exceptions=no          # GDExtension

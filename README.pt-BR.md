@@ -15,13 +15,11 @@ do que já foi feito fica para trás.
 
 ```
 466 de 466 roteiros batem com o runtime de referência em todo quadro, eventos também
-20 personagens posados em 0,043 ms por quadro, cerca de 5x mais rápido que o runtime que ele substitui
+20 personagens posados em 0,043 ms por quadro (nativo), cerca de 5x mais rápido que o runtime que ele substitui
 102 de 102 projetos Spine 4.3 de produção vão e voltam pelo .boneco sem mudar nada
-um jogo de slot em staging: 1 wasm em vez de 3, primeiro quadro em 3,4 s, não 6,7 s*
+um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
 objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
 ```
-
-<sub>* medido com uma versão anterior do módulo do motor; o módulo do núcleo sai com o mesmo wasm de 38,6 MB.</sub>
 
 **Nesta página:** [o que faz](#o-que-faz) · [Claude Code](#com-o-claude-code) ·
 [a bancada de agentes](#a-bancada-de-agentes) · [o formato .boneco](#o-formato-boneco) ·
@@ -165,13 +163,17 @@ núcleo ao lado da referência, com a diferença pixel a pixel.
   Godot oficial.
 
 O `BonecoSprite` guarda uma malha por lote e só regrava os vértices a cada
-quadro. Num jogo de slot com 17 personagens animados, em staging, o módulo do
-motor substituiu o plugin oficial: um wasm em vez de três, export de 51 MB em vez
-de 64 MB, primeiro quadro em 3,4 s em vez de 6,7 s (medido com uma versão anterior do módulo;
-o módulo do núcleo sai com o mesmo wasm de 38,6 MB). Guardar as malhas levou os
-objetos de GPU criados por quadro de 160 para 0,3. De 153 quadros comparados
-pixel a pixel com o renderizador anterior, 149 são iguais; nos outros 4, um
-flipbook está um passo adiante, e é o núcleo que bate com a referência.
+quadro. Num jogo de slot com 17 personagens animados, em staging, o módulo do motor
+substituiu o plugin oficial: um wasm em vez de três, export de 51 MB em vez de 64
+MB, primeiro quadro em 3,4 s em vez de 6,7 s. Esses tempos foram medidos com uma
+versão anterior do módulo; o do núcleo sai com o mesmo wasm de 38,6 MB e o mesmo
+download comprimido, e no nativo custa o mesmo por quadro (0,63 ms para os 17 personagens).
+No navegador ele ainda ocupa mais a thread principal que aquela versão, e isso
+está sendo resolvido. Guardar as malhas levou os objetos de GPU criados por quadro
+de 160 para 0,3. De 153 quadros comparados pixel a pixel com o renderizador
+anterior, 142 são iguais; os outros 11 vêm de flipbooks um passo adiante (4 acima
+de 1% dos pixels, 7 abaixo de 0,5%), e onde foi conferido, é o núcleo que bate com
+a referência.
 
 ```sh
 scons -C nucleo/godot platform=linux target=template_debug disable_exceptions=no          # GDExtension
