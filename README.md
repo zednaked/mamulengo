@@ -180,6 +180,11 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 
 ## Run it
 
+The editor still draws through `spine-core` and `spine-webgl` (installed from npm) as its
+reference renderer, until the core takes over; using them requires a
+[Spine license](https://esotericsoftware.com/spine-purchase). The core in `nucleo/` and the
+`.boneco` format do not depend on them.
+
 ```sh
 npm install
 echo "MAMULENGO_ROOTS=/path/to/your/projects" > .env.local

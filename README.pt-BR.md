@@ -180,6 +180,11 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 
 ## Rodar
 
+O editor ainda desenha pelo `spine-core` e pelo `spine-webgl` (instalados pelo npm) como
+renderizador de referência, até o núcleo assumir; usá-los exige uma
+[licença do Spine](https://esotericsoftware.com/spine-purchase). O núcleo em `nucleo/` e o
+formato `.boneco` não dependem deles.
+
 ```sh
 npm install
 echo "MAMULENGO_ROOTS=/caminho/dos/projetos" > .env.local
