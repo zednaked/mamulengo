@@ -222,9 +222,21 @@ const handlers: Record<string, Handler> = {
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; sequence?: SequenceParam; runtime?: Runtime }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
+    // imagem de referencia por cima (file: caminho dentro das raizes); null tira
+    if (p.reference === null) app.referencia = null;
+    else if (p.reference) {
+      const r = p.reference;
+      if (r.file) await app.porReferencia(fileUrl(r.file));
+      if (app.referencia) {
+        if (r.x !== undefined) app.referencia.x = r.x;
+        if (r.y !== undefined) app.referencia.y = r.y;
+        if (r.width !== undefined) app.referencia.largura = r.width;
+        if (r.opacity !== undefined) app.referencia.opacidade = r.opacity;
+      }
+    }
     if (p.runtime !== undefined) {
       if (!["godot", "spine", "nucleo"].includes(p.runtime)) throw new Error(`runtime desconhecido: ${p.runtime} (godot, spine ou nucleo)`);
       await app.setRuntime(p.runtime);

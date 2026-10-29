@@ -74,18 +74,18 @@ struct Cor {
 // trecho de canais na ordem das timelines
 enum class TipoEfeito : uint8_t { Linha, Brilho, Dissolver, Tingir };
 constexpr int NUM_EFEITOS = 4;
-constexpr int EFEITO_INICIO[NUM_EFEITOS] = {0, 5, 11, 17};
-constexpr int EFEITO_CANAIS[NUM_EFEITOS] = {5, 6, 6, 5};
-constexpr int CANAIS_EFEITOS = 22;
+constexpr int EFEITO_INICIO[NUM_EFEITOS] = {0, 5, 11, 18};
+constexpr int EFEITO_CANAIS[NUM_EFEITOS] = {5, 6, 7, 5};
+constexpr int CANAIS_EFEITOS = 23;
 // indices no vetor
 enum : int {
   LINHA_R = 0, LINHA_A = 3, LINHA_LARGURA = 4,
   BRILHO_R = 5, BRILHO_A = 8, BRILHO_FORCA = 9, BRILHO_RAIO = 10,
-  DISSOLVER_VALOR = 11, DISSOLVER_R = 12, DISSOLVER_A = 15, DISSOLVER_BORDA = 16,
-  TINGIR_R = 17, TINGIR_A = 20, TINGIR_FORCA = 21,
+  DISSOLVER_VALOR = 11, DISSOLVER_R = 12, DISSOLVER_A = 15, DISSOLVER_BORDA = 16, DISSOLVER_GRAO = 17,
+  TINGIR_R = 18, TINGIR_A = 21, TINGIR_FORCA = 22,
 };
 struct Efeitos {
-  float v[CANAIS_EFEITOS] = {1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 8, 0, 1, 0.5f, 0, 1, 0.05f, 1, 1, 1, 1, 0};
+  float v[CANAIS_EFEITOS] = {1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 8, 0, 1, 0.5f, 0, 1, 0.05f, 8, 1, 1, 1, 1, 0};
   bool linha() const { return v[LINHA_LARGURA] > 0 && v[LINHA_A] > 0; }
   bool brilho() const { return v[BRILHO_FORCA] > 0 && v[BRILHO_A] > 0; }
   bool dissolver() const { return v[DISSOLVER_VALOR] > 0; }

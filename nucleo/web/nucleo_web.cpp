@@ -335,7 +335,7 @@ EMSCRIPTEN_KEEPALIVE const int32_t* mm_lotes() {
   for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos), int32_t(l.efeito)});
   return lotes.data();
 }
-// efeitos dos lotes em 28 floats: os 22 canais (docs/NUCLEO.md "Efeitos"), a caixa da imagem
+// efeitos dos lotes em 29 floats: os 23 canais (docs/NUCLEO.md "Efeitos"), a caixa da imagem
 // na pagina (u0, v0, u1, v1) e o tamanho da pagina
 EMSCRIPTEN_KEEPALIVE const float* mm_efeitos() {
   efeitos.clear();

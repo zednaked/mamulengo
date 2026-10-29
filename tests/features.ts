@@ -1041,6 +1041,33 @@ runtimeOk("remocoes (slot, osso com pesos)");
   check(ok, `GIF: ${meta.pages} quadros, loop ${meta.loop}, cor lida ${raw[at]},${raw[at + 1]},${raw[at + 2]}`);
 }
 
+// GIF so com o que muda (paleta de 255): cada quadro lido de volta igual ao quadro inteiro, e menor
+{
+  const { GifEncoder, Histogram } = await import("../src/render/gif.ts");
+  const [w, h] = [64, 48];
+  const frames = [0, 1, 2, 3, 3].map((f) => {
+    const px = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      const x = i % w,
+        y = Math.floor(i / w);
+      const bola = (x - 12 - f * 10) ** 2 + (y - 24) ** 2 < 64;
+      px.set(bola ? [230, 60, 120, 255] : [(x * 4) & 255, (y * 5) & 255, 90, 255], i * 4);
+    }
+    return px;
+  });
+  const hist = new Histogram();
+  frames.forEach((f) => hist.add(f));
+  const pal = hist.palette(255);
+  const parcial = new GifEncoder(w, h, pal);
+  const inteiro = new GifEncoder(w, h, [...pal, [0, 0, 0]]);
+  frames.forEach((f) => (parcial.frame(f, 4), inteiro.frame(f, 4)));
+  const [bp, bi] = [parcial.finish(), inteiro.finish()];
+  const [rp, ri] = await Promise.all([bp, bi].map((b) => sharp(Buffer.from(b), { animated: true }).ensureAlpha().raw().toBuffer()));
+  let dif = 0;
+  for (let i = 0; i < ri.length; i++) dif = Math.max(dif, Math.abs(rp[i] - ri[i]));
+  check(dif === 0 && rp.length === w * h * 4 * frames.length && bp.length < bi.length, `GIF parcial: diferenca ${dif} contra quadros inteiros, ${bp.length} contra ${bi.length} bytes`);
+}
+
 // GIF com ruido: estoura o dicionario do LZW (codigo de limpeza) e volta igual
 {
   const { GifEncoder, Histogram } = await import("../src/render/gif.ts");

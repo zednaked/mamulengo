@@ -71,10 +71,10 @@ const char *SAIDA[PASSOS] = {
 };
 
 // os efeitos de um slot (docs/NUCLEO.md "Efeitos"; o mesmo de src/render/desenhista.ts): ef sao
-// os 22 canais (linha 0-4, brilho 5-10, dissolver 11-16, tingir 17-21); a textura so vale
+// os 23 canais (linha 0-4, brilho 5-10, dissolver 11-17, tingir 18-22); a textura so vale
 // dentro da caixa da imagem
 const char *EFEITOS =
-    "uniform bool pma = false;\nuniform float ef[22];\nuniform vec4 caixa;\nuniform vec2 pagina = vec2(1.0);\nvarying vec4 cor_v;\n"
+    "uniform bool pma = false;\nuniform float ef[23];\nuniform vec4 caixa;\nuniform vec2 pagina = vec2(1.0);\nvarying vec4 cor_v;\n"
     "void vertex() { cor_v = COLOR; }\n"
     "vec4 T(sampler2D tx, vec2 uv) {\n"
     "  if (uv.x < caixa.x || uv.y < caixa.y || uv.x > caixa.z || uv.y > caixa.w) return vec4(0.0);\n"
@@ -94,8 +94,8 @@ const char *EFEITOS =
     "  vec2 px = 1.0 / pagina;\n"
     "  vec4 t = T(TEXTURE, UV);\n"
     "  vec4 C = vec4(t.rgb * cor_v.rgb, t.a * cor_v.a);\n"
-    "  float ft = ef[21] * ef[20];\n"
-    "  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[17], ef[18], ef[19]), ft);\n"
+    "  float ft = ef[22] * ef[21];\n"
+    "  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[18], ef[19], ef[20]), ft);\n"
     "  vec4 U = vec4(0.0);\n"
     "  if (ef[9] > 0.0 && ef[8] > 0.0) {\n"
     "    float B = 0.0;\n"
@@ -118,7 +118,7 @@ const char *EFEITOS =
     "  U.a *= cor_v.a;\n"
     "  vec4 c = sobre(C, U);\n"
     "  if (ef[11] > 0.0) {\n"
-    "    float n = ruido(UV * pagina / 8.0);\n"
+    "    float n = ruido(UV * pagina / max(ef[17], 1.0));\n"
     "    if (n < ef[11]) discard;\n"
     "    if (n < ef[11] + ef[16]) c.rgb = mix(c.rgb, vec3(ef[12], ef[13], ef[14]), ef[15]);\n"
     "  }\n";

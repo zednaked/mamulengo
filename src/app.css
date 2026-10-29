@@ -27,7 +27,8 @@ body,
   height: 100%;
   overflow: hidden;
 }
-button {
+button,
+label.botao {
   font: inherit;
   color: inherit;
   background: var(--panel2);
@@ -37,7 +38,8 @@ button {
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, transform 0.06s;
 }
-button:hover {
+button:hover,
+label.botao:hover {
   border-color: #4a4356;
   background: #302b3a;
 }

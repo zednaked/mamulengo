@@ -362,7 +362,7 @@ quadros("inimigo", ["asa_2", "asa_3", "asa_4", "asa_5"]);
   ossosA.inimigo = { mover: bob, escalar: [{ tempo: TI, x: 1, y: 1 }, { tempo: r3(TI + 0.1), x: 1.25, y: 0.7 }, { tempo: r3(TI + 0.25), x: 1, y: 1 }] };
   efeitosA.inimigo = {
     tingir: [{ tempo: 0, cor: "ff3040ff", forca: 0 }, { tempo: r3(TI - 0.01), forca: 0 }, { tempo: TI, forca: 0.9 }, { tempo: r3(TI + 0.2), forca: 0.4 }],
-    dissolver: [{ tempo: 0, valor: 0, cor: "ffcc33ff", borda: 0.1 }, { tempo: r3(TI + 0.05), valor: 0 }, { tempo: r3(TI + 0.5), valor: 1 }],
+    dissolver: [{ tempo: 0, valor: 0, cor: "ffcc33ff", borda: 0.1, grao: 12 }, { tempo: r3(TI + 0.05), valor: 0 }, { tempo: r3(TI + 0.5), valor: 1 }],
   };
 }
 

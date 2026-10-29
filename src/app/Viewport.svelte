@@ -21,6 +21,40 @@
   let downAt: { x: number; y: number } | null = null;
   let dragged = false;
 
+  // a referencia acompanha a camera: recalcula o retangulo dela a cada quadro de tela
+  let refBox = $state<{ left: number; top: number; width: number } | null>(null);
+  let refArrasto: { x: number; y: number; rx: number; ry: number } | null = null;
+  $effect(() => {
+    if (!app.referencia) return;
+    let vivo = true;
+    const passo = () => {
+      const r = app.referencia,
+        v = app.viewer;
+      if (!vivo) return;
+      if (r && v) {
+        const w = canvas.clientWidth,
+          h = canvas.clientHeight;
+        refBox = { left: w / 2 + (r.x - r.largura / 2 - v.cam.x) * v.cam.zoom, top: h / 2 - (r.y - v.cam.y) * v.cam.zoom, width: r.largura * v.cam.zoom };
+      }
+      requestAnimationFrame(passo);
+    };
+    passo();
+    return () => (vivo = false);
+  });
+  function refDown(e: PointerEvent) {
+    const r = app.referencia;
+    if (!r?.mover) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    refArrasto = { x: e.clientX, y: e.clientY, rx: r.x, ry: r.y };
+  }
+  function refMove(e: PointerEvent) {
+    const r = app.referencia,
+      v = app.viewer;
+    if (!r || !refArrasto || !v) return;
+    r.x = refArrasto.rx + (e.clientX - refArrasto.x) / v.cam.zoom;
+    r.y = refArrasto.ry - (e.clientY - refArrasto.y) / v.cam.zoom;
+  }
+
   onMount(() => {
     const v = new Viewer(canvas);
     v.runtime = app.runtime;
@@ -190,6 +224,32 @@
 <div class="wrap" class:setup={app.doc && app.mode === "setup"}>
   {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animacoes">POSE BASE</div>{/if}
   <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (cursor.inside = false)} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  {#if app.referencia && refBox}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <img
+      class="ref"
+      class:mover={app.referencia.mover}
+      src={app.referencia.src}
+      alt="referencia"
+      style:left="{refBox.left}px"
+      style:top="{refBox.top}px"
+      style:width="{refBox.width}px"
+      style:opacity={app.referencia.opacidade}
+      style:transform="translateY(-50%)"
+      onpointerdown={refDown}
+      onpointermove={refMove}
+      onpointerup={() => (refArrasto = null)}
+      draggable="false"
+    />
+    <div class="refbar">
+      <span title="imagem de referencia por cima do personagem">referencia</span>
+      <input type="range" min="0.05" max="1" step="0.05" bind:value={app.referencia.opacidade} title="transparencia" />
+      <button onclick={() => app.referencia && (app.referencia.largura *= 1.05)} title="maior">+</button>
+      <button onclick={() => app.referencia && (app.referencia.largura /= 1.05)} title="menor">−</button>
+      <button class:on={app.referencia.mover} onclick={() => app.referencia && (app.referencia.mover = !app.referencia.mover)} title="arrastar a referencia com o mouse">mover</button>
+      <button onclick={() => (app.referencia = null)} title="tirar a referencia">✕</button>
+    </div>
+  {/if}
   {#if app.viewer?.error}
     <div class="err">O runtime recusou o documento: {app.viewer.error}</div>
   {:else if app.runtime === "nucleo" && app.viewer?.nucleoError && (app.version, true)}
@@ -236,6 +296,36 @@
 </div>
 
 <style>
+  .ref {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .ref.mover {
+    pointer-events: auto;
+    cursor: move;
+    outline: 1px dashed #ff4d94;
+  }
+  .refbar {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 3;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    background: rgba(24, 20, 34, 0.85);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .refbar input {
+    width: 80px;
+  }
+  .refbar button.on {
+    background: #ff4d94;
+    color: #fff;
+  }
   .wrap {
     position: relative;
     width: 100%;

@@ -257,16 +257,16 @@ slot). A exportação para o Spine tira os efeitos e avisa.
 |---|---|---|
 | `linha` (contorno) | `cor` (`ffffffff`), `largura` (0, em pixels da textura) | `largura > 0` e alfa da cor > 0 |
 | `brilho` (halo) | `cor` (`ffffffff`), `forca` (0), `raio` (8, em pixels da textura) | `forca > 0` e alfa da cor > 0 |
-| `dissolver` | `valor` (0 a 1), `cor` da borda (`ff8000ff`), `borda` (0,05) | `valor > 0` |
+| `dissolver` | `valor` (0 a 1), `cor` da borda (`ff8000ff`), `borda` (0,05), `grao` (8: o tamanho dos pedaços, em pixels da textura) | `valor > 0` |
 | `tingir` | `cor` (`ffffffff`), `forca` (0 a 1) | `forca > 0` e alfa da cor > 0 |
 
 **Timelines.** `animacoes.<a>.efeitos.<slot>.<efeito>`: chaves com `tempo`, os campos do
 efeito e `curva` (como no `rgba`: `"degrau"` ou 4 números por canal). Os canais, na ordem da
-curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda`;
+curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda grao`;
 tingir `r g b a forca`. Campo que falta na chave vale o da chave anterior (na primeira, o do
 setup): uma chave pode mudar só a `forca`. A mistura com o que já está
 na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `borda` entre 0 e
-1; `largura`, `raio` e `forca` a partir de 0.
+1; `largura`, `raio` e `forca` a partir de 0; `grao` a partir de 1.
 
 **No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
 efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
@@ -289,7 +289,7 @@ desfeito; fora da caixa, 0), `px` o tamanho de um pixel da página e `cv` a cor 
    média das amostras mostrava cópias deslocadas da imagem).
 4. `F = C sobre (L sobre H)`, com o alfa de `L` e `H` vezes `cv.a` (o slot apagando apaga o
    halo junto).
-5. dissolver: `n` é um ruído de valor em células de 8 pixels da página (hash inteiro dos
+5. dissolver: `n` é um ruído de valor em células de `grao` pixels da página (hash inteiro dos
    cantos da célula e interpolação suave); `n < valor` some; `n < valor + borda` pinta
    `F.rgb = mix(F.rgb, dissolver.rgb, dissolver.a)`.
 

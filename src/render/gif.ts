@@ -96,9 +96,14 @@ export class Histogram {
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
+// Com uma paleta de ate 255 cores, o indice que sobra vira o transparente e cada quadro depois do
+// primeiro grava so o retangulo que mudou, transparente onde o pixel repete o anterior (sem perda;
+// o arquivo encolhe muito quando so parte da tela anda). Com 256 cores, quadros inteiros.
 export class GifEncoder {
   private out = new Bytes();
   private lut = new Int16Array(32768).fill(-1);
+  private anterior: Uint8Array | null = null;
+  private transparente: number;
 
   constructor(
     private w: number,
@@ -112,7 +117,8 @@ export class GifEncoder {
     o.byte(0xf7); // tabela global de 256 cores
     o.byte(0);
     o.byte(0);
-    for (const [r, g, b] of palette) o.bytes([r, g, b]);
+    this.transparente = palette.length < 256 ? palette.length : -1;
+    for (let i = 0; i < 256; i++) o.bytes(palette[i] ?? [0, 0, 0]);
     // NETSCAPE2.0: repetir para sempre
     o.bytes([0x21, 0xff, 11, 78, 69, 84, 83, 67, 65, 80, 69, 50, 46, 48, 3, 1, 0, 0, 0]);
   }
@@ -145,18 +151,44 @@ export class GifEncoder {
           b = Math.max(0, Math.min(255, rgba[q + 2] + d));
         idx[p] = this.nearest(((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3));
       }
-    // controle grafico: atraso, sem transparencia, descarte "nao mexe"
-    o.bytes([0x21, 0xf9, 4, 0x04]);
+    // o retangulo que mudou desde o quadro anterior (quadro inteiro no primeiro)
+    let [x0, y0, x1, y1] = [0, 0, w - 1, h - 1];
+    const ant = this.anterior,
+      T = this.transparente;
+    if (ant && T >= 0) {
+      [x0, y0, x1, y1] = [w, h, -1, -1];
+      for (let y = 0, p = 0; y < h; y++)
+        for (let x = 0; x < w; x++, p++)
+          if (idx[p] !== ant[p]) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            y1 = y;
+          }
+      // nada mudou: um pixel transparente so para levar o atraso
+      if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
+    }
+    const rw = x1 - x0 + 1,
+      rh = y1 - y0 + 1;
+    let sub = idx;
+    if (ant && T >= 0) {
+      sub = new Uint8Array(rw * rh);
+      for (let y = 0, k = 0; y < rh; y++)
+        for (let x = 0, p = (y + y0) * w + x0; x < rw; x++, p++, k++) sub[k] = idx[p] === ant[p] ? T : idx[p];
+    }
+    this.anterior = idx;
+    // controle grafico: descarte "nao mexe", atraso e o transparente (do segundo quadro em diante)
+    o.bytes([0x21, 0xf9, 4, ant && T >= 0 ? 0x05 : 0x04]);
     o.word(Math.max(1, Math.round(delayCs)));
-    o.bytes([0, 0]);
-    // descritor da imagem (quadro inteiro, usa a tabela global)
+    o.bytes([ant && T >= 0 ? T : 0, 0]);
+    // descritor da imagem (o retangulo, usa a tabela global)
     o.byte(0x2c);
-    o.word(0);
-    o.word(0);
-    o.word(w);
-    o.word(h);
+    o.word(x0);
+    o.word(y0);
+    o.word(rw);
+    o.word(rh);
     o.byte(0);
-    lzw(idx, 8, o);
+    lzw(sub, 8, o);
   }
 
   finish(): Uint8Array {

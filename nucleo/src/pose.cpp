@@ -226,8 +226,8 @@ float Efeitos::margem() const {
 
 void Efeitos::limitar() {
   for (int i = 0; i < CANAIS_EFEITOS; ++i) {
-    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO;
-    v[i] = std::max(v[i], 0.0f);
+    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO;
+    v[i] = std::max(v[i], i == DISSOLVER_GRAO ? 1.0f : 0.0f);
     if (!sem_teto) v[i] = std::min(v[i], 1.0f);
   }
 }

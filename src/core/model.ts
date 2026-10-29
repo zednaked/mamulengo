@@ -177,7 +177,7 @@ export function formatColor(rgba: number[], withAlpha = true): string {
 export const EFFECTS: Record<string, [string, number[]][]> = {
   outline: [["color", [1, 1, 1, 1]], ["width", [0]]],
   glow: [["color", [1, 1, 1, 1]], ["strength", [0]], ["radius", [8]]],
-  dissolve: [["value", [0]], ["color", [1, 0.5, 0, 1]], ["edge", [0.05]]],
+  dissolve: [["value", [0]], ["color", [1, 0.5, 0, 1]], ["edge", [0.05]], ["grain", [8]]],
   tint: [["color", [1, 1, 1, 1]], ["strength", [0]]],
 };
 export const EFFECT_NAMES = Object.keys(EFFECTS);

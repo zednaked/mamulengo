@@ -18,11 +18,11 @@ const b = JSON.parse(readFileSync(arq, "utf8"));
 const CAMPOS: Record<string, [string, number[]][]> = {
   linha: [["cor", [1, 1, 1, 1]], ["largura", [0]]],
   brilho: [["cor", [1, 1, 1, 1]], ["forca", [0]], ["raio", [8]]],
-  dissolver: [["valor", [0]], ["cor", [1, 0.5, 0, 1]], ["borda", [0.05]]],
+  dissolver: [["valor", [0]], ["cor", [1, 0.5, 0, 1]], ["borda", [0.05]], ["grao", [8]]],
   tingir: [["cor", [1, 1, 1, 1]], ["forca", [0]]],
 };
-const INICIO: Record<string, number> = { linha: 0, brilho: 5, dissolver: 11, tingir: 17 };
-const SEM_TETO = new Set([4, 9, 10]);
+const INICIO: Record<string, number> = { linha: 0, brilho: 5, dissolver: 11, tingir: 18 };
+const SEM_TETO = new Set([4, 9, 10, 17]);
 const hex = (s: string) => [0, 2, 4, 6].map((k) => (s.length > k ? parseInt(s.slice(k, k + 2), 16) / 255 : 1));
 const canais = (ef: string, j: any, antes: number[]) => {
   const v = [...antes];
@@ -37,7 +37,7 @@ const canais = (ef: string, j: any, antes: number[]) => {
   return v;
 };
 const padrao = () => Object.values(CAMPOS).flatMap((cs) => cs.flatMap(([, p]) => p));
-const limita = (v: number[]) => v.map((x, k) => Math.max(0, SEM_TETO.has(k) ? x : Math.min(1, x)));
+const limita = (v: number[]) => v.map((x, k) => Math.max(k === 17 ? 1 : 0, SEM_TETO.has(k) ? x : Math.min(1, x)));
 
 let falhas = 0,
   conferidos = 0;
@@ -74,7 +74,7 @@ for (const [anim, a] of Object.entries<any>(b.animacoes ?? {})) {
         v.forEach((x, k) => (esp[INICIO[ef] + k] = x));
       }
       esp = limita(esp);
-      const ligado = (esp[4] > 0 && esp[3] > 0) || (esp[9] > 0 && esp[8] > 0) || esp[11] > 0 || (esp[21] > 0 && esp[20] > 0);
+      const ligado = (esp[4] > 0 && esp[3] > 0) || (esp[9] > 0 && esp[8] > 0) || esp[11] > 0 || (esp[22] > 0 && esp[21] > 0);
       const saiu = quadros[q].slots.find((x: any) => x.nome === s.nome)?.efeitos;
       conferidos++;
       if (!ligado && !saiu) continue;

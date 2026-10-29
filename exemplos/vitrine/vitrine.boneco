@@ -513,7 +513,8 @@
     "dissolver": {
      "valor": 0,
      "cor": "ff8a3cff",
-     "borda": 0.08
+     "borda": 0.08,
+     "grao": 24
     }
    }
   },
@@ -530,7 +531,8 @@
     "dissolver": {
      "valor": 0,
      "cor": "ff8a3cff",
-     "borda": 0.08
+     "borda": 0.08,
+     "grao": 24
     }
    }
   },

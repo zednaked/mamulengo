@@ -21,7 +21,90 @@ export interface ExportOptions {
   sequence?: SequenceParam;
   // enquadra a animacao inteira (uniao de todos os quadros, com margem) em vez da tela
   fit?: boolean;
+  // o retangulo do mundo a filmar [x, y, largura, altura] (y para cima), no lugar da tela ou do
+  // fit: a tela de um jogo, um recorte fixo
+  rect?: [number, number, number, number];
+  // acabamento para mostrar: titulo e subtitulo numa faixa em cima, legendas por trecho de tempo
+  // (com fade) e um rodape com credito numa faixa embaixo
+  moldura?: Moldura;
   onProgress?: (done: number, total: number) => void;
+}
+
+export interface Moldura {
+  titulo?: string;
+  subtitulo?: string;
+  legendas?: { de: number; ate: number; texto: string }[];
+  rodape?: string;
+  credito?: string;
+  // cor de destaque (titulo e borda da legenda) e do fundo das faixas
+  destaque?: string;
+  fundo?: string;
+}
+
+// a moldura em volta de um quadro w x h (as faixas somam altura; tudo par para o video)
+function molduraTamanho(m: Moldura, w: number, h: number) {
+  const topo = m.titulo || m.subtitulo ? Math.round(w * 0.11) : 0;
+  const base = m.rodape || m.credito ? Math.round(w * 0.045) : 0;
+  return { topo, base, W: w, H: Math.round((h + topo + base) / 2) * 2 };
+}
+function emoldurar(m: Moldura, quadro: HTMLCanvasElement, t: number, out: HTMLCanvasElement) {
+  const w = quadro.width,
+    h = quadro.height;
+  const { topo, base, W, H } = molduraTamanho(m, w, h);
+  out.width = W;
+  out.height = H;
+  const g = out.getContext("2d")!;
+  const destaque = m.destaque ?? "#ff4d94";
+  g.fillStyle = m.fundo ?? "#181422";
+  g.fillRect(0, 0, W, H);
+  g.drawImage(quadro, 0, topo);
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  const fonte = (peso: number, px: number) => `${peso} ${Math.round(px)}px "Noto Sans", system-ui, sans-serif`;
+  if (m.titulo) {
+    g.font = fonte(900, topo * 0.42);
+    g.fillStyle = destaque;
+    g.fillText(m.titulo, W / 2, topo * (m.subtitulo ? 0.38 : 0.5));
+  }
+  if (m.subtitulo) {
+    g.font = fonte(500, topo * 0.2);
+    g.fillStyle = "#beb6d2";
+    g.fillText(m.subtitulo, W / 2, topo * 0.78);
+  }
+  const leg = m.legendas?.find((l) => t >= l.de && t < l.ate);
+  if (leg) {
+    const al = Math.max(0, Math.min(1, (t - leg.de) / 0.25, (leg.ate - t) / 0.25));
+    g.font = fonte(700, w * 0.032);
+    const tw = g.measureText(leg.texto).width,
+      ph = w * 0.06,
+      y = topo + h - ph * 0.9;
+    g.globalAlpha = al;
+    g.fillStyle = "rgba(24, 20, 34, 0.55)";
+    g.strokeStyle = destaque;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.roundRect(W / 2 - tw / 2 - ph * 0.4, y - ph / 2, tw + ph * 0.8, ph, ph / 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#ffffff";
+    g.fillText(leg.texto, W / 2, y + 1);
+    g.globalAlpha = 1;
+  }
+  if (base) {
+    const y = topo + h + base / 2;
+    g.font = fonte(500, base * 0.42);
+    if (m.rodape) {
+      g.textAlign = m.credito ? "left" : "center";
+      g.fillStyle = "#cdc6de";
+      g.fillText(m.rodape, m.credito ? base * 0.5 : W / 2, y);
+    }
+    if (m.credito) {
+      g.textAlign = "right";
+      g.fillStyle = "#968eac";
+      g.fillText(m.credito, W - base * 0.5, y);
+    }
+  }
+  return out;
 }
 
 export interface ExportResult {
@@ -66,7 +149,12 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
     let scale = o.scale ?? 1;
     const maxW = o.maxWidth ?? 960;
     let w: number, h: number, rect: number[];
-    if (o.fit) {
+    if (o.rect) {
+      rect = [...o.rect];
+      const k = Math.min(maxW, 720 * (o.scale ?? 1) * Math.max(1, rect[2] / rect[3])) / rect[2];
+      w = Math.max(2, Math.round((rect[2] * k) / 2) * 2);
+      h = Math.max(2, Math.round((rect[3] * k) / 2) * 2);
+    } else if (o.fit) {
       // uniao das bounds de todos os quadros: nada sai cortado, nada fica minusculo
       let u: number[] | null = null;
       for (let i = 0; i <= n; i++) {
@@ -98,20 +186,27 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
       const vh = (vw * h) / w;
       rect = [v.cam.x - vw / 2, v.cam.y - vh / 2, vw, vh];
     }
+    // o quadro renderizado tem qw x qh; com moldura, o arquivo (w x h) tem as faixas em volta
+    const qw = w,
+      qh = h;
+    if (o.moldura) ({ W: w, H: h } = molduraTamanho(o.moldura, qw, qh));
+    const moldurado = document.createElement("canvas");
     const frameAt = (i: number) => {
       v.poseAt(i / fps);
-      return v.renderRect(rect, [w, h]);
+      const c = v.renderRect(rect, [qw, qh]);
+      return o.moldura ? emoldurar(o.moldura, c, i / fps, moldurado) : c;
     };
     const pixels = (c: HTMLCanvasElement) => c.getContext("2d")!.getImageData(0, 0, w, h).data;
 
     let blob: Blob;
     let encoder = "gif";
     if (o.format === "gif") {
-      // paleta global a partir de ate 12 quadros espalhados
+      // paleta global a partir de ate 12 quadros espalhados; 255 cores, o indice que sobra e o
+      // transparente dos quadros que so gravam o que mudou
       const hist = new Histogram();
       const samples = Math.min(n, 12);
       for (let s = 0; s < samples; s++) hist.add(pixels(frameAt(Math.floor((s * n) / samples))), 2);
-      const gif = new GifEncoder(w, h, hist.palette(256));
+      const gif = new GifEncoder(w, h, hist.palette(255));
       for (let i = 0; i < n; i++) {
         // atrasos inteiros em centesimos que somam a duracao certa
         const delay = Math.round((100 * (i + 1)) / fps) - Math.round((100 * i) / fps);

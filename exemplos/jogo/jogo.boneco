@@ -1171,7 +1171,8 @@
     "dissolver": {
      "valor": 0,
      "cor": "ff8a3cff",
-     "borda": 0.08
+     "borda": 0.08,
+     "grao": 24
     }
    }
   },
@@ -1188,7 +1189,8 @@
     "dissolver": {
      "valor": 0,
      "cor": "ff8a3cff",
-     "borda": 0.08
+     "borda": 0.08,
+     "grao": 24
     }
    }
   },
@@ -28736,7 +28738,8 @@
        "tempo": 0,
        "valor": 0,
        "cor": "ffcc33ff",
-       "borda": 0.1
+       "borda": 0.1,
+       "grao": 12
       },
       {
        "tempo": 2.35,

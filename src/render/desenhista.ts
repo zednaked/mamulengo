@@ -61,13 +61,13 @@ void main() {
   saida = motor ? vec4(c, 1.0) : vec4(c * a, a);
 }`;
 
-// os efeitos de um slot (docs/NUCLEO.md "Efeitos"): ef sao os 22 canais (linha 0-4, brilho
-// 5-10, dissolver 11-16, tingir 17-21); a textura so vale dentro da caixa da imagem
+// os efeitos de um slot (docs/NUCLEO.md "Efeitos"): ef sao os 23 canais (linha 0-4, brilho
+// 5-10, dissolver 11-17, tingir 18-22); a textura so vale dentro da caixa da imagem
 const FRAGMENTO_EFEITOS = `#version 300 es
 precision highp float; precision highp int;
 in vec2 vuv; in vec4 vcor;
 uniform sampler2D tex; uniform bool pma; uniform bool motor;
-uniform float ef[22]; uniform vec4 caixa; uniform vec2 pagina;
+uniform float ef[23]; uniform vec4 caixa; uniform vec2 pagina;
 out vec4 saida;
 vec4 T(vec2 uv) {
   if (uv.x < caixa.x || uv.y < caixa.y || uv.x > caixa.z || uv.y > caixa.w) return vec4(0.0);
@@ -94,8 +94,8 @@ void main() {
   vec2 px = 1.0 / pagina;
   vec4 t = T(vuv);
   vec4 C = vec4(t.rgb * vcor.rgb, t.a * vcor.a);
-  float ft = ef[21] * ef[20];
-  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[17], ef[18], ef[19]), ft);
+  float ft = ef[22] * ef[21];
+  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[18], ef[19], ef[20]), ft);
   vec4 U = vec4(0.0);
   if (ef[9] > 0.0 && ef[8] > 0.0) {
     float B = 0.0;
@@ -118,7 +118,7 @@ void main() {
   U.a *= vcor.a;
   vec4 F = sobre(C, U);
   if (ef[11] > 0.0) {
-    float n = ruido(vuv * pagina / 8.0);
+    float n = ruido(vuv * pagina / max(ef[17], 1.0));
     if (n < ef[11]) discard;
     if (n < ef[11] + ef[16]) F.rgb = mix(F.rgb, vec3(ef[12], ef[13], ef[14]), ef[15]);
   }
@@ -209,7 +209,7 @@ export class Desenhista {
     const lotes = N.HEAP32.subarray(pl, pl + nl * 6);
     const ne = N._mm_num_efeitos(),
       pe = N._mm_efeitos() / 4;
-    const efeitos = ne ? N.HEAPF32.subarray(pe, pe + ne * 28) : null;
+    const efeitos = ne ? N.HEAPF32.subarray(pe, pe + ne * 29) : null;
     if (efeitos) {
       gl.useProgram(this.progEf);
       gl.uniformMatrix4fv(this.uEf.proj, false, proj);
@@ -260,10 +260,10 @@ export class Desenhista {
       const quer = ef >= 0 && efeitos ? this.progEf : this.prog;
       if (quer !== usando) gl.useProgram((usando = quer));
       if (quer === this.progEf) {
-        const o = ef * 28;
-        gl.uniform1fv(this.uEf.ef, efeitos!.subarray(o, o + 22));
-        gl.uniform4f(this.uEf.caixa, efeitos![o + 22], efeitos![o + 23], efeitos![o + 24], efeitos![o + 25]);
-        gl.uniform2f(this.uEf.pagina, efeitos![o + 26], efeitos![o + 27]);
+        const o = ef * 29;
+        gl.uniform1fv(this.uEf.ef, efeitos!.subarray(o, o + 23));
+        gl.uniform4f(this.uEf.caixa, efeitos![o + 23], efeitos![o + 24], efeitos![o + 25], efeitos![o + 26]);
+        gl.uniform2f(this.uEf.pagina, efeitos![o + 27], efeitos![o + 28]);
         gl.uniform1i(this.uEf.pma, p.pma ? 1 : 0);
         gl.uniform1i(this.uEf.motor, blend === 3 ? 1 : 0);
       } else {

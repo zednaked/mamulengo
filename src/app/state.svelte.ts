@@ -133,6 +133,18 @@ class AppState {
   // a imagem sob o pincel ainda nao e malha: oferecer converter
   offerMesh = $state<{ slot: string; attachment: string } | null>(null);
   onion = $state(false);
+  // imagem de referencia por cima do viewport, presa ao mundo (centro x, y e largura em
+  // unidades do mundo), semitransparente: para conferir pose, proporcao e encaixe
+  referencia = $state<{ src: string; x: number; y: number; largura: number; opacidade: number; mover: boolean } | null>(null);
+  // poe uma imagem de referencia ajustada a altura do personagem na tela
+  async porReferencia(src: string) {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const b = this.viewer?.currentBounds() ?? [-100, 0, 200, 300];
+    const altura = b[3] * 1.05;
+    this.referencia = { src, x: b[0] + b[2] / 2, y: b[1] + b[3] / 2, largura: (altura * img.naturalWidth) / img.naturalHeight, opacidade: 0.5, mover: false };
+  }
   // modo de desenho do viewport (godot, spine ou nucleo): segue o personagem aberto (runtimeDe);
   // escolher no seletor vale para o projeto dele
   runtime = $state<Runtime>(runtimeDoEndereco() ?? "godot");

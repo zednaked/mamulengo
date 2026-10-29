@@ -31,7 +31,7 @@ const b = JSON.parse(readFileSync(join(ROBO, "robo.boneco"), "utf8"));
 b.nome = "vitrine";
 delete b.ficha;
 
-// a pagina em 3x (robo-hd.webp, rasterizada do vetor da Kenney por robo-hd.py): o mesmo
+// a pagina em 3x (robo-hd.webp, do vetor da Kenney por tools/atlas-hd.ts com --id "{nome}_0_Layer0_*_FILL"): o mesmo
 // layout com os retangulos em 3x; as partes guardam o tamanho delas, entao so a nitidez muda.
 // Larguras e raios dos efeitos sao em pixels da textura: tambem em 3x
 const HD = 3;
@@ -94,7 +94,7 @@ for (const op of props) {
 const slot = (n: string) => b.slots.find((s: any) => s.nome === n);
 slot("cabeca").efeitos = { linha: { cor: "ffd23cff", largura: 0 } };
 slot("corpo").efeitos = { brilho: { cor: "4cc9ffff", forca: 0, raio: 16 * HD }, tingir: { cor: "ff3355ff", forca: 0 } };
-for (const s of ["braco_e", "braco_d"]) slot(s).efeitos = { dissolver: { valor: 0, cor: "ff8a3cff", borda: 0.08 } };
+for (const s of ["braco_e", "braco_d"]) slot(s).efeitos = { dissolver: { valor: 0, cor: "ff8a3cff", borda: 0.08, grao: 8 * HD } };
 
 const efeitos = {
   corpo: {

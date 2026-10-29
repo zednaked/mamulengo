@@ -63,7 +63,7 @@
   const EFEITOS: Record<string, { nome: string; dica: string; campos: { k: string; label: string; max: number; step: number }[] }> = {
     outline: { nome: "contorno", dica: "linha em volta da imagem", campos: [{ k: "width", label: "largura", max: 16, step: 0.5 }] },
     glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "forca", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
-    dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }] },
+    dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }, { k: "grain", label: "pedacos", max: 64, step: 1 }] },
     tint: { nome: "tingir", dica: "pinta a imagem com uma cor", campos: [{ k: "strength", label: "forca", max: 1, step: 0.01 }] },
   };
   const ehBoneco = $derived(!!app.asset?.tres?.endsWith(".boneco"));

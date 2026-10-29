@@ -271,6 +271,10 @@
         <option value="nucleo">desenho: nucleo</option>
       </select>
       <GodotCheck />
+      <label class="botao" title="por uma imagem de referencia por cima do personagem (pose, proporcao, encaixe)">
+        referencia
+        <input type="file" accept="image/*" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f)); (e.currentTarget as HTMLInputElement).value = ""; }} />
+      </label>
     </div>
     <div class="spacer"></div>
     <button class="help" title="Como usar" onclick={() => (guide = true)}>?</button>

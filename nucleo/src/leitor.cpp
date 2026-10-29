@@ -94,7 +94,7 @@ struct CampoEfeito {
 const std::vector<CampoEfeito> CAMPOS_EFEITO[NUM_EFEITOS] = {
     {{"cor", true}, {"largura", false}},
     {{"cor", true}, {"forca", false}, {"raio", false}},
-    {{"valor", false}, {"cor", true}, {"borda", false}},
+    {{"valor", false}, {"cor", true}, {"borda", false}, {"grao", false}},
     {{"cor", true}, {"forca", false}},
 };
 const char* NOMES_EFEITO[NUM_EFEITOS] = {"linha", "brilho", "dissolver", "tingir"};
@@ -127,7 +127,7 @@ void ler_campos_efeito(int t, const Json& j, float* v) {
 Timeline ler_timeline_efeito(const Json& chaves, int t, const Efeitos& setup) {
   Timeline tl;
   tl.canais = EFEITO_CANAIS[t];
-  float v[6];
+  float v[7];
   std::copy(setup.v + EFEITO_INICIO[t], setup.v + EFEITO_INICIO[t] + tl.canais, v);
   for (const Json& k : chaves.itens()) {
     tl.tempos.push_back(f32(k.num("tempo", 0)));

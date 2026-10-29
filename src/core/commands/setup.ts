@@ -292,7 +292,7 @@ defineCommand({
   name: "slot.effect",
   group: "slot",
   summary:
-    "Efeito do slot na setup pose (so do Mamulengo, para personagens .boneco; o Spine nao tem): outline (contorno: color, width em pixels da textura), glow (halo: color, strength, radius), dissolve (sumir em pedacos: value 0-1, color e edge da borda), tint (tingir: color, strength 0-1). Campos omitidos ficam como estao; off:true tira o efeito. Para animar, key.set com timeline outline/glow/dissolve/tint no {slot}.",
+    "Efeito do slot na setup pose (so do Mamulengo, para personagens .boneco; o Spine nao tem): outline (contorno: color, width em pixels da textura), glow (halo: color, strength, radius), dissolve (sumir em pedacos: value 0-1, color e edge da borda, grain o tamanho dos pedacos em pixels da textura), tint (tingir: color, strength 0-1). Campos omitidos ficam como estao; off:true tira o efeito. Para animar, key.set com timeline outline/glow/dissolve/tint no {slot}.",
   params: z.object({
     slot: z.string(),
     effect: z.enum(["outline", "glow", "dissolve", "tint"]),
@@ -302,6 +302,7 @@ defineCommand({
     radius: z.number().min(0).optional(),
     value: z.number().min(0).max(1).optional(),
     edge: z.number().min(0).max(1).optional(),
+    grain: z.number().min(1).optional(),
     off: z.boolean().optional(),
   }),
   label: (p) => `efeito ${p.effect} em ${p.slot}${p.off ? " (tira)" : ""}`,
@@ -316,7 +317,7 @@ defineCommand({
     const campos = EFFECTS[p.effect].map(([f]) => f);
     const novo: Record<string, any> = { ...(cur[p.effect] ?? {}) };
     for (const f of campos) if ((p as any)[f] !== undefined) novo[f] = f === "color" ? (p as any)[f].toLowerCase() : round((p as any)[f]);
-    for (const k of Object.keys((p as any))) if (!campos.includes(k) && ["color", "width", "strength", "radius", "value", "edge"].includes(k)) throw new Error(`${p.effect} nao tem ${k}; campos: ${campos.join(", ")}`);
+    for (const k of Object.keys((p as any))) if (!campos.includes(k) && ["color", "width", "strength", "radius", "value", "edge", "grain"].includes(k)) throw new Error(`${p.effect} nao tem ${k}; campos: ${campos.join(", ")}`);
     const tudo = { ...cur, [p.effect]: novo };
     if (JSON.stringify(cur) !== JSON.stringify(tudo)) e.set(["slots", i, "effects"], tudo);
     return { index: i, effects: tudo };

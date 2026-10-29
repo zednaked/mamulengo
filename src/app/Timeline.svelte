@@ -500,13 +500,16 @@
 
   // --- exportar
 
-  let exporting = $state<{ open: boolean; format: "gif" | "webm"; fps: number; dir: string; busy: boolean; progress: string; result: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "" });
+  let exporting = $state<{ open: boolean; format: "gif" | "webm"; fps: number; dir: string; busy: boolean; progress: string; result: string; titulo: string; subtitulo: string; rodape: string; credito: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "", titulo: "", subtitulo: "", rodape: "", credito: "" });
   async function runExport() {
     const x = exporting;
     x.busy = true;
     x.result = "";
     try {
-      const r = await exportAnimation({ format: x.format, fps: x.fps, dir: x.dir.trim() || undefined, onProgress: (d, n) => (x.progress = `${d}/${n}`) });
+      // moldura: so se algum texto foi preenchido
+      const m = { titulo: x.titulo.trim(), subtitulo: x.subtitulo.trim(), rodape: x.rodape.trim(), credito: x.credito.trim() };
+      const moldura = Object.values(m).some(Boolean) ? Object.fromEntries(Object.entries(m).filter(([, v]) => v)) : undefined;
+      const r = await exportAnimation({ format: x.format, fps: x.fps, dir: x.dir.trim() || undefined, moldura, onProgress: (d, n) => (x.progress = `${d}/${n}`) });
       x.result = `${r.path} (${Math.round(r.bytes / 1024)} KB, ${r.frames} quadros ${r.size[0]}x${r.size[1]})`;
     } catch (e: any) {
       app.toast(String(e?.message ?? e));
@@ -643,6 +646,12 @@
         </div>
         <label>fps <select bind:value={exporting.fps}><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label>
         <input placeholder="pasta (vazio: ~/.cache/mamulengo/exports)" bind:value={exporting.dir} />
+        <div class="moldura" title="moldura para mostrar: textos em faixas em volta da animacao (vazio: sem moldura)">
+          <input placeholder="titulo" bind:value={exporting.titulo} />
+          <input placeholder="subtitulo" bind:value={exporting.subtitulo} />
+          <input placeholder="rodape" bind:value={exporting.rodape} />
+          <input placeholder="credito" bind:value={exporting.credito} />
+        </div>
         <button class="go" disabled={exporting.busy || !app.play.animation} onclick={runExport}>{exporting.busy ? `gravando ${exporting.progress}` : "exportar"}</button>
         {#if exporting.result}<div class="done" title={exporting.result}>salvo: {exporting.result}</div>{/if}
       </div>
@@ -780,6 +789,11 @@
   }
   .add {
     border-style: dashed;
+  }
+  .moldura {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
   }
   .zoom {
     display: inline-flex;

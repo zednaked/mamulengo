@@ -89,6 +89,7 @@ const KeyValue = z
     strength: z.number().min(0).optional().describe("glow e tint: forca (tint de 0 a 1); physics strength usa value"),
     radius: z.number().min(0).optional().describe("glow: raio em pixels da textura"),
     edge: z.number().min(0).max(1).optional().describe("dissolve: largura da borda colorida (0 a 1)"),
+    grain: z.number().min(1).optional().describe("dissolve: tamanho dos pedacos, em pixels da textura (padrao 8)"),
   })
   .partial();
 
