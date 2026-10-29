@@ -161,12 +161,19 @@ export const CAMPOS: Record<string, string> = {
   jitter: "desvio",
   refresh: "troca",
   branches: "ramos",
+  // orbita (particulas tipo "orbita")
+  behind: "atras",
+  radii: "raios",
+  period: "volta",
+  band: "faixa",
+  tilt: "inclinacao",
+  depth: "profundidade",
 };
 
 // valores de enum que mudam de nome (por campo)
 export const VALORES: Record<string, Record<string, string>> = {
   blend: { additive: "aditivo", multiply: "multiplica", screen: "tela" },
-  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio" },
+  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
   curve: { stepped: "degrau" },
 };
 

@@ -54,7 +54,7 @@ defineCommand({
     max: z.number().int().min(1).optional(),
     seed: z.number().int().min(0).optional(),
     // raio
-    type: z.enum(["particles", "lightning"]).optional().describe("lightning: um raio (linha quebrada refeita a cada refresh s); rate vira a intensidade 0 a 1"),
+    type: z.enum(["particles", "lightning", "orbit"]).optional().describe("lightning: um raio (linha quebrada refeita a cada refresh s); orbit: particulas girando em volta do osso, passando atras (slot behind) e na frente (slot); nos dois, rate vira a intensidade 0 a 1"),
     toBone: z.string().optional().describe("raio: osso do fim (com toX, toY); sem ele, length na direcao angle"),
     toX: z.number().optional(),
     toY: z.number().optional(),
@@ -64,6 +64,14 @@ defineCommand({
     width: z.number().positive().optional().describe("raio: largura em px"),
     refresh: z.number().positive().optional().describe("raio: segundos entre um desenho e o seguinte"),
     branches: z.number().int().min(0).optional(),
+    // orbita
+    behind: z.string().optional().describe("orbita: slot onde desenham as que passam atras (as da frente desenham no slot)"),
+    radii: z.tuple([z.number(), z.number()]).optional().describe("orbita: raios da elipse na tela [largura, altura] em px"),
+    period: z.number().optional().describe("orbita: segundos por volta (negativo gira ao contrario)"),
+    count: z.number().int().min(0).optional().describe("orbita: quantas particulas"),
+    band: z.number().min(0).optional().describe("orbita: quanto fogem para cima ou para baixo da elipse, px"),
+    tilt: z.number().optional().describe("orbita: inclinacao da elipse em graus"),
+    depth: z.number().min(0).optional().describe("orbita: quanto a da frente cresce e a de tras encolhe"),
   }),
   label: (p) => `particulas ${p.name}`,
   run({ e }, p) {
@@ -83,8 +91,10 @@ defineCommand({
     for (const [k, v] of Object.entries(campos)) if (v !== undefined) novo[k] = num(v);
     // a escala do emissor fica "escala" nos dois formatos (scale e a timeline escalar)
     if (scale !== undefined) novo.escala = num(scale);
-    if (type === "lightning") novo.type = "lightning";
+    if (type === "lightning" || type === "orbit") novo.type = type;
     else if (type === "particles") delete novo.type;
+    if (p.behind) requireSlot(e.json, p.behind);
+    if ((novo.type === "orbit") && !novo.behind) throw new Error("orbita: diga behind (o slot onde desenham as que passam atras)");
     if (i < 0) e.set(["particles"], [...lista, novo]);
     else if (JSON.stringify(novo) !== JSON.stringify(lista[i])) e.set(["particles", i], novo);
     return { index: i < 0 ? lista.length : i, emitter: novo };

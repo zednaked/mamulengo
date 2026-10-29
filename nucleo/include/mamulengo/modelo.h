@@ -272,6 +272,10 @@ struct DadosEmissor {
   int ate = -1;                        // osso do fim (-1: comprimento na direcao do angulo)
   double ate_x = 0, ate_y = 0, comprimento = 100, desvio = 0.15, largura = 6, troca = 0.06;
   int segmentos = 10, ramos = 2;
+  // orbita (tipo "orbita"): giram numa elipse; as de tras desenham depois do slot `atras`
+  bool orbita = false;
+  int atras = -1, quantidade = 8;
+  double raios[2] = {80, 20}, volta = 2, faixa = 0, inclinacao = 0, profundidade = 0.35;
 };
 
 struct TimelineTaxa {
@@ -382,6 +386,7 @@ struct Modelo {
   std::vector<DadosRestricao> restricoes;
   std::vector<DadosEmissor> emissores;
   std::vector<std::vector<int>> emissores_do_slot;  // por slot, os emissores que desenham nele
+  std::vector<std::vector<int>> orbitas_atras;      // por slot, as orbitas cujas de tras desenham nele
   std::vector<Animacao> animacoes;
   std::vector<std::string> nomes_partes;  // id -> nome
   std::vector<DadosEvento> eventos;

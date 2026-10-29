@@ -462,6 +462,7 @@ defineCommand({
     ...DeformBase,
     angle: z.number().min(-80).max(80),
     axis: z.enum(["vertical", "horizontal"]).default("vertical"),
+    tilt: z.number().min(-80).max(80).optional().describe("um segundo giro no outro eixo, depois do primeiro (olhar um pouco para cima ou para baixo enquanto vira)"),
     perspective: z.number().min(0).max(1).default(0.25),
     center: z.tuple([z.number(), z.number()]).optional().describe("centro do cilindro na tela (padrao: centro da malha)"),
     radius: z.number().positive().optional().describe("raio do cilindro (padrao: metade da malha no sentido do giro); menor, so o miolo gira e as pontas acompanham rigidas"),
@@ -477,15 +478,17 @@ defineCommand({
     const xs = pts.map((q) => q[0]),
       ys = pts.map((q) => q[1]);
     const c: Pt = p.center ?? [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
-    // a = eixo em que os pontos andam (x no giro vertical), b = o outro (cresce ou encolhe)
-    const [a, b] = p.axis === "vertical" ? [0, 1] : [1, 0];
-    const R = p.radius ?? (Math.max(...pts.map((q) => q[a])) - Math.min(...pts.map((q) => q[a]))) / 2;
-    if (!(R > 0)) throw new Error("malha sem largura para virar");
-    const th = (p.angle * Math.PI) / 180;
-    // dentro do raio: a superficie do cilindro; fora dele (orelhas, abas): anda rigida junto
-    // com a borda do lado dela, sem esticar
-    const gira = (fi: number) => Math.max(-Math.PI / 2, Math.min(Math.PI / 2, fi + th));
-    const deltas: Pt[] = pts.map((q) => {
+    // um giro num eixo: a = eixo em que os pontos andam (x no giro vertical), b = o outro
+    // (cresce ou encolhe); o raio padrao e metade da malha no sentido do giro
+    const virar = (pts: Pt[], eixo: "vertical" | "horizontal", graus: number, raio?: number): Pt[] => {
+      const [a, b] = eixo === "vertical" ? [0, 1] : [1, 0];
+      const R = raio ?? (Math.max(...pts.map((q) => q[a])) - Math.min(...pts.map((q) => q[a]))) / 2;
+      if (!(R > 0)) throw new Error("malha sem largura para virar");
+      const th = (graus * Math.PI) / 180;
+      // dentro do raio: a superficie do cilindro; fora dele (orelhas, abas): anda rigida junto
+      // com a borda do lado dela, sem esticar
+      const gira = (fi: number) => Math.max(-Math.PI / 2, Math.min(Math.PI / 2, fi + th));
+      return pts.map((q) => {
       const u = (q[a] - c[a]) / R;
       const out: Pt = [q[0], q[1]];
       if (Math.abs(u) <= 1) {
@@ -500,8 +503,12 @@ defineCommand({
         out[a] = q[a] + R * (Math.sin(b2) - Math.sin(borda));
         out[b] = c[b] + (q[b] - c[b]) * (1 + p.perspective * (Math.cos(b2) - Math.cos(borda)));
       }
-      return [out[0] - q[0], out[1] - q[1]];
-    });
+      return out;
+      });
+    };
+    let fim = virar(pts, p.axis, p.angle, p.radius);
+    if (p.tilt) fim = virar(fim, p.axis === "vertical" ? "horizontal" : "vertical", p.tilt);
+    const deltas: Pt[] = fim.map((q, i) => [q[0] - pts[i][0], q[1] - pts[i][1]]);
     return writeDeform(ctx, p, worldToDeform(e.json, sk, p.slot, source, deltas));
   },
 });

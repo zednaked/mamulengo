@@ -199,6 +199,26 @@ void linhas_raio(const Esqueleto& e, int ie, std::vector<std::vector<double>>& l
   }
 }
 
+void posicoes_orbita(const Esqueleto& e, int ie, std::vector<double>& out) {
+  out.clear();
+  const DadosEmissor& de = e.modelo().emissores[size_t(ie)];
+  if (!de.orbita) return;
+  const Matriz& w = e.mundo()[size_t(de.osso)];
+  const double cx = w.a * de.x + w.b * de.y + w.x, cy = w.c * de.x + w.d * de.y + w.y;
+  const double inc = de.inclinacao * GRAU, ci = std::cos(inc), si = std::sin(inc);
+  const uint32_t j6 = de.semente * 8u + 6u, j7 = de.semente * 8u + 7u;
+  const int n = de.quantidade;
+  for (int k = 0; k < n; ++k) {
+    const double s0 = sorteio(uint32_t(k), j6), s1 = sorteio(uint32_t(k), j7), s2 = sorteio(uint32_t(k) + 1000u, j6);
+    const double th = 2 * PI * (e.relogio() / de.volta + double(k) / n + 0.3 * (s0 - 0.5) / n);
+    const double z = std::sin(th);
+    const double px = de.raios[0] * std::cos(th), py = -de.raios[1] * z + de.faixa * (2 * s1 - 1);
+    const double esc = de.escala[0] * (0.85 + 0.3 * s2) * (1 + de.profundidade * z);
+    const double giro = (de.giro[0] + (de.giro[1] - de.giro[0]) * s2) * e.relogio();
+    out.insert(out.end(), {cx + px * ci - py * si, cy + px * si + py * ci, z, esc, giro});
+  }
+}
+
 void desenhar(const Esqueleto& e, Desenho& d) {
   const Modelo& m = e.modelo();
   std::vector<double> mundo;
@@ -317,18 +337,52 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       for (size_t i = 0; i + 3 < ln.size(); i += 2) pedaco(de, P2{ln[i], ln[i + 1]}, P2{ln[i + 2], ln[i + 3]}, w, cr, cg, cb, ca);
     }
   };
+  std::vector<double> orb;
+  // as particulas de uma orbita, so as da frente ou so as de tras; a cor e a do slot do emissor
+  auto orbita = [&](int ie, const DadosEmissor& de, const EstadoEmissor& ee, bool frente) {
+    const EstadoSlot& s = e.slots()[size_t(de.slot)];
+    const double intens = std::min(std::max(ee.taxa, 0.0), 1.0);
+    if (intens <= 0 || s.cor.a <= 0) return;
+    posicoes_orbita(e, ie, orb);
+    const Cor &cf = de.cores.front(), &ct = de.cores.back();
+    for (size_t k = 0; k + 4 < orb.size() + 1; k += 5) {
+      const double z = orb[k + 2];
+      if ((z >= 0) != frente) continue;
+      const double f = (z + 1) / 2;
+      const float cr = float(ct.r + (cf.r - ct.r) * f) * s.cor.r, cg = float(ct.g + (cf.g - ct.g) * f) * s.cor.g;
+      const float cb = float(ct.b + (cf.b - ct.b) * f) * s.cor.b, ca = float((ct.a + (cf.a - ct.a) * f) * s.cor.a * intens);
+      const double esc = orb[k + 3];
+      if (ca <= 0 || esc <= 0) continue;
+      const double cs = std::cos(orb[k + 4] * GRAU) * esc, sn = std::sin(orb[k + 4] * GRAU) * esc;
+      const double l0 = -de.meia_largura, r0 = de.meia_largura, b0 = -de.meia_altura, t0 = de.meia_altura;
+      const double qx[4] = {l0, l0, r0, r0}, qy[4] = {b0, t0, t0, b0};
+      float q[8];
+      for (int c = 0; c < 4; ++c) q[c * 2] = float(orb[k] + qx[c] * cs - qy[c] * sn), q[c * 2 + 1] = float(orb[k + 1] + qx[c] * sn + qy[c] * cs);
+      quad(q, de.uvs, cr, cg, cb, ca);
+    }
+  };
   auto particulas = [&](int si) {
     if (m.emissores_do_slot.empty()) return;
+    // as de tras das orbitas que passam atras deste slot
+    for (int ie : m.orbitas_atras[size_t(si)]) {
+      const DadosEmissor& de = m.emissores[size_t(ie)];
+      if (de.pagina < 0) continue;
+      Lote& l = lote(Comando::Triangulos, de.pagina, de.blend >= 0 ? Blend(de.blend) : m.slots[size_t(de.slot)].blend);
+      const size_t li = size_t(&l - d.lotes.data());
+      orbita(ie, de, e.emissores()[size_t(ie)], false);
+      d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+    }
     const EstadoSlot& s = e.slots()[size_t(si)];
     if (s.cor.a <= 0) return;
     for (int ie : m.emissores_do_slot[size_t(si)]) {
       const DadosEmissor& de = m.emissores[size_t(ie)];
       const EstadoEmissor& ee = e.emissores()[size_t(ie)];
-      if (de.pagina < 0 || (!de.raio && ee.vivas.empty())) continue;
+      if (de.pagina < 0 || (!de.raio && !de.orbita && ee.vivas.empty())) continue;
       Lote& l = lote(Comando::Triangulos, de.pagina, de.blend >= 0 ? Blend(de.blend) : m.slots[size_t(si)].blend);
       const size_t li = size_t(&l - d.lotes.data());
-      if (de.raio) {
-        raio(ie, de, ee, s);
+      if (de.raio || de.orbita) {
+        if (de.raio) raio(ie, de, ee, s);
+        else orbita(ie, de, ee, true);
         d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
         continue;
       }

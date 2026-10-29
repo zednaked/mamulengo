@@ -206,7 +206,8 @@ const faiscas = (nome: string, s: string) => ({
 // jatos de fogo dos pes (as pernas apontam para baixo: angulo 0 e ao longo do osso)
 const jato = (nome: string, s: string) => ({
   nome,
-  slot: s,
+  slot: s.replace("perna_", "jato_nucleo_"),
+  osso: s,
   x: 40,
   imagem: "fogo",
   blend: "aditivo",
@@ -237,7 +238,9 @@ const rampa = (t0: number, t1: number, t2: number, pico: number) => [
   { tempo: t1, valor: pico },
   { tempo: t2, valor: 0 },
 ];
-const particulas = {
+const particulas: any = {
+  fumaca: { rajada: [{ tempo: 2.26, quantidade: 16 }, { tempo: 6.16, quantidade: 16 }] },
+  anel: { taxa: [{ valor: 0 }, { tempo: 2.4, valor: 0 }, { tempo: 2.7, valor: 1 }, { tempo: 3.5, valor: 1 }, { tempo: 3.9, valor: 0 }, { tempo: 6.3, valor: 0 }, { tempo: 6.6, valor: 1 }, { tempo: 7.5, valor: 1 }, { tempo: 7.9, valor: 0 }] },
   faiscas_e: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
   faiscas_d: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
   fogo_e: { taxa: [...rampa(2.25, 2.4, 3.7, 55), ...rampa(6.15, 6.3, 7.6, 65)] },
@@ -254,7 +257,179 @@ const particulas = {
   },
 };
 
-b.animacoes = { vitrine: { ossos, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
+// ---- o jato (o mesmo desenho de camadas de um jato feito a mao, com arte e numeros nossos):
+// um halo grande de luz falsa (amarelo por fora, anel frio por dentro), um nucleo branco no bocal
+// e as linguas e brasas das particulas de fogo; os dois primeiros somam luz e tremem a cada 1/30 s,
+// com um exagero na ignicao. Em volta, a luz falsa: as pernas esquentam (tingir) e o chao acende
+const RGBA = (arquivo: string, w: number, h: number, px: (x: number, y: number) => number[]) => {
+  const png = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const [r, g, bb, a] = px((x + 0.5) / w, (y + 0.5) / h);
+      const i = (y * w + x) * 4;
+      png.data[i] = Math.round(r);
+      png.data[i + 1] = Math.round(g);
+      png.data[i + 2] = Math.round(bb);
+      png.data[i + 3] = Math.round(Math.min(1, Math.max(0, a)) * 255);
+    }
+  writeFileSync(join(AQUI, arquivo), PNG.sync.write(png));
+  b.paginas.push({ arquivo, tamanho: [w, h] });
+  b.imagens.push({ nome: arquivo.replace(/\.png$/, ""), pagina: b.paginas.length - 1, ret: [0, 0, w, h] });
+};
+const mistura = (c1: number[], c2: number[], f: number) => c1.map((v, i) => v + (c2[i] - v) * Math.min(1, Math.max(0, f)));
+// halo: elipse ao longo de x (o bocal a esquerda); por fora amarelo, por dentro um anel frio
+RGBA("jato_halo.png", 192, 128, (x, y) => {
+  const e = Math.hypot((x - 0.42) / 0.42, (y - 0.5) / 0.46);
+  // quente por dentro (branco amarelado, laranja), dourado na borda, um toque rosado entre os dois
+  const cor = e < 0.35 ? mistura([255, 244, 214], [255, 170, 80], e / 0.35) : e < 0.7 ? mistura([255, 170, 80], [255, 120, 150], (e - 0.35) / 0.35) : mistura([255, 120, 150], [255, 205, 80], (e - 0.7) / 0.3);
+  // mais forte perto do bocal (a esquerda), sumindo ao longo do jato
+  return [...cor, Math.pow(Math.max(0, 1 - e), 1.15) * (1 - 0.45 * x)];
+});
+// nucleo: oval branca no bocal
+RGBA("jato_nucleo.png", 96, 48, (x, y) => {
+  const e = Math.hypot((x - 0.32) / 0.32, (y - 0.5) / 0.44);
+  return [255, 255, 250, Math.pow(Math.max(0, 1 - e), 1.1)];
+});
+// luz no chao: elipse branca macia (a cor vem do slot)
+RGBA("luz_chao.png", 256, 64, (x, y) => [255, 255, 255, Math.pow(Math.max(0, 1 - Math.hypot((x - 0.5) / 0.5, (y - 0.5) / 0.5)), 1.6)]);
+
+// as linguas de fogo em 6 quadros (trocados a cada 1/30 s, como uma sequencia desenhada): cada
+// uma e um feixe de chamas ao longo de x (o bocal a esquerda), branco no comeco, amarelo,
+// laranja e vermelho na ponta, com o recorte e a ponta mudando de quadro para quadro
+const LW = 160,
+  LH = 64,
+  NL = 6;
+{
+  const png = new PNG({ width: LW, height: LH * NL });
+  const ruido = (a: number, bb: number) => {
+    const v = Math.sin(a * 127.1 + bb * 311.7) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  for (let f = 0; f < NL; f++)
+    for (let y = 0; y < LH; y++)
+      for (let x = 0; x < LW; x++) {
+        const u = (x + 0.5) / LW,
+          v = (y + 0.5) / LH - 0.5;
+        // tres linguas que se abrem e balancam
+        let a = 0;
+        for (let k = 0; k < 3; k++) {
+          const desl = (k - 1) * 0.12 * u + 0.06 * Math.sin(u * 9 + f * 1.9 + k * 2.1) * u;
+          const larg = (0.2 - 0.05 * Math.abs(k - 1)) * Math.pow(1 - u, 0.7) * (0.85 + 0.3 * ruido(f + k, Math.floor(u * 8)));
+          const comp = 0.75 + 0.25 * ruido(f * 3 + k, 7);
+          if (u > comp) continue;
+          a = Math.max(a, Math.min(1, Math.max(0, (larg - Math.abs(v - desl)) / 0.035)) * Math.pow(1 - u / comp, 0.5));
+        }
+        const cor = u < 0.15 ? mistura([255, 255, 245], [255, 225, 120], u / 0.15) : u < 0.45 ? mistura([255, 225, 120], [255, 140, 40], (u - 0.15) / 0.3) : mistura([255, 140, 40], [210, 40, 20], (u - 0.45) / 0.55);
+        const i = ((f * LH + y) * LW + x) * 4;
+        [png.data[i], png.data[i + 1], png.data[i + 2]] = cor.map(Math.round);
+        png.data[i + 3] = Math.round(a * 255);
+      }
+  writeFileSync(join(AQUI, "linguas.png"), PNG.sync.write(png));
+  b.paginas.push({ arquivo: "linguas.png", tamanho: [LW, LH * NL] });
+  for (let f = 0; f < NL; f++) b.imagens.push({ nome: `lingua_${f}`, pagina: b.paginas.length - 1, ret: [0, f * LH, LW, LH] });
+}
+// o clarao da ignicao: um disco com raios finos, branco (a cor vem do slot)
+RGBA("clarao.png", 160, 160, (x, y) => {
+  const dx = x - 0.5,
+    dy = y - 0.5,
+    r = Math.hypot(dx, dy) * 2,
+    g = Math.atan2(dy, dx);
+  // 8 raios girados meio passo (nenhum em pe, que ficaria uma barra entre as pernas)
+  const raios = Math.pow(Math.abs(Math.cos(4 * (g - Math.PI / 8))), 18) * Math.max(0, 1 - r) * 0.8;
+  return [255, 255, 255, Math.min(1, Math.pow(Math.max(0, 1 - r), 2.2) + raios)];
+});
+// a fumaca: uma nuvem macia de bordas irregulares, cinza clara
+RGBA("fumaca.png", 96, 96, (x, y) => {
+  const dx = x - 0.5,
+    dy = y - 0.5,
+    g = Math.atan2(dy, dx);
+  const borda = 0.42 + 0.06 * Math.sin(g * 5) + 0.03 * Math.sin(g * 11 + 1);
+  const r = Math.hypot(dx, dy);
+  return [235, 232, 240, Math.pow(Math.max(0, 1 - r / borda), 0.9) * 0.9];
+});
+
+const JANELAS: [number, number][] = [
+  [2.25, 3.7],
+  [6.15, 7.6],
+];
+// tremor repetivel: um numero de 0 a 1 por quadro e canal
+const tremor = (k: number, canal: number) => {
+  const v = Math.sin(k * 12.9898 + canal * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+// envelope do jato: 0 antes, ignicao exagerada (1,35 em 0,12 s), 1 ate perto do fim, 0 no fim
+const envelope = (t: number, [a, z]: [number, number]) => {
+  if (t <= a || t >= z) return 0;
+  if (t < a + 0.12) return (1.35 * (t - a)) / 0.12;
+  if (t < a + 0.3) return 1.35 - (0.35 * (t - a - 0.12)) / 0.18;
+  if (t > z - 0.15) return (z - t) / 0.15;
+  return 1;
+};
+const QUADRO = 1 / 30;
+const tremido = (fn: (t: number, k: number, env: number) => any) => {
+  const ks: any[] = [{ tempo: 0, ...fn(0, 0, 0) }];
+  for (const jan of JANELAS) {
+    ks.push({ tempo: r3(jan[0]), ...fn(jan[0], 0, 0) });
+    for (let k = 1, t = jan[0] + QUADRO; t < jan[1]; k++, t += QUADRO) ks.push({ tempo: r3(t), ...fn(t, k, envelope(t, jan)) });
+    ks.push({ tempo: r3(jan[1]), ...fn(jan[1], 0, 0) });
+  }
+  return ks;
+};
+const hex = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0");
+
+const iPernaD = b.slots.findIndex((x: any) => x.nome === "perna_d");
+const novos: any[] = [];
+for (const lado of ["e", "d"]) {
+  b.ossos.push({ nome: `jato_${lado}`, pai: `perna_${lado}`, x: 42 });
+  // a mascara: um recorte preso a perna, em cone da largura da sola para baixo (x a partir de 44
+  // no osso), para o jato sair por baixo do pe e nao pelos lados; corta o halo, as linguas, o
+  // nucleo e as particulas de fogo
+  novos.push({ nome: `mascara_${lado}`, osso: `perna_${lado}`, parte: "mascara" });
+  b.skins[0].partes[`mascara_${lado}`] = { mascara: { tipo: "recorte", fim: `jato_nucleo_${lado}`, num_vertices: 4, vertices: [44, -21, 260, -230, 260, 230, 44, 21] } };
+  novos.push(
+    { nome: `jato_halo_${lado}`, osso: `jato_${lado}`, parte: "jato_halo", blend: "aditivo" },
+    { nome: `jato_lingua_${lado}`, osso: `jato_${lado}`, blend: "aditivo" },
+    { nome: `jato_nucleo_${lado}`, osso: `jato_${lado}`, parte: "jato_nucleo", blend: "aditivo" },
+  );
+  b.skins[0].partes[`jato_lingua_${lado}`] = Object.fromEntries(Array.from({ length: NL }, (_, f) => [`lingua_${f}`, { x: 52, largura: 92, altura: 38 }]));
+  b.skins[0].partes[`jato_halo_${lado}`] = { jato_halo: { x: 46, largura: 150, altura: 84 } };
+  b.skins[0].partes[`jato_nucleo_${lado}`] = { jato_nucleo: { x: 14, largura: 46, altura: 24 } };
+  // o osso do jato: escala pelo envelope e um tremor de 12% a cada quadro
+  (ossos[`jato_${lado}`] ??= {}).escalar = tremido((_t, k, env) => ({ x: r3(env * (0.9 + 0.24 * tremor(k + (lado === "d" ? 50 : 0), 1))), y: r3(env * (0.9 + 0.2 * tremor(k + (lado === "d" ? 50 : 0), 2))) }));
+}
+b.slots.splice(iPernaD + 1, 0, ...novos);
+// a luz no chao e o clarao da ignicao, atras de tudo, presos ao root (o chao); a fumaca nasce
+// no chao e desenha num slot proprio, sem imagem, antes de tudo (atras do robo)
+b.ossos.push({ nome: "chao", pai: "root" }, { nome: "clarao", pai: "root", y: 6 });
+b.slots.unshift({ nome: "fumaca", osso: "chao" }, { nome: "luz_chao", osso: "chao", parte: "luz_chao", blend: "aditivo", cor: "ff9a4000" }, { nome: "clarao", osso: "clarao", parte: "clarao", blend: "aditivo", cor: "ffd9a000" });
+b.skins[0].partes.clarao = { clarao: { largura: 150, altura: 90 } };
+// um anel de estrelas em orbita no corpo: as de tras passam atras do robo (slot da fumaca, o
+// primeiro) e as da frente por cima de tudo (slot da cabeca, o ultimo)
+b.particulas.push({ nome: "anel", tipo: "orbita", slot: "cabeca", atras: "fumaca", osso: "corpo", x: 30, imagem: "estrela", blend: "aditivo", taxa: 0, raios: [125, 24], volta: 1.6, quantidade: 14, faixa: 14, inclinacao: -8, profundidade: 0.45, escala: [0.17, 0.17], giro: [-140, 140], cor: ["ffe680ff", "7d70c0aa"], semente: 2 });
+b.particulas.push({ nome: "fumaca", slot: "fumaca", osso: "chao", y: 8, imagem: "fumaca", taxa: 0, vida: [0.9, 1.6], velocidade: [70, 190], angulo: 90, abertura: 175, gravidade: -25, arrasto: 2.2, escala: [0.45, 1.5], giro: [-40, 40], cor: ["d8d2e0b0", "9890a860", "80789000"], semente: 9 });
+b.skins[0].partes.luz_chao = { luz_chao: { y: 2, largura: 230, altura: 46 } };
+const slotsAnim: any = {};
+for (const lado of ["e", "d"]) {
+  slotsAnim[`jato_halo_${lado}`] = { rgba: tremido((_t, k, env) => ({ cor: "ffffff" + hex(Math.min(1, env) * (0.7 + 0.3 * tremor(k + 7, 3))) })) };
+  slotsAnim[`jato_nucleo_${lado}`] = { rgba: tremido((_t, k, env) => ({ cor: "ffffff" + hex(Math.min(1, env) * (0.8 + 0.2 * tremor(k + 11, 4))) })) };
+  // as pernas esquentam com a luz do jato
+  (efeitos as any)[`perna_${lado}`] = { tingir: tremido((_t, k, env) => ({ cor: "ff9a48ff", forca: r3(Math.min(1, env) * (0.28 + 0.12 * tremor(k + 3, 5))) })) };
+}
+for (const [li, lado] of ["e", "d"].entries()) {
+  // as linguas: um quadro a cada 1/30 s dentro das janelas, cada pe comecando num quadro
+  const ks: any[] = [{ tempo: 0, nome: null }];
+  for (const jan of JANELAS) {
+    for (let k = 0, t = jan[0]; t < jan[1]; k++, t += QUADRO) ks.push({ tempo: r3(t), nome: `lingua_${(k + li * 3) % NL}` });
+    ks.push({ tempo: r3(jan[1]), nome: null });
+  }
+  slotsAnim[`jato_lingua_${lado}`] = { parte: ks };
+}
+// o clarao: acende na ignicao e some em 0,25 s, crescendo
+slotsAnim.clarao = { rgba: [{ tempo: 0, cor: "ffd9a000" }, ...JANELAS.flatMap(([a]) => [{ tempo: a, cor: "ffd9a000", curva: "degrau" }, { tempo: r3(a + 0.02), cor: "ffd9a0ff" }, { tempo: r3(a + 0.28), cor: "ffd9a000" }])] };
+(ossos as any).clarao = { escalar: [{ tempo: 0, x: 0.4, y: 0.4 }, ...JANELAS.flatMap(([a]) => [{ tempo: a, x: 0.4, y: 0.4, curva: "degrau" }, { tempo: r3(a + 0.02), x: 0.7, y: 0.7 }, { tempo: r3(a + 0.28), x: 1.9, y: 1.4 }])] };
+slotsAnim.luz_chao = { rgba: tremido((_t, k, env) => ({ cor: "ff9a40" + hex(Math.min(1, env) * (0.45 + 0.2 * tremor(k + 5, 6))) })) };
+
+b.animacoes = { vitrine: { ossos, slots: slotsAnim, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
 
 // ---- 2,5D: com os comandos do editor (os mesmos da tela e da ponte), sobre o documento no
 // formato do editor. A cabeca vira malha pelo contorno da imagem e olha para os lados
@@ -275,8 +450,34 @@ const imagens: AssetProvider = {
   },
 };
 const doc = Document.fromText(JSON.stringify(ex.json), { text: ex.atlas, pages: {} });
-const olhar = (time: number, angle: number) => ({ cmd: "deform.turn", args: { anim: "vitrine", slot: "cabeca", attachment: "head", time, angle, perspective: 0.2, radius: 32, ...(time < 2 ? { curve: "suave" } : {}) } });
-await executeAsync(doc, [{ cmd: "mesh.create", args: { slot: "cabeca", name: "head", detail: 1.4 } }, olhar(0, 0), olhar(0.5, -18), olhar(1.0, 0), olhar(1.5, 18), olhar(2.0, 0)], "gerador", "2,5D", {}, imagens);
+// alem do olhar, um 2,5D sutil em tudo: cada parte gira devagar uns poucos graus, em fases
+// diferentes (a cabeca puxa, o corpo vem logo atras, as pernas acompanham menos, os bracos tem o
+// ritmo deles). Periodos que fecham nos 8,6 s do laco, para nao pular na volta
+const DUR = 8.6;
+const onda = (t: number, graus: number, periodo: number, fase = 0) => graus * Math.sin((2 * Math.PI * (t - fase)) / periodo);
+// o olhar de 0 a 2 s: 0, -18, 0, 18, 0 com ida e volta suave; depois o balanco
+const olharCabeca = (t: number) => {
+  if (t <= 2) return -18 * Math.sin(Math.PI * t);
+  return t < 2.15 ? 0 : onda(t, 7, DUR / 4, 2.15);
+};
+const PARTES = [
+  { slot: "cabeca", att: "head", raio: 32, giro: olharCabeca, aceno: (t: number) => onda(t, 5, DUR / 3) },
+  { slot: "corpo", att: "body", raio: undefined, giro: (t: number) => onda(t, 5, DUR / 4, 0.12), aceno: (t: number) => onda(t, 3, DUR / 3, 0.2) },
+  { slot: "perna_e", att: "leg", raio: undefined, giro: (t: number) => onda(t, 3, DUR / 4, 0.2), aceno: () => 0 },
+  { slot: "perna_d", att: "leg", raio: undefined, giro: (t: number) => onda(t, 3, DUR / 4, 0.2), aceno: () => 0 },
+  { slot: "braco_e", att: "arm", raio: undefined, giro: (t: number) => onda(t, 6, DUR / 5, 0.3), aceno: () => 0 },
+  { slot: "braco_d", att: "arm", raio: undefined, giro: (t: number) => onda(t, 6, DUR / 5, 0.6), aceno: () => 0 },
+];
+const chamadas: any[] = [];
+for (const pt of PARTES)
+  if (pt.att !== "arm") chamadas.push({ cmd: "mesh.create", args: { slot: pt.slot, name: pt.att, detail: 1.4 } });
+for (const pt of PARTES)
+  for (let k = 0; k * (1 / 6) <= DUR + 1e-9; k++) {
+    const t = r3(Math.min(k / 6, DUR));
+    const tilt = pt.aceno(t);
+    chamadas.push({ cmd: "deform.turn", args: { anim: "vitrine", slot: pt.slot, attachment: pt.att, time: t, angle: r3(pt.giro(t)), perspective: 0.15, ...(pt.raio ? { radius: pt.raio } : {}), ...(tilt ? { tilt: r3(tilt) } : {}) } });
+  }
+await executeAsync(doc, chamadas, "gerador", "2,5D", {}, imagens);
 const final = importarSpine(doc.json, ex.atlas, "vitrine");
 final.mix = { padrao: 0.2 };
 writeFileSync(join(AQUI, "vitrine.boneco"), JSON.stringify(final, null, 1) + "\n");

@@ -269,6 +269,7 @@ class Leitor {
 
   void ler_particulas(const Json& lista) {
     m.emissores_do_slot.assign(m.slots.size(), {});
+    m.orbitas_atras.assign(m.slots.size(), {});
     for (const Json& j : lista.itens()) {
       DadosEmissor d;
       d.nome = j.str("nome", "");
@@ -287,7 +288,8 @@ class Leitor {
       par("escala", d.escala);
       par("giro", d.giro);
       d.raio = j.str("tipo", "") == "raio";
-      if (d.raio) d.angulo = 0, d.cores = {Cor{1, 1, 1, 1}};
+      d.orbita = j.str("tipo", "") == "orbita";
+      if (d.raio || d.orbita) d.angulo = 0, d.cores = {Cor{1, 1, 1, 1}};
       d.angulo = j.num("angulo", d.angulo);
       d.abertura = j.num("abertura", d.abertura);
       d.gravidade = j.num("gravidade", d.gravidade);
@@ -295,7 +297,7 @@ class Leitor {
       if (const Json* c = j.acha("cor"); c && c->lista() && !c->itens().empty()) {
         d.cores.clear();
         for (const Json& x : c->itens()) d.cores.push_back(x.texto() ? cor_hex(x.str()) : Cor{});
-        if (d.cores.size() == 1 && !d.raio) d.cores.push_back(d.cores[0]);
+        if (d.cores.size() == 1 && !d.raio && !d.orbita) d.cores.push_back(d.cores[0]);
       }
       if (const Json* b = j.acha("blend"); b && b->texto()) d.blend = int(ler_blend(b->str()));
       par("onda", d.onda);
@@ -320,6 +322,17 @@ class Leitor {
         d.meia_altura = g.rh / 2;
         const double cx[4] = {0, 0, g.rw, g.rw}, cy[4] = {g.rh, 0, 0, g.rh};
         for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &d.uvs[i * 2]);
+      }
+      if (d.orbita) {
+        d.atras = slot(j["atras"], "particulas (orbita: atras)");
+        par("raios", d.raios);
+        d.volta = j.num("volta", d.volta);
+        if (d.volta == 0) d.volta = 1;
+        d.quantidade = std::max(0, int(j.num("quantidade", d.quantidade)));
+        d.faixa = j.num("faixa", d.faixa);
+        d.inclinacao = j.num("inclinacao", d.inclinacao);
+        d.profundidade = j.num("profundidade", d.profundidade);
+        m.orbitas_atras[size_t(d.atras)].push_back(int(m.emissores.size()));
       }
       m.emissores_do_slot[size_t(d.slot)].push_back(int(m.emissores.size()));
       m.emissores.push_back(std::move(d));

@@ -7,8 +7,8 @@ have, in one looping animation (`vitrine`, 8.6 s):
 
 | time | body | features |
 |---|---|---|
-| 0.0 to 2.0 s | idle | **2.5D**: the head looks left and right (the mesh turned like a cylinder by `deform.turn`); **tint**: the body flashes red |
-| 2.3 to 3.6 s | celebration | **glow** around the body, **particles**: sparks from both hands, two bursts of stars from the head and **fire** jets under the feet |
+| 0.0 to 2.0 s | idle | **2.5D**: the head looks left and right (the mesh turned like a cylinder by `deform.turn`), and every part keeps a subtle turn for depth through the whole loop; **tint**: the body flashes red |
+| 2.3 to 3.6 s | celebration | **jets** under the feet (a fake-light halo, a white core, flame tongues swapped every frame, masked to come out only below the soles, with a flash and smoke on ignition), **glow** around the body, sparks from the hands, star bursts from the head and a ring of stars in **orbit** that passes behind and in front of the body |
 | 3.9 to 5.9 s | idle | **dissolve**: both arms break apart with an orange edge and come back |
 | 6.2 to 7.5 s | celebration | everything together, with the body tinted gold, an **outline** on the head and a **lightning** arc between the hands |
 | 7.8 to 8.6 s | idle | everything fades out and the loop starts again |

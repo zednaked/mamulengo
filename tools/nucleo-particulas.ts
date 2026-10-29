@@ -32,7 +32,8 @@ function sorteio(i: number, j: number) {
 
 const par = (v: any, d: [number, number]): [number, number] => (Array.isArray(v) ? [v[0] ?? d[0], v[1] ?? d[1]] : v === undefined ? d : [v, v]);
 const raios = (b.particulas ?? []).filter((e: any) => e.tipo === "raio");
-const emissores = (b.particulas ?? []).filter((e: any) => e.tipo !== "raio").map((e: any) => {
+const orbitas = (b.particulas ?? []).filter((e: any) => e.tipo === "orbita");
+const emissores = (b.particulas ?? []).filter((e: any) => e.tipo !== "raio" && e.tipo !== "orbita").map((e: any) => {
   const slot = b.slots.find((s: any) => s.nome === e.slot);
   return {
     nome: e.nome,
@@ -213,7 +214,7 @@ function linhasRaio(d: any, w: number[], we: number[] | null, relogio: number) {
   return out;
 }
 for (const anim of Object.keys(b.animacoes ?? {})) {
-  if (!raios.length) break;
+  if (!raios.length && !orbitas.length) break;
   const ts = [0.05, 1.1, 6.6, 7.1];
   const r = spawnSync(bin, [arq, anim, ts.join(",")], { encoding: "utf8", maxBuffer: 1 << 28 });
   if (r.status !== 0) throw new Error(r.stderr);
@@ -229,6 +230,41 @@ for (const anim of Object.keys(b.animacoes ?? {})) {
       if (t - acc < 1e-12) acc = t;
       rel += dt;
     }
+    // orbitas (docs/NUCLEO.md "Orbita"): x, y, z, escala, giro por particula
+    for (const d of orbitas) {
+      const w = ossos[q][d.osso ?? b.slots.find((s: any) => s.nome === d.slot).osso];
+      const cx = w[0] * (d.x ?? 0) + w[1] * (d.y ?? 0) + w[4],
+        cy = w[2] * (d.x ?? 0) + w[3] * (d.y ?? 0) + w[5];
+      const inc = (d.inclinacao ?? 0) * GRAU;
+      const [rx, ry] = par(d.raios, [80, 20]);
+      const volta = d.volta || 2,
+        n = d.quantidade ?? 8,
+        faixa = d.faixa ?? 0,
+        prof = d.profundidade ?? 0.35;
+      const esc0 = par(d.escala, [1, 1])[0],
+        giro = par(d.giro, [0, 0]);
+      const j6 = ((d.semente ?? 0) * 8 + 6) >>> 0,
+        j7 = ((d.semente ?? 0) * 8 + 7) >>> 0;
+      const esp: number[] = [];
+      for (let k = 0; k < n; k++) {
+        const s0 = sorteio(k, j6),
+          s1 = sorteio(k, j7),
+          s2 = sorteio(k + 1000, j6);
+        const th = 2 * Math.PI * (rel / volta + k / n + (0.3 * (s0 - 0.5)) / n);
+        const z = Math.sin(th);
+        const px = rx * Math.cos(th),
+          py = -ry * z + faixa * (2 * s1 - 1);
+        esp.push(cx + px * Math.cos(inc) - py * Math.sin(inc), cy + px * Math.sin(inc) + py * Math.cos(inc), z, esc0 * (0.85 + 0.3 * s2) * (1 + prof * z), (giro[0] + (giro[1] - giro[0]) * s2) * rel);
+      }
+      const nos: number[] = quadros[q].orbitas?.[d.nome] ?? [];
+      let pior = esp.length === nos.length ? 0 : Infinity;
+      esp.forEach((v, i) => (pior = Math.max(pior, Math.abs(v - nos[i]))));
+      linhasConf += n;
+      if (!(pior <= 1e-3)) {
+        falhas++;
+        console.log(`FALHA orbita ${d.nome} ${anim} t=${t}: pior ${pior}`);
+      }
+    }
     for (const d of raios) {
       const intens = Math.min(1, Math.max(0, taxaEm(anim, d.nome, d.taxa ?? 10, t)));
       const esp = intens > 0 ? linhasRaio(d, ossos[q][d.osso ?? b.slots.find((s: any) => s.nome === d.slot).osso], d.ate ? ossos[q][d.ate] : null, rel) : [];
@@ -243,5 +279,5 @@ for (const anim of Object.keys(b.animacoes ?? {})) {
     }
   });
 }
-console.log(falhas ? `${falhas} conferencias falharam` : `particulas iguais (${conferidas} particulas conferidas${raios.length ? `, ${linhasConf} linhas de raio` : ""})`);
+console.log(falhas ? `${falhas} conferencias falharam` : `particulas iguais (${conferidas} particulas conferidas${raios.length || orbitas.length ? `, ${linhasConf} linhas de raio e particulas de orbita` : ""})`);
 process.exit(falhas ? 1 : 0);

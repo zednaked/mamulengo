@@ -388,6 +388,35 @@ pelo Estado (no jogo e no editor) usam o mesmo intervalo dos eventos; ali a conf
 desenho: o editor (modo núcleo) e o Godot 4.7.2 mostram o mesmo. No editor, um personagem com
 partículas é simulado desde o 0 em passos, como um com física.
 
+### Órbita
+
+Um emissor com `tipo: "orbita"`: partículas que giram numa elipse em volta de um ponto do osso,
+passando por trás e pela frente do personagem (um 2,5D de partículas). Também sem estado: tudo
+sai do relógio. Valem `nome`, `slot` (onde desenham as da frente), `osso`, `x`, `y` (o centro),
+`imagem`, `blend`, `giro`, `semente` e a `taxa`, que é a intensidade (0 a 1). Campos próprios:
+
+| campo | padrão | o quê |
+|---|---|---|
+| `atras` | (obrigatório) | slot onde desenham as que estão atrás |
+| `raios` | `[80, 20]` | os raios da elipse na tela, em px (o segundo pequeno: vista de cima) |
+| `volta` | 2 | segundos por volta (negativo gira ao contrário) |
+| `quantidade` | 8 | partículas na órbita |
+| `faixa` | 0 | quanto cada uma foge para cima ou para baixo da elipse, em px |
+| `inclinacao` | 0 | graus: a elipse inclinada na tela |
+| `profundidade` | 0,35 | quanto a da frente cresce e a de trás encolhe |
+| `escala` | `[1, 1]` | o primeiro valor é a escala de base |
+| `cor` | `["ffffffff"]` | o primeiro tom vale na frente, o último atrás, misturados pela profundidade |
+
+A partícula `k` (0 a `quantidade - 1`), com os sorteios `s0` (`i = k`, `j = semente * 8 + 6`),
+`s1` (`i = k`, `j = semente * 8 + 7`) e `s2` (`i = k + 1000`, `j = semente * 8 + 6`): o ângulo é `θ = 2π (relogio / volta + k / quantidade + 0,3 (s0 - 0,5) /
+quantidade)`, a profundidade `z = sin θ` e a posição, antes de inclinar,
+`(raios[0] cos θ, -raios[1] sin θ + faixa (2 s1 - 1))` somada ao centro (a da frente fica mais
+embaixo: a câmera olha um pouco de cima). A escala é `escala[0] * (0,85 + 0,3 s2) *
+(1 + profundidade * z)`; a cor, a mistura do tom de trás para o da frente por `(z + 1) / 2`, vezes
+a cor do slot e a intensidade; o giro, `giro[0] + (giro[1] - giro[0]) s2` graus por segundo vezes
+o relógio. Com `z < 0` desenha logo depois do slot `atras`; senão, logo depois do `slot`.
+`posicoes_orbita` (`desenho.h`) dá as posições, que o desenho usa.
+
 ## Estado
 
 `mamulengo/estado.h`: trilhas, fila, mix e eventos (o que o jogo usa para tocar, emendar e

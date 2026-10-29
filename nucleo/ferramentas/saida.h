@@ -122,6 +122,24 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       out += ']';
     }
     out += '}';
+    // orbitas: [x, y, z, escala, giro] por particula
+    out += ",\"orbitas\":{";
+    bool primeira_orbita = true;
+    std::vector<double> orb;
+    for (size_t i = 0; i < m.emissores.size(); ++i) {
+      if (!m.emissores[i].orbita) continue;
+      if (!primeira_orbita) out += ',';
+      primeira_orbita = false;
+      escreve_texto(out, m.emissores[i].nome);
+      out += ":[";
+      posicoes_orbita(e, int(i), orb);
+      for (size_t j = 0; j < orb.size(); ++j) {
+        if (j) out += ',';
+        escreve_num(out, orb[j]);
+      }
+      out += ']';
+    }
+    out += '}';
     // linhas dos raios: [[x, y, x, y, ...], ...] (a principal e os ramos)
     out += ",\"raios\":{";
     bool primeiro_raio = true;

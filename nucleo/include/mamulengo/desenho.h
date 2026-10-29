@@ -49,6 +49,10 @@ struct Desenho {
 // os ramos, cada uma uma lista de pontos x, y (vazia se a intensidade e 0)
 void linhas_raio(const Esqueleto& e, int emissor, std::vector<std::vector<double>>& linhas);
 
+// as particulas de uma orbita no relogio atual (docs/NUCLEO.md "Orbita"): por particula x, y,
+// z (-1 atras a 1 na frente), escala e giro (graus)
+void posicoes_orbita(const Esqueleto& e, int emissor, std::vector<double>& out);
+
 // monta o desenho da pose atual (depois de atualizar_mundo); acrescenta a `d`, entao varias
 // instancias podem ir num desenho so
 void desenhar(const Esqueleto& e, Desenho& d);
