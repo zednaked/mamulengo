@@ -27,3 +27,12 @@ out, a gap between the legs, hands centered on the arms). The star image (`estre
 by the generator. To see it live, open the editor with this folder in `MAMULENGO_ROOTS`
 (it opens in the core's own renderer), or load it in Godot with the `BonecoSprite` node from
 `addons/boneco`.
+
+The GIF above comes straight from the editor's export, with a fixed crop of the world and a frame
+(title, captions per stretch, footer), through the bridge:
+
+```sh
+npx tsx tools/ponte.ts chamar export '{"format":"gif","animation":"vitrine","fps":20,"rect":[-200,-105,400,370],"maxWidth":640,"dir":"<this folder>","name":"vitrine","moldura":{"titulo":"Mamulengo","legendas":[{"de":0,"ate":2.25,"texto":"..."}],"rodape":"...","credito":"..."}}'
+```
+
+The same frame fields are in the export panel of the timeline.

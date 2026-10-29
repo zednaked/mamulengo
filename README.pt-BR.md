@@ -10,8 +10,9 @@ numa timeline, ou peça ao Claude pelo MCP e veja cada osso que ele mexe, ao viv
 no mesmo editor. O personagem é gravado em `.boneco`, um arquivo só e legível,
 com o atlas, as transições e uma ficha escrita. Um núcleo em C++, escrito do
 zero, toca esses arquivos no Godot (módulo do motor ou GDExtension) e no
-navegador (220 KB de WebAssembly). Abre e grava projetos do Spine 4.3, então nada
-do que já foi feito fica para trás.
+navegador (316 KB de WebAssembly, 127 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
+do que já foi feito fica para trás, e soma o que o Spine não tem: efeitos por
+parte, partículas e giro em 2,5D.
 
 [Read in English](README.md) · Godot 4.5+ · Linux, Windows e macOS
 
@@ -23,7 +24,7 @@ um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
 objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
 ```
 
-**Nesta página:** [o que faz](#o-que-faz) · [Claude Code](#com-o-claude-code) ·
+**Nesta página:** [o que faz](#o-que-faz) · [além do Spine](#além-do-spine) · [Claude Code](#com-o-claude-code) ·
 [a bancada de agentes](#a-bancada-de-agentes) · [o formato .boneco](#o-formato-boneco) ·
 [o núcleo](#o-núcleo) · [use no seu jogo Godot](#use-no-seu-jogo-godot) ·
 [num jogo Godot](#num-jogo-godot) · [rodar](#rodar) ·
@@ -58,13 +59,48 @@ as mesmas regras do que é uma boa animação.
   cada animação deve fazer, com regras que a ferramenta confere: amplitude e
   silhueta contra a mediana da casa, limite de junta depois do IK, malha que
   dobra demais, borda escondida que aparece, emenda que pula.
-- **Exportar** GIF ou WebM de qualquer animação ou emenda, como está na tela.
+- **Exportar** GIF ou WebM de qualquer animação ou emenda, como está na tela ou
+  num recorte fixo do mundo, com moldura para divulgar se quiser (título,
+  legendas por trecho, rodapé). O GIF grava só o que muda entre quadros.
+- **Imagem de referência.** Um desenho ou a arte original por cima do personagem,
+  presa ao mundo e semitransparente, para conferir pose, proporção e encaixe.
+- **Arte mais nítida a partir do vetor.** `tools/atlas-hd.ts` refaz uma página do
+  atlas em 2x, 3x... a partir do SVG original, parte por parte, no mesmo layout.
 
 ![Dois personagens saindo do ganho e voltando ao idle, a emenda que o jogo toca](docs/media/emendas.webp)
 
 *Do ganho para o idle, visto do jeito que o jogo mistura.*
 
 Guia completo: [docs/EDITOR.md](docs/EDITOR.md).
+
+## Além do Spine
+
+O que o formato `.boneco` e o núcleo fazem e o Spine não, com chaves na timeline
+como qualquer outra propriedade e o mesmo desenho no editor, no navegador e no
+Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
+
+- **Efeitos por parte:** contorno, brilho, dissolver (com tamanho do grão e borda
+  em brasa) e tingir. A malha cresce pelo contorno para o halo ter onde aparecer.
+- **Partículas presas a ossos:** emissores de imagens com taxa e rajadas, rampa
+  de cores, soma de luz e tremor (fogo, faíscas, fumaça); **raio** procedural
+  entre dois ossos; um anel em **órbita** que passa por trás e pela frente do
+  corpo.
+- **Giro em 2,5D:** `deform.turn` gira uma malha como um cilindro, e a cabeça olha
+  para o lado com as orelhas rígidas.
+
+![O robô olhando em 2,5D, voando com jatos, brilho e um anel de estrelas, dissolvendo os braços e soltando um raio entre as mãos](exemplos/vitrine/vitrine.gif)
+
+*[exemplos/vitrine](exemplos/vitrine): o robô CC0 passando por cada recurso num
+laço de 8,6 s. Exportado pelo editor, com moldura e legendas.*
+
+![Uma fase de plataforma: o robô pula entre plataformas, pega moedas, pisa num inimigo alado que se dissolve e voa com um propulsor](exemplos/jogo/jogo.gif)
+
+*[exemplos/jogo](exemplos/jogo): uma tela de jogo inteira num `.boneco`, com
+paralaxe, plataformas, moedas, inimigo, interface e o robô como herói. Arte:
+Jumper Pack, UI Pack e Particle Pack, de Kenney (CC0).*
+
+As contas e os parâmetros: [docs/NUCLEO.md](docs/NUCLEO.md) ("Efeitos" e
+"Partículas").
 
 ## Com o Claude Code
 
@@ -80,6 +116,10 @@ Abra o Claude Code nesta pasta e o servidor MCP `mamulengo` está lá
 | `mamulengo_notas`, `mamulengo_versoes` | notas da equipe e versões |
 | `mamulengo_export` | GIF ou WebM, devolve o caminho do arquivo |
 | `mamulengo_psd` | personagem novo a partir de um PSD, ou o aberto atualizado |
+
+Para trabalhar numa janela que alguém está olhando, `tools/ponte.ts servir` mantém
+uma conexão fixa com o editor aberto e repassa chamadas (`chamar`, `olhar`), e cada
+passo aparece lá na hora.
 
 Enquanto um agente trabalha, qualquer outra aba do editor o acompanha: o
 personagem, a animação e os ossos que ele toca acendem conforme ele avança, e o
@@ -207,8 +247,8 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 ## Rodar
 
 No modo de desenho "núcleo" o editor não usa o `spine-core`: o desenho, a pose, a interação, as
-medidas, a ficha e os comandos vêm do núcleo em wasm. Os modos "godot" e "spine" (o padrão ainda
-é o "godot") e o oráculo dos testes usam o `spine-core` e o `spine-webgl` (instalados pelo npm),
+medidas, a ficha e os comandos vêm do núcleo em wasm. Um `.boneco` abre no "núcleo"; um projeto do
+Spine abre no "godot", que, como o "spine" e o oráculo dos testes, usa o `spine-core` e o `spine-webgl` (instalados pelo npm),
 que exigem uma [licença do Spine](https://esotericsoftware.com/spine-purchase). O núcleo em
 `nucleo/` e o formato `.boneco` não dependem deles.
 
@@ -228,11 +268,12 @@ diferenças de motor que o editor reproduz: [docs/PARIDADE.md](docs/PARIDADE.md)
 
 ## Estado
 
-Funcionando: o editor, o servidor MCP, a bancada de agentes, o `.boneco`, o
+Funcionando: o editor (desenho, pose e medidas pelo núcleo no modo "núcleo"), o
+servidor MCP, a bancada de agentes, o `.boneco` com efeitos e partículas, o
 núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
 o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
-Próximos: o editor desenhando pelo núcleo no lugar do renderizador de referência,
-e um `.boneco` binário para pacotes menores. Plano:
+Próximos: o núcleo como modo padrão do editor para todo projeto, um `.boneco`
+binário para pacotes menores e o addon na Godot Asset Library. Plano:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licença

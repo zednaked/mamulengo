@@ -54,7 +54,10 @@ const MAO_Y = -5;
 parte("mao_e", "hand").y += MAO_Y;
 parte("mao_d", "hand").y -= MAO_Y;
 
-// ---- corpo: trechos das animacoes do robo em sequencia, com 0,3 s de emenda entre eles
+// ---- corpo: trechos das animacoes do robo em sequencia, com 0,3 s de emenda entre eles. O ultimo
+// idle e cortado no fim do laco, que fecha na pose do comeco (sem isso a animacao ia ate 9,8 s)
+
+const DUR = 8.6;
 
 const TRECHOS: [string, number][] = [
   ["idle", 0],
@@ -86,7 +89,13 @@ for (const op of props) {
     if (proprias) ks.push(...proprias.map((k) => desloca(k, t0)));
     else ks.push({ tempo: t0, ...NEUTRO[p] }, { tempo: r3(t0 + fim(a)), ...NEUTRO[p] });
   }
-  (ossos[o] ??= {})[p] = ks;
+  const { tempo: _t, curva: _c, ...inicio } = ks[0];
+  // pelo menos 0,15 s para voltar a pose do comeco, sem salto na emenda
+  const antes = ks.filter((k) => k.tempo <= DUR - 0.15);
+  // a bezier da ultima chave mirava a chave seguinte, que saiu: vira linear ate o fim
+  const ultima = antes[antes.length - 1];
+  if (Array.isArray(ultima.curva) && ultima.curva.some((v: number, i: number) => i % 2 === 0 && v > DUR - 0.15)) delete ultima.curva;
+  (ossos[o] ??= {})[p] = [...antes, { tempo: DUR, ...inicio }];
 }
 
 // ---- efeitos (docs/NUCLEO.md "Efeitos"): setup desligado, a animacao liga e apaga
@@ -409,8 +418,7 @@ const imagens: AssetProvider = {
 const doc = Document.fromText(JSON.stringify(ex.json), { text: ex.atlas, pages: {} });
 // alem do olhar, um 2,5D sutil em tudo: cada parte gira devagar uns poucos graus, em fases
 // diferentes (a cabeca puxa, o corpo vem logo atras, as pernas acompanham menos, os bracos tem o
-// ritmo deles). Periodos que fecham nos 8,6 s do laco, para nao pular na volta
-const DUR = 8.6;
+// ritmo deles). Periodos que fecham nos 8,6 s do laco (DUR), para nao pular na volta
 const onda = (t: number, graus: number, periodo: number, fase = 0) => graus * Math.sin((2 * Math.PI * (t - fase)) / periodo);
 // o olhar de 0 a 2 s: 0, -18, 0, 18, 0 com ida e volta suave; depois o balanco
 const olharCabeca = (t: number) => {

@@ -9,8 +9,9 @@ together.** Rig a character from a layered PSD, animate it on a timeline, or ask
 Claude to do it over MCP and watch every bone it moves, live, in the same editor.
 Characters are saved as `.boneco`, one readable file that carries its atlas,
 transitions and a written brief. A C++ core, written from scratch, plays them in
-Godot (engine module or GDExtension) and in the browser (220 KB of WebAssembly).
-It opens and writes Spine 4.3 projects, so nothing already made gets left behind.
+Godot (engine module or GDExtension) and in the browser (316 KB of WebAssembly, 127 KB gzipped).
+It opens and writes Spine 4.3 projects, so nothing already made gets left behind,
+and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 
 [Leia em português](README.pt-BR.md) · Godot 4.5+ · Linux, Windows and macOS
 
@@ -23,7 +24,7 @@ GPU objects created per frame in that game: 160 before, 0.3 now
 ```
 
 **On this page:** [what it does](#what-it-does) ·
-[Claude Code](#working-with-claude-code) ·
+[beyond Spine](#beyond-spine) · [Claude Code](#working-with-claude-code) ·
 [the agent bench](#the-agent-bench) · [the .boneco format](#the-boneco-format) ·
 [the core](#the-core) · [use in your Godot game](#use-in-your-godot-game) ·
 [in a Godot game](#in-a-godot-game) · [run it](#run-it) ·
@@ -58,13 +59,48 @@ the same rules for what a good animation is.
   what each animation should do, with rules the tool checks: amplitude and
   silhouette against the house median, joint limits after IK, meshes that fold
   too far, hidden edges that show, transitions that jump.
-- **Export** a GIF or WebM of any animation or transition, as seen on screen.
+- **Export** a GIF or WebM of any animation or transition, as seen on screen or
+  of a fixed crop of the world, optionally framed for sharing (title, timed
+  captions, footer). GIFs store only what changed between frames.
+- **Reference image.** Lay a drawing or the original art over the character,
+  pinned to the world and semi-transparent, to check pose, proportion and fit.
+- **Sharper art from vectors.** `tools/atlas-hd.ts` rebuilds an atlas page at 2x,
+  3x... from the source SVG, part by part, in the same layout.
 
 ![Two characters going from their win animation back into idle, the transition the game plays](docs/media/emendas.webp)
 
 *Win into idle, previewed the way the game blends it.*
 
 Full guide (in Portuguese): [docs/EDITOR.md](docs/EDITOR.md).
+
+## Beyond Spine
+
+Things the `.boneco` format and the core do that Spine does not, keyed on the
+timeline like any other property, drawn the same way in the editor, the browser
+and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
+
+- **Effects per part:** outline, glow, dissolve (with a grain size and a burning
+  edge) and tint. The mesh grows along its contour so the halo has room.
+- **Particles attached to bones:** sprite emitters with rate and bursts, color
+  ramps, additive blend and sway (fire, sparks, smoke); procedural **lightning**
+  between two bones; a ring in **orbit** that passes behind and in front of the
+  body.
+- **2.5D turns:** `deform.turn` turns a mesh like a cylinder, so a head can look
+  sideways with the ears staying rigid.
+
+![The robot looking around in 2.5D, flying on jets with a glow and a ring of stars, dissolving its arms and firing a lightning arc between its hands](exemplos/vitrine/vitrine.gif)
+
+*[exemplos/vitrine](exemplos/vitrine): the CC0 robot going through every feature
+in one 8.6 s loop. Exported from the editor, frame and captions included.*
+
+![A side-scrolling platformer scene: the robot jumps over platforms, picks coins, stomps a winged enemy that dissolves and flies with a jetpack](exemplos/jogo/jogo.gif)
+
+*[exemplos/jogo](exemplos/jogo): a whole game screen in one `.boneco`, with
+parallax, platforms, coins, an enemy, a HUD and the robot as the hero. Art: Jumper
+Pack, UI Pack and Particle Pack by Kenney (CC0).*
+
+The math and the parameters: [docs/NUCLEO.md](docs/NUCLEO.md) ("Efeitos" and
+"Partículas").
 
 ## Working with Claude Code
 
@@ -80,6 +116,10 @@ Open Claude Code in this folder and the `mamulengo` MCP server is there
 | `mamulengo_notas`, `mamulengo_versoes` | team notes and versions |
 | `mamulengo_export` | GIF or WebM, returns the file path |
 | `mamulengo_psd` | new character from a PSD, or update the open one |
+
+To work in a window someone is watching, `tools/ponte.ts servir` keeps a fixed
+connection to the open editor and relays calls (`chamar`, `olhar`), so every step
+shows up there as it happens.
 
 While an agent works, any other tab on the editor follows it: the character, the
 animation and the bones it touches light up as it goes, and what it writes between
@@ -208,7 +248,8 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 
 In the "nucleo" drawing mode the editor does not use `spine-core`: drawing, posing,
 interaction, measurements, the character sheet and the commands all come from the core in wasm.
-The "godot" and "spine" modes (the default is still "godot") and the test oracle use
+A `.boneco` opens in "nucleo"; a Spine project opens in "godot", which, like "spine" and the
+test oracle, uses
 `spine-core` and `spine-webgl` (installed from npm), which require a
 [Spine license](https://esotericsoftware.com/spine-purchase). The core in `nucleo/` and the
 `.boneco` format do not depend on them.
@@ -229,11 +270,12 @@ differences the editor reproduces: [docs/PARIDADE.md](docs/PARIDADE.md).
 
 ## Status
 
-Working: the editor, the MCP server, the agent bench, `.boneco`, the core with
-its Godot module and GDExtension. A slot game runs on staging with the engine
-module, and its `.boneco` build, all on the core, passes its tests. Next: the
-editor drawing through the core in place of the reference renderer, and a binary
-`.boneco` for smaller packs. Plan:
+Working: the editor (drawing, posing and measuring through the core in the
+"nucleo" mode), the MCP server, the agent bench, `.boneco` with effects and
+particles, the core with its Godot module and GDExtension. A slot game runs on
+staging with the engine module, and its `.boneco` build, all on the core, passes
+its tests. Next: the core as the editor's default mode for every project, a
+binary `.boneco` for smaller packs, and the addon on the Godot Asset Library. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
