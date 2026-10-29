@@ -286,13 +286,29 @@ class Leitor {
       par("velocidade", d.velocidade);
       par("escala", d.escala);
       par("giro", d.giro);
+      d.raio = j.str("tipo", "") == "raio";
+      if (d.raio) d.angulo = 0, d.cores = {Cor{1, 1, 1, 1}};
       d.angulo = j.num("angulo", d.angulo);
       d.abertura = j.num("abertura", d.abertura);
       d.gravidade = j.num("gravidade", d.gravidade);
       d.arrasto = j.num("arrasto", d.arrasto);
-      if (const Json* c = j.acha("cor"); c && c->lista()) {
-        if ((*c)[0].texto()) d.cor[0] = cor_hex((*c)[0].str());
-        if ((*c)[1].texto()) d.cor[1] = cor_hex((*c)[1].str());
+      if (const Json* c = j.acha("cor"); c && c->lista() && !c->itens().empty()) {
+        d.cores.clear();
+        for (const Json& x : c->itens()) d.cores.push_back(x.texto() ? cor_hex(x.str()) : Cor{});
+        if (d.cores.size() == 1 && !d.raio) d.cores.push_back(d.cores[0]);
+      }
+      if (const Json* b = j.acha("blend"); b && b->texto()) d.blend = int(ler_blend(b->str()));
+      par("onda", d.onda);
+      if (d.raio) {
+        if (const Json* a = j.acha("ate"); a && a->texto()) d.ate = osso(*a, "particulas");
+        d.ate_x = j.num("ate_x", 0);
+        d.ate_y = j.num("ate_y", 0);
+        d.comprimento = j.num("comprimento", d.comprimento);
+        d.segmentos = std::max(2, int(j.num("segmentos", d.segmentos)));
+        d.desvio = j.num("desvio", d.desvio);
+        d.largura = j.num("largura", d.largura);
+        d.troca = std::max(0.001, j.num("troca", d.troca));
+        d.ramos = std::max(0, int(j.num("ramos", d.ramos)));
       }
       d.maximo = int(j.num("maximo", d.maximo));
       d.semente = uint32_t(j.num("semente", 0));

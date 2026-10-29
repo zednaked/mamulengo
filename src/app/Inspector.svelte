@@ -104,7 +104,15 @@
     { k: "angle", label: "direcao", max: 360, step: 5, dica: "graus no osso (0 = ao longo do osso)" },
     { k: "gravity", label: "gravidade", max: 1000, step: 10, dica: "px/s2 para baixo" },
   ] as const;
-  const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0 };
+  const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0, width: 6, jitter: 0.15, segments: 10 };
+  // o raio: a taxa e a intensidade (0 a 1), e os controles sao os da linha
+  const CAMPOS_RAIO = [
+    { k: "rate", label: "intensidade", max: 1, step: 0.01, dica: "0 apaga, 1 cheio" },
+    { k: "width", label: "largura", max: 60, step: 1, dica: "px" },
+    { k: "jitter", label: "desvio", max: 0.5, step: 0.01, dica: "quanto foge para os lados (fracao do comprimento)" },
+    { k: "segments", label: "segmentos", max: 30, step: 1, dica: "pedacos da linha" },
+  ];
+  const camposDe = (p: any) => (p.type === "lightning" ? CAMPOS_RAIO : CAMPOS_P);
   const emissores = $derived.by(() => {
     app.version;
     app.play.time;
@@ -400,10 +408,10 @@
           <div class="ef">
             <div class="efnome" title="emissor de particulas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
               <span>✦ {em.p.name}</span>
-              {#if animando}<button onclick={() => rajada(em.p.name)} title="rajada: 12 nascem de uma vez neste instante">rajada</button>{/if}
+              {#if animando && em.p.type !== "lightning"}<button onclick={() => rajada(em.p.name)} title="rajada: 12 nascem de uma vez neste instante">rajada</button>{/if}
               {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "particles.delete", args: { name: em.p.name } }, `apaga ${em.p.name}`)} title="apagar o emissor">✕</button>{/if}
             </div>
-            {#each CAMPOS_P.filter((c) => !animando || c.k === "rate") as c}
+            {#each camposDe(em.p).filter((c) => !animando || c.k === "rate") as c}
               <label class="efcampo" title={c.dica}>
                 <span>{c.label}</span>
                 <input type="range" min="0" max={c.max} step={c.step} value={em.v(c.k)} oninput={(e) => setP(em.p.name, c.k, +(e.target as HTMLInputElement).value, em.p[c.k])} />

@@ -7,9 +7,11 @@
 //   0,0-2,0  idle      dano: o corpo pisca vermelho (tingir); a cabeca olha para os lados em 2,5D
 //                      (malha virada como cilindro pelo deform.turn: o rosto gira, as orelhas
 //                      acompanham rigidas)
-//   2,3-3,6  ganhou    halo azul no corpo (brilho), faiscas das maos, duas rajadas da cabeca
+//   2,3-3,6  ganhou    halo azul no corpo (brilho), faiscas das maos, duas rajadas da cabeca e
+//                      jatos de fogo nos pes (particulas com varios tons, somando luz e tremendo)
 //   3,9-5,9  idle      os bracos se dissolvem e voltam (dissolver ida e volta)
-//   6,2-7,5  ganhou    tudo junto: dourado no corpo, contorno, halo, faiscas e rajadas
+//   6,2-7,5  ganhou    tudo junto: dourado no corpo, contorno, halo, faiscas, rajadas, fogo e um
+//                      raio entre as maos (emissor tipo raio, refeito a cada 0,05 s)
 //   7,8-8,6  idle      tudo apaga; a animacao volta ao comeco
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -166,6 +168,26 @@ writeFileSync(join(AQUI, "estrela.png"), PNG.sync.write(estrela));
 b.paginas.push({ arquivo: "estrela.png", tamanho: [LADO, LADO] });
 b.imagens.push({ nome: "estrela", pagina: b.paginas.length - 1, ret: [0, 0, LADO, LADO] });
 
+// o fogo: um disco branco macio (a cor vem do emissor, somando luz); o raio: um traco macio
+// de um lado ao outro (v), com o miolo forte, esticado ao longo de cada pedaco (u)
+const pagina = (arquivo: string, w: number, h: number, alfa: (x: number, y: number) => number) => {
+  const png = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      png.data[i] = png.data[i + 1] = png.data[i + 2] = 255;
+      png.data[i + 3] = Math.round(Math.min(1, Math.max(0, alfa((x + 0.5) / w, (y + 0.5) / h))) * 255);
+    }
+  writeFileSync(join(AQUI, arquivo), PNG.sync.write(png));
+  b.paginas.push({ arquivo, tamanho: [w, h] });
+  b.imagens.push({ nome: arquivo.replace(/\.png$/, ""), pagina: b.paginas.length - 1, ret: [0, 0, w, h] });
+};
+pagina("fogo.png", 96, 96, (x, y) => Math.pow(Math.max(0, 1 - Math.hypot(x - 0.5, y - 0.5) * 2), 1.6));
+pagina("raio.png", 16, 64, (_x, y) => {
+  const d = Math.abs(y - 0.5) * 2;
+  return Math.max(0, 1 - d / 0.22) + 0.45 * Math.pow(Math.max(0, 1 - d), 2.5);
+});
+
 const faiscas = (nome: string, s: string) => ({
   nome,
   slot: s,
@@ -181,7 +203,31 @@ const faiscas = (nome: string, s: string) => ({
   cor: ["ffe066ff", "ff6a1e00"],
   semente: nome.length,
 });
+// jatos de fogo dos pes (as pernas apontam para baixo: angulo 0 e ao longo do osso)
+const jato = (nome: string, s: string) => ({
+  nome,
+  slot: s,
+  x: 40,
+  imagem: "fogo",
+  blend: "aditivo",
+  taxa: 0,
+  vida: [0.22, 0.45],
+  velocidade: [160, 260],
+  angulo: 0,
+  abertura: 22,
+  gravidade: -380,
+  escala: [0.42, 0.12],
+  giro: [-90, 90],
+  onda: [5, 7],
+  cor: ["fff4d0b0", "ffd25a99", "ff7a1a80", "c0201000"],
+  semente: nome.length + 11,
+});
+// o arco eletrico entre as maos
+const arco = { nome: "arco", tipo: "raio", slot: "cabeca", osso: "mao_e", ate: "mao_d", imagem: "raio", blend: "aditivo", taxa: 0, largura: 20, segmentos: 14, desvio: 0.16, ramos: 3, troca: 0.05, cor: ["9fe8ffff"], semente: 4 };
 b.particulas = [
+  jato("fogo_e", "perna_e"),
+  jato("fogo_d", "perna_d"),
+  arco,
   faiscas("faiscas_e", "mao_e"),
   faiscas("faiscas_d", "mao_d"),
   { nome: "confete", slot: "cabeca", y: 50, imagem: "estrela", taxa: 0, vida: [0.9, 1.6], velocidade: [180, 360], angulo: 0, abertura: 150, gravidade: 320, arrasto: 1.2, escala: [0.2, 0.0875], giro: [-300, 300], cor: ["7fe3ffff", "ff7ad900"], semente: 7 },
@@ -194,6 +240,10 @@ const rampa = (t0: number, t1: number, t2: number, pico: number) => [
 const particulas = {
   faiscas_e: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
   faiscas_d: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
+  fogo_e: { taxa: [...rampa(2.25, 2.4, 3.7, 55), ...rampa(6.15, 6.3, 7.6, 65)] },
+  fogo_d: { taxa: [...rampa(2.25, 2.4, 3.7, 55), ...rampa(6.15, 6.3, 7.6, 65)] },
+  // o arco liga, treme (a intensidade pisca) e apaga
+  arco: { taxa: [{ tempo: 6.35, valor: 0, curva: "degrau" }, { tempo: 6.4, valor: 1 }, { tempo: 6.9, valor: 0.55 }, { tempo: 7.0, valor: 1 }, { tempo: 7.45, valor: 1 }, { tempo: 7.6, valor: 0 }] },
   confete: {
     rajada: [
       { tempo: 2.45, quantidade: 22 },

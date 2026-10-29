@@ -152,12 +152,21 @@ export const CAMPOS: Record<string, string> = {
   max: "maximo",
   seed: "semente",
   burst: "rajada",
+  wave: "onda",
+  // raio (particulas tipo "raio")
+  toBone: "ate",
+  toX: "ate_x",
+  toY: "ate_y",
+  segments: "segmentos",
+  jitter: "desvio",
+  refresh: "troca",
+  branches: "ramos",
 };
 
 // valores de enum que mudam de nome (por campo)
 export const VALORES: Record<string, Record<string, string>> = {
   blend: { additive: "aditivo", multiply: "multiplica", screen: "tela" },
-  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider" },
+  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio" },
   curve: { stepped: "degrau" },
 };
 
@@ -167,7 +176,7 @@ export const VALORES_VOLTA: Record<string, Record<string, string>> = Object.from
 );
 
 // o dicionario tem de ser de mao dupla: nenhum nome portugues igual a outro, nem a um campo
-// do Spine que ficaria sem traducao
+// do Spine que ficaria sem traducao (chave repetida no objeto: tests/features.ts le o fonte)
 {
   const pt = Object.values(CAMPOS);
   const dup = pt.filter((v, i) => pt.indexOf(v) !== i);

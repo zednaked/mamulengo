@@ -49,6 +49,7 @@ enum class Mistura : uint8_t { Setup, Primeira, Substitui, Soma };
 // uma particula viva, no espaco do esqueleto
 struct Particula {
   double x = 0, y = 0, vx = 0, vy = 0, rot = 0, giro = 0, idade = 0, vida = 1;
+  double fase = 0;  // do balanco (onda), sorteada no nascimento
 };
 
 // estado de um emissor: a taxa animavel e a memoria entre quadros

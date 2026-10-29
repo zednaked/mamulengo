@@ -312,6 +312,8 @@ void Esqueleto::atualizar_particulas() {
       dt = std::max(relogio_ - e.relogio, 0.0);
     }
     e.relogio = relogio_;
+    // o raio nao tem particulas vivas: e desenhado do relogio (desenho.cpp)
+    if (d.raio) continue;
     // 1 e 2: envelhecer e mover
     if (dt > 0) {
       const double arrasto = std::exp(-d.arrasto * dt);
@@ -355,6 +357,7 @@ void Esqueleto::atualizar_particulas() {
       p.vy = dy * vel;
       p.vida = d.vida[0] + (d.vida[1] - d.vida[0]) * s_vida;
       p.giro = d.giro[0] + (d.giro[1] - d.giro[0]) * s_giro;
+      p.fase = sorteio(idx, j + 4);
       e.vivas.push_back(p);
     }
   }

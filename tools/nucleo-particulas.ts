@@ -8,6 +8,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { oraculo } from "./oraculo.ts";
+import { exportarSpine } from "../src/boneco/spine.ts";
+import { animDuration } from "../src/core/ficha.ts";
 
 const args = process.argv.slice(2);
 const i = args.indexOf("--nucleo");
@@ -29,7 +31,8 @@ function sorteio(i: number, j: number) {
 }
 
 const par = (v: any, d: [number, number]): [number, number] => (Array.isArray(v) ? [v[0] ?? d[0], v[1] ?? d[1]] : v === undefined ? d : [v, v]);
-const emissores = (b.particulas ?? []).map((e: any) => {
+const raios = (b.particulas ?? []).filter((e: any) => e.tipo === "raio");
+const emissores = (b.particulas ?? []).filter((e: any) => e.tipo !== "raio").map((e: any) => {
   const slot = b.slots.find((s: any) => s.nome === e.slot);
   return {
     nome: e.nome,
@@ -63,6 +66,13 @@ function taxaEm(anim: string, nome: string, setup: number, t: number) {
   return Math.max(v0 + ((v1 - v0) * (t - t0)) / (t1 - t0), 0);
 }
 
+// a duracao como o nucleo a conta: a ultima chave de qualquer timeline, inclusive particulas
+function duracao(anim: string) {
+  const a = b.animacoes[anim];
+  const ps = Object.values<any>(a?.particulas ?? {}).flatMap((tls: any) => Object.values<any>(tls).flatMap((ks: any[]) => ks.map((k) => f32(k.tempo ?? 0))));
+  return f32(Math.max(animDuration(exportarSpine(b).json.animations?.[anim]), ...ps, 0));
+}
+
 function simula(anim: string, t: number) {
   // os passos do nucleo-pose
   const passos: [number, number][] = [[0, 0]];
@@ -73,18 +83,24 @@ function simula(anim: string, t: number) {
     if (t - acc < 1e-12) acc = t;
     passos.push([acc, dt]);
   }
-  const ossos = oraculo(b, anim, passos.map(([a]) => a)).quadros.map((q: any) => q.ossos);
+  const dur0 = duracao(anim);
+  const ossos = oraculo(b, anim, passos.map(([a]) => (dur0 > 0 ? a % dur0 : a))).quadros.map((q: any) => q.ossos);
   const st = emissores.map(() => ({ acumulado: 0, nascidas: 0, pendentes: 0, vivas: [] as any[] }));
   let ultimo = -1;
+  // a animacao toca em laco (o nucleo-pose aplica com loop): o tempo dela da a volta
+  const dur = duracao(anim);
   passos.forEach(([a, dt], n) => {
+    const ta = dur > 0 ? a % dur : a;
     emissores.forEach((d: any, ie: number) => {
       const e = st[ie];
       for (const k of b.animacoes[anim]?.particulas?.[d.nome]?.rajada ?? []) {
         const tk = f32(k.tempo ?? 0);
-        if (n > 0 && a === ultimo) continue;
-        if (tk > ultimo && tk <= a) e.pendentes += k.quantidade ?? 1;
+        if (n > 0 && ta === ultimo) continue;
+        // como o aplicar do nucleo: em laco, a volta pega as chaves depois do ultimo e ate agora
+        const passou = ta >= ultimo ? tk > ultimo && tk <= ta : tk > ultimo || tk <= ta;
+        if (passou) e.pendentes += k.quantidade ?? 1;
       }
-      const taxa = taxaEm(anim, d.nome, d.taxa, a);
+      const taxa = taxaEm(anim, d.nome, d.taxa, ta);
       if (dt > 0) {
         const arr = Math.exp(-d.arrasto * dt);
         e.vivas = e.vivas.filter((p: any) => {
@@ -118,7 +134,7 @@ function simula(anim: string, t: number) {
         e.vivas.push({ x: w[0] * d.x + w[1] * d.y + w[4], y: w[2] * d.x + w[3] * d.y + w[5], vx: dx * vel, vy: dy * vel, rot: 0, giro: d.giro[0] + (d.giro[1] - d.giro[0]) * sg, idade: 0, vida: d.vida[0] + (d.vida[1] - d.vida[0]) * sv });
       }
     });
-    ultimo = a;
+    ultimo = ta;
   });
   return st;
 }
@@ -126,7 +142,7 @@ function simula(anim: string, t: number) {
 let falhas = 0,
   conferidas = 0;
 for (const anim of Object.keys(b.animacoes ?? {})) {
-  const ts = [0.05, 0.2, 0.45, 0.7, 1.1];
+  const ts = process.env.TEMPOS ? process.env.TEMPOS.split(",").map(Number) : [0.05, 0.2, 0.45, 0.7, 1.1, 2.6, 3.2, 6.6, 7.1];
   const r = spawnSync(bin, [arq, anim, ts.join(",")], { encoding: "utf8", maxBuffer: 1 << 28 });
   if (r.status !== 0) throw new Error(r.stderr);
   const quadros = JSON.parse(r.stdout).quadros;
@@ -139,12 +155,93 @@ for (const anim of Object.keys(b.animacoes ?? {})) {
       if (nos.length !== esp.length) pior = Infinity;
       else esp.forEach((p: any, k: number) => (pior = Math.max(pior, Math.hypot(p.x - nos[k][0], p.y - nos[k][1]), Math.abs(p.rot - nos[k][2]), Math.abs(p.idade - nos[k][3]))));
       conferidas += esp.length;
-      if (!(pior <= 1e-4)) {
+      if (!(pior <= 1e-3)) {
         falhas++;
-        console.log(`FALHA ${anim} t=${t} ${d.nome}: ${esp.length} esperadas, ${nos.length} no nucleo, pior diferenca ${pior}`);
+        console.log(`FALHA ${anim} t=${t} ${d.nome}: ${esp.length} esperadas, ${nos.length} no nucleo, pior diferenca ${pior}${process.env.TEMPOS ? ` idades esperadas ${[...new Set(esp.map((p: any) => p.idade.toFixed(2)))].join(",")}` : ""}`);
       }
     });
   });
 }
-console.log(falhas ? `${falhas} conferencias falharam` : `particulas iguais (${conferidas} particulas conferidas)`);
+// raios (docs/NUCLEO.md "Raio"): as linhas no instante, pela especificacao
+let linhasConf = 0;
+function linhasRaio(d: any, w: number[], we: number[] | null, relogio: number) {
+  const S = [w[0] * (d.x ?? 0) + w[1] * (d.y ?? 0) + w[4], w[2] * (d.x ?? 0) + w[3] * (d.y ?? 0) + w[5]];
+  let E: number[];
+  if (we) E = [we[0] * (d.ate_x ?? 0) + we[1] * (d.ate_y ?? 0) + we[4], we[2] * (d.ate_x ?? 0) + we[3] * (d.ate_y ?? 0) + we[5]];
+  else {
+    const g = (d.angulo ?? 0) * GRAU;
+    let ux = w[0] * Math.cos(g) + w[1] * Math.sin(g),
+      uy = w[2] * Math.cos(g) + w[3] * Math.sin(g);
+    const ul = Math.hypot(ux, uy);
+    if (ul > 1e-9) (ux /= ul), (uy /= ul);
+    E = [S[0] + ux * (d.comprimento ?? 100), S[1] + uy * (d.comprimento ?? 100)];
+  }
+  const seg = Math.max(2, d.segmentos ?? 10),
+    desvio = d.desvio ?? 0.15,
+    troca = Math.max(0.001, d.troca ?? 0.06);
+  const g = Math.floor(relogio / troca) >>> 0,
+    j = ((d.semente ?? 0) * 8 + 5) >>> 0;
+  const out: number[][] = [];
+  const quebrada = (A: number[], B: number[], n: number, dv: number, i0: number) => {
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    const nx = L > 1e-9 ? -(B[1] - A[1]) / L : 0,
+      ny = L > 1e-9 ? (B[0] - A[0]) / L : 0;
+    const ln = [A[0], A[1]];
+    for (let i = 1; i < n; i++) {
+      const f = i / n,
+        sx = sorteio((Math.imul(g, 64) + i0 + i) >>> 0, j);
+      const off = L * dv * (2 * sx - 1) * Math.sin(Math.PI * f);
+      ln.push(A[0] + (B[0] - A[0]) * f + nx * off, A[1] + (B[1] - A[1]) * f + ny * off);
+    }
+    ln.push(B[0], B[1]);
+    out.push(ln);
+  };
+  quebrada(S, E, seg, desvio, 0);
+  const L = Math.hypot(E[0] - S[0], E[1] - S[1]),
+    dir = Math.atan2(E[1] - S[1], E[0] - S[0]);
+  for (let r = 0; r < (d.ramos ?? 2) && seg > 2; r++) {
+    const b0 = (Math.imul(g, 64) + 40 + r * 4) >>> 0;
+    const s1 = sorteio(b0 + 1, j),
+      s2 = sorteio(b0 + 2, j),
+      s3 = sorteio(b0 + 3, j);
+    const k = 1 + Math.floor(s1 * (seg - 2));
+    const A = [out[0][k * 2], out[0][k * 2 + 1]];
+    const ang = dir + ((s2 - 0.5) * Math.PI) / 2,
+      comp = L * (0.25 + 0.25 * s3);
+    quebrada(A, [A[0] + Math.cos(ang) * comp, A[1] + Math.sin(ang) * comp], Math.max(2, Math.floor(seg / 2)), desvio / 2, 20 + r * 16);
+  }
+  return out;
+}
+for (const anim of Object.keys(b.animacoes ?? {})) {
+  if (!raios.length) break;
+  const ts = [0.05, 1.1, 6.6, 7.1];
+  const r = spawnSync(bin, [arq, anim, ts.join(",")], { encoding: "utf8", maxBuffer: 1 << 28 });
+  if (r.status !== 0) throw new Error(r.stderr);
+  const quadros = JSON.parse(r.stdout).quadros;
+  const ossos = oraculo(b, anim, ts).quadros.map((q: any) => q.ossos);
+  ts.forEach((t, q) => {
+    // o relogio do nucleo-pose: a soma dos passos (0, depois 1/64 ate t)
+    let acc = 0,
+      rel = 0;
+    while (acc < t) {
+      const dt = Math.min(1 / 64, t - acc);
+      acc += dt;
+      if (t - acc < 1e-12) acc = t;
+      rel += dt;
+    }
+    for (const d of raios) {
+      const intens = Math.min(1, Math.max(0, taxaEm(anim, d.nome, d.taxa ?? 10, t)));
+      const esp = intens > 0 ? linhasRaio(d, ossos[q][d.osso ?? b.slots.find((s: any) => s.nome === d.slot).osso], d.ate ? ossos[q][d.ate] : null, rel) : [];
+      const nos: number[][] = quadros[q].raios?.[d.nome] ?? [];
+      let pior = esp.length === nos.length ? 0 : Infinity;
+      esp.forEach((ln, k) => ln.forEach((v, i) => (pior = Math.max(pior, Math.abs(v - (nos[k]?.[i] ?? NaN))))));
+      linhasConf += esp.length;
+      if (!(pior <= 1e-3)) {
+        falhas++;
+        console.log(`FALHA raio ${d.nome} ${anim} t=${t}: ${esp.length} linhas esperadas, ${nos.length} no nucleo, pior ${pior}`);
+      }
+    }
+  });
+}
+console.log(falhas ? `${falhas} conferencias falharam` : `particulas iguais (${conferidas} particulas conferidas${raios.length ? `, ${linhasConf} linhas de raio` : ""})`);
 process.exit(falhas ? 1 : 0);

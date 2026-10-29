@@ -437,6 +437,22 @@ runtimeOk("constraints");
       `particulas: particles.set cria e muda, key.set anima rate e burst, spine-core le o documento${erroSpine ? ` (erro: ${erroSpine})` : ""}`,
     );
     const nome0 = s0.name;
+    // fogo (tons, blend, balanco) e raio (entre dois ossos) vao para o .boneco com os nomes certos
+    await run("particles.set", { name: "t.fogo", slot: s0.name, color: ["ffffffff", "ffcc00ff", "ff3300ff", "ff000000"], blend: "additive", wave: [4, 6] });
+    const ossos2 = doc.json.bones.map((o: any) => o.name);
+    await run("particles.set", { name: "t.raio", slot: s0.name, type: "lightning", bone: ossos2[1], toBone: ossos2[2], segments: 12, jitter: 0.2, width: 10, branches: 2, refresh: 0.05, rate: 1 });
+    {
+      const { importarSpine } = await import("../src/boneco/spine.ts");
+      const bb = importarSpine(doc.json, atlasText, "t");
+      const fogo = bb.particulas.find((x: any) => x.nome === "t.fogo"),
+        raio = bb.particulas.find((x: any) => x.nome === "t.raio");
+      check(
+        fogo?.blend === "aditivo" && fogo?.cor?.length === 4 && fogo?.onda?.[1] === 6 && raio?.tipo === "raio" && raio?.ate === ossos2[2] && raio?.segmentos === 12 && raio?.desvio === 0.2 && raio?.ramos === 2 && raio?.troca === 0.05,
+        `particulas: fogo (tons, blend, onda) e raio (tipo, ate, segmentos, desvio, ramos, troca) chegam ao .boneco (${JSON.stringify(raio)})`,
+      );
+    }
+    await run("particles.delete", { name: "t.fogo" });
+    await run("particles.delete", { name: "t.raio" });
     await run("slot.rename", { slot: nome0, to: "t.slotp" });
     const seguiu = (doc.json as any).particles[0].slot === "t.slotp";
     await run("slot.rename", { slot: "t.slotp", to: nome0 });
@@ -499,7 +515,15 @@ runtimeOk("constraints");
       asset.defaultMix === 0.2 && lerVirtual(asset.atlas) === atlasTexto(b2) && b3.animacoes[a0].ossos.cabeca.girar[0].valor === 7 && b3.mix.padrao === 0.2 && b3.paginas[0].jogo?.qualidade === 0.7 && b3.ficha.texto === "# nova",
       ".boneco no editor: le e grava pelos arquivos virtuais sem perder mix, compressao e ficha",
     );
-    // efeitos (so do Mamulengo): vao e voltam como `effects`, o spine-core le o JSON sem
+    // o dicionario sem chave repetida (no objeto literal a ultima ganharia calada)
+  {
+    const fonte = readFileSync(new URL("../src/boneco/dicionario.ts", import.meta.url), "utf8");
+    const bloco = fonte.slice(fonte.indexOf("export const CAMPOS"), fonte.indexOf("};", fonte.indexOf("export const CAMPOS")));
+    const chaves = [...bloco.matchAll(/^\s+([A-Za-z_][\w]*):/gm)].map((m) => m[1]);
+    const rep = chaves.filter((k, i) => chaves.indexOf(k) !== i);
+    check(!rep.length, `dicionario do .boneco sem chave repetida${rep.length ? `: ${rep.join(", ")}` : ""} (${chaves.length} campos)`);
+  }
+  // efeitos (so do Mamulengo): vao e voltam como `effects`, o spine-core le o JSON sem
     // reclamar e a exportacao para o Spine de verdade os tira com aviso
     const be = structuredClone(b);
     const se = be.slots[0].nome;

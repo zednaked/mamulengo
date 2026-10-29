@@ -31,7 +31,7 @@ defineCommand({
   name: "particles.set",
   group: "slot",
   summary:
-    "Cria ou muda um emissor de particulas (so do Mamulengo, para .boneco; o Spine nao tem). Nascem do osso (padrao: o do slot) no ponto x,y; desenham logo depois da parte do slot, com a cor e o blend dele. image: nome de imagem do atlas (padrao: a do slot). rate por segundo; life, speed, scale, spin aceitam numero ou [inicio/min, fim/max]; angle e spread em graus no espaco do osso; gravity px/s2 para baixo; drag por segundo; color [nascimento, fim] em hex. Para animar: key.set com target {particles: nome}, timeline rate {value} ou burst {count} (nascem de uma vez).",
+    "Cria ou muda um emissor de particulas (so do Mamulengo, para .boneco; o Spine nao tem). Nascem do osso (padrao: o do slot) no ponto x,y; desenham logo depois da parte do slot, com a cor e o blend dele. image: nome de imagem do atlas (padrao: a do slot). rate por segundo; life, speed, scale, spin aceitam numero ou [inicio/min, fim/max]; angle e spread em graus no espaco do osso; gravity px/s2 para baixo; drag por segundo; color [nascimento, fim] em hex. Para animar: key.set com target {particles: nome}, timeline rate {value} ou burst {count} (nascem de uma vez). Fogo: color com varios tons, blend additive e wave. Raio: type lightning entre bone e toBone (ou length), com segments, jitter, width, refresh, branches; rate e a intensidade 0 a 1.",
   params: z.object({
     name: z.string().min(1),
     slot: z.string().optional(),
@@ -48,9 +48,22 @@ defineCommand({
     drag: z.number().min(0).optional(),
     scale: Par.optional(),
     spin: Par.optional(),
-    color: z.tuple([Cor, Cor]).optional(),
+    color: z.array(Cor).min(1).optional().describe("tons espalhados pela vida (o primeiro no nascimento, o ultimo no fim); no raio, so o primeiro"),
+    blend: z.enum(["normal", "additive", "multiply", "screen"]).optional().describe("o do emissor (fogo e brilho: additive); sem ele, o do slot"),
+    wave: z.tuple([z.number(), z.number()]).optional().describe("balanco lateral: [amplitude px, frequencia Hz] (a chama treme)"),
     max: z.number().int().min(1).optional(),
     seed: z.number().int().min(0).optional(),
+    // raio
+    type: z.enum(["particles", "lightning"]).optional().describe("lightning: um raio (linha quebrada refeita a cada refresh s); rate vira a intensidade 0 a 1"),
+    toBone: z.string().optional().describe("raio: osso do fim (com toX, toY); sem ele, length na direcao angle"),
+    toX: z.number().optional(),
+    toY: z.number().optional(),
+    length: z.number().positive().optional(),
+    segments: z.number().int().min(2).optional(),
+    jitter: z.number().min(0).optional().describe("raio: quanto os pontos fogem para os lados, em fracao do comprimento"),
+    width: z.number().positive().optional().describe("raio: largura em px"),
+    refresh: z.number().positive().optional().describe("raio: segundos entre um desenho e o seguinte"),
+    branches: z.number().int().min(0).optional(),
   }),
   label: (p) => `particulas ${p.name}`,
   run({ e }, p) {
@@ -58,7 +71,8 @@ defineCommand({
     const i = lista.findIndex((x) => x.name === p.name);
     if (p.slot) requireSlot(e.json, p.slot);
     if (p.bone) requireBone(e.json, p.bone);
-    const { name, scale, ...campos } = p;
+    if (p.toBone) requireBone(e.json, p.toBone);
+    const { name, scale, type, ...campos } = p;
     const novo: any = i >= 0 ? { ...lista[i] } : { name };
     if (i < 0) {
       if (!p.slot) throw new Error("emissor novo: diga o slot (lugar na ordem de desenho)");
@@ -69,6 +83,8 @@ defineCommand({
     for (const [k, v] of Object.entries(campos)) if (v !== undefined) novo[k] = num(v);
     // a escala do emissor fica "escala" nos dois formatos (scale e a timeline escalar)
     if (scale !== undefined) novo.escala = num(scale);
+    if (type === "lightning") novo.type = "lightning";
+    else if (type === "particles") delete novo.type;
     if (i < 0) e.set(["particles"], [...lista, novo]);
     else if (JSON.stringify(novo) !== JSON.stringify(lista[i])) e.set(["particles", i], novo);
     return { index: i < 0 ? lista.length : i, emitter: novo };

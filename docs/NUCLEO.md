@@ -322,7 +322,9 @@ tira e avisa.
 | `arrasto` | 0 | por segundo: `v *= exp(-arrasto * dt)` |
 | `escala` | `[1, 1]` | no nascimento e no fim da vida |
 | `giro` | `[0, 0]` | graus/s, sorteado |
-| `cor` | `["ffffffff", "ffffff00"]` | no nascimento e no fim (some no fim, por padrão) |
+| `cor` | `["ffffffff", "ffffff00"]` | dois ou mais tons, espalhados por igual pela vida (o primeiro no nascimento, o último no fim); some no fim, por padrão |
+| `blend` | o do slot | `normal`, `aditivo`, `multiplica`, `tela`: o do emissor (fogo e brilho somam luz sem mudar a camada) |
+| `onda` | `[0, 0]` | balanço lateral do desenho: amplitude em px e frequência em Hz, com fase sorteada por partícula (a chama treme) |
 | `maximo` | 200 | vivas ao mesmo tempo (as que passam não nascem) |
 | `semente` | 0 | muda o sorteio |
 
@@ -344,9 +346,40 @@ O sorteio `s` de cada campo (`c` = 0 vida, 1 velocidade, 2 direção, 3 giro) é
 (acima) com `i = k`, `j = semente * 8 + c`. Inteiro, então igual na web, no Godot e no editor.
 
 **Desenho:** a partícula é o retângulo com pixels da imagem, centrado nela, escalado pela escala
-do momento (interpolada pela idade), girado por `rot` e posto em `pos`; a cor é a do momento
-vezes a cor do slot. Entra logo depois da parte do slot, com o blend do slot; slot com alfa 0
-não desenha as partículas (mas elas seguem vivendo).
+do momento (interpolada pela idade), girado por `rot` e posto em `pos`, mais o balanço
+`amplitude * sin(2π * frequencia * idade + 2π * s)` no eixo x do mundo (`s`: o sorteio de campo 4);
+a cor é a do momento (entre os dois tons vizinhos da lista) vezes a cor do slot. Entra logo
+depois da parte do slot, com o blend do emissor (ou o do slot); slot com alfa 0 não desenha as
+partículas (mas elas seguem vivendo).
+
+### Raio
+
+Um emissor com `tipo: "raio"`: uma linha quebrada, refeita de tempos em tempos, sem partículas
+vivas. Do emissor valem `nome`, `slot`, `osso`, `x`, `y`, `imagem`, `blend`, `semente` e a `taxa`,
+que aqui é a intensidade (0 apaga, 1 cheio; animável como sempre). Campos próprios:
+
+| campo | padrão | o quê |
+|---|---|---|
+| `ate` | (nenhum) | osso do fim (o ponto `ate_x`, `ate_y` nele); sem ele, `comprimento` na direção `angulo` (no osso) |
+| `comprimento`, `angulo` | 100, 0 | quando não há `ate` |
+| `segmentos` | 10 | pedaços da linha principal |
+| `desvio` | 0,15 | quanto os pontos do meio fogem para os lados, em fração do comprimento |
+| `largura` | 6 | px |
+| `troca` | 0,06 | segundos entre um desenho e o seguinte |
+| `ramos` | 2 | galhos (cada um sai de um ponto do meio da linha principal) |
+| `cor` | `["ffffffff"]` | a primeira cor da lista (vezes a do slot e a intensidade) |
+
+A forma `g = floor(relogio / troca)` (o relógio do esqueleto) muda a cada troca. Com `S` o ponto de
+saída, `E` o de chegada, `L = |E - S|` e `n` a perpendicular unitária, o ponto `i` (1 a
+`segmentos - 1`) é `S + (E - S) * i / segmentos + n * L * desvio * (2s - 1) * sin(π i / segmentos)`,
+com `s` o sorteio de `i = g * 64 + i`, `j = semente * 8 + 5`. O ramo `r` sai do ponto
+`1 + floor(s1 * (segmentos - 2))`, gira `(s2 - 0,5) * 90°` da direção do raio, tem comprimento
+`L * (0,25 + 0,25 * s3)` e metade dos segmentos (no mínimo 2) e do desvio (sorteios de
+`i = g * 64 + 40 + r * 4 + 1, 2, 3`, mesmo `j`; os pontos do ramo como os da principal, com
+`i = g * 64 + 20 + r * 16 + i`), com largura pela metade. `linhas_raio` (`desenho.h`) devolve as
+linhas, que o desenho usa. Cada pedaço é um retângulo de `largura` ao longo
+do segmento, com a imagem esticada: `u` ao longo, `v` de um lado ao outro (uma imagem com um
+traço macio no meio dá o brilho). Desenha na mesma posição das partículas.
 
 Conferência: `npx tsx tools/nucleo-particulas.ts` refaz a simulação de
 `tests/nucleo/particulas/particulas.boneco` (o robô CC0 com faíscas na mão e rajadas na cabeça)

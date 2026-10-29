@@ -262,9 +262,16 @@ struct DadosEmissor {
   double taxa = 10;
   double vida[2] = {1, 1}, velocidade[2] = {100, 100}, escala[2] = {1, 1}, giro[2] = {0, 0};
   double angulo = 90, abertura = 30, gravidade = 0, arrasto = 0;
-  Cor cor[2] = {Cor{1, 1, 1, 1}, Cor{1, 1, 1, 0}};
+  std::vector<Cor> cores = {Cor{1, 1, 1, 1}, Cor{1, 1, 1, 0}};  // tons espalhados pela vida
+  int blend = -1;                      // Blend do emissor; -1: o do slot
+  double onda[2] = {0, 0};             // balanco lateral: amplitude (px) e frequencia (Hz)
   int maximo = 200;
   uint32_t semente = 0;
+  // raio (tipo "raio"): linha quebrada refeita a cada `troca` segundos; a taxa e a intensidade
+  bool raio = false;
+  int ate = -1;                        // osso do fim (-1: comprimento na direcao do angulo)
+  double ate_x = 0, ate_y = 0, comprimento = 100, desvio = 0.15, largura = 6, troca = 0.06;
+  int segmentos = 10, ramos = 2;
 };
 
 struct TimelineTaxa {

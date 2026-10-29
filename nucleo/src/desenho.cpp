@@ -88,6 +88,17 @@ void corta(std::vector<P2>& v, P2 a, P2 b, std::vector<P2>& tmp) {
   v.swap(tmp);
 }
 
+// o hash inteiro dos efeitos (docs/NUCLEO.md "Efeitos"), de 0 a 1
+double sorteio(uint32_t i, uint32_t j) {
+  uint32_t x = i * 1664525u + j * 1013904223u;
+  x ^= x >> 16;
+  x *= 0x7feb352du;
+  x ^= x >> 15;
+  x *= 0x846ca68bu;
+  x ^= x >> 16;
+  return double(x) / 4294967295.0;
+}
+
 // a malha cresce pelo contorno (os h primeiros vertices, em ordem; 8 floats por vertice: x, y,
 // u, v, cor): cada um anda para fora `margem` pixels da textura (docs/NUCLEO.md "Efeitos")
 void crescer_malha(float* v, int h, float margem, int W, int H) {
@@ -140,6 +151,53 @@ void crescer_malha(float* v, int h, float margem, int W, int H) {
 }
 
 }  // namespace
+
+void linhas_raio(const Esqueleto& e, int ie, std::vector<std::vector<double>>& linhas) {
+  linhas.clear();
+  const Modelo& m = e.modelo();
+  const DadosEmissor& de = m.emissores[size_t(ie)];
+  if (!de.raio || std::min(std::max(e.emissores()[size_t(ie)].taxa, 0.0), 1.0) <= 0) return;
+  const Matriz& w = e.mundo()[size_t(de.osso)];
+  const P2 S{w.a * de.x + w.b * de.y + w.x, w.c * de.x + w.d * de.y + w.y};
+  P2 E;
+  if (de.ate >= 0) {
+    const Matriz& t = e.mundo()[size_t(de.ate)];
+    E = {t.a * de.ate_x + t.b * de.ate_y + t.x, t.c * de.ate_x + t.d * de.ate_y + t.y};
+  } else {
+    const double g = de.angulo * GRAU;
+    double ux = w.a * std::cos(g) + w.b * std::sin(g), uy = w.c * std::cos(g) + w.d * std::sin(g);
+    const double ul = std::hypot(ux, uy);
+    if (ul > 1e-9) ux /= ul, uy /= ul;
+    E = {S.x + ux * de.comprimento, S.y + uy * de.comprimento};
+  }
+  const uint32_t g = uint32_t(std::floor(e.relogio() / de.troca));
+  const uint32_t j = de.semente * 8u + 5u;
+  // a linha quebrada de A ate B em n pedacos, desvio em fracao do comprimento
+  auto quebrada = [&](P2 A, P2 B, int n, double desvio, uint32_t i0) {
+    const double L = std::hypot(B.x - A.x, B.y - A.y);
+    const double nx = L > 1e-9 ? -(B.y - A.y) / L : 0, ny = L > 1e-9 ? (B.x - A.x) / L : 0;
+    std::vector<double> ln;
+    ln.reserve(size_t(n + 1) * 2);
+    ln.insert(ln.end(), {A.x, A.y});
+    for (int i = 1; i < n; ++i) {
+      const double f = double(i) / n, sx = sorteio(g * 64u + i0 + uint32_t(i), j);
+      const double off = L * desvio * (2 * sx - 1) * std::sin(PI * f);
+      ln.insert(ln.end(), {A.x + (B.x - A.x) * f + nx * off, A.y + (B.y - A.y) * f + ny * off});
+    }
+    ln.insert(ln.end(), {B.x, B.y});
+    linhas.push_back(std::move(ln));
+  };
+  quebrada(S, E, de.segmentos, de.desvio, 0);
+  const double L = std::hypot(E.x - S.x, E.y - S.y), dir = std::atan2(E.y - S.y, E.x - S.x);
+  for (int r = 0; r < de.ramos && de.segmentos > 2; ++r) {
+    const uint32_t b0 = g * 64u + 40u + uint32_t(r) * 4u;
+    const double s1 = sorteio(b0 + 1, j), s2 = sorteio(b0 + 2, j), s3 = sorteio(b0 + 3, j);
+    const size_t k = size_t(1 + int(std::floor(s1 * (de.segmentos - 2))));
+    const P2 A{linhas[0][k * 2], linhas[0][k * 2 + 1]};
+    const double ang = dir + (s2 - 0.5) * PI / 2, comp = L * (0.25 + 0.25 * s3);
+    quebrada(A, P2{A.x + std::cos(ang) * comp, A.y + std::sin(ang) * comp}, std::max(2, de.segmentos / 2), de.desvio / 2, 20u + uint32_t(r) * 16u);
+  }
+}
 
 void desenhar(const Esqueleto& e, Desenho& d) {
   const Modelo& m = e.modelo();
@@ -224,6 +282,41 @@ void desenhar(const Esqueleto& e, Desenho& d) {
     }
   };
   // as particulas dos emissores do slot (docs/NUCLEO.md "Particulas"), logo depois da parte dele
+  std::vector<std::vector<double>> raios;
+  auto quad = [&](const float* q, const float* uv, float cr, float cg, float cb, float ca) {
+    // q: 4 cantos (x, y); uv: 4 pares; a ordem baixo-esquerda, cima-esquerda, cima-direita,
+    // baixo-direita
+    const uint32_t base = uint32_t(d.vertices.size() / 8);
+    for (int k = 0; k < 4; ++k) d.vertices.insert(d.vertices.end(), {q[k * 2], q[k * 2 + 1], uv[k * 2], uv[k * 2 + 1], cr, cg, cb, ca});
+    if (recorte_fim != -2 && d.recorte_cpu) {
+      tri_cortado(base, base + 1, base + 2);
+      tri_cortado(base + 2, base + 3, base);
+    } else {
+      d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+    }
+  };
+  // um pedaco do raio: retangulo de largura w de a ate b, a imagem esticada (u ao longo, v de
+  // um lado ao outro, nas uvs dos cantos da imagem)
+  auto pedaco = [&](const DadosEmissor& de, P2 a, P2 b, double w, float cr, float cg, float cb, float ca) {
+    double dx = b.x - a.x, dy = b.y - a.y;
+    const double l = std::hypot(dx, dy);
+    if (l < 1e-9) return;
+    const double nx = -dy / l * w / 2, ny = dx / l * w / 2;
+    const float q[8] = {float(a.x - nx), float(a.y - ny), float(a.x + nx), float(a.y + ny), float(b.x + nx), float(b.y + ny), float(b.x - nx), float(b.y - ny)};
+    quad(q, de.uvs, cr, cg, cb, ca);
+  };
+  auto raio = [&](int ie, const DadosEmissor& de, const EstadoEmissor& ee, const EstadoSlot& s) {
+    const double intens = std::min(std::max(ee.taxa, 0.0), 1.0);
+    const Cor& c0 = de.cores[0];
+    const float cr = c0.r * s.cor.r, cg = c0.g * s.cor.g, cb = c0.b * s.cor.b, ca = float(c0.a * s.cor.a * intens);
+    if (ca <= 0) return;
+    linhas_raio(e, ie, raios);
+    for (size_t k = 0; k < raios.size(); ++k) {
+      const std::vector<double>& ln = raios[k];
+      const double w = k == 0 ? de.largura : de.largura / 2;
+      for (size_t i = 0; i + 3 < ln.size(); i += 2) pedaco(de, P2{ln[i], ln[i + 1]}, P2{ln[i + 2], ln[i + 3]}, w, cr, cg, cb, ca);
+    }
+  };
   auto particulas = [&](int si) {
     if (m.emissores_do_slot.empty()) return;
     const EstadoSlot& s = e.slots()[size_t(si)];
@@ -231,29 +324,36 @@ void desenhar(const Esqueleto& e, Desenho& d) {
     for (int ie : m.emissores_do_slot[size_t(si)]) {
       const DadosEmissor& de = m.emissores[size_t(ie)];
       const EstadoEmissor& ee = e.emissores()[size_t(ie)];
-      if (de.pagina < 0 || ee.vivas.empty()) continue;
-      Lote& l = lote(Comando::Triangulos, de.pagina, m.slots[size_t(si)].blend);
+      if (de.pagina < 0 || (!de.raio && ee.vivas.empty())) continue;
+      Lote& l = lote(Comando::Triangulos, de.pagina, de.blend >= 0 ? Blend(de.blend) : m.slots[size_t(si)].blend);
       const size_t li = size_t(&l - d.lotes.data());
+      if (de.raio) {
+        raio(ie, de, ee, s);
+        d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+        continue;
+      }
+      const size_t nc = de.cores.size();
       for (const Particula& p : ee.vivas) {
         const double f = p.vida > 0 ? std::min(p.idade / p.vida, 1.0) : 1;
         const double esc = de.escala[0] + (de.escala[1] - de.escala[0]) * f;
-        const float cr = float(de.cor[0].r + (de.cor[1].r - de.cor[0].r) * f) * s.cor.r;
-        const float cg = float(de.cor[0].g + (de.cor[1].g - de.cor[0].g) * f) * s.cor.g;
-        const float cb = float(de.cor[0].b + (de.cor[1].b - de.cor[0].b) * f) * s.cor.b;
-        const float ca = float(de.cor[0].a + (de.cor[1].a - de.cor[0].a) * f) * s.cor.a;
+        // a cor entre os dois tons vizinhos da lista
+        const double pos = f * double(nc - 1);
+        const size_t k0 = std::min(size_t(pos), nc - 1), k1 = std::min(k0 + 1, nc - 1);
+        const double fr = pos - double(k0);
+        const Cor &c0 = de.cores[k0], &c1 = de.cores[k1];
+        const float cr = float(c0.r + (c1.r - c0.r) * fr) * s.cor.r;
+        const float cg = float(c0.g + (c1.g - c0.g) * fr) * s.cor.g;
+        const float cb = float(c0.b + (c1.b - c0.b) * fr) * s.cor.b;
+        const float ca = float(c0.a + (c1.a - c0.a) * fr) * s.cor.a;
         if (ca <= 0 || esc <= 0) continue;
+        double px = p.x;
+        if (de.onda[0] != 0) px += de.onda[0] * std::sin(2 * PI * (de.onda[1] * p.idade + p.fase));
         const double cs = std::cos(p.rot * GRAU) * esc, sn = std::sin(p.rot * GRAU) * esc;
         const double l0 = -de.meia_largura, r0 = de.meia_largura, b0 = -de.meia_altura, t0 = de.meia_altura;
-        const double px[4] = {l0, l0, r0, r0}, py[4] = {b0, t0, t0, b0};
-        const uint32_t base = uint32_t(d.vertices.size() / 8);
-        for (int k = 0; k < 4; ++k)
-          d.vertices.insert(d.vertices.end(), {float(p.x + px[k] * cs - py[k] * sn), float(p.y + px[k] * sn + py[k] * cs), de.uvs[k * 2], de.uvs[k * 2 + 1], cr, cg, cb, ca});
-        if (recorte_fim != -2 && d.recorte_cpu) {
-          tri_cortado(base, base + 1, base + 2);
-          tri_cortado(base + 2, base + 3, base);
-        } else {
-          d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
-        }
+        const double cx[4] = {l0, l0, r0, r0}, cy[4] = {b0, t0, t0, b0};
+        float q[8];
+        for (int k = 0; k < 4; ++k) q[k * 2] = float(px + cx[k] * cs - cy[k] * sn), q[k * 2 + 1] = float(p.y + cx[k] * sn + cy[k] * cs);
+        quad(q, de.uvs, cr, cg, cb, ca);
       }
       d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
     }

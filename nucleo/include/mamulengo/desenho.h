@@ -45,6 +45,10 @@ struct Desenho {
   }
 };
 
+// as linhas de um emissor tipo raio no relogio atual (docs/NUCLEO.md "Raio"): a principal e
+// os ramos, cada uma uma lista de pontos x, y (vazia se a intensidade e 0)
+void linhas_raio(const Esqueleto& e, int emissor, std::vector<std::vector<double>>& linhas);
+
 // monta o desenho da pose atual (depois de atualizar_mundo); acrescenta a `d`, entao varias
 // instancias podem ir num desenho so
 void desenhar(const Esqueleto& e, Desenho& d);

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "mamulengo/desenho.h"
 #include "mamulengo/pose.h"
 
 namespace mamulengo {
@@ -115,6 +116,29 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
         for (int j = 0; j < 5; ++j) {
           if (j) out += ',';
           escreve_num(out, vals[j]);
+        }
+        out += ']';
+      }
+      out += ']';
+    }
+    out += '}';
+    // linhas dos raios: [[x, y, x, y, ...], ...] (a principal e os ramos)
+    out += ",\"raios\":{";
+    bool primeiro_raio = true;
+    std::vector<std::vector<double>> linhas;
+    for (size_t i = 0; i < m.emissores.size(); ++i) {
+      if (!m.emissores[i].raio) continue;
+      if (!primeiro_raio) out += ',';
+      primeiro_raio = false;
+      escreve_texto(out, m.emissores[i].nome);
+      out += ":[";
+      linhas_raio(e, int(i), linhas);
+      for (size_t k = 0; k < linhas.size(); ++k) {
+        if (k) out += ',';
+        out += '[';
+        for (size_t j = 0; j < linhas[k].size(); ++j) {
+          if (j) out += ',';
+          escreve_num(out, linhas[k][j]);
         }
         out += ']';
       }
