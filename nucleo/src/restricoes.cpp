@@ -437,6 +437,7 @@ void Esqueleto::restricao_caminho(int ri) {
         py += (y + w.c * c - y2) * e.mix_girar;
       }
     }
+    mundo_para_local(o);
   }
 }
 
@@ -489,7 +490,12 @@ void Esqueleto::restricao_fisica(int ri) {
   const double a = e.sobra / h;
   e.saida = e.rot_ant + (e.rot - e.rot_ant) * a;
   const double r = e.saida * d.girar * e.mix;
-  if (r != 0) gira(w, r);
+  if (r != 0) {
+    gira(w, r);
+    // medido: sem isso a cabeca perdia a fisica quando o IK do tronco vinha depois na ordem
+    if (m.ossos[size_t(d.osso)].heranca == Heranca::Normal) mundo_para_local(d.osso);
+    else local[size_t(d.osso)].rotacao += r * RAD;
+  }
   // ponta mostrada, para a inercia do proximo quadro
   const double am = base + e.saida;
   e.ox = w.x;
@@ -614,6 +620,7 @@ void Esqueleto::restricao_transformacao(int ri) {
       }
     }
     if (d.alvo_local) mundo_osso(o);
+    else mundo_para_local(o);
   }
 }
 

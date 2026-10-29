@@ -123,6 +123,16 @@ Ossos em ordem de hierarquia (pai antes de filho). Cada restrição roda na orde
 ela controla. Depois dela, os ossos controlados e todos os descendentes são recalculados.
 Restrição com `skin` só vale se a skin estiver ativa.
 
+O recálculo parte da pose local de cada osso, então o que uma restrição faz tem de estar
+nela. IK e transformação com `alvo_local` já mexem na pose local; física, caminho e
+transformação no mundo mexem no mundo, e depois o mundo de cada osso controlado volta para a
+pose local (rotação, escala e cisalha em y, cisalha em x zero; a escala em y é o comprimento
+do eixo y, com o sinal do determinante). Sem isso, uma restrição num ancestral que viesse
+depois na ordem desfazia a anterior: medido com a física da cabeça antes do IK do tronco
+(3,2°), e com caminho e transformação no mundo antes do IK do pai (até 440 px). Casos em
+`tests/nucleo/ordem-restricoes`. Na herança diferente da normal, só a rotação da física vai
+para a pose local (nenhum personagem medido junta as duas coisas).
+
 ## Slots
 
 No setup, cada slot mostra a `parte` do setup (ou nenhuma) com a `cor` do setup (hex

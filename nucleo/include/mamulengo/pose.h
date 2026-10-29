@@ -147,6 +147,9 @@ class Esqueleto {
   void restricao_transformacao(int r);
   // pose local a partir do mundo (depois que uma restricao mexe no mundo do osso)
   Local local_de_mundo(int i) const;
+  // depois de uma restricao que escreve no mundo: leva o mundo para a pose local, para que uma
+  // restricao seguinte num ancestral, ao recalcular este osso, nao desfaca o que ela fez
+  void mundo_para_local(int i);
 };
 
 }  // namespace mamulengo

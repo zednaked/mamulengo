@@ -1,0 +1,999 @@
+{
+ "boneco": 0,
+ "nome": "transformacao_antes_do_ik",
+ "paginas": [
+  {
+   "arquivo": "aventureiro.webp",
+   "tamanho": [
+    235,
+    246
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "braco",
+   "pagina": 0,
+   "ret": [
+    191,
+    0,
+    42,
+    60
+   ]
+  },
+  {
+   "nome": "cabeca",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    113,
+    121
+   ]
+  },
+  {
+   "nome": "cabeca_susto",
+   "pagina": 0,
+   "ret": [
+    0,
+    123,
+    113,
+    121
+   ]
+  },
+  {
+   "nome": "corpo",
+   "pagina": 0,
+   "ret": [
+    115,
+    0,
+    74,
+    78
+   ]
+  },
+  {
+   "nome": "mao",
+   "pagina": 0,
+   "ret": [
+    115,
+    80,
+    37,
+    34
+   ]
+  },
+  {
+   "nome": "perna",
+   "pagina": 0,
+   "ret": [
+    191,
+    62,
+    36,
+    58
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./images/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "quadril",
+   "pai": "root",
+   "x": 0.000001206665,
+   "y": 52
+  },
+  {
+   "nome": "tronco",
+   "pai": "quadril",
+   "comprimento": 48,
+   "rotacao": 90,
+   "x": 3.733234e-13,
+   "y": 1.421085e-14
+  },
+  {
+   "nome": "cabeca",
+   "pai": "tronco",
+   "comprimento": 86,
+   "rotacao": -0.000003988664,
+   "x": 52,
+   "y": -0.000003619996
+  },
+  {
+   "nome": "braco_e",
+   "pai": "tronco",
+   "comprimento": 42.37924,
+   "rotacao": 160.7099,
+   "x": 36,
+   "y": 36
+  },
+  {
+   "nome": "mao_e",
+   "pai": "braco_e",
+   "comprimento": 30,
+   "rotacao": 19.29009,
+   "x": 42.37924,
+   "y": 0.00003699391
+  },
+  {
+   "nome": "braco_d",
+   "pai": "tronco",
+   "comprimento": 42.37924,
+   "rotacao": -160.71,
+   "x": 36,
+   "y": -36
+  },
+  {
+   "nome": "mao_d",
+   "pai": "braco_d",
+   "comprimento": 30,
+   "rotacao": -19.29,
+   "x": 42.37924,
+   "y": 0.000034913
+  },
+  {
+   "nome": "perna_e",
+   "pai": "quadril",
+   "comprimento": 48,
+   "rotacao": -90,
+   "x": -20,
+   "y": 1.421085e-14
+  },
+  {
+   "nome": "perna_d",
+   "pai": "quadril",
+   "comprimento": 48,
+   "rotacao": -90,
+   "x": 20,
+   "y": 1.421085e-14
+  },
+  {
+   "nome": "alvo_tronco",
+   "pai": "root",
+   "x": 120,
+   "y": 260
+  }
+ ],
+ "slots": [
+  {
+   "nome": "perna_e",
+   "osso": "perna_e",
+   "parte": "perna"
+  },
+  {
+   "nome": "perna_d",
+   "osso": "perna_d",
+   "parte": "perna"
+  },
+  {
+   "nome": "corpo",
+   "osso": "tronco",
+   "parte": "corpo"
+  },
+  {
+   "nome": "braco_e",
+   "osso": "braco_e",
+   "parte": "braco"
+  },
+  {
+   "nome": "braco_d",
+   "osso": "braco_d",
+   "parte": "braco"
+  },
+  {
+   "nome": "mao_e",
+   "osso": "mao_e",
+   "parte": "mao"
+  },
+  {
+   "nome": "mao_d",
+   "osso": "mao_d",
+   "parte": "mao"
+  },
+  {
+   "nome": "cabeca",
+   "osso": "cabeca",
+   "parte": "cabeca"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "perna_e": {
+     "perna": {
+      "x": 23,
+      "y": -5.33717e-7,
+      "escala_y": -1,
+      "rotacao": -90,
+      "largura": 36,
+      "altura": 58
+     }
+    },
+    "perna_d": {
+     "perna": {
+      "x": 23,
+      "y": -5.33717e-7,
+      "escala_y": 1,
+      "rotacao": 90,
+      "largura": 36,
+      "altura": 58
+     }
+    },
+    "corpo": {
+     "corpo": {
+      "tipo": "malha",
+      "uvs": [
+       0,
+       0,
+       0.5,
+       0,
+       1,
+       0,
+       1,
+       0.3333333,
+       1,
+       0.6666667,
+       1,
+       1,
+       0.5,
+       1,
+       0,
+       1,
+       0,
+       0.6666667,
+       0,
+       0.3333333,
+       0.5,
+       0.3333333,
+       0.5,
+       0.6666667
+      ],
+      "triangulos": [
+       0,
+       1,
+       10,
+       0,
+       10,
+       9,
+       1,
+       2,
+       3,
+       1,
+       3,
+       10,
+       9,
+       10,
+       11,
+       9,
+       11,
+       8,
+       10,
+       3,
+       4,
+       10,
+       4,
+       11,
+       8,
+       11,
+       6,
+       8,
+       6,
+       7,
+       11,
+       4,
+       5,
+       11,
+       5,
+       6
+      ],
+      "pesos": [
+       [
+        [
+         "tronco",
+         62,
+         38,
+         0.7609261
+        ],
+        [
+         "quadril",
+         -38,
+         62,
+         0.2390739
+        ]
+       ],
+       [
+        [
+         "tronco",
+         62,
+         0.9999984,
+         0.9481847
+        ],
+        [
+         "quadril",
+         -0.9999998,
+         62,
+         0.05181525
+        ]
+       ],
+       [
+        [
+         "tronco",
+         62,
+         -36,
+         0.7725517
+        ],
+        [
+         "quadril",
+         36,
+         62,
+         0.2274483
+        ]
+       ],
+       [
+        [
+         "tronco",
+         36,
+         -36,
+         0.6645241
+        ],
+        [
+         "quadril",
+         36,
+         36,
+         0.3354759
+        ]
+       ],
+       [
+        [
+         "tronco",
+         10,
+         -36,
+         0.5182748
+        ],
+        [
+         "quadril",
+         36,
+         10,
+         0.4817252
+        ]
+       ],
+       [
+        [
+         "tronco",
+         -16,
+         -36,
+         0.5
+        ],
+        [
+         "quadril",
+         36,
+         -16,
+         0.5
+        ]
+       ],
+       [
+        [
+         "quadril",
+         -0.999998,
+         -16,
+         0.5
+        ],
+        [
+         "tronco",
+         -16,
+         0.9999984,
+         0.5
+        ]
+       ],
+       [
+        [
+         "quadril",
+         -38,
+         -16,
+         0.5
+        ],
+        [
+         "tronco",
+         -16,
+         38,
+         0.5
+        ]
+       ],
+       [
+        [
+         "tronco",
+         10,
+         38,
+         0.5164779
+        ],
+        [
+         "quadril",
+         -38,
+         9.999998,
+         0.4835221
+        ]
+       ],
+       [
+        [
+         "tronco",
+         36,
+         38,
+         0.6529435
+        ],
+        [
+         "quadril",
+         -38,
+         36,
+         0.3470565
+        ]
+       ],
+       [
+        [
+         "tronco",
+         36,
+         0.9999984,
+         0.998094
+        ]
+       ],
+       [
+        [
+         "tronco",
+         10,
+         0.9999984,
+         0.9779273
+        ],
+        [
+         "quadril",
+         -0.9999986,
+         10,
+         0.02207276
+        ]
+       ]
+      ],
+      "contorno": 10,
+      "arestas": [
+       0,
+       2,
+       2,
+       4,
+       4,
+       6,
+       6,
+       8,
+       8,
+       10,
+       10,
+       12,
+       12,
+       14,
+       14,
+       16,
+       16,
+       18,
+       18,
+       0
+      ],
+      "largura": 74,
+      "altura": 78
+     }
+    },
+    "braco_e": {
+     "braco": {
+      "x": 24.68189,
+      "y": -0.8966431,
+      "escala_x": 1,
+      "escala_y": -1,
+      "rotacao": -70.70991,
+      "largura": 42,
+      "altura": 60
+     }
+    },
+    "braco_d": {
+     "braco": {
+      "x": 24.6819,
+      "y": 0.8966866,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": 70.71,
+      "largura": 42,
+      "altura": 60
+     }
+    },
+    "mao_e": {
+     "mao": {
+      "x": 18,
+      "y": 0.5000016,
+      "escala_x": 1,
+      "escala_y": -1,
+      "rotacao": -90,
+      "largura": 37,
+      "altura": 34
+     }
+    },
+    "mao_d": {
+     "mao": {
+      "x": 18,
+      "y": -0.4999997,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": 90,
+      "largura": 37,
+      "altura": 34
+     }
+    },
+    "cabeca": {
+     "cabeca": {
+      "x": 47.5,
+      "y": -4.5,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 113,
+      "altura": 121
+     },
+     "cabeca_susto": {
+      "x": 47.5,
+      "y": -4.5,
+      "escala_x": 1,
+      "escala_y": 1,
+      "rotacao": -90,
+      "largura": 113,
+      "altura": 121
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "idle": {
+   "ossos": {
+    "tronco": {
+     "escalar": [
+      {
+       "curva": [
+        0.2,
+        1,
+        0.6,
+        1.05,
+        0.2,
+        1,
+        0.6,
+        0.97
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": 1.05,
+       "y": 0.97,
+       "curva": [
+        1,
+        1.05,
+        1.4,
+        1,
+        1,
+        0.97,
+        1.4,
+        1
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "curva": [
+        1.85,
+        1,
+        2.35,
+        2,
+        1.85,
+        1,
+        2.35,
+        2
+       ]
+      }
+     ]
+    },
+    "cabeca": {
+     "girar": [
+      {
+       "valor": -4,
+       "curva": [
+        0.1,
+        -4,
+        0.3,
+        0
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "curva": [
+        0.5,
+        0,
+        0.7,
+        4
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "valor": 4,
+       "curva": [
+        0.9,
+        4,
+        1.1,
+        -2.66453e-15
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": -3.06285e-15,
+       "curva": [
+        1.3,
+        -3.06285e-15,
+        1.5,
+        -4
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "valor": -4,
+       "curva": [
+        1.85,
+        -4,
+        2.35,
+        -3
+       ]
+      }
+     ]
+    },
+    "braco_e": {
+     "girar": [
+      {
+       "curva": [
+        0.1,
+        0,
+        0.3,
+        6
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "valor": 6,
+       "curva": [
+        0.5,
+        6,
+        0.7,
+        0
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "curva": [
+        0.9,
+        0,
+        1.1,
+        -6
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": -6,
+       "curva": [
+        1.3,
+        -6,
+        1.5,
+        0
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "curva": [
+        1.85,
+        0,
+        2.35,
+        1
+       ]
+      }
+     ]
+    },
+    "braco_d": {
+     "girar": [
+      {
+       "curva": [
+        0.1,
+        0,
+        0.3,
+        -6
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "valor": -6,
+       "curva": [
+        0.5,
+        -6,
+        0.7,
+        0
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "curva": [
+        0.9,
+        0,
+        1.1,
+        6
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "valor": 6,
+       "curva": [
+        1.3,
+        6,
+        1.5,
+        0
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "curva": [
+        1.85,
+        0,
+        2.35,
+        1
+       ]
+      }
+     ]
+    },
+    "alvo_tronco": {
+     "mover": [
+      {
+       "tempo": 0,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.5,
+       "x": -80,
+       "y": 40
+      },
+      {
+       "tempo": 1,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   }
+  },
+  "susto": {
+   "ossos": {
+    "quadril": {
+     "mover": [
+      {
+       "curva": [
+        0,
+        0,
+        0.174,
+        0,
+        0,
+        0,
+        0.174,
+        30
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "y": 30,
+       "curva": [
+        0.426,
+        0,
+        0.6,
+        0,
+        0.426,
+        30,
+        0.6,
+        0
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "curva": [
+        1.02,
+        0,
+        1.6,
+        1,
+        1.02,
+        0,
+        1.6,
+        1
+       ]
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1.15,
+       "y": 0.85,
+       "curva": [
+        0,
+        1.15,
+        0.0522,
+        0.925,
+        0,
+        0.85,
+        0.0522,
+        1.075
+       ]
+      },
+      {
+       "tempo": 0.09,
+       "x": 0.925,
+       "y": 1.075,
+       "curva": [
+        0.1425,
+        0.925,
+        0.2475,
+        1,
+        0.1425,
+        1.075,
+        0.2475,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "curva": [
+        0.3525,
+        1,
+        0.4575,
+        0.925,
+        0.3525,
+        1,
+        0.4575,
+        1.075
+       ]
+      },
+      {
+       "tempo": 0.51,
+       "x": 0.925,
+       "y": 1.075,
+       "curva": [
+        0.5478,
+        0.925,
+        0.6,
+        1.15,
+        0.5478,
+        1.075,
+        0.6,
+        0.85
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "x": 1.15,
+       "y": 0.85,
+       "curva": [
+        1.02,
+        1.15,
+        1.6,
+        2.15,
+        1.02,
+        0.85,
+        1.6,
+        1.85
+       ]
+      }
+     ]
+    },
+    "cabeca": {
+     "mover": [
+      {
+       "x": -8,
+       "y": 3.2
+      },
+      {
+       "tempo": 0.05,
+       "x": 7,
+       "y": -2.8
+      },
+      {
+       "tempo": 0.1,
+       "x": -6,
+       "y": 2.4
+      },
+      {
+       "tempo": 0.15,
+       "x": 5,
+       "y": -2
+      },
+      {
+       "tempo": 0.2,
+       "x": -4,
+       "y": 1.6
+      },
+      {
+       "tempo": 0.25,
+       "x": 3,
+       "y": -1.2
+      },
+      {
+       "tempo": 0.3,
+       "x": -2,
+       "y": 0.8
+      },
+      {
+       "tempo": 0.35,
+       "x": 1,
+       "y": -0.4
+      },
+      {
+       "tempo": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "cabeca": {
+     "parte": [
+      {
+       "nome": "cabeca_susto"
+      },
+      {
+       "tempo": 0.6,
+       "nome": "cabeca"
+      }
+     ]
+    }
+   }
+  }
+ },
+ "restricoes": [
+  {
+   "tipo": "transformacao",
+   "nome": "cabeca_tr",
+   "fonte": "braco_e",
+   "ossos": [
+    "cabeca"
+   ],
+   "ordem": 0,
+   "propriedades": {
+    "girar": {
+     "para": {
+      "girar": {
+       "escalar": 0.8
+      },
+      "escala_x": {
+       "escalar": 0.004
+      }
+     }
+    },
+    "x": {
+     "para": {
+      "x": {
+       "escalar": 0.3
+      }
+     }
+    }
+   },
+   "mix_girar": 0.6,
+   "mix_x": 0.5,
+   "mix_escala_x": 0.7
+  },
+  {
+   "tipo": "ik",
+   "nome": "tronco_ik",
+   "ossos": [
+    "tronco"
+   ],
+   "alvo": "alvo_tronco",
+   "mix": 0.7,
+   "ordem": 1
+  }
+ ],
+ "mix": {
+  "padrao": 0
+ }
+}

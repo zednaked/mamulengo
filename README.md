@@ -219,7 +219,7 @@ echo "MAMULENGO_ROOTS=/path/to/your/projects" > .env.local
 npm run dev                                   # http://localhost:5199
 npm test                                      # every command, no external assets
 cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
-npx tsx tools/nucleo-compara.ts tests/boneco  # the core against the reference
+npx tsx tools/nucleo-compara.ts tests/boneco tests/nucleo  # the core against the reference
 ```
 
 `tests/assets` holds three CC0 characters by Kenney (cartoon, mascot, human), rigged

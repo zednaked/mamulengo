@@ -494,8 +494,8 @@ Local Esqueleto::local_de_mundo(int i) const {
   r.escala_x = std::sqrt(l.a * l.a + l.c * l.c);
   if (r.escala_x > 1e-4) {
     const double det = l.a * l.d - l.b * l.c;
-    r.escala_y = det / r.escala_x;
-    r.cisalha_y = std::atan2(l.a * l.b + l.c * l.d, det) * RAD;
+    r.escala_y = std::copysign(std::sqrt(l.b * l.b + l.d * l.d), det);
+    r.cisalha_y = -std::atan2(l.a * l.b + l.c * l.d, det) * RAD;
     r.rotacao = std::atan2(l.c, l.a) * RAD;
   } else {
     r.escala_x = 0;
@@ -504,6 +504,12 @@ Local Esqueleto::local_de_mundo(int i) const {
     r.rotacao = 90 - std::atan2(l.d, l.b) * RAD;
   }
   return r;
+}
+
+void Esqueleto::mundo_para_local(int i) {
+  // so na heranca normal, onde local_de_mundo inverte mundo_osso; nas outras o osso fica com a
+  // pose local de antes (nenhum personagem medido junta as duas coisas)
+  if (m_->ossos[size_t(i)].heranca == Heranca::Normal) local[size_t(i)] = local_de_mundo(i);
 }
 
 void Esqueleto::vertices_geometria(int si, const Parte& p, double* out) const {

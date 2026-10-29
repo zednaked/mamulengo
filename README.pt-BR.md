@@ -218,7 +218,7 @@ echo "MAMULENGO_ROOTS=/caminho/dos/projetos" > .env.local
 npm run dev                                   # http://localhost:5199
 npm test                                      # todos os comandos, sem assets externos
 cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
-npx tsx tools/nucleo-compara.ts tests/boneco  # o núcleo contra a referência
+npx tsx tools/nucleo-compara.ts tests/boneco tests/nucleo  # o núcleo contra a referência
 ```
 
 `tests/assets` tem três personagens CC0 de Kenney (cartoon, mascote, humano), montados

@@ -1,0 +1,139 @@
+{
+ "boneco": 0,
+ "nome": "caminho_antes_do_ik",
+ "paginas": [],
+ "imagens": [],
+ "esqueleto": {
+  "versao_spine": "4.3.23"
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "suporte",
+   "pai": "root",
+   "x": 10,
+   "y": 5
+  },
+  {
+   "nome": "meio",
+   "pai": "root",
+   "comprimento": 40,
+   "rotacao": 20,
+   "x": 10,
+   "y": 5,
+   "escala_x": 1.2,
+   "escala_y": 0.8
+  },
+  {
+   "nome": "b",
+   "pai": "meio",
+   "rotacao": 20
+  },
+  {
+   "nome": "alvo_meio",
+   "pai": "root",
+   "x": 60,
+   "y": 90
+  }
+ ],
+ "slots": [
+  {
+   "nome": "trilho",
+   "osso": "suporte",
+   "parte": "trilho"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "trilho": {
+     "trilho": {
+      "tipo": "caminho",
+      "num_vertices": 6,
+      "comprimentos": [
+       500,
+       1000
+      ],
+      "vertices": [
+       -50,
+       -50,
+       0,
+       0,
+       100,
+       300,
+       300,
+       -200,
+       400,
+       0,
+       450,
+       50
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "restricoes": [
+  {
+   "tipo": "caminho",
+   "nome": "c",
+   "slot": "trilho",
+   "ossos": [
+    "b"
+   ],
+   "rotacao": 10,
+   "ordem": 0
+  },
+  {
+   "tipo": "ik",
+   "nome": "meio_ik",
+   "ossos": [
+    "meio"
+   ],
+   "alvo": "alvo_meio",
+   "mix": 0.6,
+   "ordem": 1
+  }
+ ],
+ "animacoes": {
+  "p": {
+   "caminho": {
+    "c": {
+     "posicao": [
+      {
+       "valor": -0.2
+      },
+      {
+       "tempo": 1,
+       "valor": 1.2
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "alvo_meio": {
+     "mover": [
+      {
+       "tempo": 0,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.5,
+       "x": -70,
+       "y": 30
+      },
+      {
+       "tempo": 1,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   }
+  }
+ }
+}
