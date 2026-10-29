@@ -233,6 +233,7 @@ class Leitor {
     ler_slots(r["slots"]);
     ler_skins(r["skins"]);
     ler_restricoes(r["restricoes"]);
+    ler_particulas(r["particulas"]);
     for (const auto& [nome, d] : r["eventos"].campos()) {
       DadosEvento e;
       e.nome = nome;
@@ -256,6 +257,57 @@ class Leitor {
       m.mix_pares.push_back(pm);
     }
     preparar_desenho();
+  }
+
+  // ---- particulas (docs/NUCLEO.md "Particulas")
+
+  int emissor(const std::string& nome) const {
+    for (size_t i = 0; i < m.emissores.size(); ++i)
+      if (m.emissores[i].nome == nome) return int(i);
+    return -1;
+  }
+
+  void ler_particulas(const Json& lista) {
+    m.emissores_do_slot.assign(m.slots.size(), {});
+    for (const Json& j : lista.itens()) {
+      DadosEmissor d;
+      d.nome = j.str("nome", "");
+      if (emissor(d.nome) >= 0) falha("particulas: emissor repetido " + d.nome);
+      d.slot = slot(j["slot"], "particulas");
+      d.osso = j.acha("osso") ? osso(j["osso"], "particulas") : m.slots[size_t(d.slot)].osso;
+      d.x = j.num("x", 0);
+      d.y = j.num("y", 0);
+      auto par = [&](const char* campo, double* v) {
+        if (const Json* x = j.acha(campo); x && x->lista()) v[0] = (*x)[0].num(v[0]), v[1] = (*x)[1].num(v[1]);
+        else if (x) v[0] = v[1] = x->num(v[0]);
+      };
+      d.taxa = std::max(j.num("taxa", d.taxa), 0.0);
+      par("vida", d.vida);
+      par("velocidade", d.velocidade);
+      par("escala", d.escala);
+      par("giro", d.giro);
+      d.angulo = j.num("angulo", d.angulo);
+      d.abertura = j.num("abertura", d.abertura);
+      d.gravidade = j.num("gravidade", d.gravidade);
+      d.arrasto = j.num("arrasto", d.arrasto);
+      if (const Json* c = j.acha("cor"); c && c->lista()) {
+        if ((*c)[0].texto()) d.cor[0] = cor_hex((*c)[0].str());
+        if ((*c)[1].texto()) d.cor[1] = cor_hex((*c)[1].str());
+      }
+      d.maximo = int(j.num("maximo", d.maximo));
+      d.semente = uint32_t(j.num("semente", 0));
+      auto it = imagens.find(j.str("imagem", ""));
+      if (it != imagens.end()) {
+        const Imagem& g = it->second;
+        d.pagina = g.pagina;
+        d.meia_largura = g.rw / 2;
+        d.meia_altura = g.rh / 2;
+        const double cx[4] = {0, 0, g.rw, g.rw}, cy[4] = {g.rh, 0, 0, g.rh};
+        for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &d.uvs[i * 2]);
+      }
+      m.emissores_do_slot[size_t(d.slot)].push_back(int(m.emissores.size()));
+      m.emissores.push_back(std::move(d));
+    }
   }
 
   // ---- desenho
@@ -722,6 +774,32 @@ class Leitor {
         te.tl = ler_timeline_efeito(chaves, t, m.slots[size_t(si)].efeitos);
         conta(te.tl.fim());
         an.efeitos.push_back(std::move(te));
+      }
+    }
+
+    // particulas: emissor -> { taxa: [...], rajada: [...] }
+    for (const auto& [nome_em, tls] : a["particulas"].campos()) {
+      const int ie = emissor(nome_em);
+      if (ie < 0) falha("animacao " + nome + ": emissor desconhecido " + nome_em);
+      for (const auto& [tipo, chaves] : tls.campos()) {
+        if (tipo == "taxa") {
+          TimelineTaxa tt;
+          tt.emissor = ie;
+          tt.tl = ler_timeline(chaves, {{"valor", m.emissores[size_t(ie)].taxa}});
+          conta(tt.tl.fim());
+          an.taxas.push_back(std::move(tt));
+        } else if (tipo == "rajada") {
+          TimelineRajada tr;
+          tr.emissor = ie;
+          for (const Json& k : chaves.itens()) {
+            tr.tempos.push_back(f32(k.num("tempo", 0)));
+            tr.quantidades.push_back(int(k.num("quantidade", 1)));
+          }
+          if (!tr.tempos.empty()) conta(tr.tempos.back());
+          an.rajadas.push_back(std::move(tr));
+        } else {
+          falha("animacao " + nome + ": timeline de particulas desconhecida " + tipo);
+        }
       }
     }
 

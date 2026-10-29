@@ -172,6 +172,41 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       v2 = d.vertices.data() + size_t(i2) * 8;
     }
   };
+  // as particulas dos emissores do slot (docs/NUCLEO.md "Particulas"), logo depois da parte dele
+  auto particulas = [&](int si) {
+    if (m.emissores_do_slot.empty()) return;
+    const EstadoSlot& s = e.slots()[size_t(si)];
+    if (s.cor.a <= 0) return;
+    for (int ie : m.emissores_do_slot[size_t(si)]) {
+      const DadosEmissor& de = m.emissores[size_t(ie)];
+      const EstadoEmissor& ee = e.emissores()[size_t(ie)];
+      if (de.pagina < 0 || ee.vivas.empty()) continue;
+      Lote& l = lote(Comando::Triangulos, de.pagina, m.slots[size_t(si)].blend);
+      const size_t li = size_t(&l - d.lotes.data());
+      for (const Particula& p : ee.vivas) {
+        const double f = p.vida > 0 ? std::min(p.idade / p.vida, 1.0) : 1;
+        const double esc = de.escala[0] + (de.escala[1] - de.escala[0]) * f;
+        const float cr = float(de.cor[0].r + (de.cor[1].r - de.cor[0].r) * f) * s.cor.r;
+        const float cg = float(de.cor[0].g + (de.cor[1].g - de.cor[0].g) * f) * s.cor.g;
+        const float cb = float(de.cor[0].b + (de.cor[1].b - de.cor[0].b) * f) * s.cor.b;
+        const float ca = float(de.cor[0].a + (de.cor[1].a - de.cor[0].a) * f) * s.cor.a;
+        if (ca <= 0 || esc <= 0) continue;
+        const double cs = std::cos(p.rot * GRAU) * esc, sn = std::sin(p.rot * GRAU) * esc;
+        const double l0 = -de.meia_largura, r0 = de.meia_largura, b0 = -de.meia_altura, t0 = de.meia_altura;
+        const double px[4] = {l0, l0, r0, r0}, py[4] = {b0, t0, t0, b0};
+        const uint32_t base = uint32_t(d.vertices.size() / 8);
+        for (int k = 0; k < 4; ++k)
+          d.vertices.insert(d.vertices.end(), {float(p.x + px[k] * cs - py[k] * sn), float(p.y + px[k] * sn + py[k] * cs), de.uvs[k * 2], de.uvs[k * 2 + 1], cr, cg, cb, ca});
+        if (recorte_fim != -2 && d.recorte_cpu) {
+          tri_cortado(base, base + 1, base + 2);
+          tri_cortado(base + 2, base + 3, base);
+        } else {
+          d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+        }
+      }
+      d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+    }
+  };
   for (int si : e.ordem()) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
@@ -213,6 +248,7 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
       // invisivel ou sem imagem: nem calcula os vertices (os brilhos apagados sao muitos)
       if (a <= 0 || p.pagina < 0 || p.uvs.empty()) {
+        particulas(si);
         if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
         continue;
       }
@@ -334,6 +370,7 @@ void desenhar(const Esqueleto& e, Desenho& d) {
         d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
       }
     }
+    particulas(si);
     if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
   }
   if (recorte_fim != -2) fecha_recorte();

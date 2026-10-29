@@ -19,8 +19,8 @@
   const PAD = 10;
   const snap = (t: number) => Math.max(0, Math.round(t * FPS) / FPS);
   const tkey = (t: number) => Math.round(t * 1e4);
-  const NOCURVE = new Set(["attachment", "events", "drawOrder", "sequence", "inherit", "reset"]);
-  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0", outline: "#ffd23c", glow: "#4cc9ff", dissolve: "#ff8a3c", tint: "#ff5577" };
+  const NOCURVE = new Set(["attachment", "events", "drawOrder", "sequence", "inherit", "reset", "burst"]);
+  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0", outline: "#ffd23c", glow: "#4cc9ff", dissolve: "#ff8a3c", tint: "#ff5577", rate: "#ffd23c", burst: "#ffd23c" };
 
   let creating = $state(false);
   let renaming = $state<string | null>(null);
@@ -84,6 +84,10 @@
     for (const type of ["path", "physics", "slider"])
       for (const [n, tls] of Object.entries<any>(a[type] ?? {}))
         if (known.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `c:${n}`, partLabel: n, partColor: "#ffd166", target: { constraint: n }, timeline: tl, label: tl, keys });
+    // particulas (so do Mamulengo): rate e burst por emissor
+    const emissores = new Set(((json as any).particles ?? []).map((p: any) => p.name));
+    for (const [n, tls] of Object.entries<any>(a.particles ?? {}))
+      if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: tl, keys });
     if (a.events?.length) out.push({ part: "ev", partLabel: "eventos", partColor: "#ffffff", timeline: "events", label: "eventos", keys: a.events });
     if (a.drawOrder?.length) out.push({ part: "do", partLabel: "ordem", partColor: "#ff9f6c", timeline: "drawOrder", label: "ordem", keys: a.drawOrder });
     return out;
@@ -155,6 +159,7 @@
     if (t.bone) return a.bones?.[t.bone]?.[tl] ?? [];
     if (t.slot) return (isEffect(tl) ? a.effects : a.slots)?.[t.slot]?.[tl] ?? [];
     if (t.deform) return a.attachments?.[t.deform.skin]?.[t.deform.slot]?.[t.deform.attachment]?.[tl] ?? [];
+    if (t.particles) return a.particles?.[t.particles]?.[tl] ?? [];
     return [];
   });
 

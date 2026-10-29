@@ -99,6 +99,29 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
     out += ']';
   }
   out += '}';
+  // particulas vivas por emissor: [x, y, rot, idade, vida] (docs/NUCLEO.md "Particulas")
+  if (!m.emissores.empty()) {
+    out += ",\"particulas\":{";
+    for (size_t i = 0; i < m.emissores.size(); ++i) {
+      if (i) out += ',';
+      escreve_texto(out, m.emissores[i].nome);
+      out += ":[";
+      const auto& vivas = e.emissores()[i].vivas;
+      for (size_t k = 0; k < vivas.size(); ++k) {
+        if (k) out += ',';
+        const Particula& p = vivas[k];
+        const double vals[5] = {p.x, p.y, p.rot, p.idade, p.vida};
+        out += '[';
+        for (int j = 0; j < 5; ++j) {
+          if (j) out += ',';
+          escreve_num(out, vals[j]);
+        }
+        out += ']';
+      }
+      out += ']';
+    }
+    out += '}';
+  }
 }
 
 }  // namespace mamulengo

@@ -299,6 +299,58 @@ Conferência: `npx tsx tools/nucleo-efeitos.ts` calcula os canais das timelines 
 compara com o núcleo. O desenho foi olhado no editor (modo núcleo) e no Godot 4.7.2
 (Compatibility): os mesmos quatro efeitos, iguais nos dois.
 
+## Partículas
+
+O segundo recurso além do Spine: emissores de imagens pequenas (brilhos, moedas, faíscas) que
+nascem de um osso e vivem no espaço do esqueleto. Ficam numa lista própria, `particulas`, fora
+das skins (um tipo de parte novo quebraria o leitor do Spine); a exportação para o Spine os
+tira e avisa.
+
+| campo | padrão | o quê |
+|---|---|---|
+| `nome`, `slot`, `imagem` | (obrigatórios) | o slot dá o lugar na ordem de desenho (logo depois da parte dele), a cor e o blend; `imagem` é um nome de `imagens` |
+| `osso` | o osso do slot | de onde nascem; `x`, `y` (0) é o ponto no osso |
+| `taxa` | 10 | partículas por segundo (animável) |
+| `vida` | `[1, 1]` | segundos, sorteado entre os dois |
+| `velocidade` | `[100, 100]` | px/s, sorteada |
+| `angulo`, `abertura` | 90, 30 | direção em graus no espaço do osso (0 = eixo x do osso) e a abertura total do leque |
+| `gravidade` | 0 | px/s² para baixo (y negativo) |
+| `arrasto` | 0 | por segundo: `v *= exp(-arrasto * dt)` |
+| `escala` | `[1, 1]` | no nascimento e no fim da vida |
+| `giro` | `[0, 0]` | graus/s, sorteado |
+| `cor` | `["ffffffff", "ffffff00"]` | no nascimento e no fim (some no fim, por padrão) |
+| `maximo` | 200 | vivas ao mesmo tempo (as que passam não nascem) |
+| `semente` | 0 | muda o sorteio |
+
+**Timelines:** `animacoes.<a>.particulas.<emissor>.taxa` (chaves com `valor`, curvas como as
+outras) e `.rajada` (chaves com `quantidade`: nascem de uma vez quando o tempo passa pela
+chave). A `taxa` mistura como a cor; a rajada vale só da animação que está entrando ou tocando
+(não da que sai num mix).
+
+**Simulação** (no fim do `atualizar_mundo`, pelo relógio do esqueleto, como a física; o setup
+zera tudo). Com `dt` o tempo desde a última vez:
+1. cada partícula envelhece `dt`; a que passou da vida some;
+2. `v *= exp(-arrasto * dt)`, `v.y -= gravidade * dt`, `pos += v * dt`, `rot += giro * dt`;
+3. nascem `floor(acumulado)` partículas, com `acumulado += taxa * dt` (e o que sobra fica), mais
+   as rajadas. A `k`-ésima do emissor (contando desde o setup) nasce no ponto do osso, com idade
+   0, direção `angulo + (s - 0,5) * abertura` levada ao mundo pela matriz do osso (só a direção),
+   e vida, velocidade e giro interpolados pelos sorteios `s`.
+
+O sorteio `s` de cada campo (`c` = 0 vida, 1 velocidade, 2 direção, 3 giro) é o hash dos efeitos
+(acima) com `i = k`, `j = semente * 8 + c`. Inteiro, então igual na web, no Godot e no editor.
+
+**Desenho:** a partícula é o retângulo com pixels da imagem, centrado nela, escalado pela escala
+do momento (interpolada pela idade), girado por `rot` e posto em `pos`; a cor é a do momento
+vezes a cor do slot. Entra logo depois da parte do slot, com o blend do slot; slot com alfa 0
+não desenha as partículas (mas elas seguem vivendo).
+
+Conferência: `npx tsx tools/nucleo-particulas.ts` refaz a simulação de
+`tests/nucleo/particulas/particulas.boneco` (o robô CC0 com faíscas na mão e rajadas na cabeça)
+com os ossos do oráculo, nos passos do `nucleo-pose`, e compara cada partícula viva. As rajadas
+pelo Estado (no jogo e no editor) usam o mesmo intervalo dos eventos; ali a conferência é a do
+desenho: o editor (modo núcleo) e o Godot 4.7.2 mostram o mesmo. No editor, um personagem com
+partículas é simulado desde o 0 em passos, como um com física.
+
 ## Estado
 
 `mamulengo/estado.h`: trilhas, fila, mix e eventos (o que o jogo usa para tocar, emendar e

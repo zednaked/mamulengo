@@ -147,6 +147,9 @@ export function channels(timeline: string): { key: string; def: number }[] {
     case "gravity":
     case "mix":
       return [{ key: "value", def: timeline === "mix" ? 1 : 0 }];
+    // particulas: a taxa sem padrao fixo (o do emissor), entao a chave sempre guarda o valor
+    case "rate":
+      return [{ key: "value", def: NaN }];
     default:
       // efeitos: os campos numericos (a cor vai em keyFields, como no rgba)
       if (isEffect(timeline)) return EFFECTS[timeline].filter(([f]) => f !== "color").map(([key, def]) => ({ key, def: def[0] }));

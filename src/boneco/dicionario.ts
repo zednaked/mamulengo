@@ -138,6 +138,20 @@ export const CAMPOS: Record<string, string> = {
   tint: "tingir",
   radius: "raio",
   edge: "borda",
+  // particulas (so do Mamulengo; docs/NUCLEO.md "Particulas"); a escala do emissor fica
+  // "escala" nos dois lados (scale ja e a timeline "escalar")
+  particles: "particulas",
+  image: "imagem",
+  rate: "taxa",
+  life: "vida",
+  speed: "velocidade",
+  angle: "angulo",
+  spread: "abertura",
+  drag: "arrasto",
+  spin: "giro",
+  max: "maximo",
+  seed: "semente",
+  burst: "rajada",
 };
 
 // valores de enum que mudam de nome (por campo)

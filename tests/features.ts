@@ -390,6 +390,42 @@ runtimeOk("constraints");
     check(renomeou && !doc.json.animations["t.efeito"].effects[s0].dissolve && doc.json.slots[0].effects === undefined, "efeitos: renomear o slot leva as timelines; key.delete e off limpam");
     await run("animation.delete", { name: "t.efeito" });
   }
+  // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
+  // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
+  {
+    const s0 = doc.json.slots.find((s: any) => s.attachment)!;
+    await run("particles.set", { name: "t.faisca", slot: s0.name, rate: 15, life: [0.5, 1], scale: [0.4, 0.1], color: ["ffd23cff", "ff000000"] });
+    await run("particles.set", { name: "t.faisca", gravity: 120 });
+    let semSlot = false;
+    await run("particles.set", { name: "t.outra" }).catch(() => (semSlot = true));
+    await run("animation.create", { name: "t.particulas" });
+    await run("key.set", { anim: "t.particulas", target: { particles: "t.faisca" }, timeline: "rate", time: 0, value: 0 });
+    await run("key.set", { anim: "t.particulas", target: { particles: "t.faisca" }, timeline: "rate", time: 0.5, value: 40 });
+    await run("key.set", { anim: "t.particulas", target: { particles: "t.faisca" }, timeline: "burst", time: 0.25, count: 8 });
+    let erroSpine = "";
+    try {
+      const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))).readSkeletonData(structuredClone(doc.json));
+    } catch (e: any) {
+      erroSpine = String(e?.message ?? e);
+    }
+    const em = (doc.json as any).particles[0];
+    const tl = doc.json.animations["t.particulas"].particles["t.faisca"];
+    const osso0 = em.bone ?? s0.bone;
+    check(
+      em.image === (s0.attachment ?? em.image) && em.gravity === 120 && em.escala?.[0] === 0.4 && semSlot && tl.rate[0].value === 0 && tl.rate[1].value === 40 && tl.burst[0].count === 8 && !erroSpine,
+      `particulas: particles.set cria e muda, key.set anima rate e burst, spine-core le o documento${erroSpine ? ` (erro: ${erroSpine})` : ""}`,
+    );
+    const nome0 = s0.name;
+    await run("slot.rename", { slot: nome0, to: "t.slotp" });
+    const seguiu = (doc.json as any).particles[0].slot === "t.slotp";
+    await run("slot.rename", { slot: "t.slotp", to: nome0 });
+    await run("particles.rename", { name: "t.faisca", to: "t.brilho" });
+    const renomeou = !!doc.json.animations["t.particulas"].particles["t.brilho"];
+    await run("particles.delete", { name: "t.brilho" });
+    check(seguiu && renomeou && !(doc.json as any).particles && !doc.json.animations["t.particulas"].particles && !!osso0, "particulas: renomear slot e emissor acompanha; apagar leva as timelines");
+    await run("animation.delete", { name: "t.particulas" });
+  }
   // path constraint no formato 4.3 (slot em "slot"): o runtime le, a posicao anima e o
   // estudo do rig (que nao carrega o path attachment) nao quebra com a timeline dele
   await run("slot.add", { name: "trilho", bone: "root" });
@@ -448,7 +484,8 @@ runtimeOk("constraints");
     const be = structuredClone(b);
     const se = be.slots[0].nome;
     be.slots[0].efeitos = { linha: { cor: "ffcc00ff", largura: 3 }, brilho: { forca: 0.8, raio: 12 } };
-    be.animacoes[a0] = { ...be.animacoes[a0], efeitos: { [se]: { dissolver: [{ valor: 0 }, { tempo: 0.5, valor: 1, cor: "00ff88ff" }], tingir: [{ cor: "ff0000ff", forca: 0, curva: "degrau" }, { tempo: 0.25, forca: 1 }] } } };
+    be.particulas = [{ nome: "brilhos", slot: se, imagem: be.imagens[0].nome, taxa: 5, vida: [0.5, 1], escala: [1, 0.2], cor: ["ffffffff", "ffffff00"] }];
+    be.animacoes[a0] = { ...be.animacoes[a0], particulas: { brilhos: { taxa: [{ valor: 0 }, { tempo: 0.3, valor: 20 }], rajada: [{ tempo: 0.1, quantidade: 6 }] } }, efeitos: { [se]: { dissolver: [{ valor: 0 }, { tempo: 0.5, valor: 1, cor: "00ff88ff" }], tingir: [{ cor: "ff0000ff", forca: 0, curva: "degrau" }, { tempo: 0.25, forca: 1 }] } } };
     const ve = exportarSpine(structuredClone(be));
     const soSpine = exportarSpine(structuredClone(be), { soSpine: true });
     const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
@@ -466,8 +503,13 @@ runtimeOk("constraints");
         JSON.stringify(de.slots[0].efeitos) === JSON.stringify(be.slots[0].efeitos) &&
         JSON.stringify(de.animacoes[a0].efeitos) === JSON.stringify(be.animacoes[a0].efeitos) &&
         !JSON.stringify(soSpine.json).includes("effects") &&
-        soSpine.avisos.filter((a) => a.includes("efeito")).length === 2,
-      `.boneco: efeitos vao e voltam como effects, o spine-core le sem erro${lido ? ` (erro: ${lido})` : ""} e a exportacao para o Spine tira com aviso`,
+        soSpine.avisos.filter((a) => a.includes("efeito")).length === 2 &&
+        JSON.stringify(de.particulas) === JSON.stringify(be.particulas) &&
+        JSON.stringify(de.animacoes[a0].particulas) === JSON.stringify(be.animacoes[a0].particulas) &&
+        ve.json.particles?.[0]?.rate === 5 &&
+        !JSON.stringify(soSpine.json).includes("particles") &&
+        soSpine.avisos.filter((a) => a.includes("particulas")).length === 2,
+      `.boneco: efeitos e particulas vao e voltam (effects, particles), o spine-core le sem erro${lido ? ` (erro: ${lido})` : ""} e a exportacao para o Spine tira com aviso`,
     );
   }
   const { parseFicha } = await import("../src/core/ficha.ts");

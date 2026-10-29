@@ -95,6 +95,60 @@
     app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, off: true } }, `tira ${EFEITOS[n].nome} de ${slot.name}`);
   }
 
+  // ---- particulas (so .boneco; docs/NUCLEO.md "Particulas"): os emissores que desenham nesta camada
+  const CAMPOS_P = [
+    { k: "rate", label: "taxa", max: 100, step: 1, dica: "particulas por segundo" },
+    { k: "speed", label: "velocidade", max: 600, step: 5, par: true, dica: "px/s (o maior do sorteio)" },
+    { k: "life", label: "vida", max: 4, step: 0.05, par: true, dica: "segundos (a maior do sorteio)" },
+    { k: "spread", label: "abertura", max: 360, step: 5, dica: "graus do leque" },
+    { k: "angle", label: "direcao", max: 360, step: 5, dica: "graus no osso (0 = ao longo do osso)" },
+    { k: "gravity", label: "gravidade", max: 1000, step: 10, dica: "px/s2 para baixo" },
+  ] as const;
+  const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0 };
+  const emissores = $derived.by(() => {
+    app.version;
+    app.play.time;
+    if (!slot || !app.doc || !ehBoneco) return [];
+    const anim = app.mode === "animate" ? app.play.animation : null;
+    return ((app.doc.json as any).particles ?? [])
+      .filter((p: any) => p.slot === slot.name)
+      .map((p: any) => {
+        const ks: any[] = (anim && app.doc!.json.animations?.[anim]?.particles?.[p.name]?.rate) || [];
+        let rate = p.rate ?? PADRAO_P.rate;
+        // a taxa no instante (linear entre as chaves), para o controle mostrar o que toca
+        if (ks.length && app.play.time >= (ks[0].time ?? 0)) {
+          let k = ks.length - 1;
+          while (k > 0 && (ks[k].time ?? 0) > app.play.time) k--;
+          rate = ks[k].value ?? rate;
+          if (k < ks.length - 1 && ks[k].curve !== "stepped") rate += (((ks[k + 1].value ?? rate) - rate) * (app.play.time - (ks[k].time ?? 0))) / ((ks[k + 1].time ?? 0) - (ks[k].time ?? 0));
+        }
+        const v = (k: string) => (k === "rate" ? rate : Array.isArray(p[k]) ? p[k][1] : (p[k] ?? PADRAO_P[k]));
+        return { p, v };
+      });
+  });
+  const animando = $derived(app.mode === "animate" && !!app.play.animation);
+  function setP(nome: string, campo: string, valor: number, atual: any) {
+    if (animando && campo === "rate") {
+      const time = +app.play.time.toFixed(4);
+      app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { particles: nome }, timeline: "rate", time, value: valor } }, `taxa ${nome} @${time}`, `p-rate-${nome}-${time}`);
+      return;
+    }
+    // campos com [min, max]: o controle muda o maior e mantem a proporcao do menor
+    const par = CAMPOS_P.find((c) => c.k === campo && "par" in c);
+    const val = par ? (Array.isArray(atual) ? [+(atual[0] * (valor / (atual[1] || 1))).toFixed(3), valor] : [valor * 0.5, valor]) : valor;
+    app.run({ cmd: "particles.set", args: { name: nome, [campo]: val } }, `particulas ${nome}`, `p-${campo}-${nome}`);
+  }
+  function novoEmissor() {
+    if (!slot) return;
+    let nome = `${slot.name}_particulas`;
+    for (let n = 2; ((app.doc?.json as any).particles ?? []).some((p: any) => p.name === nome); n++) nome = `${slot.name}_particulas_${n}`;
+    app.run({ cmd: "particles.set", args: { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] } }, `particulas em ${slot.name}`);
+  }
+  function rajada(nome: string) {
+    const time = +app.play.time.toFixed(4);
+    app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { particles: nome }, timeline: "burst", time, count: 12 } }, `rajada ${nome} @${time}`);
+  }
+
   // tipo da imagem atual do slot (region vira malha; malha pode ganhar pesos)
   const attKind = $derived.by(() => {
     app.version;
@@ -324,7 +378,7 @@
     {#if ehBoneco}
       <div class="efeitos">
         <div class="dim small">
-          Efeitos (do Mamulengo, o Spine nao tem; aparecem no desenho do nucleo e no jogo). {app.mode === "animate" && app.play.animation ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
+          Efeitos e particulas (do Mamulengo, o Spine nao tem; aparecem no desenho do nucleo e no jogo). {app.mode === "animate" && app.play.animation ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
         </div>
         {#each efeitos as ef (ef.n)}
           <div class="ef">
@@ -342,6 +396,23 @@
             {/each}
           </div>
         {/each}
+        {#each emissores as em (em.p.name)}
+          <div class="ef">
+            <div class="efnome" title="emissor de particulas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
+              <span>✦ {em.p.name}</span>
+              {#if animando}<button onclick={() => rajada(em.p.name)} title="rajada: 12 nascem de uma vez neste instante">rajada</button>{/if}
+              {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "particles.delete", args: { name: em.p.name } }, `apaga ${em.p.name}`)} title="apagar o emissor">✕</button>{/if}
+            </div>
+            {#each CAMPOS_P.filter((c) => !animando || c.k === "rate") as c}
+              <label class="efcampo" title={c.dica}>
+                <span>{c.label}</span>
+                <input type="range" min="0" max={c.max} step={c.step} value={em.v(c.k)} oninput={(e) => setP(em.p.name, c.k, +(e.target as HTMLInputElement).value, em.p[c.k])} />
+                <span class="num">{(+em.v(c.k)).toFixed(c.step < 1 ? 2 : 0)}</span>
+              </label>
+            {/each}
+          </div>
+        {/each}
+        {#if !animando}<button onclick={novoEmissor} title="particulas que nascem do osso desta camada e desenham logo depois dela">+ particulas</button>{/if}
         {#if faltam.length && (app.mode !== "animate" || !app.play.animation)}
           <select value="" onchange={(e) => { ligar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="liga um efeito nesta camada">
             <option value="">+ efeito...</option>

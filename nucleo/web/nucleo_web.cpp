@@ -174,6 +174,9 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
   }
   bool fisica = false;
   for (const DadosRestricao& r : m.restricoes) fisica = fisica || r.tipo == TipoRestricao::Fisica;
+  // "fisica": a pose depende do caminho ate o instante (o editor simula em passos desde o 0); as
+  // particulas tambem
+  fisica = fisica || !m.emissores.empty();
   info += std::string("],\"fisica\":") + (fisica ? "true" : "false") + ",\"ossos\":[";
   for (size_t i = 0; i < m.ossos.size(); ++i) {
     info += i ? ",{\"nome\":" : "{\"nome\":";
@@ -522,6 +525,9 @@ EMSCRIPTEN_KEEPALIVE int mm_simular(int inst, int anim, int loop, const double* 
   const Modelo& m = *i.modelo;
   bool fisica = false;
   for (const DadosRestricao& r : m.restricoes) fisica = fisica || r.tipo == TipoRestricao::Fisica;
+  // "fisica": a pose depende do caminho ate o instante (o editor simula em passos desde o 0); as
+  // particulas tambem
+  fisica = fisica || !m.emissores.empty();
   const double PASSO = 1.0 / 64;
   std::vector<double> out;
   out.reserve(size_t(n) * m.ossos.size() * 6);

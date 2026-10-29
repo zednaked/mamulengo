@@ -13,8 +13,9 @@ export const Target = z
     z.object({ slot: z.string() }),
     z.object({ constraint: z.string() }),
     z.object({ deform: z.object({ slot: z.string(), attachment: z.string(), skin: z.string().default("default") }) }),
+    z.object({ particles: z.string() }),
   ])
-  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"} ou {"deform":{"slot":"body","attachment":"body"}}');
+  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}} ou {"particles":"faiscas"} (rate, burst)');
 export type Target = z.infer<typeof Target>;
 
 export const TIMELINE_NAMES = {
@@ -26,6 +27,7 @@ export const TIMELINE_NAMES = {
   path: ["position", "spacing", "mix"],
   physics: ["inertia", "strength", "damping", "mass", "wind", "gravity", "mix", "reset"],
   slider: ["time", "mix"],
+  particles: ["rate", "burst"],
 } as const;
 
 export const CurveArg = z
@@ -52,6 +54,11 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
     requireSlot(doc, d.slot);
     if (timeline !== "deform" && timeline !== "sequence") throw new Error("timeline de attachment: deform ou sequence");
     return { path: [...base, "attachments", d.skin, d.slot, d.attachment, timeline], kind: timeline };
+  }
+  if ("particles" in target) {
+    if (!(doc as any).particles?.some((p: any) => p.name === target.particles)) throw new Error(`emissor de particulas nao existe: "${target.particles}"`);
+    if (!(TIMELINE_NAMES.particles as readonly string[]).includes(timeline)) throw new Error(`timeline de particulas invalida: ${timeline}. Use rate ou burst`);
+    return { path: [...base, "particles", target.particles, timeline], kind: timeline };
   }
   const c = constraints(doc).find((x) => x.c.name === target.constraint);
   if (!c) throw new Error(`constraint nao existe: "${target.constraint}". Constraints: ${constraints(doc).map((x) => x.c.name).join(", ") || "(nenhuma)"}`);
@@ -185,6 +192,10 @@ export function keyFields(kind: string, a: Record<string, any>): Record<string, 
     return out;
   }
   if (kind === "reset") return out;
+  if (kind === "burst") {
+    out.count = Math.max(1, Math.round(a.count ?? 1));
+    return out;
+  }
   for (const c of channels(kind)) {
     const v = a[c.key];
     if (v !== undefined && v !== c.def) out[c.key] = round(v);

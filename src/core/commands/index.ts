@@ -13,5 +13,6 @@ import "./principles.ts";
 import "./study.ts";
 import "./estilo.ts";
 import "./psd.ts";
+import "./particles.ts";
 
 export * from "./registry.ts";

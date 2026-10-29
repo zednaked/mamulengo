@@ -13,6 +13,7 @@ Esqueleto::Esqueleto(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo
   mundo_.resize(m.ossos.size());
   slots_.resize(m.slots.size());
   rest_.resize(m.restricoes.size());
+  emis_.resize(m.emissores.size());
   // descendentes de cada restricao, em ordem de hierarquia (o pai vem antes no arquivo)
   descendentes_.resize(m.restricoes.size());
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
@@ -52,6 +53,11 @@ void Esqueleto::setup() {
     s.parte = m.parte_de(skin_, int(i), m.slots[i].parte_setup);
     s.deform.clear();
   }
+  for (size_t i = 0; i < m.emissores.size(); ++i) {
+    emis_[i] = EstadoEmissor{};
+    emis_[i].taxa = m.emissores[i].taxa;
+  }
+  ultima_anim_ = -1;
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
     const DadosRestricao& d = m.restricoes[r];
     EstadoRestricao& e = rest_[r];
@@ -253,6 +259,107 @@ void Esqueleto::aplicar_efeito(const TimelineEfeito& te, double t, double alfa, 
   e.limitar();
 }
 
+void Esqueleto::aplicar_taxa(const TimelineTaxa& tt, double t, double alfa, Mistura mist) {
+  const int k = tt.tl.chave(t);
+  double& v = emis_[size_t(tt.emissor)].taxa;
+  const double s = m_->emissores[size_t(tt.emissor)].taxa;
+  if (k < 0) {
+    if (mist == Mistura::Setup) v = s;
+    else if (mist == Mistura::Primeira) v += (s - v) * alfa;
+    return;
+  }
+  const double x = tt.tl.valor(k, 0, t);
+  if (alfa == 1) {
+    v = x;
+  } else {
+    if (mist == Mistura::Setup) v = s;
+    v += (x - v) * alfa;
+  }
+  v = std::max(v, 0.0);
+}
+
+void Esqueleto::aplicar_rajada(const TimelineRajada& tr, double de, double ate) {
+  int n = 0;
+  for (size_t k = 0; k < tr.tempos.size(); ++k) {
+    const double t = tr.tempos[k];
+    if (ate >= de ? (t > de && t <= ate) : (t > de || t <= ate)) n += tr.quantidades[k];
+  }
+  emis_[size_t(tr.emissor)].pendentes += n;
+}
+
+namespace {
+// o hash inteiro dos efeitos (docs/NUCLEO.md "Efeitos"), de 0 a 1
+double sorteio(uint32_t i, uint32_t j) {
+  uint32_t x = i * 1664525u + j * 1013904223u;
+  x ^= x >> 16;
+  x *= 0x7feb352du;
+  x ^= x >> 15;
+  x *= 0x846ca68bu;
+  x ^= x >> 16;
+  return double(x) / 4294967295.0;
+}
+}  // namespace
+
+void Esqueleto::atualizar_particulas() {
+  const Modelo& m = *m_;
+  for (size_t ie = 0; ie < m.emissores.size(); ++ie) {
+    const DadosEmissor& d = m.emissores[ie];
+    EstadoEmissor& e = emis_[ie];
+    double dt = 0;
+    if (e.reiniciar) {
+      e.reiniciar = false;
+    } else {
+      dt = std::max(relogio_ - e.relogio, 0.0);
+    }
+    e.relogio = relogio_;
+    // 1 e 2: envelhecer e mover
+    if (dt > 0) {
+      const double arrasto = std::exp(-d.arrasto * dt);
+      size_t n = 0;
+      for (Particula& p : e.vivas) {
+        p.idade += dt;
+        if (p.idade >= p.vida) continue;
+        p.vx *= arrasto;
+        p.vy = p.vy * arrasto - d.gravidade * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.rot += p.giro * dt;
+        e.vivas[n++] = p;
+      }
+      e.vivas.resize(n);
+    }
+    // 3: nascer
+    e.acumulado += e.taxa * dt;
+    int nascem = int(std::floor(e.acumulado));
+    e.acumulado -= nascem;
+    nascem += e.pendentes;
+    e.pendentes = 0;
+    if (nascem <= 0) continue;
+    const Matriz& w = mundo_[size_t(d.osso)];
+    const double ox = w.a * d.x + w.b * d.y + w.x, oy = w.c * d.x + w.d * d.y + w.y;
+    for (int k = 0; k < nascem; ++k) {
+      const uint32_t idx = e.nascidas++;
+      if (int(e.vivas.size()) >= d.maximo) continue;
+      const uint32_t j = d.semente * 8u;
+      const double s_vida = sorteio(idx, j), s_vel = sorteio(idx, j + 1), s_dir = sorteio(idx, j + 2), s_giro = sorteio(idx, j + 3);
+      const double ang = (d.angulo + (s_dir - 0.5) * d.abertura) * GRAU;
+      // a direcao no osso levada ao mundo (so a direcao)
+      double dx = w.a * std::cos(ang) + w.b * std::sin(ang), dy = w.c * std::cos(ang) + w.d * std::sin(ang);
+      const double len = std::hypot(dx, dy);
+      if (len > 1e-9) dx /= len, dy /= len;
+      const double vel = d.velocidade[0] + (d.velocidade[1] - d.velocidade[0]) * s_vel;
+      Particula p;
+      p.x = ox;
+      p.y = oy;
+      p.vx = dx * vel;
+      p.vy = dy * vel;
+      p.vida = d.vida[0] + (d.vida[1] - d.vida[0]) * s_vida;
+      p.giro = d.giro[0] + (d.giro[1] - d.giro[0]) * s_giro;
+      e.vivas.push_back(p);
+    }
+  }
+}
+
 void Esqueleto::aplicar_deformar(const TimelineDeformar& td, double t, double alfa, Mistura mist) {
   const Modelo& m = *m_;
   EstadoSlot& s = slots_[size_t(td.slot)];
@@ -426,12 +533,23 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
         break;
     }
   }
+  for (size_t i = 0; i < m.emissores.size(); ++i) emis_[i].taxa = m.emissores[i].taxa;
   // o deformar vem todo da animacao
   for (EstadoSlot& s : slots_) s.deform.clear();
-  if (ai < 0 || ai >= int(m.animacoes.size())) return;
+  if (ai < 0 || ai >= int(m.animacoes.size())) {
+    ultima_anim_ = -1;
+    return;
+  }
   const Animacao& an = m.animacoes[size_t(ai)];
   double t = tempo;
   if (loop && an.duracao > 0) t = std::fmod(t, an.duracao);
+  // rajadas desde a ultima vez (na primeira, desde antes do 0)
+  const double de = ai == ultima_anim_ ? ultimo_tempo_ : -1;
+  if (!(ai == ultima_anim_ && t == ultimo_tempo_))
+    for (const TimelineRajada& tr : an.rajadas) aplicar_rajada(tr, de, t);
+  ultima_anim_ = ai;
+  ultimo_tempo_ = t;
+  for (const TimelineTaxa& tt : an.taxas) aplicar_taxa(tt, t, 1, Mistura::Setup);
 
   // a mesma ordem do Estado: partes (o deformar so vale para a parte que o slot mostra), cores,
   // ossos, restricoes, deformar, ordem de desenho
@@ -512,6 +630,7 @@ void Esqueleto::atualizar_mundo() {
     for (int o : descendentes_[r]) mundo_osso(o);
   }
   local.swap(antes_);
+  atualizar_particulas();
 }
 
 Local Esqueleto::local_de_mundo(int i) const {

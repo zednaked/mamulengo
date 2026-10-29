@@ -87,6 +87,7 @@ descobre se há pesos comparando tamanhos. Sem pesos: `vertices` como no Spine.
 | Malha com pesos | vetor misto | pesos explícitos | leitor simples, menos erro |
 | Ficha e regras | arquivo `.md` ao lado | `ficha` no arquivo | a intenção e os limites viajam com o personagem |
 | Efeitos por slot | não existem | `efeitos` no slot e na animação: linha, brilho, dissolver e tingir (docs/NUCLEO.md, "Efeitos") | destaque de prêmio, aparecer e sumir, dano, sem arte nova; a exportação para o Spine os tira e avisa |
+| Partículas | não existem | `particulas` (emissores presos a ossos) e `particulas` na animação (taxa e rajadas); docs/NUCLEO.md, "Partículas" | brilho de prêmio, moedas, faíscas, sem vídeo nem nó à parte no jogo; a exportação para o Spine as tira e avisa |
 | Binário | `.skel` fechado | `.bonecob`, especificado aqui | carregar rápido no jogo |
 
 Fora do v0, por não aparecerem em nenhum dos 102 assets: slider, sequência de imagens, cor

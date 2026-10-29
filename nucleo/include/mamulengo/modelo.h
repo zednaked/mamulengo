@@ -250,6 +250,34 @@ struct TimelineEfeito {
   Timeline tl;  // EFEITO_CANAIS[tipo] canais
 };
 
+// ---- particulas (docs/NUCLEO.md "Particulas")
+
+struct DadosEmissor {
+  std::string nome;
+  int slot = -1, osso = -1;
+  double x = 0, y = 0;                 // ponto no osso
+  int pagina = -1;                     // da imagem (-1: sem imagem, nao desenha)
+  float uvs[8] = {0};                  // cantos da imagem: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita
+  double meia_largura = 0, meia_altura = 0;  // metade do retangulo com pixels
+  double taxa = 10;
+  double vida[2] = {1, 1}, velocidade[2] = {100, 100}, escala[2] = {1, 1}, giro[2] = {0, 0};
+  double angulo = 90, abertura = 30, gravidade = 0, arrasto = 0;
+  Cor cor[2] = {Cor{1, 1, 1, 1}, Cor{1, 1, 1, 0}};
+  int maximo = 200;
+  uint32_t semente = 0;
+};
+
+struct TimelineTaxa {
+  int emissor;
+  Timeline tl;  // 1 canal
+};
+
+struct TimelineRajada {
+  int emissor;
+  std::vector<double> tempos;
+  std::vector<int> quantidades;
+};
+
 struct TimelineParte {
   int slot;
   std::vector<double> tempos;
@@ -312,6 +340,8 @@ struct Animacao {
   std::vector<TimelineOsso> ossos;
   std::vector<TimelineCor> cores;
   std::vector<TimelineEfeito> efeitos;
+  std::vector<TimelineTaxa> taxas;
+  std::vector<TimelineRajada> rajadas;
   std::vector<TimelineParte> partes;
   std::vector<TimelineDeformar> deformar;
   std::vector<TimelineOrdem> ordem;  // 0 ou 1
@@ -343,6 +373,8 @@ struct Modelo {
   std::vector<Parte> partes;
   std::vector<Skin> skins;  // a 0 e a "default" (criada vazia se o arquivo nao tem)
   std::vector<DadosRestricao> restricoes;
+  std::vector<DadosEmissor> emissores;
+  std::vector<std::vector<int>> emissores_do_slot;  // por slot, os emissores que desenham nele
   std::vector<Animacao> animacoes;
   std::vector<std::string> nomes_partes;  // id -> nome
   std::vector<DadosEvento> eventos;

@@ -84,6 +84,7 @@ const KeyValue = z
     mode: z.string().optional(),
     index: z.number().int().optional(),
     delay: z.number().optional(),
+    count: z.number().int().min(1).optional().describe("burst: quantas particulas nascem de uma vez"),
     width: z.number().min(0).optional().describe("outline: largura em pixels da textura"),
     strength: z.number().min(0).optional().describe("glow e tint: forca (tint de 0 a 1); physics strength usa value"),
     radius: z.number().min(0).optional().describe("glow: raio em pixels da textura"),
@@ -105,7 +106,7 @@ defineCommand({
     space: z.enum(["parent", "world"]).default("parent").describe("translate: x/y no espaco do pai (padrao) ou na tela (world)"),
     ...KeyValue.shape,
   }),
-  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : p.target.deform.attachment} @${p.time}`,
+  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : "particles" in p.target ? p.target.particles : p.target.deform.attachment} @${p.time}`,
   run({ e }, p) {
     requireAnimation(e.json, p.anim);
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);

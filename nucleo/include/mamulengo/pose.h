@@ -46,6 +46,21 @@ struct EstadoSlot {
 // - Soma: soma o valor da timeline (relativo ao setup) vezes alfa.
 enum class Mistura : uint8_t { Setup, Primeira, Substitui, Soma };
 
+// uma particula viva, no espaco do esqueleto
+struct Particula {
+  double x = 0, y = 0, vx = 0, vy = 0, rot = 0, giro = 0, idade = 0, vida = 1;
+};
+
+// estado de um emissor: a taxa animavel e a memoria entre quadros
+struct EstadoEmissor {
+  double taxa = 0;
+  bool reiniciar = true;
+  double relogio = 0, acumulado = 0;
+  uint32_t nascidas = 0;  // quantas ja nasceram desde o setup (o indice do sorteio)
+  int pendentes = 0;      // rajadas ainda por nascer
+  std::vector<Particula> vivas;
+};
+
 // valores animaveis das restricoes (comecam nos do modelo a cada aplicar)
 struct EstadoRestricao {
   double mix = 1, suavidade = 0;  // ik
@@ -82,6 +97,10 @@ class Esqueleto {
   void aplicar_osso(const TimelineOsso& tl, double t, double alfa, Mistura mist, bool sai);
   void aplicar_cor(const TimelineCor& tl, double t, double alfa, Mistura mist);
   void aplicar_efeito(const TimelineEfeito& tl, double t, double alfa, Mistura mist);
+  void aplicar_taxa(const TimelineTaxa& tl, double t, double alfa, Mistura mist);
+  // rajadas com tempo em (de, ate]; com ate < de (a animacao deu a volta), as depois de `de` e
+  // as ate `ate`
+  void aplicar_rajada(const TimelineRajada& tl, double de, double ate);
   void aplicar_deformar(const TimelineDeformar& tl, double t, double alfa, Mistura mist);
   void aplicar_ordem(const TimelineOrdem& tl, double t, Mistura mist, bool sai);
   void aplicar_restricao(const TimelineRestricao& tl, double t, double alfa, Mistura mist, bool sai);
@@ -121,6 +140,8 @@ class Esqueleto {
   const std::vector<EstadoSlot>& slots() const { return slots_; }
   const std::vector<int>& ordem() const { return ordem_; }
   std::vector<EstadoRestricao>& restricoes() { return rest_; }
+  std::vector<EstadoEmissor>& emissores() { return emis_; }
+  const std::vector<EstadoEmissor>& emissores() const { return emis_; }
 
   // vertices em mundo da parte do slot (regiao: 4 cantos; malha: 2 numeros por vertice);
   // devolve quantos numeros escreveu (0 se o slot nao mostra regiao nem malha)
@@ -134,6 +155,10 @@ class Esqueleto {
   std::vector<EstadoSlot> slots_;
   std::vector<int> ordem_;
   std::vector<EstadoRestricao> rest_;
+  std::vector<EstadoEmissor> emis_;
+  // aplicar() sem Estado: a animacao e o tempo da ultima vez (para as rajadas)
+  int ultima_anim_ = -1;
+  double ultimo_tempo_ = 0;
   // por restricao: os ossos a recalcular depois dela (descendentes dos controlados)
   std::vector<std::vector<int>> descendentes_;
   int skin_ = 0;
@@ -147,6 +172,7 @@ class Esqueleto {
   void restricao_caminho(int r);
   void restricao_fisica(int r);
   void restricao_transformacao(int r);
+  void atualizar_particulas();
   // pose local a partir do mundo (depois que uma restricao mexe no mundo do osso)
   Local local_de_mundo(int i) const;
   // depois de uma restricao que escreve no mundo: leva o mundo para a pose local, para que uma
