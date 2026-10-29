@@ -277,8 +277,9 @@ então a margem não mostra a imagem vizinha do atlas. Por fragmento, com `T(uv)
 desfeito; fora da caixa, 0), `px` o tamanho de um pixel da página e `cv` a cor do vértice:
 
 1. `C = T(uv) * cv`; tingir: `C.rgb = mix(C.rgb, tingir.rgb, forca * tingir.a)`.
-2. linha: `A = max` do alfa de `T` a `largura` e a `largura / 2` em 16 direções; camada
-   `L = (linha.rgb, linha.a * A)`.
+2. linha: `A = max` do alfa de `T` a `largura`, `2 largura / 3` e `largura / 3` em 24
+   direções (com 16 direções e duas distâncias, um canto vivo de linha larga saía em degraus);
+   camada `L = (linha.rgb, linha.a * A)`.
 3. brilho: `B = max` de `alfa(T) * (1 - (i - 1) / 6)²` a `raio * i / 6`, `i` de 1 a 6, em 16
    direções (nos anéis pares, giradas meio passo); camada
    `H = (brilho.rgb, min(1, brilho.a * forca * B))`. Uma borda que cai com a distância (a

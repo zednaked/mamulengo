@@ -108,10 +108,10 @@ void main() {
   }
   if (ef[4] > 0.0 && ef[3] > 0.0) {
     float A = 0.0;
-    for (int k = 0; k < 16; k++) {
-      float g = float(k) * 6.2831853 / 16.0;
+    for (int k = 0; k < 24; k++) {
+      float g = float(k) * 6.2831853 / 24.0;
       vec2 d = vec2(cos(g), sin(g)) * ef[4] * px;
-      A = max(A, max(T(vuv + d).a, T(vuv + d * 0.5).a));
+      A = max(A, max(T(vuv + d).a, max(T(vuv + d * 0.6666667).a, T(vuv + d * 0.3333333).a)));
     }
     U = sobre(vec4(ef[0], ef[1], ef[2], ef[3] * A), U);
   }

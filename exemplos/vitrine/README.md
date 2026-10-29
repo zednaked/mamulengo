@@ -18,7 +18,10 @@ bones; both are keyed on the timeline like any other property. The format and th
 [docs/NUCLEO.md](../../docs/NUCLEO.md) ("Efeitos" and "Partículas"). Exporting to Spine drops
 them with a warning.
 
-The file is generated: `npx tsx exemplos/vitrine/gerar.ts`. The star image (`estrela.png`) is
-drawn by the generator. To see it live, open the editor with this folder in `MAMULENGO_ROOTS`
+The file is generated: `npx tsx exemplos/vitrine/gerar.ts`. The robot page (`robo-hd.webp`) is
+the same CC0 art at 3x, rasterized from the pack's vector file by `robo-hd.py`, so it stays sharp
+when zoomed in; the generator also fixes the rig against Kenney's reference pose (feet pointing
+out, a gap between the legs, hands centered on the arms). The star image (`estrela.png`) is drawn
+by the generator. To see it live, open the editor with this folder in `MAMULENGO_ROOTS`
 (it opens in the core's own renderer), or load it in Godot with the `BonecoSprite` node from
 `addons/boneco`.

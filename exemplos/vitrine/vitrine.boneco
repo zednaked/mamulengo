@@ -3,10 +3,10 @@
  "nome": "vitrine",
  "paginas": [
   {
-   "arquivo": "robo.webp",
+   "arquivo": "robo-hd.webp",
    "tamanho": [
-    510,
-    290
+    1530,
+    870
    ],
    "jogo": {
     "compressao": "sem_perda"
@@ -15,8 +15,8 @@
   {
    "arquivo": "estrela.png",
    "tamanho": [
-    32,
-    32
+    128,
+    128
    ]
   }
  ],
@@ -25,10 +25,10 @@
    "nome": "arm",
    "pagina": 0,
    "ret": [
-    432,
-    60,
-    38,
-    58
+    1296,
+    180,
+    114,
+    174
    ]
   },
   {
@@ -36,9 +36,9 @@
    "pagina": 0,
    "ret": [
     0,
-    92,
-    94,
-    78
+    276,
+    282,
+    234
    ]
   },
   {
@@ -46,9 +46,9 @@
    "pagina": 0,
    "ret": [
     0,
-    172,
-    94,
-    78
+    516,
+    282,
+    234
    ]
   },
   {
@@ -56,9 +56,9 @@
    "pagina": 0,
    "ret": [
     0,
-    252,
-    36,
-    36
+    756,
+    108,
+    108
    ]
   },
   {
@@ -67,58 +67,58 @@
    "ret": [
     0,
     0,
-    106,
-    90
+    318,
+    270
    ]
   },
   {
    "nome": "headBack",
    "pagina": 0,
    "ret": [
-    108,
+    324,
     0,
-    106,
-    90
+    318,
+    270
    ]
   },
   {
    "nome": "headFocus",
    "pagina": 0,
    "ret": [
-    216,
+    648,
     0,
-    106,
-    90
+    318,
+    270
    ]
   },
   {
    "nome": "headShock",
    "pagina": 0,
    "ret": [
-    324,
+    972,
     0,
-    106,
-    90
+    318,
+    270
    ]
   },
   {
    "nome": "leg",
    "pagina": 0,
    "ret": [
-    472,
-    60,
-    36,
-    58
+    1416,
+    180,
+    108,
+    174
    ]
   },
   {
    "nome": "legBend",
    "pagina": 0,
    "ret": [
-    432,
+    1296,
     0,
-    46,
-    58
+    138,
+    174
    ]
   },
   {
@@ -127,8 +127,8 @@
    "ret": [
     0,
     0,
-    32,
-    32
+    128,
+    128
    ]
   }
  ],
@@ -218,7 +218,7 @@
    "pai": "base",
    "comprimento": 40,
    "rotacao": -90,
-   "x": -14,
+   "x": -22,
    "y": 45
   },
   {
@@ -226,7 +226,7 @@
    "pai": "base",
    "comprimento": 40,
    "rotacao": -90,
-   "x": 14,
+   "x": 22,
    "y": 45
   }
  ],
@@ -283,7 +283,7 @@
     "brilho": {
      "cor": "4cc9ffff",
      "forca": 0,
-     "raio": 16
+     "raio": 48
     },
     "tingir": {
      "cor": "ff3355ff",
@@ -311,16 +311,16 @@
      "leg": {
       "x": 16,
       "y": 0.000001717178,
-      "escala_y": 1,
-      "rotacao": 90,
+      "escala_y": -1,
+      "rotacao": -90,
       "largura": 36,
       "altura": 58
      },
      "legBend": {
       "x": 16,
       "y": 0.000001717178,
-      "escala_y": 1,
-      "rotacao": 90,
+      "escala_y": -1,
+      "rotacao": -90,
       "largura": 46,
       "altura": 58
      }
@@ -329,16 +329,16 @@
      "leg": {
       "x": 16,
       "y": 0.000001717178,
-      "escala_y": -1,
-      "rotacao": -90,
+      "escala_y": 1,
+      "rotacao": 90,
       "largura": 36,
       "altura": 58
      },
      "legBend": {
       "x": 16,
       "y": 0.000001717178,
-      "escala_y": -1,
-      "rotacao": -90,
+      "escala_y": 1,
+      "rotacao": 90,
       "largura": 46,
       "altura": 58
      }
@@ -1274,7 +1274,7 @@
     "mao_e": {
      "hand": {
       "x": 11.14007,
-      "y": -0.9480902,
+      "y": -5.9480902,
       "rotacao": 95.44033,
       "largura": 36,
       "altura": 36,
@@ -1285,7 +1285,7 @@
     "mao_d": {
      "hand": {
       "x": 11.14007,
-      "y": 0.9480921,
+      "y": 5.9480921,
       "escala_y": -1,
       "rotacao": -95.44033,
       "largura": 36,
@@ -9892,11 +9892,11 @@
       },
       {
        "tempo": 1.2,
-       "largura": 4
+       "largura": 12
       },
       {
        "tempo": 2,
-       "largura": 4
+       "largura": 12
       },
       {
        "tempo": 2.4,
@@ -9908,11 +9908,11 @@
       },
       {
        "tempo": 6.5,
-       "largura": 3.5
+       "largura": 10.5
       },
       {
        "tempo": 7.6,
-       "largura": 3.5
+       "largura": 10.5
       },
       {
        "tempo": 8,
@@ -13669,8 +13669,8 @@
    "abertura": 70,
    "gravidade": 260,
    "escala": [
-    0.7,
-    0.1
+    0.175,
+    0.025
    ],
    "giro": [
     -200,
@@ -13699,8 +13699,8 @@
    "abertura": 70,
    "gravidade": 260,
    "escala": [
-    0.7,
-    0.1
+    0.175,
+    0.025
    ],
    "giro": [
     -200,
@@ -13731,8 +13731,8 @@
    "gravidade": 320,
    "arrasto": 1.2,
    "escala": [
-    0.8,
-    0.35
+    0.2,
+    0.0875
    ],
    "giro": [
     -300,

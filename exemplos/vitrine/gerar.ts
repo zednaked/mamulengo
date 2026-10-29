@@ -9,7 +9,7 @@
 //   3,9-5,9  idle      os bracos se dissolvem e voltam (dissolver ida e volta)
 //   6,2-7,5  ganhou    tudo junto: dourado no corpo, contorno, halo, faiscas e rajadas
 //   7,8-8,6  idle      tudo apaga; a animacao volta ao comeco
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
@@ -19,6 +19,29 @@ const ROBO = join(AQUI, "..", "..", "tests", "boneco", "robo");
 const b = JSON.parse(readFileSync(join(ROBO, "robo.boneco"), "utf8"));
 b.nome = "vitrine";
 delete b.ficha;
+
+// a pagina em 3x (robo-hd.webp, rasterizada do vetor da Kenney por robo-hd.py): o mesmo
+// layout com os retangulos em 3x; as partes guardam o tamanho delas, entao so a nitidez muda.
+// Larguras e raios dos efeitos sao em pixels da textura: tambem em 3x
+const HD = 3;
+b.paginas[0] = { ...b.paginas[0], arquivo: "robo-hd.webp", tamanho: b.paginas[0].tamanho.map((v: number) => v * HD) };
+for (const im of b.imagens) im.ret = im.ret.map((v: number) => v * HD);
+
+// ---- acertos do rig do robo, conferidos contra a pose "idle" da Kenney: os pes para fora (a
+// perna esquerda e a espelhada, nao a direita), um vao entre as pernas e as maos centradas na
+// ponta do braco
+const parte = (s: string, n: string) => b.skins[0].partes[s][n];
+for (const n of ["leg", "legBend"]) {
+  const e = parte("perna_e", n),
+    d = parte("perna_d", n);
+  [e.rotacao, e.escala_y, d.rotacao, d.escala_y] = [d.rotacao, d.escala_y, e.rotacao, e.escala_y];
+}
+const PERNA_X = 22;
+b.ossos.find((o: any) => o.nome === "perna_e").x = -PERNA_X;
+b.ossos.find((o: any) => o.nome === "perna_d").x = PERNA_X;
+const MAO_Y = -5;
+parte("mao_e", "hand").y += MAO_Y;
+parte("mao_d", "hand").y -= MAO_Y;
 
 // ---- corpo: trechos das animacoes do robo em sequencia, com 0,3 s de emenda entre eles
 
@@ -59,7 +82,7 @@ for (const op of props) {
 
 const slot = (n: string) => b.slots.find((s: any) => s.nome === n);
 slot("cabeca").efeitos = { linha: { cor: "ffd23cff", largura: 0 } };
-slot("corpo").efeitos = { brilho: { cor: "4cc9ffff", forca: 0, raio: 16 }, tingir: { cor: "ff3355ff", forca: 0 } };
+slot("corpo").efeitos = { brilho: { cor: "4cc9ffff", forca: 0, raio: 16 * HD }, tingir: { cor: "ff3355ff", forca: 0 } };
 for (const s of ["braco_e", "braco_d"]) slot(s).efeitos = { dissolver: { valor: 0, cor: "ff8a3cff", borda: 0.08 } };
 
 const efeitos = {
@@ -91,12 +114,12 @@ const efeitos = {
   cabeca: {
     linha: [
       { tempo: 0.5, largura: 0 },
-      { tempo: 1.2, largura: 4 },
-      { tempo: 2.0, largura: 4 },
+      { tempo: 1.2, largura: 4 * HD },
+      { tempo: 2.0, largura: 4 * HD },
       { tempo: 2.4, largura: 0 },
       { tempo: 6.2, largura: 0 },
-      { tempo: 6.5, largura: 3.5 },
-      { tempo: 7.6, largura: 3.5 },
+      { tempo: 6.5, largura: 3.5 * HD },
+      { tempo: 7.6, largura: 3.5 * HD },
       { tempo: 8.0, largura: 0 },
     ],
   },
@@ -121,17 +144,16 @@ const efeitos = {
 // ---- particulas (docs/NUCLEO.md "Particulas"): desligadas no setup (taxa 0)
 
 // a imagem das particulas: uma estrela de quatro pontas branca (a cor vem do emissor), numa
-// pagina propria desenhada aqui
-const LADO = 32;
+// pagina propria desenhada aqui. A forma e uma astroide (|x|^e + |y|^e <= 1, lados para dentro)
+// com borda firme: so ~1 px de transicao, para nao parecer borrada ampliada
+const LADO = 128;
 const estrela = new PNG({ width: LADO, height: LADO });
 for (let y = 0; y < LADO; y++)
   for (let x = 0; x < LADO; x++) {
     const dx = Math.abs(x + 0.5 - LADO / 2) / (LADO / 2),
       dy = Math.abs(y + 0.5 - LADO / 2) / (LADO / 2);
-    // pontas finas nos eixos e um miolo redondo
-    const ponta = Math.max(0, 1 - Math.sqrt(dx) - Math.sqrt(dy) * 0.0) * Math.max(0, 1 - dy * 6) + Math.max(0, 1 - Math.sqrt(dy)) * Math.max(0, 1 - dx * 6);
-    const miolo = Math.max(0, 1 - Math.hypot(dx, dy) * 2.6);
-    const a = Math.min(1, ponta + miolo);
+    const f = Math.pow(dx, 0.55) + Math.pow(dy, 0.55);
+    const a = Math.min(1, Math.max(0, (1 - f) / 0.035));
     const i = (y * LADO + x) * 4;
     estrela.data[i] = estrela.data[i + 1] = estrela.data[i + 2] = 255;
     estrela.data[i + 3] = Math.round(a * 255);
@@ -150,7 +172,7 @@ const faiscas = (nome: string, s: string) => ({
   angulo: 90,
   abertura: 70,
   gravidade: 260,
-  escala: [0.7, 0.1],
+  escala: [0.175, 0.025],
   giro: [-200, 200],
   cor: ["ffe066ff", "ff6a1e00"],
   semente: nome.length,
@@ -158,7 +180,7 @@ const faiscas = (nome: string, s: string) => ({
 b.particulas = [
   faiscas("faiscas_e", "mao_e"),
   faiscas("faiscas_d", "mao_d"),
-  { nome: "confete", slot: "cabeca", y: 50, imagem: "estrela", taxa: 0, vida: [0.9, 1.6], velocidade: [180, 360], angulo: 0, abertura: 150, gravidade: 320, arrasto: 1.2, escala: [0.8, 0.35], giro: [-300, 300], cor: ["7fe3ffff", "ff7ad900"], semente: 7 },
+  { nome: "confete", slot: "cabeca", y: 50, imagem: "estrela", taxa: 0, vida: [0.9, 1.6], velocidade: [180, 360], angulo: 0, abertura: 150, gravidade: 320, arrasto: 1.2, escala: [0.2, 0.0875], giro: [-300, 300], cor: ["7fe3ffff", "ff7ad900"], semente: 7 },
 ];
 const rampa = (t0: number, t1: number, t2: number, pico: number) => [
   { tempo: t0, valor: 0 },
@@ -181,5 +203,4 @@ const particulas = {
 b.animacoes = { vitrine: { ossos, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
 b.mix = { padrao: 0.2 };
 writeFileSync(join(AQUI, "vitrine.boneco"), JSON.stringify(b, null, 1) + "\n");
-copyFileSync(join(ROBO, "robo.webp"), join(AQUI, "robo.webp"));
 console.log(`vitrine.boneco: ${Object.keys(ossos).length} ossos animados, ${b.particulas.length} emissores, efeitos em ${Object.keys(efeitos).length} slots`);
