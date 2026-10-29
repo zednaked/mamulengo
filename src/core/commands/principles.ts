@@ -126,9 +126,9 @@ defineCommand({
     const times = p.at === "inicio" ? [0] : p.at === "fim" ? [dur] : [0, dur];
     let keys = 0;
     for (const b of sk.bones) {
-      const name = b.data.name;
-      const q = b.pose,
-        s = b.data.setupPose;
+      const name = b.name;
+      const q = b.local,
+        s = b.setup;
       const want = {
         rotate: [wrapDeg(q.rotation - s.rotation)],
         translate: [q.x - s.x, q.y - s.y],
@@ -138,7 +138,7 @@ defineCommand({
       const rest = { rotate: [0], translate: [0, 0], scale: [1, 1], shear: [0, 0] };
       for (const t of times) {
         // pose atual da animacao naquele instante, para nao gravar o que ja bate
-        const now = poseAt(ctx.e.json, p.anim, t).findBone(name)!.pose;
+        const now = poseAt(ctx.e.json, p.anim, t).findBone(name)!.local;
         const have = {
           rotate: [wrapDeg(now.rotation - s.rotation)],
           translate: [now.x - s.x, now.y - s.y],

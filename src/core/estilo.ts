@@ -1,7 +1,8 @@
 // Regua do estilo da casa: mede uma animacao (duracao, quanto o corpo anda e gira,
 // amassa, batidas, pausas, curvas, trocas) relativa ao tamanho do personagem. Usada pelo
 // tools/estilo.ts (medir os jogos) e pelo comando query.estilo (comparar com a casa).
-import { animDuration, poseAt, wrapDeg } from "./ficha.ts";
+import { animDuration, posesAt, wrapDeg } from "./ficha.ts";
+import { abrirLeve, type Medidor } from "./instantes.ts";
 import casaPadrao from "./estilo-casa.json" with { type: "json" };
 
 // faixas da casa: vazias no repositorio; gere as suas com
@@ -73,7 +74,15 @@ export interface Medida {
   loop: boolean;
 }
 
-export function medir(asset: string, j: any, anim: string): Medida {
+export function medir(asset: string, j: any, anim: string, m?: Medidor): Medida {
+  if (!m) {
+    const own = abrirLeve(j);
+    try {
+      return medir(asset, j, anim, own);
+    } finally {
+      own.liberar();
+    }
+  }
   const a = j.animations[anim];
   const dur = animDuration(a);
   const h = Math.max(1, j.skeleton?.height ?? 500);
@@ -98,15 +107,15 @@ export function medir(asset: string, j: any, anim: string): Medida {
   const pos: [number, number][][] = [];
   const rot: Record<string, number[]> = {};
   let amassa = 0;
-  for (let i = 0; i <= n; i++) {
-    const sk = poseAt(j, anim, (i / n) * dur);
-    pos.push(sk.bones.map((b: any) => [b.appliedPose.worldX, b.appliedPose.worldY]));
+  const quadros = posesAt(m, j, anim, Array.from({ length: n + 1 }, (_, i) => (i / n) * dur));
+  for (const sk of quadros) {
+    pos.push(sk.bones.map((b) => [b.worldX, b.worldY]));
     for (const name of animated) {
       const b = sk.findBone(name);
       if (!b) continue;
-      (rot[name] ??= []).push(wrapDeg(b.pose.rotation - b.data.setupPose.rotation));
+      (rot[name] ??= []).push(wrapDeg(b.local.rotation - b.setup.rotation));
       // espelhar (escala -1) e truque de desenho, nao amassar: compara o modulo
-      amassa = Math.max(amassa, Math.abs(Math.abs(b.pose.scaleX / (b.data.setupPose.scaleX || 1)) - 1), Math.abs(Math.abs(b.pose.scaleY / (b.data.setupPose.scaleY || 1)) - 1));
+      amassa = Math.max(amassa, Math.abs(Math.abs(b.local.scaleX / (b.setup.scaleX || 1)) - 1), Math.abs(Math.abs(b.local.scaleY / (b.setup.scaleY || 1)) - 1));
     }
   }
   // corpo: quanto o centro de massa dos ossos anda (independe de qual osso e o "corpo")
@@ -156,10 +165,9 @@ export function medir(asset: string, j: any, anim: string): Medida {
   };
   scan({ bones: a.bones, slots: a.slots, attachments: a.attachments, ik: a.ik, transform: a.transform, physics: a.physics });
   const trocas = Object.values<any>(a.slots ?? {}).reduce((s, t) => s + (t.attachment?.length ?? 0), 0);
-  const start = poseAt(j, anim, 0),
-    end = poseAt(j, anim, dur);
+  const [start, end] = posesAt(m, j, anim, [0, dur]);
   let gap = 0;
-  start.bones.forEach((b: any, k: number) => (gap = Math.max(gap, Math.hypot(b.appliedPose.worldX - end.bones[k].appliedPose.worldX, b.appliedPose.worldY - end.bones[k].appliedPose.worldY))));
+  start.bones.forEach((b, k) => (gap = Math.max(gap, Math.hypot(b.worldX - end.bones[k].worldX, b.worldY - end.bones[k].worldY))));
   return {
     asset,
     anim,

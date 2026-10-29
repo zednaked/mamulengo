@@ -465,7 +465,7 @@ runtimeOk("constraints");
       const sk = skeletonAt(doc.json, null, 0);
       const s = doc.json.slots.find((x: any) => x.name === sk0.name);
       const att = doc.json.skins[0].attachments[sk0.name][s.attachment];
-      const b = sk.findBone(s.bone)!.appliedPose;
+      const b = sk.findBone(s.bone)!;
       const x = att.x ?? 0,
         y = att.y ?? 0;
       return [b.a * x + b.b * y + b.worldX, b.c * x + b.d * y + b.worldY];
@@ -956,7 +956,7 @@ runtimeOk("remocoes (slot, osso com pesos)");
         const m = skeletonAt(j, a.name, t);
         g.bones.forEach((b, i) => {
           const p = b.appliedPose,
-            q = m.bones[i].appliedPose;
+            q = m.bones[i];
           const e = Math.abs(Math.atan2(-p.c, p.a) - Math.atan2(q.c, q.a)) * (180 / Math.PI);
           worst = Math.max(worst, Math.min(e, 360 - e) + Math.hypot(p.worldX - q.worldX, p.worldY + q.worldY));
         });

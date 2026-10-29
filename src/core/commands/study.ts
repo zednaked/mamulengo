@@ -3,12 +3,11 @@
 // relacao a outra ao longo do tempo) e pose.follow (gira uma cadeia para uma peca
 // acompanhar outra, como a mao que segura os oculos acompanhando a cabeca).
 import { z } from "zod";
-import { Physics } from "@esotericsoftware/spine-core";
 import { defineCommand } from "./registry.ts";
 import { requireAnimation, requireBone } from "../model.ts";
 import { round } from "./timeline.ts";
-import { animDuration as duration, checkFicha, draftFicha, fmt, meshDistortion, relation, rigStudy, wrapDeg } from "../ficha.ts";
-import { skeletonAt } from "../pose.ts";
+import { EMPATE, animDuration as duration, checkFicha, draftFicha, fmt, meshDistortion, relation, rigStudy, wrapDeg } from "../ficha.ts";
+import { abrirMedidor, comMedidor, modoMedidas } from "../instantes.ts";
 import { exposedSeams, seamImages, type Pixels } from "../recorte.ts";
 
 const wrap = wrapDeg;
@@ -45,19 +44,21 @@ defineCommand({
     requireBone(doc.json, p.bone);
     requireBone(doc.json, p.relativeTo);
     const dur = duration(a);
-    const r0 = relation(skeletonAt(doc.json, null, 0), p.relativeTo, p.bone);
     const n = Math.max(1, Math.round(dur * p.fps));
+    const times = Array.from({ length: n + 1 }, (_, i) => (i / n) * dur);
+    const [setup, poses] = comMedidor(doc.json, null, (m) => [m.poses(null, [0])[0], m.poses(p.anim, times.map((t, i) => (i === n && n > 0 ? dur - 1e-4 : t)))] as const, { leve: true });
+    const r0 = relation(setup, p.relativeTo, p.bone);
     const rows: string[] = [];
     let maxD = 0,
       maxA = 0,
       at = 0;
     for (let i = 0; i <= n; i++) {
-      const t = (i / n) * dur;
-      const r = relation(skeletonAt(doc.json, p.anim, i === n && n > 0 ? dur - 1e-4 : t), p.relativeTo, p.bone);
+      const t = times[i];
+      const r = relation(poses[i], p.relativeTo, p.bone);
       const dx = r.x - r0.x,
         dy = r.y - r0.y,
         da = wrap(r.ang - r0.ang);
-      if (Math.hypot(dx, dy) > maxD) (maxD = Math.hypot(dx, dy)), (at = t);
+      if (Math.hypot(dx, dy) > maxD + EMPATE) (maxD = Math.hypot(dx, dy)), (at = t);
       maxA = Math.max(maxA, Math.abs(da));
       rows.push(`${t.toFixed(2)}: ${fmt(dx)},${fmt(dy)} ${fmt(da)}°`);
     }
@@ -111,54 +112,64 @@ defineCommand({
         }
       return offs[offs.length - 1];
     };
-    const r0 = relation(skeletonAt(j, null, 0), p.relativeTo, p.bone);
+    const leve = { leve: true };
+    const r0 = comMedidor(j, null, (m) => relation(m.poses(null, [0])[0], p.relativeTo, p.bone), leve);
     const report: string[] = [];
     let worst = 0;
-    for (const t of times) {
-      const sk = skeletonAt(ctx.e.json, p.anim, t >= duration(a) && t > 0 ? duration(a) - 1e-4 : t);
-      const o = offsetAt(t);
-      const goal = { x: r0.x + o.x, y: r0.y + o.y, ang: r0.ang + o.rotation };
-      const chain = p.chain.map((n) => sk.findBone(n)!);
-      const base = chain.map((b) => b.pose.rotation);
-      const err = (v: number[]) => {
-        chain.forEach((b, i) => (b.pose.rotation = base[i] + v[i]));
-        sk.updateWorldTransform(Physics.pose);
-        const r = relation(sk, p.relativeTo, p.bone);
-        // um pouco de preferencia por girar pouco: entre solucoes iguais, a mais calma
-        return Math.hypot(r.x - goal.x, r.y - goal.y) + Math.abs(wrap(r.ang - goal.ang)) * p.angleWeight + 0.02 * Math.hypot(...v);
-      };
-      let v = chain.map(() => 0),
-        e = err(v);
-      for (let step = 8; step > 0.01; step /= 2)
-        for (let it = 0, better = true; better && it < 200; it++) {
-          better = false;
-          for (let i = 0; i < v.length; i++)
-            for (const s of [step, -step]) {
-              const w = [...v];
-              w[i] += s;
-              const ew = err(w);
-              if (ew < e) (e = ew), (v = w), (better = true);
-            }
-        }
-      err(v);
-      const r = relation(sk, p.relativeTo, p.bone);
-      const d = Math.hypot(r.x - goal.x, r.y - goal.y);
-      worst = Math.max(worst, d);
-      chain.forEach((b, i) => ctx.run("key.set", { anim: p.anim, target: { bone: b.data.name }, timeline: "rotate", time: round(t), value: round(base[i] + v[i] - b.data.setupPose.rotation), curve: p.curve }));
-      report.push(`${round(t)}: ${fmt(d)} ${fmt(wrap(r.ang - goal.ang))}°`);
-    }
-    // confere entre as chaves: curvas e limites de constraints (ex: max de um transform) podem escapar
     let between = 0,
       betweenAt = 0;
-    const dur = duration(requireAnimation(ctx.e.json, p.anim));
-    for (let i = 1; i < times.length; i++)
-      for (const u of [0.25, 0.5, 0.75]) {
-        const t = times[i - 1] + (times[i] - times[i - 1]) * u;
+    for (const t of times) {
+      // a pose com as chaves ja gravadas nos instantes anteriores
+      const m = abrirMedidor(ctx.e.json, null, modoMedidas(), leve);
+      try {
+        const sk = m.poses(p.anim, [t >= duration(a) && t > 0 ? duration(a) - 1e-4 : t])[0];
         const o = offsetAt(t);
-        const r = relation(skeletonAt(ctx.e.json, p.anim, Math.min(t, dur - 1e-4)), p.relativeTo, p.bone);
+        const goal = { x: r0.x + o.x, y: r0.y + o.y, ang: r0.ang + o.rotation };
+        const chain = p.chain.map((n) => sk.findBone(n)!);
+        const base = chain.map((b) => b.local.rotation);
+        const reposa = (v: number[]) => m.reposar(chain.map((b, i) => ({ bone: b.name, local: { rotation: base[i] + v[i] } })));
+        const err = (v: number[]) => {
+          const r = relation(reposa(v), p.relativeTo, p.bone);
+          // um pouco de preferencia por girar pouco: entre solucoes iguais, a mais calma
+          return Math.hypot(r.x - goal.x, r.y - goal.y) + Math.abs(wrap(r.ang - goal.ang)) * p.angleWeight + 0.02 * Math.hypot(...v);
+        };
+        let v = chain.map(() => 0),
+          e = err(v);
+        for (let step = 8; step > 0.01; step /= 2)
+          for (let it = 0, better = true; better && it < 200; it++) {
+            better = false;
+            for (let i = 0; i < v.length; i++)
+              for (const s of [step, -step]) {
+                const w = [...v];
+                w[i] += s;
+                const ew = err(w);
+                // so melhora de verdade (mais que 1e-4): ruido do runtime nao escolhe o caminho
+                if (ew < e - 1e-4) (e = ew), (v = w), (better = true);
+              }
+          }
+        const r = relation(reposa(v), p.relativeTo, p.bone);
+        const d = Math.hypot(r.x - goal.x, r.y - goal.y);
+        worst = Math.max(worst, d);
+        chain.forEach((b, i) => ctx.run("key.set", { anim: p.anim, target: { bone: b.name }, timeline: "rotate", time: round(t), value: round(base[i] + v[i] - b.setup.rotation), curve: p.curve }));
+        report.push(`${round(t)}: ${fmt(d)} ${fmt(wrap(r.ang - goal.ang))}°`);
+      } finally {
+        m.liberar();
+      }
+    }
+    // confere entre as chaves: curvas e limites de constraints (ex: max de um transform) podem escapar
+    const dur = duration(requireAnimation(ctx.e.json, p.anim));
+    comMedidor(ctx.e.json, null, (m2) => {
+      const ts: number[] = [];
+      for (let i = 1; i < times!.length; i++) for (const u of [0.25, 0.5, 0.75]) ts.push(times![i - 1] + (times![i] - times![i - 1]) * u);
+      const ordem = ts.map((t, k) => [t, k] as const).sort((x, y) => x[0] - y[0]);
+      const qs = m2.poses(p.anim, ordem.map(([t]) => Math.min(t, dur - 1e-4)));
+      ordem.forEach(([t], k) => {
+        const o = offsetAt(t);
+        const r = relation(qs[k], p.relativeTo, p.bone);
         const d = Math.hypot(r.x - r0.x - o.x, r.y - r0.y - o.y);
         if (d > between) (between = d), (betweenAt = t);
-      }
+      });
+    }, leve);
     return {
       keys: times.length * p.chain.length,
       pior_nas_chaves: fmt(worst),
@@ -219,7 +230,7 @@ defineCommand({
     const w = meshDistortion(doc.json, p.anim, Array.from({ length: n + 1 }, (_, i) => (i / n) * d));
     // um momento por malha e janela de 0.15 s, os piores primeiro
     const picks: typeof w.all = [];
-    for (const e of w.all.sort((x, y) => y.frac - x.frac)) if (!picks.some((q) => q.mesh === e.mesh && Math.abs(q.t - e.t) < 0.15)) picks.push(e);
+    for (const e of w.all.sort((x, y) => +(y.frac * 1000).toFixed(2) - +(x.frac * 1000).toFixed(2) || x.t - y.t)) if (!picks.some((q) => q.mesh === e.mesh && Math.abs(q.t - e.t) < 0.15)) picks.push(e);
     return {
       anim: p.anim,
       momentos: picks.slice(0, p.top).map((e) => ({ t: round(e.t), malha: e.mesh, torcao: +(e.frac * 1000).toFixed(2) })),
@@ -260,7 +271,8 @@ defineCommand({
     const pct = (l: number) => +((l / h) * 100).toFixed(1);
     // um momento por peca e janela de 0.15 s, os piores primeiro
     const picks: typeof e.frames = [];
-    for (const f of e.frames.filter((f) => f.worst).sort((x, y) => y.len - x.len)) if (!picks.some((q) => q.worst!.slot === f.worst!.slot && Math.abs(q.t - f.t) < 0.15)) picks.push(f);
+    // empate no valor mostrado: o instante mais cedo primeiro
+    for (const f of e.frames.filter((f) => f.worst).sort((x, y) => pct(y.len) - pct(x.len) || x.t - y.t)) if (!picks.some((q) => q.worst!.slot === f.worst!.slot && Math.abs(q.t - f.t) < 0.15)) picks.push(f);
     return {
       anim: p.anim,
       momentos: picks.slice(0, p.top).map((f) => ({ t: round(f.t), recorte: pct(f.len), peca: f.worst!.slot, escondida_por: f.worst!.behind, da_peca: pct(f.worst!.len) })),

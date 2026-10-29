@@ -6,7 +6,7 @@ import { round } from "./timeline.ts";
 import type { Editor } from "../document.ts";
 import { apply, applyLinear, boneWorld, invert, skeletonAt, type Affine } from "../pose.ts";
 import { withBoneOrder } from "../boneorder.ts";
-import { AtlasAttachmentLoader, MixFrom, Physics, Skeleton, SkeletonJson, TextureAtlas, Vector2 } from "@esotericsoftware/spine-core";
+import { comMedidor } from "../instantes.ts";
 
 const BoneProps = z.object({
   x: z.number().optional(),
@@ -499,27 +499,20 @@ defineCommand({
   params: z.object({ animations: z.boolean().default(false).describe("inclui a pose de cada animacao (amostrada)") }),
   label: () => "bounds do esqueleto",
   run({ e, doc }, p) {
-    const data = new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(doc.atlas.text))).readSkeletonData(structuredClone(e.json));
-    const sk = new Skeleton(data);
     let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-    const off = new Vector2(),
-      size = new Vector2();
-    const grow = () => {
-      sk.getBounds(off, size, []);
-      if (!isFinite(size.x) || size.x <= 0) return;
-      [x0, y0, x1, y1] = [Math.min(x0, off.x), Math.min(y0, off.y), Math.max(x1, off.x + size.x), Math.max(y1, off.y + size.y)];
+    const grow = (c: [number, number, number, number] | null) => {
+      if (!c || !(c[2] > c[0])) return;
+      [x0, y0, x1, y1] = [Math.min(x0, c[0]), Math.min(y0, c[1]), Math.max(x1, c[2]), Math.max(y1, c[3])];
     };
-    sk.setupPose();
-    sk.updateWorldTransform(Physics.reset);
-    grow();
-    if (p.animations)
-      for (const a of data.animations)
-        for (let t = 0; t <= a.duration + 1e-9; t += Math.max(a.duration / 8, 1 / 30)) {
-          sk.setupPose();
-          a.apply(sk, 0, t, false, [], 1, MixFrom.setup, false, false, false);
-          sk.updateWorldTransform(Physics.pose);
-          grow();
+    // a pose de setup e, com animations, a pose direta de cada animacao (sem relogio)
+    comMedidor(e.json, doc.atlas.text, (m) => {
+      grow(m.caixa(null, 0));
+      if (p.animations)
+        for (const a of Object.keys(e.json.animations ?? {})) {
+          const d = m.duracao(a);
+          for (let t = 0; t <= d + 1e-9; t += Math.max(d / 8, 1 / 30)) grow(m.caixa(a, t));
         }
+    });
     if (!isFinite(x0)) throw new Error("nada visivel para medir");
     const b = { x: round(x0), y: round(y0), width: round(x1 - x0), height: round(y1 - y0) };
     for (const [k, v] of Object.entries(b)) e.set(["skeleton", k], v);

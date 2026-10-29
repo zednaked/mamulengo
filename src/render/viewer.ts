@@ -30,6 +30,7 @@ import {
 import type { ChangeEvent, Document, Path } from "../core/document.ts";
 import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/sim.ts";
 import { patchSkeletonData } from "../core/patch.ts";
+import { usarMedidas } from "../core/instantes.ts";
 import { NucleoCena } from "./nucleo.ts";
 import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
 
@@ -280,8 +281,16 @@ export class Viewer {
     this.atlas = atlas;
     this.builtVersion = -1;
     this.view.animation = null;
+    this.medidas();
     this.rebuild();
     this.frameAll();
+  }
+
+  // as medidas (query.*, ficha, transicao, recorte, comandos de setup e de malha) seguem o modo
+  // de desenho: no modo "nucleo", pelo nucleo (o mesmo modulo wasm); sem o nucleo, pelo spine-core
+  private medidas() {
+    if (this.runtime === "nucleo") usarMedidas(this.nucleo ? "nucleo" : "spine", this.nucleo?.N);
+    else usarMedidas(this.runtime);
   }
 
   // Reconstroi a partir do JSON mantendo animacao e tempo.
@@ -359,6 +368,7 @@ export class Viewer {
   async setRuntime(r: Runtime) {
     if (r === this.runtime) return;
     this.runtime = r;
+    this.medidas();
     if (!this.doc || !this.urlFor) return;
     const keep = { view: { ...this.view }, cam: { ...this.cam } };
     await this.setDocument(this.doc, this.urlFor);

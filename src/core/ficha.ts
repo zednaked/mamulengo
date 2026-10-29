@@ -28,16 +28,17 @@
 //                                 em corpo, silhueta, giro, giro tipico ou batidas (animacao
 //                                 timida). Precisa de bounds no cabecalho
 //   exceto 4.win                  (na secao Rig) a regra seguinte nao vale para essas animacoes
-import { skeletonAt } from "./pose.ts";
 import { compararEstilo, medir } from "./estilo.ts";
-import { AnimationState, AnimationStateData, MeshAttachment, Skeleton, SkeletonJson, type AttachmentLoader } from "@esotericsoftware/spine-core";
-import { godotGravity, nullLoader } from "./pose.ts";
-import { PoseSim } from "./sim.ts";
+import { abrirLeve, abrirMedidor, type LocalQ, type Medidor, type Quadro } from "./instantes.ts";
 import { measureCuts, measureTransition } from "./transition.ts";
 import { animations, bones, constraints, keyValues, skins, slots } from "./model.ts";
 import type { SpineJson } from "./format.ts";
 
 const DEG = 180 / Math.PI;
+// o pior (ou o maior) so muda de instante, ou de osso, se passar o anterior em mais que isto
+// (px ou graus, abaixo do que se ve): o lugar de um maximo de ruido nao depende do arredondamento
+// do runtime (as poses do spine-core e do nucleo diferem em 1e-4 px)
+export const EMPATE = 1e-3;
 export const wrapDeg = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 // inteiro acima de 10; abaixo, ate 2 casas (escala 1,04 nao pode virar "1")
 export const fmt = (x: number) => (Math.abs(x) >= 10 ? x.toFixed(0) : x.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")).replace(/^-0$/, "0");
@@ -53,9 +54,9 @@ export function animDuration(a: any): number {
 }
 
 // pose de b no espaco de a (posicao local e angulo relativo)
-export function relation(sk: any, a: string, b: string) {
-  const h = sk.findBone(a).appliedPose,
-    g = sk.findBone(b).appliedPose;
+export function relation(sk: Quadro, a: string, b: string) {
+  const h = sk.findBone(a)!,
+    g = sk.findBone(b)!;
   const det = h.a * h.d - h.b * h.c,
     dx = g.worldX - h.worldX,
     dy = g.worldY - h.worldY;
@@ -65,32 +66,46 @@ export function relation(sk: any, a: string, b: string) {
 // Distancia entre duas poses do mesmo esqueleto: para cada osso, a origem e as pontas dos
 // dois eixos (comprimento do osso, no minimo 50), entao rotacao, escala e cisalhamento
 // contam, nao so a posicao. Ossos com fisica ficam de fora (dependem do passado).
-export function poseDistance(json: SpineJson, A: any, B: any): { worst: number; bone: string } {
+export function poseDistance(json: SpineJson, A: Quadro, B: Quadro): { worst: number; bone: string } {
   const phys = new Set(constraints(json).filter((x) => x.type === "physics").map((x) => x.c.bone));
   let worst = 0,
     bone = "";
   for (const b of A.bones) {
-    if (phys.has(b.data.name)) continue;
-    const p = b.appliedPose,
-      q = B.findBone(b.data.name)!.appliedPose;
-    const L = Math.max(b.data.length || 0, 50);
+    if (phys.has(b.name)) continue;
+    const p = b,
+      q = B.findBone(b.name)!;
+    const L = Math.max(b.length || 0, 50);
     const d = Math.max(
       Math.hypot(p.worldX - q.worldX, p.worldY - q.worldY),
       Math.hypot(p.worldX + p.a * L - q.worldX - q.a * L, p.worldY + p.c * L - q.worldY - q.c * L),
       Math.hypot(p.worldX + p.b * L - q.worldX - q.b * L, p.worldY + p.d * L - q.worldY - q.d * L),
     );
-    if (d > worst) (worst = d), (bone = b.data.name);
+    if (d > worst + EMPATE) (worst = d), (bone = b.name);
   }
   return { worst, bone };
 }
 
-// pose do instante t; no fim de um loop, um pouco antes (t == duracao ja e o comeco)
-export function poseAt(json: SpineJson, anim: string | null, t: number) {
+// poses dos instantes (crescentes, de uma vez); no fim, o ultimo quadro de quem toca uma vez
+// (chave stepped no fim vale): em loop, t = duracao ja seria o comeco
+export function posesAt(m: Medidor, json: SpineJson, anim: string | null, times: number[]): Quadro[] {
   const d = anim ? animDuration(json.animations[anim]) : 0;
-  // o fim e o ultimo quadro de quem toca uma vez (chave stepped no fim vale); em loop,
-  // t = duracao ja seria o comeco
-  if (anim && d > 0 && t >= d) return skeletonAt(json, anim, d, false);
-  return skeletonAt(json, anim, t);
+  const fim = (t: number) => !!anim && d > 0 && t >= d;
+  const dentro = times.filter((t) => !fim(t));
+  const a = m.poses(anim, dentro);
+  const b = times.some(fim) ? m.poses(anim, [d], { loop: false })[0] : null;
+  let k = 0;
+  return times.map((t) => (fim(t) ? b! : a[k++]));
+}
+
+// pose de um instante (abre um medidor so para ela: para varios, use posesAt)
+export function poseAt(json: SpineJson, anim: string | null, t: number, m?: Medidor): Quadro {
+  if (m) return posesAt(m, json, anim, [t])[0];
+  const own = abrirLeve(json);
+  try {
+    return posesAt(own, json, anim, [t])[0];
+  } finally {
+    own.liberar();
+  }
 }
 
 function constraintKeys(a: any, type: string, name: string): any[] | undefined {
@@ -117,7 +132,7 @@ export interface RigStudy {
   warnings: string[];
 }
 
-export function rigStudy(json: SpineJson, exclude: string[] = [], onlyUnder?: string): RigStudy {
+export function rigStudy(json: SpineJson, exclude: string[] = [], onlyUnder?: string, m?: Medidor): RigStudy {
   const anims = Object.entries<any>(animations(json)).filter(([n]) => !exclude.includes(n));
   const out: RigStudy = { animations: anims.map(([n, a]) => ({ name: n, duration: animDuration(a) })), constraints: [], ranges: [], swaps: [], warnings: [] };
   const parent = new Map(bones(json).map((b) => [b.name, b.parent]));
@@ -176,12 +191,12 @@ export function rigStudy(json: SpineJson, exclude: string[] = [], onlyUnder?: st
   };
   // so conta quem cobre de verdade: caixas das imagens (region) na setup que se tocam.
   // Malha ou outro tipo: sem caixa, conta (na duvida, avisa).
-  const setupSk = skeletonAt(json, null, 0);
+  const setupSk = poseAt(json, null, 0, m);
   const defaultSkin = skins(json).find((k) => k.name === "default") ?? skins(json)[0];
   const box = (slot: { name: string; bone: string; attachment?: string }): number[] | null => {
     const at = slot.attachment && defaultSkin?.attachments?.[slot.name]?.[slot.attachment];
     if (!at || (at.type && at.type !== "region")) return null;
-    const p = setupSk.findBone(slot.bone)?.appliedPose;
+    const p = setupSk.findBone(slot.bone);
     if (!p || !at.width || !at.height) return null;
     const r = ((at.rotation ?? 0) * Math.PI) / 180,
       cs = Math.cos(r),
@@ -287,22 +302,25 @@ export interface RuleResult {
 }
 
 // angulo final de um osso em relacao ao pai (depois de IK e constraints), em graus
-export function relAngle(sk: any, bone: string): number {
-  const b = sk.findBone(bone);
-  const w = (x: any) => Math.atan2(x.appliedPose.c, x.appliedPose.a) * DEG;
+export function relAngle(sk: Quadro, bone: string): number {
+  const b = sk.findBone(bone)!;
+  const w = (x: { a: number; c: number }) => Math.atan2(x.c, x.a) * DEG;
   return b.parent ? w(b) - w(b.parent) : w(b);
 }
 
 // faixa de rotacao final (relativa a pose base) de cada osso, medida nas animacoes
-export function appliedRotateRanges(json: SpineJson, bones: string[], anims: string[], fps = 15): Map<string, [number, number]> {
-  const setup = poseAt(json, null, 0);
+export function appliedRotateRanges(json: SpineJson, bones: string[], anims: string[], fps = 15, m?: Medidor): Map<string, [number, number]> {
+  const own = m ? null : abrirLeve(json);
+  const med = m ?? own!;
+  try {
+  const setup = poseAt(json, null, 0, med);
   const base = new Map(bones.map((b) => [b, relAngle(setup, b)]));
   const out = new Map<string, [number, number]>();
   for (const an of anims) {
     const d = animDuration((json.animations as any)[an]);
     const n = Math.max(1, Math.round(d * fps));
-    for (let i = 0; i <= n; i++) {
-      const sk = poseAt(json, an, (i / n) * d);
+    const poses = posesAt(med, json, an, Array.from({ length: n + 1 }, (_, i) => (i / n) * d));
+    for (const sk of poses) {
       for (const b of bones) {
         const v = wrapDeg(relAngle(sk, b) - base.get(b)!);
         const r = out.get(b) ?? [Infinity, -Infinity];
@@ -311,9 +329,12 @@ export function appliedRotateRanges(json: SpineJson, bones: string[], anims: str
     }
   }
   return out;
+  } finally {
+    own?.liberar();
+  }
 }
 
-const CHANNEL: Record<string, (p: any, s: any) => number> = {
+const CHANNEL: Record<string, (p: LocalQ, s: LocalQ) => number> = {
   rotate: (p, s) => wrapDeg(p.rotation - s.rotation),
   x: (p, s) => p.x - s.x,
   y: (p, s) => p.y - s.y,
@@ -323,15 +344,25 @@ const CHANNEL: Record<string, (p: any, s: any) => number> = {
   shearY: (p, s) => p.shearY - s.shearY,
 };
 
-export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps = 30): RuleResult[] {
+// m: o medidor (sem: abre um so para esta animacao)
+export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps = 30, m?: Medidor): RuleResult[] {
   const a = json.animations?.[anim];
   if (!a) return [{ rule: `animacao ${anim}`, ok: false, detail: "nao existe no asset" }];
+  if (!m) {
+    const own = abrirLeve(json);
+    try {
+      return checkAnimation(json, anim, rules, fps, own);
+    } finally {
+      own.liberar();
+    }
+  }
+  const med = m;
   const dur = animDuration(a);
   const n = Math.max(1, Math.round(dur * fps));
   const times = Array.from({ length: n + 1 }, (_, i) => (i / n) * dur);
-  let poses: any[] | null = null;
-  const samples = () => (poses ??= times.map((t) => poseAt(json, anim, t)));
-  const setup = poseAt(json, null, 0);
+  let poses: Quadro[] | null = null;
+  const samples = () => (poses ??= posesAt(med, json, anim, times));
+  const setup = poseAt(json, null, 0, med);
   const res: RuleResult[] = [];
   const need = (cond: boolean, msg: string) => {
     if (!cond) throw new Error(msg);
@@ -348,7 +379,7 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
         }
         case "loop": {
           const tol = +(p0 ?? 2);
-          const { worst, bone: at } = poseDistance(json, poseAt(json, anim, 0), poseAt(json, anim, dur));
+          const { worst, bone: at } = poseDistance(json, poseAt(json, anim, 0, med), poseAt(json, anim, dur, med));
           res.push({ rule: r.line, ok: worst <= tol, detail: worst <= tol ? `emenda (pior ${fmt(worst)})` : `${at} salta ${fmt(worst)} do fim para o comeco` });
           break;
         }
@@ -365,12 +396,13 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
             tmax = 0;
           // rotate: o angulo final em relacao ao pai, depois de IK e constraints (as chaves
           // de um osso movido por IK ficam paradas e diziam 0..0 com o pulso virado do avesso)
-          const rel = (sk: any) => relAngle(sk, p0);
+          const rel = (sk: Quadro) => relAngle(sk, p0);
           const base = rel(setup);
           samples().forEach((sk, i) => {
-            const v = p1 === "rotate" ? wrapDeg(rel(sk) - base) : get(sk.findBone(p0)!.pose, sd!.data.setupPose);
-            if (v < min) (min = v), (tmin = times[i]);
-            if (v > max) (max = v), (tmax = times[i]);
+            const b = sk.findBone(p0)!;
+            const v = p1 === "rotate" ? wrapDeg(rel(sk) - base) : get(b.local, b.setup);
+            if (v < min - EMPATE) (min = v), (tmin = times[i]);
+            if (v > max + EMPATE) (max = v), (tmax = times[i]);
           });
           const ok = min >= lo - 1e-3 && max <= hi + 1e-3;
           res.push({ rule: r.line, ok, detail: ok ? `${fmt(min)}..${fmt(max)}` : `${fmt(min)} em t=${tmin.toFixed(2)} .. ${fmt(max)} em t=${tmax.toFixed(2)}` });
@@ -385,7 +417,7 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
           samples().forEach((sk, i) => {
             const q = relation(sk, p1, p0);
             const d = Math.hypot(q.x - r0.x, q.y - r0.y);
-            if (d > worst) (worst = d), (at = times[i]);
+            if (d > worst + EMPATE) (worst = d), (at = times[i]);
           });
           res.push({ rule: r.line, ok: worst <= tol, detail: `pior ${fmt(worst)} em t=${at.toFixed(2)}` });
           break;
@@ -400,7 +432,7 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
             at = 0;
           samples().forEach((sk, i) => {
             const d = Math.abs(wrapDeg(relation(sk, par!, p0).ang - r0.ang));
-            if (d > worst) (worst = d), (at = times[i]);
+            if (d > worst + EMPATE) (worst = d), (at = times[i]);
           });
           res.push({ rule: r.line, ok: worst <= lim, detail: `pior ${fmt(worst)}° em t=${at.toFixed(2)}` });
           break;
@@ -409,7 +441,7 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
         case "comeca_como": {
           need(!!p0 && !!json.animations?.[p0], `animacao nao existe: ${p0}`);
           const tol = +(p1 ?? 15);
-          const { worst, bone: at } = poseDistance(json, poseAt(json, anim, r.kind === "termina_como" ? dur : 0), poseAt(json, p0, 0));
+          const { worst, bone: at } = poseDistance(json, poseAt(json, anim, r.kind === "termina_como" ? dur : 0, med), poseAt(json, p0, 0, med));
           res.push({ rule: r.line, ok: worst <= tol, detail: worst <= tol ? `combina (pior ${fmt(worst)})` : `${at} fica a ${fmt(worst)} da pose de ${p0}` });
           break;
         }
@@ -419,10 +451,10 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
           need(p1 !== undefined && isFinite(+p1), `use: ${r.kind} <animacao> <mix em segundos> [tolerancia]`);
           const o = { tol: p2 !== undefined ? +p2 : undefined };
           if (r.kind === "transicao") {
-            const m = measureTransition(json, anim, { next: p0, mix: +p1 }, o);
+            const m = measureTransition(json, anim, { next: p0, mix: +p1 }, o, med);
             res.push({ rule: r.line, ok: m.ok, detail: m.summary });
           } else {
-            const m = measureCuts(json, anim, { next: p0, mix: +p1 }, o);
+            const m = measureCuts(json, anim, { next: p0, mix: +p1 }, o, med);
             const bad = m.cuts.filter((c) => !c.ok);
             res.push({ rule: r.line, ok: m.ok, detail: m.ok ? `nenhum corte pula (pior em t=${m.worst.start.toFixed(2)}: ${m.worst.bones[0]?.bone ?? "-"} score ${m.worst.bones[0]?.score ?? 0})` : `pula cortando em ${bad.map((c) => c.at.toFixed(2)).join(", ")}; pior em t=${m.worst.start.toFixed(2)}: ${m.worst.summary}` });
           }
@@ -449,7 +481,7 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
         case "estilo": {
           // nivel de animador: pelo menos a mediana da casa (folga de 15%) na amplitude e no
           // ritmo; so ficar dentro da faixa deixa passar animacao timida
-          const m: any = medir("", json, anim);
+          const m: any = medir("", json, anim, med);
           const c = compararEstilo(m, p1 ?? "personagem", p0);
           need(!!c, `sem faixa da casa para ${p1 ?? "personagem"} / ${p0}`);
           need(!!(json.skeleton as any)?.height, "o cabecalho nao tem bounds: rode skeleton.bounds antes (as medidas sao em % da altura)");
@@ -480,33 +512,39 @@ export function checkAnimation(json: SpineJson, anim: string, rules: Rule[], fps
 // com chaves de deform na animacao (escolha do animador) tambem nao.
 // E medida para OLHAR, nao regra: animadores dobram e esticam malhas de proposito (bone
 // girando em 3D, cabeca amassando) na mesma faixa de uma torcao feia. Medido no corpus.
-export function meshDistortion(json: SpineJson, anim: string, times: number[]) {
-  const onlyMeshes = (j: any) => ({ ...j, skins: (j.skins ?? []).map((sk: any) => ({ ...sk, attachments: Object.fromEntries(Object.entries<any>(sk.attachments ?? {}).map(([slot, m]) => [slot, Object.fromEntries(Object.entries<any>(m).filter(([, a]) => a.type === "mesh" && a.triangles))])) })) });
-  const loader: AttachmentLoader = {
-    ...nullLoader,
-    newMeshAttachment: (_s: any, _ph: any, name: string, _p: any, seq: any) => {
-      // sem textura: a sequencia so serve para a regiao da imagem
-      const m = new MeshAttachment(name, seq);
-      m.updateSequence = () => {};
-      return m as any;
-    },
-  };
-  const data = new SkeletonJson(loader).readSkeletonData(godotGravity(onlyMeshes(json)));
-  const sk = new Skeleton(data);
-  const sim = new PoseSim(sk, new AnimationState(new AnimationStateData(data)));
-  const verts = () => {
-    const out = new Map<any, number[]>();
-    for (const slot of sk.slots) {
-      const a = slot.appliedPose.attachment;
-      if (!(a instanceof MeshAttachment)) continue;
-      const v = new Array(a.worldVerticesLength).fill(0);
-      a.computeWorldVertices(sk, slot, 0, a.worldVerticesLength, v, 0, 2);
-      out.set(a, v);
+export function meshDistortion(json: SpineJson, anim: string, times: number[], m?: Medidor) {
+  const own = m ? null : abrirMedidor(json);
+  try {
+    return distorcao(m ?? own!, json, anim, times);
+  } finally {
+    own?.liberar();
+  }
+}
+
+// a malha (do JSON) que cada slot mostra, por nome da parte: so malhas com triangulos (malha
+// ligada e regiao ficam de fora)
+function malhasDoJson(json: SpineJson) {
+  const out = new Map<string, { name: string; triangles: number[] }>();
+  const sks = skins(json);
+  const def = sks.find((k) => k.name === "default");
+  for (const sk of def ? [def, ...sks.filter((k) => k !== def)] : sks)
+    for (const [slot, atts] of Object.entries<any>(sk.attachments ?? {}))
+      for (const [n, a] of Object.entries<any>(atts)) if (a?.type === "mesh" && a.triangles && !out.has(`${slot}\u0000${n}`)) out.set(`${slot}\u0000${n}`, { name: n, triangles: a.triangles });
+  return out;
+}
+
+function distorcao(med: Medidor, json: SpineJson, anim: string, times: number[]) {
+  const malhas = malhasDoJson(json);
+  const verts = (q: Quadro) => {
+    const out = new Map<string, { v: number[]; tri: number[]; name: string }>();
+    for (const s of q.slots) {
+      const mm = s.attachment !== null ? malhas.get(`${s.name}\u0000${s.attachment}`) : undefined;
+      if (!mm || !s.vertices?.length) continue;
+      out.set(`${s.name}\u0000${s.attachment}`, { v: s.vertices, tri: mm.triangles, name: mm.name });
     }
     return out;
   };
-  sim.poseAt(null, true, 0);
-  const base = verts();
+  const base = verts(med.poses(null, [0], { vertices: true })[0]);
   const area = (v: number[], p: number, q: number, r: number) => ((v[q * 2] - v[p * 2]) * (v[r * 2 + 1] - v[p * 2 + 1]) - (v[r * 2] - v[p * 2]) * (v[q * 2 + 1] - v[p * 2 + 1])) / 2;
   // por malha e instante: a fracao da area da imagem em triangulos que viraram ou mudaram
   // mais que 2.5x. Deform de animador mexe em poucos triangulos pequenos (boca, sobrancelha);
@@ -520,12 +558,14 @@ export function meshDistortion(json: SpineJson, anim: string, times: number[]) {
   const h = Math.max(1, (json.skeleton as any)?.height || 500);
   let worst = { frac: 0, ratio: 1, mesh: "", t: 0 };
   const all: { frac: number; mesh: string; t: number }[] = [];
-  for (const t of times) {
-    sim.poseAt(anim, true, t);
-    for (const [a, v1] of verts()) {
-      const v0 = base.get(a);
-      if (!v0 || sculpted.has((a as any).name)) continue;
-      const tri = (a as MeshAttachment).triangles;
+  const quadros = med.poses(anim, times, { vertices: true });
+  for (const q of quadros) {
+    const t = q.t;
+    for (const [a, cur] of verts(q)) {
+      const v1 = cur.v;
+      const v0 = base.get(a)?.v;
+      if (!v0 || sculpted.has(cur.name)) continue;
+      const tri = cur.tri;
       const pairs: [number, number][] = [];
       let total = 0;
       for (let k = 0; k < tri.length; k += 3) {
@@ -554,18 +594,23 @@ export function meshDistortion(json: SpineJson, anim: string, times: number[]) {
       }
       // area estragada na tela, em % da area de um quadrado da altura do personagem
       const frac = bad / (h * h);
-      if (frac > 0) all.push({ frac, mesh: (a as any).name, t });
-      if (frac > worst.frac) worst = { frac, ratio: top, mesh: (a as any).name, t };
+      if (frac > 0) all.push({ frac, mesh: cur.name, t });
+      if (frac > worst.frac) worst = { frac, ratio: top, mesh: cur.name, t };
     }
   }
   return { ...worst, all };
 }
 
-export function checkFicha(json: SpineJson, md: string, only?: string[]): Record<string, RuleResult[]> {
+export function checkFicha(json: SpineJson, md: string, only?: string[], m?: Medidor): Record<string, RuleResult[]> {
   const f = parseFicha(md);
   const names = only ?? Object.keys(animations(json));
   const out: Record<string, RuleResult[]> = {};
-  for (const n of names) out[n] = checkAnimation(json, n, [...f.all, ...(f.byAnim[n] ?? [])]);
+  const own = m ? null : abrirLeve(json);
+  try {
+    for (const n of names) out[n] = checkAnimation(json, n, [...f.all, ...(f.byAnim[n] ?? [])], 30, m ?? own!);
+  } finally {
+    own?.liberar();
+  }
   for (const n of Object.keys(f.byAnim)) if (!animations(json)[n] && (!only || only.includes(n))) out[n] = [{ rule: `## Animacao: ${n}`, ok: false, detail: "a ficha descreve, mas o asset nao tem (falta fazer?)" }];
   return out;
 }
@@ -580,17 +625,26 @@ export interface GameContext {
 }
 
 // Medidas de uma animacao para o rascunho: o que ela faz hoje, para virar regra.
-function measure(json: SpineJson, anim: string) {
+function measure(json: SpineJson, anim: string, m: Medidor) {
   const a = json.animations[anim];
   const dur = animDuration(a);
-  const loop = checkAnimation(json, anim, [{ line: "loop", kind: "loop", args: ["2"], except: [] }])[0];
+  const loop = checkAnimation(json, anim, [{ line: "loop", kind: "loop", args: ["2"], except: [] }], 30, m)[0];
   const physics = constraints(json).filter((x) => x.type === "physics");
-  const phys = physics.map(({ c }) => ({ bone: c.bone, res: checkAnimation(json, anim, [{ line: "", kind: "fisica", args: [c.bone, "999"], except: [] }])[0] }));
+  const phys = physics.map(({ c }) => ({ bone: c.bone, res: checkAnimation(json, anim, [{ line: "", kind: "fisica", args: [c.bone, "999"], except: [] }], 30, m)[0] }));
   return { dur, loopOk: loop.ok, loopDetail: loop.detail, phys, bones: Object.keys(a.bones ?? {}), swaps: Object.keys(a.slots ?? {}).filter((s) => a.slots[s].attachment), events: (a.events ?? []).map((e: any) => `${e.name}@${fmt(e.time ?? 0)}`) };
 }
 
 export function draftFicha(json: SpineJson, name: string, ctx: GameContext = {}): string {
-  const st = rigStudy(json);
+  const m = abrirLeve(json);
+  try {
+    return rascunho(json, name, ctx, m);
+  } finally {
+    m.liberar();
+  }
+}
+
+function rascunho(json: SpineJson, name: string, ctx: GameContext, med: Medidor): string {
+  const st = rigStudy(json, [], undefined, med);
   const L: string[] = [];
   const allBones = bones(json).map((b) => b.name);
   L.push(`# Ficha: ${name}`, "");
@@ -632,7 +686,7 @@ export function draftFicha(json: SpineJson, name: string, ctx: GameContext = {})
     const driven = (json.constraints ?? []).filter((c: any) => (c.type ?? "") === "ik" || c.type === "transform").flatMap((c: any) => c.bones ?? (c.bone ? [c.bone] : []));
     const list = [...new Set([...keyed, ...driven])].filter((b) => bones(json).some((x) => x.name === b));
     const animNames = Object.keys(json.animations ?? {});
-    const rr = appliedRotateRanges(json, list, animNames);
+    const rr = appliedRotateRanges(json, list, animNames, 15, med);
     for (const b of list) {
       const r = rr.get(b);
       if (!r || !isFinite(r[0])) continue;
@@ -650,7 +704,7 @@ export function draftFicha(json: SpineJson, name: string, ctx: GameContext = {})
     // quanto o animador desloca a peca em cada animacao: a tolerancia vem disso, e o que
     // passa muito da mediana (tirar os oculos, por exemplo) vira excecao
     const devs = st.animations.map(({ name: an }) => {
-      const d = checkAnimation(json, an, [{ line: "", kind: "preso", args: [target, par, "0"], except: [] }])[0].detail;
+      const d = checkAnimation(json, an, [{ line: "", kind: "preso", args: [target, par, "0"], except: [] }], 30, med)[0].detail;
       return { an, d: +(/pior ([\d.]+)/.exec(d)?.[1] ?? 0) };
     });
     const sorted = devs.map((x) => x.d).sort((x, y) => x - y);
@@ -667,7 +721,7 @@ export function draftFicha(json: SpineJson, name: string, ctx: GameContext = {})
   L.push("## Animacoes", "");
   L.push("Cada animacao: para que serve, quando toca, roteiro em batidas, comportamento esperado e o que nao fazer. As regras de cada secao somam com as do Rig.", "");
   for (const { name: an } of st.animations) {
-    const m = measure(json, an);
+    const m = measure(json, an, med);
     L.push(`## Animacao: ${an}`, "");
     L.push(`- **Para que serve:** (descrever)`);
     L.push(`- **Quando toca:** ${ctx.usage?.[an]?.length ? `citada em ${ctx.usage[an].slice(0, 4).join(", ")}${ctx.usage[an].length > 4 ? "..." : ""}` : "(descrever; o codigo do jogo nao cita este nome)"}`);
@@ -684,14 +738,14 @@ export function draftFicha(json: SpineJson, name: string, ctx: GameContext = {})
     const next = ctx.returnsTo?.[an] ?? (!m.loopOk && idle && idle !== an ? idle : undefined);
     if (next && next !== an) {
       // o que o animador fez hoje e aceito (o mix do jogo cobre); acima de 15, anota a medida
-      const r = checkAnimation(json, an, [{ line: "", kind: "termina_como", args: [next, "15"], except: [] }])[0];
+      const r = checkAnimation(json, an, [{ line: "", kind: "termina_como", args: [next, "15"], except: [] }], 30, med)[0];
       const m2 = /a ([\d.]+) da pose/.exec(r.detail);
       if (r.ok || !m2) L.push(`termina_como ${next} 15`);
       else L.push(`# hoje termina a ${m2[1]} da pose de ${next} (${r.detail.split(" ")[0]}); o mix do jogo cobre`, `termina_como ${next} ${Math.ceil(+m2[1]) + 2}`);
       const mix = ctx.mix?.defaultMix;
       if (mix !== undefined) {
         // a emenda como o jogo toca (queueAnim com o mix do -data.tres)
-        const t = measureTransition(json, an, { next, mix });
+        const t = measureTransition(json, an, { next, mix }, {}, med);
         if (t.ok) L.push(`transicao ${next} ${mix}`);
         // hoje pula: fica anotado (o rascunho so propoe regras que a animacao cumpre)
         else L.push(`# hoje ${t.summary}`, `# transicao ${next} ${mix}`);

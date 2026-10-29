@@ -37,7 +37,7 @@ if(EMSCRIPTEN)
   target_link_libraries(nucleo PRIVATE mamulengo_nucleo)
   set_target_properties(nucleo PROPERTIES SUFFIX ".mjs")
   target_link_options(nucleo PRIVATE
-    -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=0
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=0
     "-sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAPF64','HEAPU32','HEAP32','HEAPU8','UTF8ToString','stringToNewUTF8']"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']")
 endif()

@@ -1,5 +1,6 @@
 // Lado do editor na ponte: recebe chamadas do agente (MCP) e executa no documento
 // aberto, com origem "claude", para o usuario ver acontecendo.
+import { estatisticas as estatisticasMedidas, modoMedidas } from "../core/instantes.ts";
 import { app, fileUrl } from "../app/state.svelte.ts";
 import { execute, describeCommands, type Call } from "../core/commands/index.ts";
 import { exportAnimation, type ExportOptions } from "../app/exporter.ts";
@@ -213,7 +214,7 @@ const handlers: Record<string, Handler> = {
       asset: app.asset ? `${app.asset.project}/${app.asset.name}` : null,
       file: app.doc?.file ?? null,
       dirty: app.doc?.dirty ?? false,
-      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data } } : null,
+      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data }, medidas: { modo: modoMedidas(), ...estatisticasMedidas } } : null,
       selection: app.selection,
       runtimeError: v?.error ?? null,
       history: app.doc?.history().slice(-15) ?? [],

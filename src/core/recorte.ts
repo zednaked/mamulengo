@@ -7,9 +7,10 @@
 // borda de bastidor. Em cada instante da animacao (ordem de desenho do instante), mede o
 // comprimento dessas bordas que nenhuma imagem da frente cobre mais. Contorno coberto por
 // acaso (o corpo atras da mao) nao conta: so vale perto da articulacao que liga as duas.
-import { AnimationState, AnimationStateData, MeshAttachment, RegionAttachment, Skeleton, SkeletonJson, type AttachmentLoader, type Bone, type Slot } from "@esotericsoftware/spine-core";
-import { godotGravity, nullLoader } from "./pose.ts";
-import { PoseSim } from "./sim.ts";
+//
+// A pose vem da camada de src/core/instantes.ts (spine-core ou nucleo, conforme o modo); a
+// geometria das partes (cantos da imagem inteira, uvs e triangulos das malhas) vem do JSON.
+import { abrirMedidor, type Medidor, type OssoQ, type Quadro, type SlotQ } from "./instantes.ts";
 import type { SpineJson } from "./format.ts";
 
 export interface Pixels {
@@ -30,28 +31,51 @@ const SOLID = 128; // alpha de quem esconde a borda na pose de setup
 const COVER = 24; // alpha que ainda esconde no instante (o antialias da borda nao conta)
 const MIN_RUN = 4; // pontos seguidos (~4 passos de borda) para contar como trecho
 
-// uma imagem (regiao ou malha) do slot, na pose atual
-export function shapeOf(slot: Slot, sk: Skeleton): Shape | null {
-  const a = slot.appliedPose.attachment;
+// a parte (do JSON) com esse nome no slot: na skin default, senao na primeira que tiver
+export function parteDoJson(json: SpineJson, slot: string, nome: string): any | null {
+  const sks: any[] = (json as any).skins ?? [];
+  const def = sks.find((k) => k.name === "default");
+  for (const sk of def ? [def, ...sks.filter((k) => k !== def)] : sks) {
+    const a = sk.attachments?.[slot]?.[nome];
+    if (a) return a;
+  }
+  return null;
+}
+
+// a malha de onde uma malha ligada tira uvs e triangulos
+function fonteDaMalha(json: SpineJson, slot: string, a: any): any | null {
+  if (a?.type !== "linkedmesh") return a;
+  const sks: any[] = (json as any).skins ?? [];
+  const sk = sks.find((k) => k.name === (a.skin ?? "default")) ?? sks[0];
+  return sk?.attachments?.[a.slot ?? slot]?.[a.source ?? a.parent] ?? null;
+}
+
+// uma imagem (regiao ou malha) do slot, na pose do quadro
+export function shapeOf(json: SpineJson, slot: SlotQ): Shape | null {
+  if (slot.attachment === null) return null;
+  const a = parteDoJson(json, slot.name, slot.attachment);
+  if (!a) return null;
+  const type = a.type ?? "region";
   let uvs: number[], tris: number[], world: number[];
-  if (a instanceof MeshAttachment) {
-    world = new Array(a.worldVerticesLength).fill(0);
-    a.computeWorldVertices(sk, slot, 0, a.worldVerticesLength, world, 0, 2);
-    uvs = Array.from(a.regionUVs);
-    tris = Array.from(a.triangles);
-  } else if (a instanceof RegionAttachment) {
+  if (type === "mesh" || type === "linkedmesh") {
+    const src = fonteDaMalha(json, slot.name, a);
+    if (!src?.uvs || !src.triangles || !slot.vertices?.length) return null;
+    world = slot.vertices.slice();
+    uvs = Array.from(src.uvs);
+    tris = Array.from(src.triangles);
+  } else if (type === "region") {
     // cantos da imagem original inteira (o recorte de transparencia do atlas nao importa:
     // o alpha vem da imagem original)
-    const w = (a.width / 2) * a.scaleX,
-      h = (a.height / 2) * a.scaleY;
-    const r = (a.rotation * Math.PI) / 180,
+    const w = ((a.width ?? 0) / 2) * (a.scaleX ?? 1),
+      h = ((a.height ?? 0) / 2) * (a.scaleY ?? 1);
+    const r = ((a.rotation ?? 0) * Math.PI) / 180,
       c = Math.cos(r),
       s = Math.sin(r);
-    const b = slot.bone.appliedPose;
+    const b = slot.bone;
     world = [];
     for (const [lx, ly] of [[-w, -h], [-w, h], [w, h], [w, -h]]) {
-      const x = lx * c - ly * s + a.x,
-        y = lx * s + ly * c + a.y;
+      const x = lx * c - ly * s + (a.x ?? 0),
+        y = lx * s + ly * c + (a.y ?? 0);
       world.push(x * b.a + y * b.b + b.worldX, x * b.c + y * b.d + b.worldY);
     }
     uvs = [0, 1, 0, 0, 1, 0, 1, 1];
@@ -139,23 +163,24 @@ function contour(img: Pixels, step: number): [number, number][] {
   return out;
 }
 
-const imageName = (slot: Slot) => {
-  const a: any = slot.appliedPose.attachment;
-  return a ? (a.path ?? a.name) : null;
+const imageName = (json: SpineJson, slot: SlotQ) => {
+  if (slot.attachment === null) return null;
+  const a = parteDoJson(json, slot.name, slot.attachment);
+  return a?.path ?? slot.attachment;
 };
 
 // os ossos que giram entre as duas imagens: do osso de cada uma ate o ancestral comum
 // (exclusive). A borda de bastidor fica perto da origem de um deles (a articulacao)
-function pivots(a: Bone, b: Bone): Bone[] {
-  const up = (x: Bone) => {
-    const out: Bone[] = [];
-    for (let p: Bone | null = x; p; p = p.parent) out.push(p);
+function pivots(a: OssoQ, b: OssoQ): OssoQ[] {
+  const up = (x: OssoQ) => {
+    const out: OssoQ[] = [];
+    for (let p: OssoQ | null = x; p; p = p.parent) out.push(p);
     return out;
   };
   const ua = up(a),
     ub = up(b);
   const common = ua.find((x) => ub.includes(x));
-  const res: Bone[] = [];
+  const res: OssoQ[] = [];
   for (const x of ua) if (x === common) break; else res.push(x);
   for (const x of ub) if (x === common) break; else res.push(x);
   return res;
@@ -187,31 +212,23 @@ export function seamImages(json: SpineJson): string[] {
 // reference: animacoes do animador da casa. Borda que ele mesmo descobre (os oculos tirados
 // mostram o contorno da cabeca, o olho fechado mostra o buraco do olho) e contorno de
 // verdade, nao bastidor: sai da conta
-export function exposedSeams(json: SpineJson, anim: string, times: number[], image: (name: string) => Pixels | null, opts: { points?: boolean; reference?: { anim: string; times: number[] }[] } = {}): Exposed {
-  const loader: AttachmentLoader = {
-    ...nullLoader,
-    newRegionAttachment: (_s: any, _ph: any, name: string, _p: any, seq: any) => {
-      const r = new RegionAttachment(name, seq);
-      r.updateSequence = () => {};
-      return r as any;
-    },
-    newMeshAttachment: (_s: any, _ph: any, name: string, _p: any, seq: any) => {
-      const m = new MeshAttachment(name, seq);
-      m.updateSequence = () => {};
-      return m as any;
-    },
-  };
-  const data = new SkeletonJson(loader).readSkeletonData(godotGravity(json));
-  const sk = new Skeleton(data);
-  const sim = new PoseSim(sk, new AnimationState(new AnimationStateData(data)));
-
+export function exposedSeams(json: SpineJson, anim: string, times: number[], image: (name: string) => Pixels | null, opts: { points?: boolean; reference?: { anim: string; times: number[] }[] } = {}, m?: Medidor): Exposed {
+  if (!m) {
+    const own = abrirMedidor(json);
+    try {
+      return exposedSeams(json, anim, times, image, opts, own);
+    } finally {
+      own.liberar();
+    }
+  }
+  const med = m;
   // imagens visiveis na ordem de desenho do instante
-  const visible = () => {
-    const out: { slot: Slot; shape: Shape; img: Pixels }[] = [];
-    for (const slot of sk.drawOrder.appliedPose) {
-      if (slot.appliedPose.color.a < 0.05 || !slot.bone.active) continue;
-      const n = imageName(slot);
-      const shape = n ? shapeOf(slot, sk) : null;
+  const visible = (q: Quadro) => {
+    const out: { slot: SlotQ; shape: Shape; img: Pixels }[] = [];
+    for (const slot of q.drawOrder) {
+      if (slot.color.a < 0.05 || !slot.bone.active) continue;
+      const n = imageName(json, slot);
+      const shape = n ? shapeOf(json, slot) : null;
       const img = n ? image(n) : null;
       if (shape && img) out.push({ slot, shape, img });
     }
@@ -226,9 +243,9 @@ export function exposedSeams(json: SpineJson, anim: string, times: number[], ima
   };
 
   // pose de setup: as bordas de bastidor
-  sim.poseAt(null, true, 0);
-  const base = visible();
-  const seam = new Map<Slot, { name: string; pts: Seam[] }>();
+  const base = visible(med.poses(null, [0], { vertices: true })[0]);
+  // por slot (indice)
+  const seam = new Map<number, { name: string; pts: Seam[] }>();
   const seams: Record<string, number> = {};
   for (let i = 0; i < base.length; i++) {
     const { slot, shape, img } = base[i];
@@ -243,26 +260,26 @@ export function exposedSeams(json: SpineJson, anim: string, times: number[], ima
       // so perto da articulacao entre as duas: raio de meia imagem menor
       const size = (e: Shape) => Math.max(e.box[2] - e.box[0], e.box[3] - e.box[1]);
       const R = 0.5 * Math.min(size(shape), size(c.shape));
-      const near = pivots(slot.bone, c.slot.bone).some((b) => Math.hypot(b.appliedPose.worldX - p[0], b.appliedPose.worldY - p[1]) < R);
+      const near = pivots(slot.bone, c.slot.bone).some((b) => Math.hypot(b.worldX - p[0], b.worldY - p[1]) < R);
       if (!near) continue;
-      pts.push({ u, v, behind: c.slot.data.name, len: step * p[2] });
+      pts.push({ u, v, behind: c.slot.name, len: step * p[2] });
       len += step * p[2];
     }
     if (pts.length) {
-      seam.set(slot, { name: imageName(slot)!, pts });
-      seams[slot.data.name] = +len.toFixed(1);
+      seam.set(slot.index, { name: imageName(json, slot)!, pts });
+      seams[slot.name] = +len.toFixed(1);
     }
   }
 
   // pontos de bastidor descobertos na pose atual, por imagem visivel
-  const exposedNow = () => {
-    const vis = visible();
-    const res: { slot: Slot; img: Pixels; out: { q: Seam; p: [number, number, number] }[] }[] = [];
+  const exposedNow = (q: Quadro) => {
+    const vis = visible(q);
+    const res: { slot: SlotQ; img: Pixels; out: { q: Seam; p: [number, number, number] }[] }[] = [];
     for (let i = 0; i < vis.length; i++) {
       const { slot, shape, img } = vis[i];
-      const s = seam.get(slot);
+      const s = seam.get(slot.index);
       // a imagem trocou (outra regiao no slot): a borda medida no setup nao vale
-      if (!s || imageName(slot) !== s.name) continue;
+      if (!s || imageName(json, slot) !== s.name) continue;
       const out: { q: Seam; p: [number, number, number] }[] = [];
       for (const q of s.pts) {
         const p = worldAt(shape, q.u, q.v, img.width, img.height);
@@ -277,26 +294,25 @@ export function exposedSeams(json: SpineJson, anim: string, times: number[], ima
   if (opts.reference?.length) {
     const shown = new Set<Seam>();
     for (const r of opts.reference)
-      for (const t of r.times) {
-        sim.poseAt(r.anim, true, t);
-        for (const e of exposedNow()) for (const o of e.out) shown.add(o.q);
-      }
+      for (const q of med.poses(r.anim, r.times, { vertices: true })) for (const e of exposedNow(q)) for (const o of e.out) shown.add(o.q);
+    const nomes = new Map(base.map((v) => [v.slot.index, v.slot.name]));
     for (const [slot, s] of seam) {
       s.pts = s.pts.filter((q) => !shown.has(q));
+      const nome = nomes.get(slot)!;
       if (!s.pts.length) {
         seam.delete(slot);
-        delete seams[slot.data.name];
-      } else seams[slot.data.name] = +s.pts.reduce((n, q) => n + q.len, 0).toFixed(1);
+        delete seams[nome];
+      } else seams[nome] = +s.pts.reduce((n, q) => n + q.len, 0).toFixed(1);
     }
   }
 
   const frames: Exposed["frames"] = [];
-  for (const t of times) {
-    sim.poseAt(anim, true, t);
+  for (const fq of med.poses(anim, times, { vertices: true })) {
+    const t = fq.t;
     let len = 0;
     const per = new Map<string, number>();
     const points: [number, number][] = [];
-    for (const { slot, img, out } of exposedNow()) {
+    for (const { slot, img, out } of exposedNow(fq)) {
       const step = Math.max(2, Math.round(Math.max(img.width, img.height) / 80));
       // so trechos continuos de borda: ponto solto e antialias ou quina, nao se ve
       const W = img.width,
@@ -315,12 +331,18 @@ export function exposedSeams(json: SpineJson, anim: string, times: number[], ima
         const l = step * p[2];
         len += l;
         if (opts.points) points.push([p[0], p[1]]);
-        const key = `${slot.data.name}\u0000${q.behind}`;
+        const key = `${slot.name}\u0000${q.behind}`;
         per.set(key, (per.get(key) ?? 0) + l);
       }
     }
     let worst: Exposed["frames"][number]["worst"] = null;
-    for (const [k, l] of per) if (!worst || l > worst.len) worst = { slot: k.split("\u0000")[0], behind: k.split("\u0000")[1], len: l };
+    // empate (pecas simetricas, ate 0,001 px): a de nome menor, sem depender do arredondamento
+    let chave = "";
+    for (const [k, l] of per)
+      if (!worst || l > worst.len + 1e-3 || (Math.abs(l - worst.len) <= 1e-3 && k < chave)) {
+        worst = { slot: k.split("\u0000")[0], behind: k.split("\u0000")[1], len: l };
+        chave = k;
+      }
     frames.push({ t, len, worst, ...(opts.points ? { points } : {}) });
   }
   return { frames, seams };

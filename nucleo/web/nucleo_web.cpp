@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -79,6 +80,18 @@ std::vector<int32_t> lotes;
 // leituras da pose (o JavaScript le os numeros direto da memoria)
 std::vector<double> saida, saida_ossos, saida_setup, saida_slots;
 std::string erro, info;
+// as medidas (mm_medir_eventos) colhem os eventos de usuario que o mm_passo le: por evento,
+// [evento, tempo da chave, instante em que saiu, animacao]
+bool colher = false;
+std::vector<double> colhidos;
+
+// numero com todos os algarismos (o to_string corta em 6 casas: a duracao de uma animacao com a
+// ultima chave em float32, 0.6000000238, sairia 0.6 e a fila entraria fora do lugar)
+std::string numero(double x) {
+  char b[32];
+  std::snprintf(b, sizeof b, "%.17g", x);
+  return b;
+}
 
 void texto_json(std::string& s, const std::string& t) {
   s += '"';
@@ -186,18 +199,35 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
   for (size_t i = 0; i < m.animacoes.size(); ++i) {
     info += i ? ",{\"nome\":" : "{\"nome\":";
     texto_json(info, m.animacoes[i].nome);
-    info += ",\"duracao\":" + std::to_string(m.animacoes[i].duracao) + "}";
+    info += ",\"duracao\":" + numero(m.animacoes[i].duracao) + "}";
+  }
+  // nomes dos eventos (o indice que o mm_medir_eventos devolve)
+  info += "],\"eventos\":[";
+  for (size_t i = 0; i < m.eventos.size(); ++i) {
+    if (i) info += ",";
+    texto_json(info, m.eventos[i].nome);
   }
   info += "]}";
   return info.c_str();
 }
 
+// nova instancia do modelo (reaproveita o lugar de uma liberada)
 EMSCRIPTEN_KEEPALIVE int mm_instancia(int modelo) {
+  for (size_t k = 0; k < instancias.size(); ++k)
+    if (!instancias[k]) {
+      instancias[k] = std::make_unique<Instancia>(modelos[size_t(modelo)]);
+      return int(k);
+    }
   instancias.push_back(std::make_unique<Instancia>(modelos[size_t(modelo)]));
   return int(instancias.size()) - 1;
 }
 
 EMSCRIPTEN_KEEPALIVE void mm_limpar_instancias() { instancias.clear(); }
+
+// solta uma instancia so (as medidas abrem e fecham a delas sem mexer nas do editor)
+EMSCRIPTEN_KEEPALIVE void mm_liberar_instancia(int inst) {
+  if (inst >= 0 && size_t(inst) < instancias.size()) instancias[size_t(inst)].reset();
+}
 
 // comeca a animacao do zero (-1: pose de setup), como um personagem novo: setup, fisica
 // reiniciada e o primeiro quadro no instante 0
@@ -268,6 +298,9 @@ EMSCRIPTEN_KEEPALIVE void mm_passo(int inst, double dt) {
   i.e.avancar(dt);
   i.e.atualizar_mundo();
   i.estado->ler_eventos(lidos);
+  if (colher)
+    for (const Evento& ev : lidos)
+      if (ev.tipo == TipoEvento::Usuario) colhidos.insert(colhidos.end(), {double(ev.evento), ev.tempo, i.tempo, double(ev.animacao)});
   lidos.clear();
 }
 
@@ -515,6 +548,196 @@ EMSCRIPTEN_KEEPALIVE int mm_simular(int inst, int anim, int loop, const double* 
   }
   saida.swap(out);
   return int(saida.size());
+}
+
+}  // extern "C"
+
+// ---- as medidas (src/core/instantes.ts): a conta do poseAt do editor (src/core/sim.ts), com e
+// sem emenda, em varios instantes, com o checkpoint entre um instante e o seguinte
+
+namespace {
+
+struct Medida {
+  int inst = -1, anim = -1;
+  bool loop = true;
+  // emenda: a animacao seguinte (-1: sem emenda), o mix, o corte (< 0: na fila) e o loop dela
+  int prox = -1;
+  double mix = 0, corte = -1;
+  bool prox_loop = true;
+  // com fisica (ou pedindo passos inteiros sempre): passos de 1/64 desde 0; sem, um passo so
+  bool passos = false;
+  double dur_a = 0;
+  // checkpoint: o ultimo passo inteiro e se a emenda ja tinha cortado ali
+  double feito = 0;
+  bool cortou = false, guardou = false;
+  static constexpr double PASSO = 1.0 / 64;
+
+  void comecar() {
+    mm_reiniciar(inst);
+    if (anim >= 0) mm_estado_tocar(inst, 0, anim, loop ? 1 : 0, 0);
+  }
+  void avanca(double done, double t, bool cut) {
+    while (done + PASSO <= t + 1e-9) {
+      mm_passo(inst, PASSO);
+      done += PASSO;
+    }
+    mm_guardar(inst);
+    guardou = true;
+    feito = done;
+    cortou = cut;
+    if (t - done > 0) mm_passo(inst, t - done);
+  }
+  // a instancia fica na pose do instante t (crescente continua do checkpoint; senao refaz)
+  void pose(double t) {
+    if (anim < 0) {
+      mm_reiniciar(inst);
+      return;
+    }
+    if (prox < 0) {
+      if (!passos) {
+        comecar();
+        mm_passo(inst, 0);
+        if (t > 0) mm_passo(inst, t);
+        return;
+      }
+      double done = 0;
+      if (guardou && t > feito) {
+        mm_restaurar(inst);
+        done = feito;
+      } else {
+        comecar();
+        mm_passo(inst, 0);
+      }
+      avanca(done, t, false);
+      return;
+    }
+    double done = 0;
+    bool cut = false;
+    if (guardou && t > feito) {
+      mm_restaurar(inst);
+      done = feito;
+      cut = cortou;
+    } else {
+      comecar();
+      if (corte < 0) mm_estado_enfileirar(inst, 0, prox, prox_loop ? 1 : 0, std::max(dur_a - mix, 0.0), mix);
+      mm_passo(inst, 0);
+      if (corte == 0) {
+        mm_estado_tocar(inst, 0, prox, prox_loop ? 1 : 0, mix);
+        cut = true;
+      }
+    }
+    if (corte >= 0 && !cut) {
+      if (t + 1e-9 < corte) return avanca(done, t, false);
+      while (done + PASSO <= corte + 1e-9) {
+        mm_passo(inst, PASSO);
+        done += PASSO;
+      }
+      if (corte - done > 0) mm_passo(inst, corte - done);
+      mm_estado_tocar(inst, 0, prox, prox_loop ? 1 : 0, mix);
+      cut = true;
+      // os passos recomecam do instante da troca
+      done = corte;
+    }
+    avanca(done, t, cut);
+  }
+};
+
+Medida medida(int inst, int anim, int loop, int prox, double mix, double corte, int prox_loop) {
+  Medida md;
+  md.inst = inst;
+  md.anim = anim;
+  md.loop = loop != 0;
+  md.prox = prox;
+  md.mix = std::max(0.0, mix);
+  md.corte = corte;
+  md.prox_loop = prox_loop != 0;
+  const Modelo& m = *instancias[size_t(inst)]->modelo;
+  for (const DadosRestricao& r : m.restricoes) md.passos = md.passos || r.tipo == TipoRestricao::Fisica;
+  if (anim >= 0) md.dur_a = m.animacoes[size_t(anim)].duracao;
+  return md;
+}
+
+}  // namespace
+
+extern "C" {
+
+// A pose em varios instantes (as medidas): a animacao `anim` (-1: setup) em loop ou nao, e com
+// `prox` >= 0 a emenda com a animacao seguinte (mix; corte >= 0 interrompe nesse instante,
+// corte < 0 enfileira quando faltar o mix para `anim` acabar). A mesma conta do poseAt do editor
+// (NucleoCena e PoseSim). Escreve em mm_saida, por instante:
+// - o mundo de cada osso [a, b, c, d, x, y] e a pose local [x, y, rotacao, escala_x, escala_y,
+//   cisalha_x, cisalha_y] (13 numeros por osso);
+// - com `pedidos & 1`: por slot a parte (-1 sem) e a cor [r, g, b, a], depois a ordem de desenho;
+// - com `pedidos & 2`: por slot, quantos numeros e os vertices em mundo da parte (regiao e
+//   malha; 0 nas outras).
+// Devolve quantos numeros. A instancia fica na pose do ultimo instante.
+EMSCRIPTEN_KEEPALIVE int mm_medir(int inst, int anim, int loop, int prox, double mix, double corte, int prox_loop, const double* instantes, int n, int pedidos) {
+  Instancia& i = *instancias[size_t(inst)];
+  Medida md = medida(inst, anim, loop, prox, mix, corte, prox_loop);
+  std::vector<double> out, v;
+  for (int k = 0; k < n; ++k) {
+    md.pose(instantes[k]);
+    const auto& w = i.e.mundo();
+    for (size_t o = 0; o < w.size(); ++o) {
+      const Matriz& x = w[o];
+      const Local& l = i.e.local[o];
+      out.insert(out.end(), {x.a, x.b, x.c, x.d, x.x, x.y, l.x, l.y, l.rotacao, l.escala_x, l.escala_y, l.cisalha_x, l.cisalha_y});
+    }
+    if (pedidos & 1) {
+      for (const EstadoSlot& s : i.e.slots()) out.insert(out.end(), {double(s.parte), s.cor.r, s.cor.g, s.cor.b, s.cor.a});
+      for (int s : i.e.ordem()) out.push_back(s);
+    }
+    if (pedidos & 2)
+      for (int s = 0; s < int(i.e.slots().size()); ++s) {
+        const size_t c = i.e.vertices(s, v);
+        out.push_back(double(c));
+        out.insert(out.end(), v.begin(), v.begin() + long(c));
+      }
+  }
+  saida.swap(out);
+  return int(saida.size());
+}
+
+// Os eventos de usuario da mesma conta ate o instante `ate`, sempre em passos de 1/64 desde 0
+// (sem o checkpoint): em mm_saida, por evento, [evento (indice em `eventos` do mm_info), tempo
+// da chave, instante em que saiu, animacao]. Devolve quantos numeros.
+EMSCRIPTEN_KEEPALIVE int mm_medir_eventos(int inst, int anim, int loop, int prox, double mix, double corte, int prox_loop, double ate) {
+  Medida md = medida(inst, anim, loop, prox, mix, corte, prox_loop);
+  md.passos = true;
+  colhidos.clear();
+  colher = true;
+  md.pose(ate);
+  colher = false;
+  saida.swap(colhidos);
+  colhidos.clear();
+  return int(saida.size());
+}
+
+// A pose atual com a pose local de alguns ossos trocada (pose.follow procura o giro de uma
+// cadeia): o mundo recalculado numa copia do esqueleto, sem andar o relogio e sem a inercia da
+// fisica (a fisica mostra o que ja tinha, como o Physics.pose do spine-core). `dados`: por osso,
+// [osso, x, y, rotacao, escala_x, escala_y, cisalha_x, cisalha_y]. Escreve em mm_saida o mundo
+// de cada osso [a, b, c, d, x, y]; a instancia nao muda.
+EMSCRIPTEN_KEEPALIVE int mm_reposar(int inst, const double* dados, int n) {
+  const Instancia& i = *instancias[size_t(inst)];
+  Esqueleto e = i.e;
+  for (EstadoRestricao& r : e.restricoes()) r.inercia = 0;
+  for (int k = 0; k < n; ++k, dados += 8) {
+    Local& l = e.local[size_t(dados[0])];
+    l.x = dados[1], l.y = dados[2], l.rotacao = dados[3], l.escala_x = dados[4], l.escala_y = dados[5], l.cisalha_x = dados[6], l.cisalha_y = dados[7];
+  }
+  e.atualizar_mundo();
+  saida.clear();
+  for (const Matriz& x : e.mundo()) saida.insert(saida.end(), {x.a, x.b, x.c, x.d, x.x, x.y});
+  return int(saida.size());
+}
+
+// pose direta (como a cebola, mm_pose_direta) e a caixa dela (como o mm_caixa): o
+// skeleton.bounds. anim -1: o setup
+EMSCRIPTEN_KEEPALIVE int mm_caixa_direta(int inst, int anim, double t, int loop) {
+  if (anim < 0) mm_reiniciar(inst);
+  else mm_pose_direta(inst, anim, t, loop);
+  return mm_caixa(inst);
 }
 
 }  // extern "C"

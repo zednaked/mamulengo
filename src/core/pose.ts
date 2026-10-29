@@ -1,9 +1,9 @@
-// Pose dos ossos num instante de uma animacao, calculada pelo runtime oficial a partir
-// do documento (sem texturas). Comandos usam para converter "mover na tela" em valores
-// locais. Mesma sequencia deterministica do viewer (medida igual ao spine-godot).
-import { AnimationState, AnimationStateData, Skeleton, SkeletonJson, type AttachmentLoader } from "@esotericsoftware/spine-core";
+// Pose dos ossos num instante de uma animacao, a partir do documento. Comandos usam para
+// converter "mover na tela" em valores locais. Mesma sequencia deterministica do viewer
+// (src/core/instantes.ts: spine-core ou nucleo, conforme o modo das medidas).
+import type { AttachmentLoader } from "@esotericsoftware/spine-core";
 import type { SpineJson } from "./format.ts";
-import { PoseSim } from "./sim.ts";
+import { comMedidor, type Quadro } from "./instantes.ts";
 
 // Esqueleto so com ossos, slots (sem imagens) e constraints: as timelines que mexem em
 // attachments saem, porque nao ha imagens carregadas.
@@ -66,12 +66,12 @@ export function godotGravity(doc: SpineJson): SpineJson {
   return { ...doc, constraints, animations };
 }
 
-export function skeletonAt(doc: SpineJson, anim: string | null, t: number, loop = true): Skeleton {
-  const data = new SkeletonJson(nullLoader).readSkeletonData(godotGravity(bonesOnly(doc)));
-  const sk = new Skeleton(data);
+// A pose dos ossos num instante (a camada de src/core/instantes.ts, no modo das medidas:
+// spine-core nos modos "godot" e "spine", o nucleo no modo "nucleo"). Para varios instantes,
+// abra um medidor (abrirMedidor) e peca todos de uma vez.
+export function skeletonAt(doc: SpineJson, anim: string | null, t: number, loop = true): Quadro {
   // loop como o viewer (o editor toca em loop); sem loop, t = duracao e o ultimo quadro
-  new PoseSim(sk, new AnimationState(new AnimationStateData(data))).poseAt(anim, loop, t);
-  return sk;
+  return comMedidor(doc, null, (m) => m.poses(anim, [t], { loop })[0], { leve: true });
 }
 
 export interface Affine {
@@ -83,11 +83,10 @@ export interface Affine {
   y: number;
 }
 
-export function boneWorld(sk: Skeleton, name: string): Affine {
+export function boneWorld(sk: Quadro, name: string): Affine {
   const b = sk.findBone(name);
   if (!b) throw new Error(`osso nao existe: ${name}`);
-  const p = b.appliedPose;
-  return { a: p.a, b: p.b, c: p.c, d: p.d, x: p.worldX, y: p.worldY };
+  return { a: b.a, b: b.b, c: b.c, d: b.d, x: b.worldX, y: b.worldY };
 }
 
 export const apply = (m: Affine, x: number, y: number): [number, number] => [m.a * x + m.b * y + m.x, m.c * x + m.d * y + m.y];

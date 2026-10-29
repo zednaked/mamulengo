@@ -206,10 +206,11 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 
 ## Rodar
 
-O editor ainda desenha pelo `spine-core` e pelo `spine-webgl` (instalados pelo npm) como
-renderizador de referência, até o núcleo assumir; usá-los exige uma
-[licença do Spine](https://esotericsoftware.com/spine-purchase). O núcleo em `nucleo/` e o
-formato `.boneco` não dependem deles.
+No modo de desenho "núcleo" o editor não usa o `spine-core`: o desenho, a pose, a interação, as
+medidas, a ficha e os comandos vêm do núcleo em wasm. Os modos "godot" e "spine" (o padrão ainda
+é o "godot") e o oráculo dos testes usam o `spine-core` e o `spine-webgl` (instalados pelo npm),
+que exigem uma [licença do Spine](https://esotericsoftware.com/spine-purchase). O núcleo em
+`nucleo/` e o formato `.boneco` não dependem deles.
 
 ```sh
 npm install

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { defineCommand, describeCommands } from "./registry.ts";
 import { animations, bones, constraints, keyValues, requireAnimation, requireBone, requireSlot, skins, slots } from "../model.ts";
 import { timeOf } from "./timeline.ts";
-import { skeletonAt } from "../pose.ts";
+import { comMedidor } from "../instantes.ts";
 import { measureCuts, measureTransition, type TransitionReport } from "../transition.ts";
 
 function duration(a: any): number {
@@ -223,16 +223,17 @@ defineCommand({
     const dur = duration(a);
     const n = Math.max(1, Math.round(dur * p.fps));
     const samples: Record<string, { t: number; x: number; y: number; ang: number; tx: number; ty: number }[]> = {};
-    // cada amostra refaz a pose do zero (mesma sequencia deterministica do viewer)
+    // a mesma sequencia deterministica do viewer, todas as amostras de uma vez
+    const times = Array.from({ length: n + 1 }, (_, i) => (i / n) * dur);
+    // em loop, t == duracao ja e o tempo 0 de novo: mede o fim um pouco antes
+    const poses = comMedidor(doc.json, null, (m) => m.poses(p.anim, times.map((t, i) => (i === n && n > 0 ? dur - 1e-4 : t))), { leve: true });
     for (let i = 0; i <= n; i++) {
-      const t = (i / n) * dur;
-      // em loop, t == duracao ja e o tempo 0 de novo: mede o fim um pouco antes
-      const s = skeletonAt(doc.json, p.anim, i === n && n > 0 ? dur - 1e-4 : t);
+      const t = times[i];
+      const s = poses[i];
       for (const name of p.bones) {
-        const b = s.findBone(name)!;
-        const w = b.appliedPose;
+        const w = s.findBone(name)!;
         const ang = Math.atan2(w.c, w.a) * (180 / Math.PI);
-        const len = b.data.length || 0;
+        const len = w.length || 0;
         (samples[name] ??= []).push({ t: +t.toFixed(3), x: w.worldX, y: w.worldY, ang, tx: w.worldX + w.a * len, ty: w.worldY + w.c * len });
       }
     }

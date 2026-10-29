@@ -206,8 +206,10 @@ scons platform=web target=template_release threads=no custom_modules=<repo>/nucl
 
 ## Run it
 
-The editor still draws through `spine-core` and `spine-webgl` (installed from npm) as its
-reference renderer, until the core takes over; using them requires a
+In the "nucleo" drawing mode the editor does not use `spine-core`: drawing, posing,
+interaction, measurements, the character sheet and the commands all come from the core in wasm.
+The "godot" and "spine" modes (the default is still "godot") and the test oracle use
+`spine-core` and `spine-webgl` (installed from npm), which require a
 [Spine license](https://esotericsoftware.com/spine-purchase). The core in `nucleo/` and the
 `.boneco` format do not depend on them.
 

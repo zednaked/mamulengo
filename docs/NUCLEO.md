@@ -490,7 +490,8 @@ motivo; a próxima recarga tenta o núcleo de novo.
 - **Várias poses de uma vez:** `mm_simular(instância, animação, loop, instantes, n)` (e
   `NucleoCena.simular`) devolve o mundo de cada osso em cada instante, com a conta do `poseAt`
   (andando de um instante ao seguinte pelo checkpoint). Igual a um `poseAt` por instante em
-  todos os algarismos (`simularDiff` 0 no bench). É a base para as medidas da etapa C.
+  todos os algarismos (`simularDiff` 0 no bench). As medidas usam o `mm_medir`, que estende essa
+  conta (abaixo).
 
 **Paridade de imagem** (`npx tsx tools/nucleo-editor.ts`: editor próprio na porta 5207 com
 `tests/assets`, Chromium headless com SwiftShader, 480x480, o personagem inteiro enquadrado,
@@ -551,20 +552,152 @@ a 11 vezes menos. Nenhum passo de arrasto recarregou o núcleo (`nucleoReloadsIn
 recarga continua mais cara (1,2 a 1,9 ms contra 0,2 a 0,3 ms do spine-core): é o
 `importarSpine` e a leitura do `.boneco` no wasm; o remendo evita isso no arrasto.
 
-**Etapa C (o que ainda usa o spine-core no modo núcleo e o que ela vai precisar):**
+**Etapa C: as medidas e os comandos.** No modo núcleo o editor não usa o spine-core para nada:
+nem `SkeletonData`, nem `Skeleton`, nem `AnimationState`, nem `updateWorldTransform`, em nenhum
+fluxo (viewer, interação, medidas, ficha e o painel dela, comandos). O spine-core fica nos modos
+godot e spine e no oráculo dos testes (`tools/oraculo.ts`, `tools/parity.ts` e afins).
 
-- As medidas (`query.motion`, `query.relation` e as outras `query.*`), a ficha
-  (`src/core/ficha.ts`, inclusive o painel que confere as regras a cada edição), a transição
-  (`src/core/transition.ts`), o recorte (`src/core/recorte.ts`) e os comandos que calculam a
-  Pose base pelo spine-core (`skeletonAt` em `src/core/pose.ts`: os de malha em
-  `commands/meshedit.ts`, `commands/setup.ts`) criam esqueletos próprios. `meshView` já aceita o
-  mundo dos ossos de fora (`SetupWorld`); os comandos podem receber o mesmo.
-- Para as medidas: `mm_simular` dá o mundo dos ossos em vários instantes; faltam, pelo mesmo
-  caminho, os vértices dos slots (para `query.relation` e o recorte), a cor e a parte (para a
-  ficha) e a emenda (A e B com mix, com o corte) em vários instantes, e os eventos do intervalo.
-- O `look`, o `render`, o GIF e o vídeo exportados já saem pelo núcleo (usam o viewer); só os
-  números que acompanham (`query.*` pedidas junto) ainda vêm do spine-core.
-- O seletor "desenho" pode passar a ter o núcleo como padrão quando a etapa C tirar o resto.
+- **A pose em instantes** (`src/core/instantes.ts`): a camada que as medidas e os comandos leem.
+  Um `Medidor` aberto sobre o documento dá, por instante, o mundo e a pose local de cada osso (e
+  o setup) e, se pedidos, a parte, a cor e os vértices (região e malha) de cada slot e a ordem de
+  desenho (`poses`); a emenda A e B na fila ou no corte, com mix (`sequencia`); os eventos de
+  usuário até um instante, em passos de 1/64 (`eventos`); a caixa da pose direta, para o
+  `skeleton.bounds` (`caixa`); e a última pose com alguns locais trocados, o mundo refeito sem
+  andar a física (`reposar`, para o `pose.follow`). Duas implementações: spine-core (modos godot
+  e spine: um `SkeletonData` por medidor e o `PoseSim`) e núcleo (o documento vira `.boneco` e
+  entra no wasm; o medidor tem modelo e instância só dele). O modo vem de `usarMedidas`: o viewer
+  o acerta com o seletor "desenho"; em Node o padrão é godot (`npm run ficha -- check ...
+  --runtime nucleo` usa o núcleo). Se o núcleo recusa o documento, o medidor cai no spine-core
+  (modo spine), como o viewer cai no spine-webgl. `{leve: true}` lê só o que mexe nos ossos
+  (ossos, restrições, as partes de caminho, timelines sem imagem nem deformar): os comandos que
+  só querem o mundo dos ossos (`skeletonAt`) e as medidas de movimento.
+- **A ponte** (`nucleo/web/nucleo_web.cpp`): `mm_medir` (a conta do `poseAt`, com e sem emenda,
+  em vários instantes, com o checkpoint de um instante ao seguinte; por instante, 13 números por
+  osso e, se pedidos, parte e cor por slot, a ordem e os vértices), `mm_medir_eventos`,
+  `mm_reposar` (uma cópia do esqueleto com a inércia da física zerada: a física mostra o que já
+  tinha, como o `Physics.pose`), `mm_caixa_direta`, `mm_liberar_instancia` (o medidor abre e
+  fecha a instância dele sem tocar nas do viewer) e os nomes dos eventos no `mm_info`. O
+  `mm_info` passou a escrever a duração com todos os algarismos: com 6 casas, uma última chave em
+  float32 (0,6000000238) saía 0,6, e a fila da emenda entrava 2e-8 s antes da do `PoseSim` (o
+  bastante para o número de quadros de uma medida mudar). O módulo wasm agora também roda em Node
+  (`-sENVIRONMENT=web,node`).
+- **Quem passou para a camada:** `query.motion`, `query.relation`, `query.rig`, `query.estilo`,
+  `query.malha`, `query.recorte`, `query.transition`, `query.mesh`, `ficha.check` e `ficha.draft`
+  (com todas as regras: limite, preso, física, loop, termina_como, comeca_como, transicao, corte,
+  estilo), a transição (`src/core/transition.ts`), o recorte (`src/core/recorte.ts`: a pose do
+  medidor e a geometria das partes do JSON), o estilo (`src/core/estilo.ts`) e os comandos que
+  calculam a pose pelo mundo (`skeletonAt`, que agora devolve um quadro do medidor:
+  `bone.add`/`bone.set` com `at`, `slot.set` mantendo o lugar, `attachment.region` com `world`,
+  `ik.create`, `key.set` no espaço do mundo, os de malha, pesos e deformar, `pose.follow`,
+  `anim.match`, `skeleton.bounds`, o PSD). As medidas pedem todos os instantes de uma vez (antes,
+  uma leitura do `SkeletonData` por instante).
+- **O que muda nas medidas entre os modos.** Godot: o jogo de hoje (a gravidade das físicas de
+  rotação invertida, `godotGravity`, e o mix do spine-godot, `likeSpineGodot`). Spine: o
+  spine-core puro (o editor do Spine). Núcleo: o jogo novo (o `.boneco` já tem a gravidade no
+  sentido do jogo, docs/FORMATO.md; o mix é o do oráculo). Nos CC0 (sem gravidade de física) os
+  três modos dão a mesma `ficha.check`. Godot e núcleo diferem só no mix de uma propriedade que só
+  a animação que sai anima (godot segura o valor dela; spine e núcleo puxam para o setup); spine e
+  núcleo diferem só onde há gravidade numa física de rotação (o núcleo puxa como o jogo). Mudanças
+  no modo godot em relação a antes: as restrições de caminho passam a contar (o `bonesOnly` antigo
+  as tirava) e o pior de uma regra (ou o maior de `query.relation`) só muda de instante, ou de
+  osso, se passar o anterior em mais de 0,001 (`EMPATE`): o lugar de um máximo de ruído não pode
+  depender do arredondamento do runtime. Pelo mesmo motivo, a ordem dos momentos do
+  `query.recorte` e do `query.malha` empata pelo valor mostrado (o mais cedo primeiro), o pior par
+  do recorte empata pelo nome e a busca do `pose.follow` só aceita um passo que melhora mais que
+  1e-4.
+
+**Conferência** (`npx tsx tools/nucleo-medidas.ts [--pagina] [--detalhe]`: em Node, com o mesmo
+wasm do editor, nos 3 CC0, modo spine contra modo núcleo). A pose em instantes é comparada com
+as tolerâncias do `nucleo-compara`; as medidas, pelo que o Claude recebe: o texto igual e cada
+número dentro de uma unidade da última casa impressa. Por quê: as poses batem a 1e-4 px; as
+medidas derivam delas por somas, diferenças e velocidades a 60 quadros por segundo (1e-4 px vira
+no máximo 0,006 unidades/s), abaixo da casa mostrada, mas um valor que difere em 1e-6 pode virar
+a casa no arredondamento. O pior foi 0 casas em todos os casos: nenhum arredondamento virou.
+
+| personagem | pose (setup e animações a 30 qps): osso, matriz, vértice | emendas (fila, corte, corte em 0, mix 0) | eventos | caixa | query.rig, motion, relation, estilo, malha, recorte, transition (fila, corte, cortes), mesh | ficha.check, ficha.draft | documento depois de 15 edições |
+|---|---|---|---|---|---|---|---|
+| aventureiro | 8e-6 px, 1e-7, 2e-5 px (73 instantes) | 9e-6 px (417) | 86 iguais | 2e-5 px | iguais | iguais | 1e-6 |
+| monstro (física) | 3e-5 px, 1e-7, 3e-5 px (91) | 3e-5 px (531) | 82 iguais | 3e-5 px | iguais | iguais | 2e-6 |
+| pessoa (física) | 8e-5 px, 5e-7, 1e-4 px (133) | 8e-5 px (799) | 72 iguais | 4e-5 px | iguais | iguais | 1e-4 |
+
+Cor, parte e ordem de desenho iguais em todos os instantes; os eventos (sintéticos, quatro por
+animação, dois no mesmo tempo) com nome, animação, instante e tempo da chave iguais. As 15
+edições: `bone.add` (com `at` e `toward`, duas vezes), `bone.set` com `at`, `slot.add`,
+`attachment.region` com `world`, `ik.create` (dobra tirada da pose), `key.set` no espaço do mundo,
+`skeleton.bounds` com animações, `pose.follow`, `anim.match`, `slot.set` mantendo o lugar e, numa
+malha, `mesh.vertices`, `mesh.weights`, `deform.set` e `mesh.unbind`. A `ficha.check` leva a ficha
+do personagem mais regras de todos os tipos (preso, limite de rotação e de x, física, loop,
+termina_como, comeca_como, transicao, corte, estilo). `npm run ficha -- check` nas fichas CC0 sai
+igual, texto inteiro, nos três modos.
+
+Com `--pagina`, as mesmas 27 a 29 medidas e as 15 edições pela ponte, no editor de verdade
+(editor próprio na porta 5209, Chromium headless), com uma animação aberta (o painel da ficha
+confere as regras depois de cada edição), contando na página cada
+`SkeletonJson.readSkeletonData` e cada `Skeleton.updateWorldTransform` do spine-core, de qualquer
+quem chama:
+
+| personagem | resultados, núcleo contra spine | documento | spine-core no modo núcleo | no modo spine |
+|---|---|---|---|---|
+| aventureiro | iguais | 1e-6 | 0 leituras, 0 poses | 69 leituras, 15.632 poses |
+| monstro | iguais | 2e-6 | 0 leituras, 0 poses | 70 leituras, 19.821 poses |
+| pessoa | iguais | 1e-4 | 0 leituras, 0 poses | 82 leituras, 29.859 poses |
+
+O `tools/nucleo-interacao.ts` também exige agora 0 nos comandos e na ficha (antes anotado): 0
+leituras e 0 poses nos 3 personagens (no modo spine, 24 a 32 leituras e 382 a 566 poses).
+
+**Custo** (Node, ms, o melhor de 3, somado nas animações do personagem; spine / núcleo):
+
+| medida | aventureiro | monstro (física) | pessoa (física) |
+|---|---|---|---|
+| query.motion | 3,9 / 2,6 | 3,6 / 2,4 | 4,9 / 3,2 |
+| query.relation (8 pares) | 6,4 / 6,1 | 6,7 / 5,6 | 9,3 / 7,5 |
+| query.estilo | 4,1 / 2,6 | 3,9 / 2,3 | 5,9 / 3,4 |
+| query.malha | 3,2 / 3,8 | 3,9 / 3,6 | 6,1 / 7,7 |
+| query.recorte | 25 / 25 | 39 / 37 | 65 / 66 |
+| query.transition (fila) | 14,7 / 3,4 | 15,5 / 3,4 | 24,4 / 8,6 |
+| query.transition (6 cortes) | 52 / 12 | 63 / 12 | 98 / 24 |
+| ficha.check | 115 / 27 | 141 / 30 | 229 / 61 |
+| ficha.draft | 4,7 / 2,2 | 6,2 / 2,3 | 8,7 / 3,7 |
+| query.rig | 0,5 / 1,1 | 0,3 / 0,7 | 0,2 / 0,7 |
+| query.mesh | 0,8 / 1,4 | 0,6 / 1,3 | 1,4 / 2,9 |
+
+O que anda (emenda, ficha) custa de 3 a 5 vezes menos no núcleo; o que lê uma pose só
+(`query.rig`, `query.mesh`) custa até 1,5 ms a mais (o `importarSpine` e a leitura do `.boneco`
+a cada medidor). O recorte e a malha são dominados pelos pixels e pelos triângulos, não pela pose.
+Pela ponte, no navegador, as 27 a 29 medidas de um personagem levam 410 a 970 ms no núcleo contra
+1.070 a 1.550 ms no spine-core. Os números do `tools/bench.ts --runtime spine,nucleo` (pose,
+desenho, arrasto) ficam como os da etapa B.
+
+**Duas descobertas no núcleo** (pela conferência das edições):
+
+- *Restrição que mexe na pose local, tocando pelo Estado.* O IK (e a transformação com alvo
+  local) escrevem na pose local para recalcular o mundo; o Estado não volta ao setup a cada
+  quadro, então o que a restrição fez ficava para o quadro seguinte e somava: um IK de 2 ossos
+  com mix 0,5, sem chave nos ossos, chegava ao alvo inteiro (40 px de diferença com o oráculo). O
+  `nucleo-compara` não via (o `aplicar` dele volta ao setup a cada instante). Corrigido:
+  `atualizar_mundo` devolve a pose local de antes das restrições (como a `pose` do oráculo, que
+  as restrições não tocam). Os casos pequenos do `nucleo-medidas` (IK de 1 e 2 ossos com mix
+  parcial, transformação local somando) batem a 1e-7 px; `nucleo-compara` e `nucleo-estado`
+  seguem dentro da tolerância (180 de 180 roteiros).
+- *Ordem das restrições (pendente).* Uma restrição num osso que vem antes, na lista, de uma
+  restrição num ancestral dele (a física da cabeça do aventureiro e, depois dela, um IK com mix 0
+  no quadril e no tronco): o oráculo mostra a física; o núcleo recalcula a cabeça depois do IK e
+  a perde (3,2 graus de diferença na cabeça). Com o IK antes da física os dois batem. O
+  `nucleo-medidas` mostra o caso como "anotado"; nenhum asset do corpus tem essa ordem.
+
+**O que ainda importa `@esotericsoftware` fora dos testes e do oráculo:** `src/render/viewer.ts`
+e `src/render/pose.ts` (`SpinePose`), `src/core/sim.ts` (`PoseSim`), `src/core/patch.ts` e a
+metade spine-core de `src/core/instantes.ts` (todos só nos modos godot e spine),
+`src/palco/palco.ts` (a referência do palco) e `Color` do spine-webgl em `src/app/interact.ts` e
+`src/app/meshedit.ts` (só a classe de cor dos gizmos, que roda em qualquer modo, sem esqueleto).
+`src/core/pose.ts` só importa um tipo.
+
+**O núcleo como padrão do editor.** Dá: no modo núcleo o editor inteiro (desenho, interação,
+medidas, ficha, comandos) bate com o modo spine nos CC0 e custa o mesmo ou menos. O que segura:
+os jogos de hoje rodam no spine-godot, e o modo godot é o que mostra os defeitos dele (multiply,
+tela, pma, a gravidade invertida e o mix); quem anima para um jogo que ainda não migrou precisa
+dele. Proposta: núcleo como padrão para personagens novos e jogos já em `.boneco`, godot para os
+jogos no spine-godot (uma escolha por projeto). Antes, resolver a ordem das restrições.
 
 ## Marcos
 

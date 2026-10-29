@@ -446,6 +446,11 @@ void Esqueleto::mundo_osso(int i) {
 void Esqueleto::atualizar_mundo() {
   const Modelo& m = *m_;
   const int n = int(m.ossos.size());
+  // as restricoes de IK e de transformacao (alvo local) mexem na pose local para recalcular o
+  // mundo; no fim a pose local volta a de antes delas (a animada). Sem isso, com o Estado (que
+  // nao volta ao setup a cada quadro), o que a restricao fez num quadro ficava para o seguinte
+  // e somava: IK com mix 0,5 chegava ao alvo inteiro em poucos quadros
+  antes_ = local;
   for (int i = 0; i < n; ++i) mundo_osso(i);
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
     const DadosRestricao& d = m.restricoes[r];
@@ -461,6 +466,7 @@ void Esqueleto::atualizar_mundo() {
     }
     for (int o : descendentes_[r]) mundo_osso(o);
   }
+  local.swap(antes_);
 }
 
 Local Esqueleto::local_de_mundo(int i) const {

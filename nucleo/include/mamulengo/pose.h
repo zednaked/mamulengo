@@ -106,7 +106,8 @@ class Esqueleto {
   bool relogio_float = false;
   double f32(double x) const { return relogio_float ? double(float(x)) : x; }
   double relogio() const { return relogio_; }
-  // recalcula o mundo: ossos, depois cada restricao na ordem
+  // recalcula o mundo: ossos, depois cada restricao na ordem. A pose local continua a de antes
+  // das restricoes (a animada), como a `pose` do oraculo
   void atualizar_mundo();
 
   // skin ativa (indice em Modelo::skins); nao muda as partes ja nos slots
@@ -136,6 +137,8 @@ class Esqueleto {
   int skin_ = 0;
   double relogio_ = 0;
   std::vector<double> tmp_;
+  // a pose local antes das restricoes (atualizar_mundo a devolve no fim)
+  std::vector<Local> antes_;
 
   void mundo_osso(int i);
   void restricao_ik(int r);

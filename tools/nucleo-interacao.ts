@@ -12,7 +12,8 @@
 // Compara o que foi escolhido, o documento depois de cada edicao (numeros) e a imagem (o
 // mesmo enquadramento nos dois modos). Confere tambem que, no modo "nucleo", nenhum
 // esqueleto do spine-core foi lido ou posado (SkeletonJson.readSkeletonData e
-// Skeleton.updateWorldTransform contados na pagina).
+// Skeleton.updateWorldTransform contados na pagina), nem pelo viewer e a interacao nem pelos
+// comandos e a ficha (etapa C).
 //
 //   npx tsx tools/nucleo-interacao.ts [--port 5208] [--grade 14] [--tol 1.5] [--out dir]
 import { spawn, type ChildProcess } from "node:child_process";
@@ -152,7 +153,7 @@ await ev(`
   const c = (window.__spine = { lidos: 0, posados: 0, lidosC: 0, posadosC: 0, pilhas: {} });
   const deC = () => {
     const p = new Error().stack;
-    if (/core\\/commands\\/|core\\/ficha\\.ts/.test(p)) return true;
+    if (/core\\/(commands\\/|ficha\\.ts|instantes\\.ts|transition\\.ts|recorte\\.ts|estilo\\.ts|pose\\.ts)/.test(p)) return true;
     const k = p.split("\\n").slice(2, 7).map((l) => l.trim().replace(/https?:[^)]*\\/src\\//, "").replace(/\\?[^:]*/, "")).join(" < ");
     c.pilhas[k] = (c.pilhas[k] ?? 0) + 1;
     return false;
@@ -387,12 +388,15 @@ for (const a of assets) {
   }
   // nenhum esqueleto do spine-core no modo nucleo (e o contador funciona: o modo spine conta)
   const okS = N.spine.lidos === 0 && N.spine.posados === 0 && !N.viewer.skeleton && !N.viewer.data && S.spine.posados > 0;
+  // etapa C: os comandos e a ficha (as regras a cada edicao) tambem sem o spine-core
+  const okC = N.spine.lidosC === 0 && N.spine.posadosC === 0;
+  if (!okC) falhas++;
   if (!okS) {
     falhas++;
     console.log(`${a.name}: spine-core no modo nucleo, de onde:`, JSON.stringify(N.pilhas, null, 1));
   }
   linhas.push({ personagem: a.name, caso: `spine-core no viewer e na interacao (modo nucleo): ${N.spine.lidos} leituras, ${N.spine.posados} poses (modo spine: ${S.spine.lidos}, ${S.spine.posados})`, diferencas: "", "pior numero": "", "imagem %": "", ok: okS ? "ok" : "FALHA" });
-  linhas.push({ personagem: a.name, caso: `spine-core nos comandos e na ficha (etapa C), modo nucleo: ${N.spine.lidosC} leituras, ${N.spine.posadosC} poses`, diferencas: "", "pior numero": "", "imagem %": "", ok: "(anotado)" });
+  linhas.push({ personagem: a.name, caso: `spine-core nos comandos e na ficha, modo nucleo: ${N.spine.lidosC} leituras, ${N.spine.posadosC} poses (modo spine: ${S.spine.lidosC}, ${S.spine.posadosC})`, diferencas: "", "pior numero": "", "imagem %": "", ok: okC ? "ok" : "FALHA" });
   await call("discard");
 }
 await call("view", { runtime: "spine" }).catch(() => {});

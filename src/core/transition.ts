@@ -5,11 +5,13 @@
 //
 // Velocidade = deslocamento entre quadros seguidos (origem e ponta do osso, o que for
 // maior) vezes o fps, em unidades do esqueleto por segundo; giro em graus por segundo.
-// Fisica entra (o jogo mostra) e o esqueleto roda invertido como no spine-godot.
-import { AnimationState, AnimationStateData, Skeleton, SkeletonJson } from "@esotericsoftware/spine-core";
+// Fisica entra (o jogo mostra). A pose vem da camada de src/core/instantes.ts: no modo
+// "godot", como o spine-godot (gravidade das fisicas de rotacao invertida, o mix dele); no
+// "spine", o spine-core puro; no "nucleo", o nucleo.
 import type { SpineJson } from "./format.ts";
-import { bonesOnly, nullLoader } from "./pose.ts";
-import { PoseSim, STEP, likeSpineGodot, sequenceTimes, type Sequence } from "./sim.ts";
+import { constraints } from "./model.ts";
+import { abrirLeve, type Medidor } from "./instantes.ts";
+import { STEP, sequenceTimes, type Sequence } from "./sim.ts";
 
 export interface BoneTransition {
   bone: string;
@@ -64,45 +66,48 @@ export interface TransitionOptions {
   bones?: string[];
 }
 
-export function measureTransition(json: SpineJson, anim: string, seq: Sequence, o: TransitionOptions = {}): TransitionReport {
+export function measureTransition(json: SpineJson, anim: string, seq: Sequence, o: TransitionOptions = {}, m?: Medidor): TransitionReport {
   const anims = (json.animations ?? {}) as Record<string, any>;
   if (!anims[anim]) throw new Error(`animacao nao existe: ${anim}`);
   if (!anims[seq.next]) throw new Error(`animacao nao existe: ${seq.next}`);
+  if (!m) {
+    const own = abrirLeve(json);
+    try {
+      return measureTransition(json, anim, seq, o, own);
+    } finally {
+      own.liberar();
+    }
+  }
   const fps = o.fps ?? 60;
   const tol = o.tol ?? 1.5;
-  const data = new SkeletonJson(nullLoader).readSkeletonData(bonesOnly(json));
-  const sk = new Skeleton(data);
-  // como o spine-godot: esqueleto invertido (a fisica cai para o outro lado). As medidas
-  // sao de tamanho (distancia, angulo absoluto), entao a inversao nao muda os numeros.
-  sk.scaleY = -1;
-  const sim = new PoseSim(sk, likeSpineGodot(new AnimationState(new AnimationStateData(data))));
-  const tt = sequenceTimes(data.findAnimation(anim)!.duration, data.findAnimation(seq.next)!.duration, seq);
+  const tt = sequenceTimes(m.duracao(anim), m.duracao(seq.next), seq);
   const n = Math.max(2, Math.ceil(tt.total * fps));
-  const physBones = new Set(sk.physics.map((c) => c.data.bone.name));
-  const names = o.bones?.length ? o.bones : sk.bones.map((b) => b.data.name);
+  const physBones = new Set(constraints(json).filter((x) => x.type === "physics").map((x) => x.c.bone as string));
+  const quadros = m.sequencia(anim, seq, Array.from({ length: n + 1 }, (_, i) => Math.min(tt.total, i / fps)), { slots: true });
+  const q0 = quadros[0];
+  const names = o.bones?.length ? o.bones : q0.bones.map((b) => b.name);
   const idx = names.map((nm) => {
-    const i = sk.bones.findIndex((b) => b.data.name === nm);
-    if (i < 0) throw new Error(`osso nao existe: ${nm}`);
-    return i;
+    const b = q0.findBone(nm);
+    if (!b) throw new Error(`osso nao existe: ${nm}`);
+    return b.index;
   });
   const acc = idx.map(() => ({ mixSpeed: 0, restSpeed: 0, mixTurn: 0, restTurn: 0, at: 0, atTurn: 0 }));
   let prev: number[][] | null = null;
   let prevAlpha: number[] | null = null;
-  const slotAcc = sk.slots.map(() => ({ mix: 0, rest: 0, at: 0 }));
+  const slotAcc = q0.slots.map(() => ({ mix: 0, rest: 0, at: 0 }));
   // a troca acontece no passo seguinte ao que passou do ponto: a janela vai um passo alem
   const w0 = tt.start,
     w1 = Math.max(tt.end, tt.start) + STEP;
   for (let i = 0; i <= n; i++) {
     const t = Math.min(tt.total, i / fps);
-    sim.poseAt(anim, false, t, seq);
+    const q = quadros[i];
     const cur = idx.map((k) => {
-      const b = sk.bones[k];
-      const p = b.appliedPose;
+      const p = q.bones[k];
       // origem e os dois eixos (comprimento minimo 50): girar, esticar e amassar contam
-      const L = Math.max(b.data.length || 0, 50);
+      const L = Math.max(p.length || 0, 50);
       return [p.worldX, p.worldY, p.worldX + p.a * L, p.worldY + p.c * L, Math.atan2(p.c, p.a) * DEG, p.worldX + p.b * L, p.worldY + p.d * L, Math.abs(p.a * p.d - p.b * p.c)];
     });
-    const alpha = sk.slots.map((s: any) => s.appliedPose.color.a);
+    const alpha = q.slots.map((s) => s.color.a);
     if (prev) {
       const t0 = Math.min(tt.total, (i - 1) / fps);
       const dt = t - t0 || 1 / fps;
@@ -146,7 +151,7 @@ export function measureTransition(json: SpineJson, anim: string, seq: Sequence, 
       sTurn = a.mixTurn / (tol * a.restTurn + floor.turn);
     const score = Math.max(sSpeed, sTurn);
     return {
-      bone: sk.bones[k].data.name,
+      bone: q0.bones[k].name,
       mixSpeed: r1(a.mixSpeed),
       restSpeed: r1(a.restSpeed),
       mixTurn: r1(a.mixTurn),
@@ -156,16 +161,16 @@ export function measureTransition(json: SpineJson, anim: string, seq: Sequence, 
       ratio: a.restSpeed > 1e-6 ? +(a.mixSpeed / a.restSpeed).toFixed(2) : a.mixSpeed > 1e-6 ? null : 0,
       score: +score.toFixed(2),
       jumps: score > 1,
-      physics: physBones.has(sk.bones[k].data.name),
+      physics: physBones.has(q0.bones[k].name),
       detail: "",
     };
   });
   // transparencia: piso de 4/s (sumir inteiro em 0,25 s e aceitavel no mix)
-  const fades = sk.slots
-    .map((s: any, j: number) => {
+  const fades = q0.slots
+    .map((s, j: number) => {
       const a = slotAcc[j];
       const score = a.mix / (tol * a.rest + 4);
-      return { slot: s.data.name, mixFade: r1(a.mix), restFade: r1(a.rest), at: +a.at.toFixed(3), score: +score.toFixed(2), jumps: score > 1, detail: `${s.data.name} muda de transparencia a ${r1(a.mix)}/s no mix (resto: ${r1(a.rest)}/s) em t=${a.at.toFixed(2)}` };
+      return { slot: s.name, mixFade: r1(a.mix), restFade: r1(a.rest), at: +a.at.toFixed(3), score: +score.toFixed(2), jumps: score > 1, detail: `${s.name} muda de transparencia a ${r1(a.mix)}/s no mix (resto: ${r1(a.rest)}/s) em t=${a.at.toFixed(2)}` };
     })
     .filter((f: any) => f.mixFade > 0)
     .sort((x: any, y: any) => y.score - x.score);
@@ -188,15 +193,23 @@ export function measureTransition(json: SpineJson, anim: string, seq: Sequence, 
 }
 
 // Interromper A em varios instantes (o premio que corta a animacao no meio): o pior corte.
-export function measureCuts(json: SpineJson, anim: string, seq: Omit<Sequence, "at">, o: TransitionOptions & { cuts?: number } = {}) {
-  const dur = (json.animations as any)?.[anim] ? new SkeletonJson(nullLoader).readSkeletonData(bonesOnly(json)).findAnimation(anim)!.duration : 0;
+export function measureCuts(json: SpineJson, anim: string, seq: Omit<Sequence, "at">, o: TransitionOptions & { cuts?: number } = {}, m?: Medidor) {
+  if (!m) {
+    const own = abrirLeve(json);
+    try {
+      return measureCuts(json, anim, seq, o, own);
+    } finally {
+      own.liberar();
+    }
+  }
+  const dur = (json.animations as any)?.[anim] ? m.duracao(anim) : 0;
   const k = Math.max(1, o.cuts ?? 10);
   let worst: TransitionReport | null = null;
   const all: { at: number; ok: boolean; worst: string }[] = [];
   for (let i = 0; i < k; i++) {
     // instantes deslocados para nao cair so em cima de chaves
     const at = +((dur * (i + 0.5)) / k).toFixed(4);
-    const r = measureTransition(json, anim, { ...seq, at }, o);
+    const r = measureTransition(json, anim, { ...seq, at }, o, m);
     const b = r.bones[0];
     const f = r.fades[0];
     const pior = f && f.score > (b?.score ?? 0) ? `${f.detail} (score ${f.score})` : b ? `${b.detail} (score ${b.score})` : "";
