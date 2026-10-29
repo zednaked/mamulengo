@@ -142,6 +142,7 @@ defineCommand({
     for (const { c, path, type } of allC(e)) if (type === "path") for (const f of ["slot", "target"]) if (c[f] === p.slot) e.set([...path, f], p.to);
     for (const [an, a] of anims(e)) {
       renameKey(e, ["animations", an, "slots"], p.slot, p.to);
+      renameKey(e, ["animations", an, "effects"], p.slot, p.to);
       for (const skin of Object.keys(a.attachments ?? {})) renameKey(e, ["animations", an, "attachments", skin], p.slot, p.to);
       (a.drawOrder ?? []).forEach((k: any, ki: number) =>
         (k.offsets ?? []).forEach((o: any, oi: number) => o.slot === p.slot && e.set(["animations", an, "drawOrder", ki, "offsets", oi, "slot"], p.to)),
@@ -179,6 +180,7 @@ defineCommand({
     skins(e.json).forEach((s, si) => s.attachments?.[p.slot] && e.set(["skins", si, "attachments", p.slot], undefined));
     for (const [an, a] of anims(e)) {
       if (a.slots?.[p.slot]) e.set(["animations", an, "slots", p.slot], undefined);
+      if (a.effects?.[p.slot]) e.set(["animations", an, "effects", p.slot], undefined);
       for (const skin of Object.keys(a.attachments ?? {})) if (a.attachments[skin][p.slot]) e.set(["animations", an, "attachments", skin, p.slot], undefined);
     }
     return { deleted: p.slot };

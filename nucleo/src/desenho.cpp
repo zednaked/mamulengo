@@ -98,15 +98,17 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   std::vector<uint8_t> dentro_v;         // por vertice da peca: dentro do pedaco
   std::vector<P2> poli, tmp;
   int recorte_fim = -2;  // slot que acaba o recorte aberto (-1: o fim do desenho; -2: nenhum)
-  auto lote = [&](Comando c, int pagina, Blend blend) -> Lote& {
-    if (c == Comando::Triangulos && !d.lotes.empty()) {
+  // `efeito` >= 0: o lote de um slot com efeitos, sempre novo (os valores sao do slot)
+  auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1) -> Lote& {
+    if (c == Comando::Triangulos && efeito < 0 && !d.lotes.empty()) {
       Lote& u = d.lotes.back();
-      if (u.comando == c && u.pagina == pagina && u.blend == blend) return u;
+      if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0) return u;
     }
     Lote l;
     l.comando = c;
     l.pagina = pagina;
     l.blend = blend;
+    l.efeito = efeito;
     l.inicio = uint32_t(d.indices.size());
     d.lotes.push_back(l);
     return d.lotes.back();
@@ -229,7 +231,39 @@ void desenhar(const Esqueleto& e, Desenho& d) {
           w[6] = b;
           w[7] = a;
         }
-        Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend);
+        int efeito = -1;
+        if (s.efeitos.algum()) {
+          // a caixa da imagem na pagina (antes de crescer) e, na regiao com linha ou brilho,
+          // os cantos para fora pela margem (docs/NUCLEO.md "Efeitos")
+          EfeitosLote el;
+          el.valores = s.efeitos;
+          el.caixa[0] = el.caixa[2] = p.uvs[0];
+          el.caixa[1] = el.caixa[3] = p.uvs[1];
+          for (size_t i = 2; i < n; i += 2) {
+            el.caixa[0] = std::min(el.caixa[0], p.uvs[i]), el.caixa[2] = std::max(el.caixa[2], p.uvs[i]);
+            el.caixa[1] = std::min(el.caixa[1], p.uvs[i + 1]), el.caixa[3] = std::max(el.caixa[3], p.uvs[i + 1]);
+          }
+          const float margem = s.efeitos.margem();
+          const Pagina& pg = m.paginas[size_t(p.pagina)];
+          if (p.tipo == TipoParte::Regiao && margem > 0 && pg.largura > 0 && pg.altura > 0) {
+            // cantos: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita; ex vai do
+            // primeiro ao ultimo, ey do primeiro ao segundo (posicao e uv juntos)
+            float* q = d.vertices.data() + size_t(base) * 8;
+            float ex[4], ey[4];
+            for (int c = 0; c < 4; ++c) ex[c] = q[24 + c] - q[c], ey[c] = q[8 + c] - q[c];
+            const double lx = std::hypot(ex[2] * pg.largura, ex[3] * pg.altura);
+            const double ly = std::hypot(ey[2] * pg.largura, ey[3] * pg.altura);
+            const float fx = lx > 0 ? float(margem / lx) : 0, fy = ly > 0 ? float(margem / ly) : 0;
+            static const float sx[4] = {-1, -1, 1, 1}, sy[4] = {-1, 1, 1, -1};
+            for (int k = 0; k < 4; ++k)
+              for (int c = 0; c < 4; ++c) q[k * 8 + c] += sx[k] * ex[c] * fx + sy[k] * ey[c] * fy;
+          }
+          el.pagina[0] = float(std::max(pg.largura, 1));
+          el.pagina[1] = float(std::max(pg.altura, 1));
+          efeito = int(d.efeitos.size());
+          d.efeitos.push_back(el);
+        }
+        Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend, efeito);
         const size_t li = size_t(&l - d.lotes.data());
         // recorte na CPU: primeiro a peca inteira pela caixa dela (fora de todos os pedacos:
         // nada; dentro de um pedaco convexo: os triangulos vao direto), so o resto por triangulo

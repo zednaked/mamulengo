@@ -1,7 +1,7 @@
 // Comandos de animacao: criar/remover animacoes, chaves e curvas.
 import { z } from "zod";
 import { defineCommand } from "./registry.ts";
-import { animations, channels, requireAnimation } from "../model.ts";
+import { animations, channels, effectAt, effectFields, isEffect, requireAnimation } from "../model.ts";
 import { boneWorld, invert, skeletonAt } from "../pose.ts";
 import { CurveArg, Target, editKeys, findKey, getKeys, keyFields, presetShape, removeEmpty, round, timeOf, timelinePath, writeShape } from "./timeline.ts";
 
@@ -84,6 +84,10 @@ const KeyValue = z
     mode: z.string().optional(),
     index: z.number().int().optional(),
     delay: z.number().optional(),
+    width: z.number().min(0).optional().describe("outline: largura em pixels da textura"),
+    strength: z.number().min(0).optional().describe("glow e tint: forca (tint de 0 a 1); physics strength usa value"),
+    radius: z.number().min(0).optional().describe("glow: raio em pixels da textura"),
+    edge: z.number().min(0).max(1).optional().describe("dissolve: largura da borda colorida (0 a 1)"),
   })
   .partial();
 
@@ -95,7 +99,7 @@ defineCommand({
   params: z.object({
     anim: AnimName,
     target: Target,
-    timeline: z.string().describe("rotate, translate, scale, shear, attachment, rgba, alpha, deform, ..."),
+    timeline: z.string().describe("rotate, translate, scale, shear, attachment, rgba, alpha, deform, ...; efeitos do slot (so .boneco): outline {color, width}, glow {color, strength, radius}, dissolve {value 0-1, color, edge}, tint {color, strength 0-1}"),
     time: z.number().min(0).describe("segundos"),
     curve: CurveArg.optional(),
     space: z.enum(["parent", "world"]).default("parent").describe("translate: x/y no espaco do pai (padrao) ou na tela (world)"),
@@ -126,6 +130,11 @@ defineCommand({
           apply: () => {
             const k = keys[i];
             const fields = keyFields(kind, p);
+            // efeitos: a chave fica completa (sem tirar o que e igual ao padrao)
+            if (isEffect(kind)) {
+              for (const [f, v] of Object.entries(fields)) if (JSON.stringify(k[f]) !== JSON.stringify(v)) e.set([...path, i, f], v);
+              return;
+            }
             // canais numericos: valor igual ao default sai da chave, como no export
             for (const c of channels(kind)) {
               if ((p as any)[c.key] === undefined) continue;
@@ -148,6 +157,8 @@ defineCommand({
           if (!keys.length) e.set(path, []);
           const k: any = {};
           if (t !== 0) k.time = t;
+          // efeito: os campos que nao vieram sao os do efeito naquele instante
+          if (isEffect(kind)) Object.assign(k, effectFields(kind, effectAt(e.json, p.anim, (p.target as any).slot, kind, t)));
           Object.assign(k, keyFields(kind, p));
           e.insert(path, at, k);
         },

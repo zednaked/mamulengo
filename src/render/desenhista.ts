@@ -39,9 +39,97 @@ const blends = (gl: WebGL2RenderingContext): [number, number][] => [
   [gl.ONE, gl.ONE_MINUS_SRC_COLOR],
 ];
 
+const ATRIBUTOS = [["pos", 2, 0], ["uv", 2, 8], ["cor", 4, 16]] as const;
+
+const VERTICE = `#version 300 es
+in vec2 pos; in vec2 uv; in vec4 cor;
+uniform mat4 proj; // mundo (y para cima) -> recorte
+out vec2 vuv; out vec4 vcor;
+void main() { vuv = uv; vcor = cor; gl_Position = proj * vec4(pos, 0.0, 1.0); }`;
+
+const FRAGMENTO = `#version 300 es
+precision mediump float;
+in vec2 vuv; in vec4 vcor;
+uniform sampler2D tex; uniform bool pma; uniform bool motor;
+out vec4 saida;
+void main() {
+  vec4 t = texture(tex, vuv);
+  if (pma && t.a > 0.0) t.rgb /= t.a;
+  vec3 c = t.rgb * vcor.rgb;
+  float a = t.a * vcor.a;
+  // multiplica do motor: so a cor, sem o alfa (o retangulo escuro do Godot)
+  saida = motor ? vec4(c, 1.0) : vec4(c * a, a);
+}`;
+
+// os efeitos de um slot (docs/NUCLEO.md "Efeitos"): ef sao os 22 canais (linha 0-4, brilho
+// 5-10, dissolver 11-16, tingir 17-21); a textura so vale dentro da caixa da imagem
+const FRAGMENTO_EFEITOS = `#version 300 es
+precision highp float; precision highp int;
+in vec2 vuv; in vec4 vcor;
+uniform sampler2D tex; uniform bool pma; uniform bool motor;
+uniform float ef[22]; uniform vec4 caixa; uniform vec2 pagina;
+out vec4 saida;
+vec4 T(vec2 uv) {
+  if (uv.x < caixa.x || uv.y < caixa.y || uv.x > caixa.z || uv.y > caixa.w) return vec4(0.0);
+  vec4 t = texture(tex, uv);
+  if (pma && t.a > 0.0) t.rgb /= t.a;
+  return t;
+}
+float hash(uint i, uint j) {
+  uint x = i * 1664525u + j * 1013904223u;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return float(x) / 4294967295.0;
+}
+float ruido(vec2 p) {
+  vec2 c = floor(p), f = p - c;
+  f = f * f * (3.0 - 2.0 * f);
+  uint i = uint(int(c.x)), j = uint(int(c.y));
+  return mix(mix(hash(i, j), hash(i + 1u, j), f.x), mix(hash(i, j + 1u), hash(i + 1u, j + 1u), f.x), f.y);
+}
+vec4 sobre(vec4 cima, vec4 baixo) {
+  float a = cima.a + baixo.a * (1.0 - cima.a);
+  return a > 0.0 ? vec4((cima.rgb * cima.a + baixo.rgb * baixo.a * (1.0 - cima.a)) / a, a) : vec4(0.0);
+}
+void main() {
+  vec2 px = 1.0 / pagina;
+  vec4 t = T(vuv);
+  vec4 C = vec4(t.rgb * vcor.rgb, t.a * vcor.a);
+  float ft = ef[21] * ef[20];
+  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[17], ef[18], ef[19]), ft);
+  vec4 U = vec4(0.0);
+  if (ef[9] > 0.0 && ef[8] > 0.0) {
+    float B = 0.0;
+    for (int i = 1; i <= 6; i++)
+      for (int k = 0; k < 16; k++) {
+        float g = (float(k) + 0.5 * float(i % 2)) * 6.2831853 / 16.0;
+        B = max(B, T(vuv + vec2(cos(g), sin(g)) * ef[10] * float(i) / 6.0 * px).a * pow(1.0 - float(i - 1) / 6.0, 2.0));
+      }
+    U = vec4(ef[5], ef[6], ef[7], min(1.0, ef[8] * ef[9] * B));
+  }
+  if (ef[4] > 0.0 && ef[3] > 0.0) {
+    float A = 0.0;
+    for (int k = 0; k < 16; k++) {
+      float g = float(k) * 6.2831853 / 16.0;
+      vec2 d = vec2(cos(g), sin(g)) * ef[4] * px;
+      A = max(A, max(T(vuv + d).a, T(vuv + d * 0.5).a));
+    }
+    U = sobre(vec4(ef[0], ef[1], ef[2], ef[3] * A), U);
+  }
+  U.a *= vcor.a;
+  vec4 F = sobre(C, U);
+  if (ef[11] > 0.0) {
+    float n = ruido(vuv * pagina / 8.0);
+    if (n < ef[11]) discard;
+    if (n < ef[11] + ef[16]) F.rgb = mix(F.rgb, vec3(ef[12], ef[13], ef[14]), ef[15]);
+  }
+  saida = motor ? vec4(F.rgb, 1.0) : vec4(F.rgb * F.a, F.a);
+}`;
+
 export class Desenhista {
   readonly gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
+  private progEf: WebGLProgram;
+  private uEf: Record<string, WebGLUniformLocation | null> = {};
   private uProj: WebGLUniformLocation | null;
   private uPma: WebGLUniformLocation | null;
   private uMotor: WebGLUniformLocation | null;
@@ -59,53 +147,32 @@ export class Desenhista {
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) ?? "shader");
       return s;
     };
-    const prog = (this.prog = gl.createProgram()!);
-    gl.attachShader(
-      prog,
-      sombra(
-        gl.VERTEX_SHADER,
-        `#version 300 es
-in vec2 pos; in vec2 uv; in vec4 cor;
-uniform mat4 proj; // mundo (y para cima) -> recorte
-out vec2 vuv; out vec4 vcor;
-void main() { vuv = uv; vcor = cor; gl_Position = proj * vec4(pos, 0.0, 1.0); }`,
-      ),
-    );
-    gl.attachShader(
-      prog,
-      sombra(
-        gl.FRAGMENT_SHADER,
-        `#version 300 es
-precision mediump float;
-in vec2 vuv; in vec4 vcor;
-uniform sampler2D tex; uniform bool pma; uniform bool motor;
-out vec4 saida;
-void main() {
-  vec4 t = texture(tex, vuv);
-  if (pma && t.a > 0.0) t.rgb /= t.a;
-  vec3 c = t.rgb * vcor.rgb;
-  float a = t.a * vcor.a;
-  // multiplica do motor: so a cor, sem o alfa (o retangulo escuro do Godot)
-  saida = motor ? vec4(c, 1.0) : vec4(c * a, a);
-}`,
-      ),
-    );
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? "programa");
-    this.uProj = gl.getUniformLocation(prog, "proj");
-    this.uPma = gl.getUniformLocation(prog, "pma");
-    this.uMotor = gl.getUniformLocation(prog, "motor");
+    // os dois programas (sem e com efeitos) com os atributos nas mesmas posicoes, para um VAO so
+    const programa = (frag: string) => {
+      const p = gl.createProgram()!;
+      gl.attachShader(p, sombra(gl.VERTEX_SHADER, VERTICE));
+      gl.attachShader(p, sombra(gl.FRAGMENT_SHADER, frag));
+      ATRIBUTOS.forEach(([nome], i) => gl.bindAttribLocation(p, i, nome));
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? "programa");
+      return p;
+    };
+    this.prog = programa(FRAGMENTO);
+    this.uProj = gl.getUniformLocation(this.prog, "proj");
+    this.uPma = gl.getUniformLocation(this.prog, "pma");
+    this.uMotor = gl.getUniformLocation(this.prog, "motor");
+    this.progEf = programa(FRAGMENTO_EFEITOS);
+    for (const u of ["proj", "pma", "motor", "ef", "caixa", "pagina"]) this.uEf[u] = gl.getUniformLocation(this.progEf, u);
     this.vbo = gl.createBuffer()!;
     this.ibo = gl.createBuffer()!;
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
-    for (const [nome, n, off] of [["pos", 2, 0], ["uv", 2, 8], ["cor", 4, 16]] as const) {
-      const l = gl.getAttribLocation(prog, nome);
-      gl.enableVertexAttribArray(l);
-      gl.vertexAttribPointer(l, n, gl.FLOAT, false, 32, off);
-    }
+    ATRIBUTOS.forEach(([, n, off], i) => {
+      gl.enableVertexAttribArray(i);
+      gl.vertexAttribPointer(i, n, gl.FLOAT, false, 32, off);
+    });
     gl.bindVertexArray(null);
     this.BLENDS = blends(gl);
   }
@@ -139,7 +206,15 @@ void main() {
     const v = N.HEAPF32.subarray(N._mm_vertices() / 4, N._mm_vertices() / 4 + nv * 8);
     const ind = N.HEAPU32.subarray(N._mm_indices() / 4, N._mm_indices() / 4 + ni);
     const pl = N._mm_lotes() / 4;
-    const lotes = N.HEAP32.subarray(pl, pl + nl * 5);
+    const lotes = N.HEAP32.subarray(pl, pl + nl * 6);
+    const ne = N._mm_num_efeitos(),
+      pe = N._mm_efeitos() / 4;
+    const efeitos = ne ? N.HEAPF32.subarray(pe, pe + ne * 28) : null;
+    if (efeitos) {
+      gl.useProgram(this.progEf);
+      gl.uniformMatrix4fv(this.uEf.proj, false, proj);
+    }
+    let usando = this.prog;
     gl.useProgram(this.prog);
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
@@ -152,11 +227,12 @@ void main() {
     gl.disable(gl.STENCIL_TEST);
     let chamadas = 0;
     for (let i = 0; i < nl; i++) {
-      const cmd = lotes[i * 5],
-        pag = lotes[i * 5 + 1],
-        blend = lotes[i * 5 + 2],
-        inicio = lotes[i * 5 + 3],
-        quantos = lotes[i * 5 + 4];
+      const cmd = lotes[i * 6],
+        pag = lotes[i * 6 + 1],
+        blend = lotes[i * 6 + 2],
+        inicio = lotes[i * 6 + 3],
+        quantos = lotes[i * 6 + 4],
+        ef = lotes[i * 6 + 5];
       if (cmd === 1) {
         // recorte: marca o poligono no stencil (leque com inversao serve para poligono concavo)
         gl.enable(gl.STENCIL_TEST);
@@ -181,8 +257,19 @@ void main() {
       const p = paginas[pag];
       if (!p?.tex || !quantos) continue;
       gl.bindTexture(gl.TEXTURE_2D, p.tex);
-      gl.uniform1i(this.uPma, p.pma ? 1 : 0);
-      gl.uniform1i(this.uMotor, blend === 3 ? 1 : 0);
+      const quer = ef >= 0 && efeitos ? this.progEf : this.prog;
+      if (quer !== usando) gl.useProgram((usando = quer));
+      if (quer === this.progEf) {
+        const o = ef * 28;
+        gl.uniform1fv(this.uEf.ef, efeitos!.subarray(o, o + 22));
+        gl.uniform4f(this.uEf.caixa, efeitos![o + 22], efeitos![o + 23], efeitos![o + 24], efeitos![o + 25]);
+        gl.uniform2f(this.uEf.pagina, efeitos![o + 26], efeitos![o + 27]);
+        gl.uniform1i(this.uEf.pma, p.pma ? 1 : 0);
+        gl.uniform1i(this.uEf.motor, blend === 3 ? 1 : 0);
+      } else {
+        gl.uniform1i(this.uPma, p.pma ? 1 : 0);
+        gl.uniform1i(this.uMotor, blend === 3 ? 1 : 0);
+      }
       const [s, d] = this.BLENDS[blend] ?? this.BLENDS[0];
       gl.blendFuncSeparate(s, d, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawElements(gl.TRIANGLES, quantos, gl.UNSIGNED_INT, inicio * 4);

@@ -3,7 +3,7 @@
   // animada (ou por timeline da parte selecionada), selecao de varias chaves,
   // mover/apagar/copiar/colar e exportar GIF/WebM. Toda edicao e comando (keys.*).
   import { app } from "./state.svelte.ts";
-  import { CURVE_PRESETS, constraints } from "../core/model.ts";
+  import { CURVE_PRESETS, constraints, isEffect } from "../core/model.ts";
   import { cursor } from "./interact.ts";
   import { exportAnimation } from "./exporter.ts";
   import CurveIcon from "./CurveIcon.svelte";
@@ -20,7 +20,7 @@
   const snap = (t: number) => Math.max(0, Math.round(t * FPS) / FPS);
   const tkey = (t: number) => Math.round(t * 1e4);
   const NOCURVE = new Set(["attachment", "events", "drawOrder", "sequence", "inherit", "reset"]);
-  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0" };
+  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0", outline: "#ffd23c", glow: "#4cc9ff", dissolve: "#ff8a3c", tint: "#ff5577" };
 
   let creating = $state(false);
   let renaming = $state<string | null>(null);
@@ -68,6 +68,9 @@
     for (const [b, tls] of Object.entries<any>(a.bones ?? {}))
       for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `b:${b}`, partLabel: b, partSel: { bone: b }, partColor: "#cfc6e6", target: { bone: b }, timeline: tl, label: tl, keys, bone: b });
     for (const [s, tls] of Object.entries<any>(a.slots ?? {}))
+      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: tl, keys, slot: s });
+    // efeitos do slot (so do Mamulengo): ficam em `effects`, fora de `slots`
+    for (const [s, tls] of Object.entries<any>(a.effects ?? {}))
       for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: tl, keys, slot: s });
     for (const [skin, sl] of Object.entries<any>(a.attachments ?? {}))
       for (const [s, atts] of Object.entries<any>(sl))
@@ -150,7 +153,7 @@
     const t = s.row.target;
     const tl = s.row.timeline!;
     if (t.bone) return a.bones?.[t.bone]?.[tl] ?? [];
-    if (t.slot) return a.slots?.[t.slot]?.[tl] ?? [];
+    if (t.slot) return (isEffect(tl) ? a.effects : a.slots)?.[t.slot]?.[tl] ?? [];
     if (t.deform) return a.attachments?.[t.deform.skin]?.[t.deform.slot]?.[t.deform.attachment]?.[tl] ?? [];
     return [];
   });

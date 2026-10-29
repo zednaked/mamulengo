@@ -75,7 +75,7 @@ if (acao === "importar") {
   const nome = nomeOpt ?? b.nome ?? basename(de, ".boneco");
   const dir = resolve(para);
   mkdirSync(dir, { recursive: true });
-  const e = exportarSpine(b);
+  const e = exportarSpine(b, { soSpine: true });
   const skel = join(dir, `${nome}.spine-json`),
     atlas = join(dir, `${nome}.atlas`);
   writeFileSync(skel, serializeSpineJson(e.json, undefined, { reuse: false }));

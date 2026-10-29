@@ -8,13 +8,15 @@
 //   invertido e essa gravidade puxa para o outro lado; ver src/core/pose.ts godotGravity);
 // - blend multiply vira "multiplica" (com transparencia, o que o artista ve no editor) ou
 //   "multiplica_motor" (o do Godot, que ignora a transparencia), conforme o jogo.
+// Os efeitos (que o Spine nao tem) vao e voltam como `effects` no slot e na animacao, onde o
+// spine-core nao le; so a exportacao para o Spine de verdade (`soSpine`) os tira.
 import { CAMPOS, CAMPOS_VOLTA, VALORES, VALORES_VOLTA } from "./dicionario.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
 
 export const VERSAO = 0;
 
 // caminhos (so as chaves do esquema, sem indices) cujas chaves sao nomes do artista
-const MAPA_DE_NOMES = /^(events|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
+const MAPA_DE_NOMES = /^(events|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
 
 function traduz(n: any, campos: Record<string, string>, valores: Record<string, Record<string, string>>, eNome: (p: string) => boolean, p: string[] = []): any {
   if (Array.isArray(n)) return n.map((x) => traduz(x, campos, valores, eNome, p));
@@ -196,10 +198,27 @@ export interface Exportado {
   avisos: string[];
 }
 
-export function exportarSpine(b: Boneco): Exportado {
+export interface OpcoesExportar {
+  // so o que o Spine conhece: tira os efeitos (com aviso)
+  soSpine?: boolean;
+}
+
+export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
   if (b.boneco !== VERSAO) throw new Error(`.boneco versao ${b.boneco}: este leitor e da ${VERSAO}`);
   const avisos: string[] = [];
   const { boneco, nome, paginas, imagens, mix, ficha, ...resto } = structuredClone(b);
+  if (opts.soSpine) {
+    for (const s of resto.slots ?? [])
+      if (s.efeitos) {
+        avisos.push(`slot ${s.nome}: os efeitos (${Object.keys(s.efeitos).join(", ")}) nao existem no Spine e ficaram de fora`);
+        delete s.efeitos;
+      }
+    for (const [an, a] of Object.entries<any>(resto.animacoes ?? {}))
+      if (a.efeitos) {
+        avisos.push(`animacao ${an}: as timelines de efeito (${Object.keys(a.efeitos).join(", ")}) ficaram de fora`);
+        delete a.efeitos;
+      }
+  }
   for (const s of resto.slots ?? []) {
     if (s.blend === "multiplica") {
       avisos.push(`slot ${s.nome}: multiply com transparencia sai como multiply do Spine (no Godot a parte transparente escurece); para ficar igual, pinte de branco a parte transparente da imagem`);

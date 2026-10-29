@@ -70,12 +70,40 @@ struct Cor {
   float r = 1, g = 1, b = 1, a = 1;
 };
 
+// ---- efeitos (docs/NUCLEO.md "Efeitos"): os valores de todos num vetor so, por efeito um
+// trecho de canais na ordem das timelines
+enum class TipoEfeito : uint8_t { Linha, Brilho, Dissolver, Tingir };
+constexpr int NUM_EFEITOS = 4;
+constexpr int EFEITO_INICIO[NUM_EFEITOS] = {0, 5, 11, 17};
+constexpr int EFEITO_CANAIS[NUM_EFEITOS] = {5, 6, 6, 5};
+constexpr int CANAIS_EFEITOS = 22;
+// indices no vetor
+enum : int {
+  LINHA_R = 0, LINHA_A = 3, LINHA_LARGURA = 4,
+  BRILHO_R = 5, BRILHO_A = 8, BRILHO_FORCA = 9, BRILHO_RAIO = 10,
+  DISSOLVER_VALOR = 11, DISSOLVER_R = 12, DISSOLVER_A = 15, DISSOLVER_BORDA = 16,
+  TINGIR_R = 17, TINGIR_A = 20, TINGIR_FORCA = 21,
+};
+struct Efeitos {
+  float v[CANAIS_EFEITOS] = {1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 8, 0, 1, 0.5f, 0, 1, 0.05f, 1, 1, 1, 1, 0};
+  bool linha() const { return v[LINHA_LARGURA] > 0 && v[LINHA_A] > 0; }
+  bool brilho() const { return v[BRILHO_FORCA] > 0 && v[BRILHO_A] > 0; }
+  bool dissolver() const { return v[DISSOLVER_VALOR] > 0; }
+  bool tingir() const { return v[TINGIR_FORCA] > 0 && v[TINGIR_A] > 0; }
+  bool algum() const { return linha() || brilho() || dissolver() || tingir(); }
+  // quanto a regiao cresce para fora, em pixels da textura
+  float margem() const;
+  // limita cada canal a faixa dele (cores e valor/borda de 0 a 1; largura, raio, forca >= 0)
+  void limitar();
+};
+
 struct DadosSlot {
   std::string nome;
   int osso = 0;
   int parte_setup = -1;  // id do nome da parte (Modelo::nomes_partes), -1 sem parte
   Cor cor;
   Blend blend = Blend::Normal;
+  Efeitos efeitos;
 };
 
 enum class TipoParte : uint8_t { Regiao, Malha, MalhaLigada, Recorte, Caminho, Ponto, Caixa };
@@ -216,6 +244,12 @@ struct TimelineCor {
   Timeline tl;
 };
 
+struct TimelineEfeito {
+  int slot;
+  TipoEfeito tipo;
+  Timeline tl;  // EFEITO_CANAIS[tipo] canais
+};
+
 struct TimelineParte {
   int slot;
   std::vector<double> tempos;
@@ -277,6 +311,7 @@ struct Animacao {
   double duracao = 0;
   std::vector<TimelineOsso> ossos;
   std::vector<TimelineCor> cores;
+  std::vector<TimelineEfeito> efeitos;
   std::vector<TimelineParte> partes;
   std::vector<TimelineDeformar> deformar;
   std::vector<TimelineOrdem> ordem;  // 0 ou 1

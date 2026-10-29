@@ -4,6 +4,7 @@
   import { applyLocal } from "./interact.ts";
   import { startMeshEdit } from "./meshedit.ts";
   import MeshPanel from "./MeshPanel.svelte";
+  import { EFFECT_NAMES, effectAt, effectFields } from "../core/model.ts";
 
   const FIELDS = [
     { k: "x", label: "x", step: 1 },
@@ -56,6 +57,42 @@
       const time = +app.play.time.toFixed(4);
       app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { slot: slot.name }, timeline: "rgba", time, color: hex } }, `cor ${slot.name} @${time}`, `cor-${slot.name}-${time}`);
     } else app.run({ cmd: "slot.set", args: { slot: slot.name, color: hex } }, `cor ${slot.name}`, `cor-${slot.name}`);
+  }
+
+  // ---- efeitos (so .boneco; docs/NUCLEO.md "Efeitos"): os ligados no setup ou animados aqui
+  const EFEITOS: Record<string, { nome: string; dica: string; campos: { k: string; label: string; max: number; step: number }[] }> = {
+    outline: { nome: "contorno", dica: "linha em volta da imagem", campos: [{ k: "width", label: "largura", max: 16, step: 0.5 }] },
+    glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "forca", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
+    dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }] },
+    tint: { nome: "tingir", dica: "pinta a imagem com uma cor", campos: [{ k: "strength", label: "forca", max: 1, step: 0.01 }] },
+  };
+  const ehBoneco = $derived(!!app.asset?.tres?.endsWith(".boneco"));
+  const efeitos = $derived.by(() => {
+    app.version;
+    app.play.time;
+    if (!slot || !app.doc || !ehBoneco) return [];
+    const anim = app.mode === "animate" ? app.play.animation : null;
+    const animados = Object.keys((anim && app.doc.json.animations?.[anim]?.effects?.[slot.name]) || {});
+    return EFFECT_NAMES.filter((n) => slot.effects?.[n] || animados.includes(n)).map((n) => ({ n, v: effectFields(n, effectAt(app.doc!.json, anim, slot.name, n, app.play.time)) }));
+  });
+  const faltam = $derived(EFFECT_NAMES.filter((n) => !efeitos.some((x) => x.n === n)));
+
+  function setEfeito(n: string, campo: string, valor: any) {
+    if (!slot) return;
+    if (app.mode === "animate" && app.play.animation) {
+      const time = +app.play.time.toFixed(4);
+      app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { slot: slot.name }, timeline: n, time, [campo]: valor } }, `${EFEITOS[n].nome} ${slot.name} @${time}`, `ef-${n}-${slot.name}-${time}`);
+    } else app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, [campo]: valor } }, `${EFEITOS[n].nome} ${slot.name}`, `ef-${n}-${slot.name}`);
+  }
+  // ligar um efeito: no setup com um valor que ja aparece (o padrao deixa desligado)
+  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" } };
+  function ligar(n: string) {
+    if (!slot || !n) return;
+    app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`);
+  }
+  function tirar(n: string) {
+    if (!slot) return;
+    app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, off: true } }, `tira ${EFEITOS[n].nome} de ${slot.name}`);
   }
 
   // tipo da imagem atual do slot (region vira malha; malha pode ganhar pesos)
@@ -284,6 +321,35 @@
         </div>
       {/if}
     </div>
+    {#if ehBoneco}
+      <div class="efeitos">
+        <div class="dim small">
+          Efeitos (do Mamulengo, o Spine nao tem; aparecem no desenho do nucleo e no jogo). {app.mode === "animate" && app.play.animation ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
+        </div>
+        {#each efeitos as ef (ef.n)}
+          <div class="ef">
+            <div class="efnome" title={EFEITOS[ef.n].dica}>
+              <span>{EFEITOS[ef.n].nome}</span>
+              <input type="color" value={"#" + ef.v.color.slice(0, 6)} title="cor" oninput={(e) => setEfeito(ef.n, "color", (e.target as HTMLInputElement).value.slice(1) + ef.v.color.slice(6, 8))} />
+              {#if app.mode !== "animate" || !app.play.animation}<button class="tira" onclick={() => tirar(ef.n)} title="tirar o efeito do setup">✕</button>{/if}
+            </div>
+            {#each EFEITOS[ef.n].campos as c}
+              <label class="efcampo">
+                <span>{c.label}</span>
+                <input type="range" min="0" max={c.max} step={c.step} value={ef.v[c.k]} oninput={(e) => setEfeito(ef.n, c.k, +(e.target as HTMLInputElement).value)} />
+                <span class="num">{(+ef.v[c.k]).toFixed(c.step < 1 ? 2 : 0)}</span>
+              </label>
+            {/each}
+          </div>
+        {/each}
+        {#if faltam.length && (app.mode !== "animate" || !app.play.animation)}
+          <select value="" onchange={(e) => { ligar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="liga um efeito nesta camada">
+            <option value="">+ efeito...</option>
+            {#each faltam as n}<option value={n}>{EFEITOS[n].nome}: {EFEITOS[n].dica}</option>{/each}
+          </select>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -325,6 +391,45 @@
   }
   .wide {
     grid-column: 1 / -1;
+  }
+  .efeitos {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ef {
+    border: 1px solid var(--line, #3a3448);
+    border-radius: 6px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .efnome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .efnome span {
+    flex: 1;
+  }
+  .efnome input[type="color"] {
+    width: 30px;
+    height: 22px;
+    padding: 0 2px;
+  }
+  .efnome .tira {
+    padding: 0 6px;
+  }
+  .efcampo {
+    display: grid;
+    grid-template-columns: 56px 1fr 40px;
+    align-items: center;
+    gap: 6px;
+  }
+  .efcampo .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
   .color {
     display: flex;

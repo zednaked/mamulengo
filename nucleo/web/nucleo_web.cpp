@@ -77,6 +77,7 @@ std::vector<Evento> lidos;
 std::vector<std::unique_ptr<Instancia>> instancias;
 Desenho desenho;
 std::vector<int32_t> lotes;
+std::vector<float> efeitos;
 // leituras da pose (o JavaScript le os numeros direto da memoria)
 std::vector<double> saida, saida_ossos, saida_setup, saida_slots;
 std::string erro, info;
@@ -325,12 +326,24 @@ EMSCRIPTEN_KEEPALIVE const float* mm_vertices() { return desenho.vertices.data()
 EMSCRIPTEN_KEEPALIVE int mm_num_vertices() { return int(desenho.vertices.size() / 8); }
 EMSCRIPTEN_KEEPALIVE const uint32_t* mm_indices() { return desenho.indices.data(); }
 EMSCRIPTEN_KEEPALIVE int mm_num_indices() { return int(desenho.indices.size()); }
-// lotes em 5 inteiros: comando, pagina, blend, inicio, quantos
+// lotes em 6 inteiros: comando, pagina, blend, inicio, quantos, efeito (-1 sem efeitos)
 EMSCRIPTEN_KEEPALIVE const int32_t* mm_lotes() {
   lotes.clear();
-  for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos)});
+  for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos), int32_t(l.efeito)});
   return lotes.data();
 }
+// efeitos dos lotes em 28 floats: os 22 canais (docs/NUCLEO.md "Efeitos"), a caixa da imagem
+// na pagina (u0, v0, u1, v1) e o tamanho da pagina
+EMSCRIPTEN_KEEPALIVE const float* mm_efeitos() {
+  efeitos.clear();
+  for (const EfeitosLote& e : desenho.efeitos) {
+    efeitos.insert(efeitos.end(), e.valores.v, e.valores.v + CANAIS_EFEITOS);
+    efeitos.insert(efeitos.end(), e.caixa, e.caixa + 4);
+    efeitos.insert(efeitos.end(), e.pagina, e.pagina + 2);
+  }
+  return efeitos.data();
+}
+EMSCRIPTEN_KEEPALIVE int mm_num_efeitos() { return int(desenho.efeitos.size()); }
 EMSCRIPTEN_KEEPALIVE int mm_num_lotes() { return int(desenho.lotes.size()); }
 
 // ---- leitura da pose (o editor sem o spine-core)

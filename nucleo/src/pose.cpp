@@ -48,6 +48,7 @@ void Esqueleto::setup() {
     ordem_[i] = int(i);
     EstadoSlot& s = slots_[i];
     s.cor = m.slots[i].cor;
+    s.efeitos = m.slots[i].efeitos;
     s.parte = m.parte_de(skin_, int(i), m.slots[i].parte_setup);
     s.deform.clear();
   }
@@ -210,6 +211,48 @@ void Esqueleto::aplicar_cor(const TimelineCor& tc, double t, double alfa, Mistur
   c.a = std::clamp(v[3], 0.0f, 1.0f);
 }
 
+float Efeitos::margem() const {
+  float m = 0;
+  if (linha()) m = std::max(m, v[LINHA_LARGURA]);
+  if (brilho()) m = std::max(m, v[BRILHO_RAIO]);
+  return m;
+}
+
+void Efeitos::limitar() {
+  for (int i = 0; i < CANAIS_EFEITOS; ++i) {
+    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO;
+    v[i] = std::max(v[i], 0.0f);
+    if (!sem_teto) v[i] = std::min(v[i], 1.0f);
+  }
+}
+
+// como aplicar_cor, para os canais de um efeito
+void Esqueleto::aplicar_efeito(const TimelineEfeito& te, double t, double alfa, Mistura mist) {
+  const int k = te.tl.chave(t);
+  Efeitos& e = slots_[size_t(te.slot)].efeitos;
+  const Efeitos& s = m_->slots[size_t(te.slot)].efeitos;
+  const int c0 = EFEITO_INICIO[int(te.tipo)], nc = EFEITO_CANAIS[int(te.tipo)];
+  if (k < 0) {
+    if (mist == Mistura::Setup) {
+      for (int i = 0; i < nc; ++i) e.v[c0 + i] = s.v[c0 + i];
+    } else if (mist == Mistura::Primeira) {
+      for (int i = 0; i < nc; ++i) e.v[c0 + i] = float(e.v[c0 + i] + (s.v[c0 + i] - e.v[c0 + i]) * alfa);
+    }
+    return;
+  }
+  for (int i = 0; i < nc; ++i) {
+    const double x = te.tl.valor(k, i, t);
+    float& v = e.v[c0 + i];
+    if (alfa == 1) {
+      v = float(x);
+    } else {
+      if (mist == Mistura::Setup) v = s.v[c0 + i];
+      v = float(v + (x - v) * alfa);
+    }
+  }
+  e.limitar();
+}
+
 void Esqueleto::aplicar_deformar(const TimelineDeformar& td, double t, double alfa, Mistura mist) {
   const Modelo& m = *m_;
   EstadoSlot& s = slots_[size_t(td.slot)];
@@ -356,6 +399,7 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   for (size_t i = 0; i < m.slots.size(); ++i) {
     ordem_[i] = int(i);
     slots_[i].cor = m.slots[i].cor;
+    slots_[i].efeitos = m.slots[i].efeitos;
     mudar_parte(int(i), parte_setup(int(i)));
   }
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
@@ -393,6 +437,7 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   // ossos, restricoes, deformar, ordem de desenho
   for (const TimelineParte& tp : an.partes) mudar_parte(tp.slot, parte_no_tempo(tp, t, nullptr));
   for (const TimelineCor& tc : an.cores) aplicar_cor(tc, t, 1, Mistura::Setup);
+  for (const TimelineEfeito& te : an.efeitos) aplicar_efeito(te, t, 1, Mistura::Setup);
   for (const TimelineOsso& to : an.ossos) aplicar_osso(to, t, 1, Mistura::Setup, false);
   for (const TimelineRestricao& tr : an.restricoes) aplicar_restricao(tr, t, 1, Mistura::Setup, false);
   for (const TimelineDeformar& td : an.deformar) aplicar_deformar(td, t, 1, Mistura::Setup);

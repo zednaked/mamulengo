@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Editor } from "../document.ts";
 import type { SpineJson } from "../format.ts";
 import type { Path } from "../ops.ts";
-import { channels, constraints, denormalize, keyValues, normalize, requireBone, requireSlot, CURVE_PRESETS, type Bezier } from "../model.ts";
+import { channels, constraints, denormalize, isEffect, keyValues, normalize, requireBone, requireSlot, CURVE_PRESETS, EFFECT_NAMES, type Bezier } from "../model.ts";
 
 export const Target = z
   .union([
@@ -19,7 +19,7 @@ export type Target = z.infer<typeof Target>;
 
 export const TIMELINE_NAMES = {
   bone: ["rotate", "translate", "translatex", "translatey", "scale", "scalex", "scaley", "shear", "shearx", "sheary", "inherit"],
-  slot: ["attachment", "rgba", "rgb", "alpha", "rgba2", "rgb2"],
+  slot: ["attachment", "rgba", "rgb", "alpha", "rgba2", "rgb2", ...EFFECT_NAMES],
   deform: ["deform", "sequence"],
   ik: ["ik"],
   transform: ["transform"],
@@ -43,6 +43,8 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
   if ("slot" in target) {
     requireSlot(doc, target.slot);
     if (!(TIMELINE_NAMES.slot as readonly string[]).includes(timeline)) throw new Error(`timeline de slot invalida: ${timeline}. Use ${TIMELINE_NAMES.slot.join(", ")}`);
+    // efeitos (outline, glow, dissolve, tint): fora de `slots`, onde o spine-core nao le
+    if (isEffect(timeline)) return { path: [...base, "effects", target.slot, timeline], kind: timeline };
     return { path: [...base, "slots", target.slot, timeline], kind: timeline };
   }
   if ("deform" in target) {
@@ -156,6 +158,12 @@ export function keyFields(kind: string, a: Record<string, any>): Record<string, 
   }
   if (kind === "rgba" || kind === "rgb") {
     if (a.color !== undefined) out.color = a.color;
+    return out;
+  }
+  if (isEffect(kind)) {
+    // efeitos: a chave guarda todos os campos (o que falta herdaria da anterior)
+    if (a.color !== undefined) out.color = a.color;
+    for (const c of channels(kind)) if (a[c.key] !== undefined) out[c.key] = round(a[c.key]);
     return out;
   }
   if (kind === "rgba2" || kind === "rgb2") {

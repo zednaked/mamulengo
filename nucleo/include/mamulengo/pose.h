@@ -34,6 +34,7 @@ struct Local {
 struct EstadoSlot {
   int parte = -1;  // indice em Modelo::partes; -1 sem parte
   Cor cor;
+  Efeitos efeitos;
   std::vector<double> deform;  // deslocamentos dos vertices (ou das entradas de peso); vazio: sem deformar
   int marca = 0;  // uso do Estado: se a parte foi posta por uma timeline neste aplicar
 };
@@ -80,6 +81,7 @@ class Esqueleto {
   // ---- timelines com peso (o Estado usa; `sai`: a animacao esta saindo de um mix)
   void aplicar_osso(const TimelineOsso& tl, double t, double alfa, Mistura mist, bool sai);
   void aplicar_cor(const TimelineCor& tl, double t, double alfa, Mistura mist);
+  void aplicar_efeito(const TimelineEfeito& tl, double t, double alfa, Mistura mist);
   void aplicar_deformar(const TimelineDeformar& tl, double t, double alfa, Mistura mist);
   void aplicar_ordem(const TimelineOrdem& tl, double t, Mistura mist, bool sai);
   void aplicar_restricao(const TimelineRestricao& tl, double t, double alfa, Mistura mist, bool sai);

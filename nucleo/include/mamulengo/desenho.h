@@ -18,6 +18,14 @@ struct Lote {
   int pagina = -1;
   Blend blend = Blend::Normal;
   uint32_t inicio = 0, quantos = 0;  // em `indices` (ComecaRecorte: o leque do poligono)
+  int efeito = -1;  // indice em Desenho::efeitos (o lote de um slot com efeitos), -1 sem efeitos
+};
+
+// os efeitos de um lote (docs/NUCLEO.md "Efeitos"): os valores e a caixa da imagem na pagina
+struct EfeitosLote {
+  Efeitos valores;
+  float caixa[4] = {0, 0, 1, 1};  // u0, v0, u1, v1
+  float pagina[2] = {1, 1};        // largura e altura da pagina, em pixels
 };
 
 struct Desenho {
@@ -28,10 +36,12 @@ struct Desenho {
   std::vector<float> vertices;
   std::vector<uint32_t> indices;
   std::vector<Lote> lotes;
+  std::vector<EfeitosLote> efeitos;
   void limpar() {
     vertices.clear();
     indices.clear();
     lotes.clear();
+    efeitos.clear();
   }
 };
 

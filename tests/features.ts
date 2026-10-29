@@ -346,6 +346,50 @@ runtimeOk("constraints");
   const rt = rq.momentos[0];
   check(rq.bordas_escondidas.braco > 0 && rt?.peca === "braco" && rt.escondida_por === "corpo" && rt.t > 0.5 && !rq.momentos.some((m: any) => m.t < 0.5), `query.recorte acha o topo do braco descoberto (${JSON.stringify(rq.momentos.slice(0, 2))}, bordas ${JSON.stringify(rq.bordas_escondidas)})`);
   await run("animation.delete", { name: "t.recorte" });
+  // efeitos do slot: setup por slot.effect, chaves por key.set (completas, o que falta vem do
+  // instante), curva por canal, renomear e apagar o slot levam junto; o spine-core segue lendo
+  {
+    const s0 = doc.json.slots[0].name;
+    await run("slot.effect", { slot: s0, effect: "tint", color: "ff0000", strength: 0.2 });
+    await run("slot.effect", { slot: s0, effect: "outline", width: 3 });
+    await run("animation.create", { name: "t.efeito" });
+    await run("key.set", { anim: "t.efeito", target: { slot: s0 }, timeline: "tint", time: 0, strength: 0, curve: "suave" });
+    await run("key.set", { anim: "t.efeito", target: { slot: s0 }, timeline: "tint", time: 0.5, strength: 1 });
+    await run("key.set", { anim: "t.efeito", target: { slot: s0 }, timeline: "dissolve", time: 0.25, value: 0.4 });
+    let erroSpine = "";
+    try {
+      const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))).readSkeletonData(structuredClone(doc.json));
+    } catch (e: any) {
+      erroSpine = String(e?.message ?? e);
+    }
+    const ks = doc.json.animations["t.efeito"].effects[s0];
+    const curva = ks.tint[0].curve;
+    let recusou = false;
+    await run("slot.effect", { slot: s0, effect: "tint", width: 2 }).catch(() => (recusou = true));
+    check(
+      doc.json.slots[0].effects.tint.color === "ff0000" &&
+        doc.json.slots[0].effects.outline.width === 3 &&
+        ks.tint[0].color === "ff0000ff" &&
+        ks.tint[1].color === "ff0000ff" &&
+        ks.tint[1].strength === 1 &&
+        ks.dissolve[0].value === 0.4 &&
+        ks.dissolve[0].edge === 0.05 &&
+        Array.isArray(curva) &&
+        curva.length === 20 &&
+        !erroSpine &&
+        recusou,
+      `efeitos: slot.effect e key.set (chaves completas, curva com 5 canais, campo errado recusado), spine-core le o documento${erroSpine ? ` (erro: ${erroSpine})` : ""}`,
+    );
+    await run("slot.rename", { slot: s0, to: "t.renomeado" });
+    const renomeou = !!doc.json.animations["t.efeito"].effects["t.renomeado"];
+    await run("slot.rename", { slot: "t.renomeado", to: s0 });
+    await run("key.delete", { anim: "t.efeito", target: { slot: s0 }, timeline: "dissolve", time: 0.25 });
+    await run("slot.effect", { slot: s0, effect: "tint", off: true });
+    await run("slot.effect", { slot: s0, effect: "outline", off: true });
+    check(renomeou && !doc.json.animations["t.efeito"].effects[s0].dissolve && doc.json.slots[0].effects === undefined, "efeitos: renomear o slot leva as timelines; key.delete e off limpam");
+    await run("animation.delete", { name: "t.efeito" });
+  }
   // path constraint no formato 4.3 (slot em "slot"): o runtime le, a posicao anima e o
   // estudo do rig (que nao carrega o path attachment) nao quebra com a timeline dele
   await run("slot.add", { name: "trilho", bone: "root" });
@@ -398,6 +442,32 @@ runtimeOk("constraints");
     check(
       asset.defaultMix === 0.2 && lerVirtual(asset.atlas) === atlasTexto(b2) && b3.animacoes[a0].ossos.cabeca.girar[0].valor === 7 && b3.mix.padrao === 0.2 && b3.paginas[0].jogo?.qualidade === 0.7 && b3.ficha.texto === "# nova",
       ".boneco no editor: le e grava pelos arquivos virtuais sem perder mix, compressao e ficha",
+    );
+    // efeitos (so do Mamulengo): vao e voltam como `effects`, o spine-core le o JSON sem
+    // reclamar e a exportacao para o Spine de verdade os tira com aviso
+    const be = structuredClone(b);
+    const se = be.slots[0].nome;
+    be.slots[0].efeitos = { linha: { cor: "ffcc00ff", largura: 3 }, brilho: { forca: 0.8, raio: 12 } };
+    be.animacoes[a0] = { ...be.animacoes[a0], efeitos: { [se]: { dissolver: [{ valor: 0 }, { tempo: 0.5, valor: 1, cor: "00ff88ff" }], tingir: [{ cor: "ff0000ff", forca: 0, curva: "degrau" }, { tempo: 0.25, forca: 1 }] } } };
+    const ve = exportarSpine(structuredClone(be));
+    const soSpine = exportarSpine(structuredClone(be), { soSpine: true });
+    const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+    let lido = "";
+    try {
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(ve.atlas))).readSkeletonData(structuredClone(ve.json));
+    } catch (e: any) {
+      lido = String(e?.message ?? e);
+    }
+    const de = importarSpine(ve.json, ve.atlas, "boneco");
+    check(
+      ve.json.slots[0].effects?.outline?.width === 3 &&
+        ve.json.animations[a0].effects?.[se]?.dissolve?.[1]?.value === 1 &&
+        !lido &&
+        JSON.stringify(de.slots[0].efeitos) === JSON.stringify(be.slots[0].efeitos) &&
+        JSON.stringify(de.animacoes[a0].efeitos) === JSON.stringify(be.animacoes[a0].efeitos) &&
+        !JSON.stringify(soSpine.json).includes("effects") &&
+        soSpine.avisos.filter((a) => a.includes("efeito")).length === 2,
+      `.boneco: efeitos vao e voltam como effects, o spine-core le sem erro${lido ? ` (erro: ${lido})` : ""} e a exportacao para o Spine tira com aviso`,
     );
   }
   const { parseFicha } = await import("../src/core/ficha.ts");

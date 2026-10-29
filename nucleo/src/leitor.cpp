@@ -86,6 +86,59 @@ Timeline ler_timeline_cor(const Json& chaves, int canais) {
   return tl;
 }
 
+// ---- efeitos: os campos de cada um, na ordem dos canais (a cor ocupa 4)
+struct CampoEfeito {
+  const char* nome;
+  bool cor;
+};
+const std::vector<CampoEfeito> CAMPOS_EFEITO[NUM_EFEITOS] = {
+    {{"cor", true}, {"largura", false}},
+    {{"cor", true}, {"forca", false}, {"raio", false}},
+    {{"valor", false}, {"cor", true}, {"borda", false}},
+    {{"cor", true}, {"forca", false}},
+};
+const char* NOMES_EFEITO[NUM_EFEITOS] = {"linha", "brilho", "dissolver", "tingir"};
+
+int tipo_efeito(std::string_view nome) {
+  for (int i = 0; i < NUM_EFEITOS; ++i)
+    if (nome == NOMES_EFEITO[i]) return i;
+  return -1;
+}
+
+// os canais do efeito `t` lidos de `j` para `v` (o que falta fica como esta em `v`)
+void ler_campos_efeito(int t, const Json& j, float* v) {
+  int c = 0;
+  for (const CampoEfeito& ce : CAMPOS_EFEITO[t]) {
+    if (ce.cor) {
+      if (const Json* x = j.acha(ce.nome); x && x->texto()) {
+        const Cor k = cor_hex(x->str());
+        v[c] = k.r, v[c + 1] = k.g, v[c + 2] = k.b, v[c + 3] = k.a;
+      }
+      c += 4;
+    } else {
+      v[c] = float(j.num(ce.nome, v[c]));
+      c += 1;
+    }
+  }
+}
+
+// timeline de um efeito; o campo que falta na chave vale o da chave anterior (na primeira, o
+// do setup)
+Timeline ler_timeline_efeito(const Json& chaves, int t, const Efeitos& setup) {
+  Timeline tl;
+  tl.canais = EFEITO_CANAIS[t];
+  float v[6];
+  std::copy(setup.v + EFEITO_INICIO[t], setup.v + EFEITO_INICIO[t] + tl.canais, v);
+  for (const Json& k : chaves.itens()) {
+    tl.tempos.push_back(f32(k.num("tempo", 0)));
+    ler_campos_efeito(t, k, v);
+    for (int c = 0; c < tl.canais; ++c) tl.valores.push_back(v[c]);
+    ler_curva(tl, k);
+  }
+  tl.preparar();
+  return tl;
+}
+
 Blend ler_blend(const std::string& s) {
   if (s == "aditivo") return Blend::Aditivo;
   if (s == "multiplica") return Blend::Multiplica;
@@ -304,6 +357,12 @@ class Leitor {
       if (const Json* p = s.acha("parte"); p && p->texto()) d.parte_setup = id_nome(p->str());
       if (const Json* c = s.acha("cor"); c && c->texto()) d.cor = cor_hex(c->str());
       d.blend = ler_blend(s.str("blend", "normal"));
+      for (const auto& [nome_ef, j] : s["efeitos"].campos()) {
+        const int t = tipo_efeito(nome_ef);
+        if (t < 0) falha("slot " + d.nome + ": efeito desconhecido " + nome_ef);
+        ler_campos_efeito(t, j, d.efeitos.v + EFEITO_INICIO[t]);
+      }
+      d.efeitos.limitar();
       m.slots.push_back(std::move(d));
     }
   }
@@ -647,6 +706,22 @@ class Leitor {
         else falha("animacao " + nome + ": timeline de slot nao suportada " + tipo);
         conta(t.tl.fim());
         an.cores.push_back(std::move(t));
+      }
+    }
+
+    // efeitos: efeitos -> slot -> efeito -> [chaves]
+    for (const auto& [nome_slot, efs] : a["efeitos"].campos()) {
+      int si = m.slot(nome_slot);
+      if (si < 0) falha("animacao " + nome + ": slot desconhecido " + nome_slot);
+      for (const auto& [nome_ef, chaves] : efs.campos()) {
+        const int t = tipo_efeito(nome_ef);
+        if (t < 0) falha("animacao " + nome + ": efeito desconhecido " + nome_ef);
+        TimelineEfeito te;
+        te.slot = si;
+        te.tipo = TipoEfeito(t);
+        te.tl = ler_timeline_efeito(chaves, t, m.slots[size_t(si)].efeitos);
+        conta(te.tl.fim());
+        an.efeitos.push_back(std::move(te));
       }
     }
 

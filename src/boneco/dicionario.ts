@@ -130,6 +130,14 @@ export const CAMPOS: Record<string, string> = {
   curve: "curva",
   reset: "reiniciar",
   slider: "slider",
+  // efeitos (so do Mamulengo; docs/NUCLEO.md "Efeitos")
+  effects: "efeitos",
+  outline: "linha",
+  glow: "brilho",
+  dissolve: "dissolver",
+  tint: "tingir",
+  radius: "raio",
+  edge: "borda",
 };
 
 // valores de enum que mudam de nome (por campo)

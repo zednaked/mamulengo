@@ -71,7 +71,17 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       if (j) out += ',';
       escreve_num(out, c[j]);
     }
-    out += "]}";
+    out += ']';
+    // os efeitos (os 22 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
+    if (st.efeitos.algum()) {
+      out += ",\"efeitos\":[";
+      for (int j = 0; j < CANAIS_EFEITOS; ++j) {
+        if (j) out += ',';
+        escreve_num(out, st.efeitos.v[j]);
+      }
+      out += ']';
+    }
+    out += '}';
   }
   out += "],\"vertices\":{";
   bool primeiro = true;

@@ -247,6 +247,58 @@ O palco: `npm run dev` e `/palco.html` (os `.boneco` das raízes do editor). O w
 `emcmake cmake -S nucleo -B nucleo/build-web -G Ninja && cmake --build nucleo/build-web --target nucleo`
 (244 KB).
 
+## Efeitos
+
+O primeiro recurso que o Spine não tem. Cada slot pode ter quatro efeitos, todos desligados
+por padrão, com valores de setup (`efeitos` no slot) e animáveis (`efeitos` na animação, por
+slot). A exportação para o Spine tira os efeitos e avisa.
+
+| efeito | campos (padrão) | ligado quando |
+|---|---|---|
+| `linha` (contorno) | `cor` (`ffffffff`), `largura` (0, em pixels da textura) | `largura > 0` e alfa da cor > 0 |
+| `brilho` (halo) | `cor` (`ffffffff`), `forca` (0), `raio` (8, em pixels da textura) | `forca > 0` e alfa da cor > 0 |
+| `dissolver` | `valor` (0 a 1), `cor` da borda (`ff8000ff`), `borda` (0,05) | `valor > 0` |
+| `tingir` | `cor` (`ffffffff`), `forca` (0 a 1) | `forca > 0` e alfa da cor > 0 |
+
+**Timelines.** `animacoes.<a>.efeitos.<slot>.<efeito>`: chaves com `tempo`, os campos do
+efeito e `curva` (como no `rgba`: `"degrau"` ou 4 números por canal). Os canais, na ordem da
+curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda`;
+tingir `r g b a forca`. Campo que falta na chave vale o da chave anterior (na primeira, o do
+setup): uma chave pode mudar só a `forca`. A mistura com o que já está
+na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `borda` entre 0 e
+1; `largura`, `raio` e `forca` a partir de 0.
+
+**No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
+efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
+cresce para fora (os quatro cantos, em posição e uv) pela margem `max(largura, raio)` dos
+ligados, em pixels da textura, para o halo ter onde aparecer; a malha não cresce (o efeito
+fica dentro dela). O desenhista amostra a textura só dentro da caixa (fora dela, transparente),
+então a margem não mostra a imagem vizinha do atlas. Por fragmento, com `T(uv)` a textura (pma
+desfeito; fora da caixa, 0), `px` o tamanho de um pixel da página e `cv` a cor do vértice:
+
+1. `C = T(uv) * cv`; tingir: `C.rgb = mix(C.rgb, tingir.rgb, forca * tingir.a)`.
+2. linha: `A = max` do alfa de `T` a `largura` e a `largura / 2` em 16 direções; camada
+   `L = (linha.rgb, linha.a * A)`.
+3. brilho: `B = max` de `alfa(T) * (1 - (i - 1) / 6)²` a `raio * i / 6`, `i` de 1 a 6, em 16
+   direções (nos anéis pares, giradas meio passo); camada
+   `H = (brilho.rgb, min(1, brilho.a * forca * B))`. Uma borda que cai com a distância (a
+   média das amostras mostrava cópias deslocadas da imagem).
+4. `F = C sobre (L sobre H)`, com o alfa de `L` e `H` vezes `cv.a` (o slot apagando apaga o
+   halo junto).
+5. dissolver: `n` é um ruído de valor em células de 8 pixels da página (hash inteiro dos
+   cantos da célula e interpolação suave); `n < valor` some; `n < valor + borda` pinta
+   `F.rgb = mix(F.rgb, dissolver.rgb, dissolver.a)`.
+
+O hash do ruído: `x = i * 1664525 + j * 1013904223` (inteiros de 32 bits sem sinal), depois
+`x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0x846ca68b; x ^= x >> 16`, e
+`x / (2^32 - 1)`. Com inteiros, o mesmo padrão sai igual na web e no Godot, inclusive em placa
+de celular com float de meia precisão.
+
+Conferência: `npx tsx tools/nucleo-efeitos.ts` calcula os canais das timelines de
+`tests/nucleo/efeitos/efeitos.boneco` (o robô CC0 com os quatro efeitos) por conta própria e
+compara com o núcleo. O desenho foi olhado no editor (modo núcleo) e no Godot 4.7.2
+(Compatibility): os mesmos quatro efeitos, iguais nos dois.
+
 ## Estado
 
 `mamulengo/estado.h`: trilhas, fila, mix e eventos (o que o jogo usa para tocar, emendar e

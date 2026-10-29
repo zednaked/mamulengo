@@ -49,28 +49,94 @@ enum Passo { NORMAL_PMA, ADITIVO, MULTIPLICA, MULTIPLICA_MOTOR, TELA_MUL, TELA_A
 struct Materiais {
   RID material[PASSOS][2];
   RID shader[PASSOS][2];
+  RID shader_efeitos[PASSOS];  // os materiais com efeitos sao de cada sprite (valores do slot)
 };
 Materiais &cache() {
   static Materiais m;
   return m;
 }
 
+// cor do quadro: textura (com o pma desfeito) vezes a cor do vertice, alfa simples
+const char *MODO[PASSOS] = {"blend_mix", "blend_add", "blend_mul", "blend_mul", "blend_mul", "blend_add"};
+const char *SAIDA[PASSOS] = {
+    "c",
+    "c",
+    // destino x mix(1, cor, alfa): a parte transparente nao mexe
+    "vec4(mix(vec3(1.0), c.rgb, c.a), 1.0)",
+    // o multiply do Godot: destino x cor, sem olhar o alfa
+    "c",
+    // tela em dois passos: destino x (1 - s), depois + s (s = cor x alfa)
+    "vec4(vec3(1.0) - c.rgb * c.a, 1.0)",
+    "c",
+};
+
+// os efeitos de um slot (docs/NUCLEO.md "Efeitos"; o mesmo de src/render/desenhista.ts): ef sao
+// os 22 canais (linha 0-4, brilho 5-10, dissolver 11-16, tingir 17-21); a textura so vale
+// dentro da caixa da imagem
+const char *EFEITOS =
+    "uniform bool pma = false;\nuniform float ef[22];\nuniform vec4 caixa;\nuniform vec2 pagina = vec2(1.0);\nvarying vec4 cor_v;\n"
+    "void vertex() { cor_v = COLOR; }\n"
+    "vec4 T(sampler2D tx, vec2 uv) {\n"
+    "  if (uv.x < caixa.x || uv.y < caixa.y || uv.x > caixa.z || uv.y > caixa.w) return vec4(0.0);\n"
+    "  vec4 t = texture(tx, uv);\n  if (pma && t.a > 0.0) t.rgb /= t.a;\n  return t;\n}\n"
+    "float hash(uint i, uint j) {\n"
+    "  uint x = i * 1664525u + j * 1013904223u;\n"
+    "  x ^= x >> 16u; x *= 2146121005u; x ^= x >> 15u; x *= 2221713035u; x ^= x >> 16u;\n"
+    "  return float(x) / 4294967295.0;\n}\n"
+    "float ruido(vec2 p) {\n"
+    "  vec2 c = floor(p); vec2 f = p - c;\n  f = f * f * (3.0 - 2.0 * f);\n"
+    "  uint i = uint(int(c.x)); uint j = uint(int(c.y));\n"
+    "  return mix(mix(hash(i, j), hash(i + 1u, j), f.x), mix(hash(i, j + 1u), hash(i + 1u, j + 1u), f.x), f.y);\n}\n"
+    "vec4 sobre(vec4 cima, vec4 baixo) {\n"
+    "  float a = cima.a + baixo.a * (1.0 - cima.a);\n"
+    "  return a > 0.0 ? vec4((cima.rgb * cima.a + baixo.rgb * baixo.a * (1.0 - cima.a)) / a, a) : vec4(0.0);\n}\n"
+    "void fragment() {\n"
+    "  vec2 px = 1.0 / pagina;\n"
+    "  vec4 t = T(TEXTURE, UV);\n"
+    "  vec4 C = vec4(t.rgb * cor_v.rgb, t.a * cor_v.a);\n"
+    "  float ft = ef[21] * ef[20];\n"
+    "  if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[17], ef[18], ef[19]), ft);\n"
+    "  vec4 U = vec4(0.0);\n"
+    "  if (ef[9] > 0.0 && ef[8] > 0.0) {\n"
+    "    float B = 0.0;\n"
+    "    for (int i = 1; i <= 6; i++)\n"
+    "      for (int k = 0; k < 16; k++) {\n"
+    "        float g = (float(k) + 0.5 * float(i % 2)) * 6.2831853 / 16.0;\n"
+    "        B = max(B, T(TEXTURE, UV + vec2(cos(g), sin(g)) * ef[10] * float(i) / 6.0 * px).a * pow(1.0 - float(i - 1) / 6.0, 2.0));\n"
+    "      }\n"
+    "    U = vec4(ef[5], ef[6], ef[7], min(1.0, ef[8] * ef[9] * B));\n"
+    "  }\n"
+    "  if (ef[4] > 0.0 && ef[3] > 0.0) {\n"
+    "    float A = 0.0;\n"
+    "    for (int k = 0; k < 16; k++) {\n"
+    "      float g = float(k) * 6.2831853 / 16.0;\n"
+    "      vec2 d = vec2(cos(g), sin(g)) * ef[4] * px;\n"
+    "      A = max(A, max(T(TEXTURE, UV + d).a, T(TEXTURE, UV + d * 0.5).a));\n"
+    "    }\n"
+    "    U = sobre(vec4(ef[0], ef[1], ef[2], ef[3] * A), U);\n"
+    "  }\n"
+    "  U.a *= cor_v.a;\n"
+    "  vec4 c = sobre(C, U);\n"
+    "  if (ef[11] > 0.0) {\n"
+    "    float n = ruido(UV * pagina / 8.0);\n"
+    "    if (n < ef[11]) discard;\n"
+    "    if (n < ef[11] + ef[16]) c.rgb = mix(c.rgb, vec3(ef[12], ef[13], ef[14]), ef[15]);\n"
+    "  }\n";
+
+RID shader_efeitos(Passo passo) {
+  RID &sh = cache().shader_efeitos[passo];
+  if (sh.is_valid()) return sh;
+  RenderingServer *rs = RenderingServer::get_singleton();
+  sh = rs->shader_create();
+  rs->shader_set_code(sh, String("shader_type canvas_item;\nrender_mode ") + MODO[passo] + ";\n" + EFEITOS + "  COLOR = " + SAIDA[passo] + ";\n}\n");
+  return sh;
+}
+
 RID material_passo(Passo passo, bool pma) {
   RID &m = cache().material[passo][pma ? 1 : 0];
   if (m.is_valid()) return m;
-  // cor do quadro: textura (com o pma desfeito) vezes a cor do vertice, alfa simples
-  static const char *modo[PASSOS] = {"blend_mix", "blend_add", "blend_mul", "blend_mul", "blend_mul", "blend_add"};
-  static const char *saida[PASSOS] = {
-      "c",
-      "c",
-      // destino x mix(1, cor, alfa): a parte transparente nao mexe
-      "vec4(mix(vec3(1.0), c.rgb, c.a), 1.0)",
-      // o multiply do Godot: destino x cor, sem olhar o alfa
-      "c",
-      // tela em dois passos: destino x (1 - s), depois + s (s = cor x alfa)
-      "vec4(vec3(1.0) - c.rgb * c.a, 1.0)",
-      "c",
-  };
+  const char *const *modo = MODO;
+  const char *const *saida = SAIDA;
   String codigo = String("shader_type canvas_item;\nrender_mode ") + modo[passo] +
                   ";\nuniform bool pma = false;\nvarying vec4 cor_v;\nvoid vertex() { cor_v = COLOR; }\n"
                   "void fragment() {\n  vec4 t = texture(TEXTURE, UV);\n  if (pma && t.a > 0.0) t.rgb /= t.a;\n  vec4 c = t * cor_v;\n  COLOR = " +
@@ -98,6 +164,10 @@ void boneco_liberar_materiais() {
       cache().material[p][k] = RID();
       cache().shader[p][k] = RID();
     }
+  for (int p = 0; p < PASSOS; p++) {
+    if (cache().shader_efeitos[p].is_valid()) rs->free_rid(cache().shader_efeitos[p]);
+    cache().shader_efeitos[p] = RID();
+  }
 }
 
 // ---- BonecoData
@@ -241,9 +311,13 @@ void BonecoSprite::_liberar_itens() {
   if (!rs) return;
   for (int i = 0; i < itens.size(); i++) rs->free_rid(itens[i]);
   for (int i = 0; i < malhas.size(); i++) rs->free_rid(malhas[i]);
+  for (int i = 0; i < material_efeito.size(); i++)
+    if (material_efeito[i].is_valid()) rs->free_rid(material_efeito[i]);
   itens.clear();
   malhas.clear();
   material_item.clear();
+  material_efeito.clear();
+  passo_efeito.clear();
   indices_item.clear();
   vertices_item.clear();
   enviado_v.clear();
@@ -604,6 +678,8 @@ void BonecoSprite::_desenhar() {
   struct Item {
     int lote;
     RID material;
+    Passo passo;
+    bool pma;
   };
   std::vector<Item> lista;
   for (int l = 0; l < int(desenho.lotes.size()); ++l) {
@@ -611,14 +687,14 @@ void BonecoSprite::_desenhar() {
     if (lt.comando != Comando::Triangulos || lt.quantos == 0) continue;
     const bool pma = lt.pagina >= 0 && lt.pagina < int(data->modelo->paginas.size()) && data->modelo->paginas[size_t(lt.pagina)].pma;
     switch (lt.blend) {
-      case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma)}); break;
-      case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma)}); break;
-      case Blend::MultiplicaMotor: lista.push_back({l, material_passo(MULTIPLICA_MOTOR, pma)}); break;
+      case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma), ADITIVO, pma}); break;
+      case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma), MULTIPLICA, pma}); break;
+      case Blend::MultiplicaMotor: lista.push_back({l, material_passo(MULTIPLICA_MOTOR, pma), MULTIPLICA_MOTOR, pma}); break;
       case Blend::Tela:
-        lista.push_back({l, material_passo(TELA_MUL, pma)});
-        lista.push_back({l, material_passo(TELA_ADD, pma)});
+        lista.push_back({l, material_passo(TELA_MUL, pma), TELA_MUL, pma});
+        lista.push_back({l, material_passo(TELA_ADD, pma), TELA_ADD, pma});
         break;
-      default: lista.push_back({l, pma ? material_passo(NORMAL_PMA, true) : RID()});
+      default: lista.push_back({l, pma ? material_passo(NORMAL_PMA, true) : RID(), NORMAL_PMA, pma});
     }
   }
   const RID pai = get_canvas_item();
@@ -629,6 +705,8 @@ void BonecoSprite::_desenhar() {
     itens.push_back(it);
     malhas.push_back(rs->mesh_create());
     material_item.push_back(RID());
+    material_efeito.push_back(RID());
+    passo_efeito.push_back(-1);
     indices_item.push_back(Vector<int>());
     vertices_item.push_back(0);
     enviado_v.push_back(PackedByteArray());
@@ -647,6 +725,25 @@ void BonecoSprite::_desenhar() {
     rs->canvas_item_clear(it);
     if (k >= int(lista.size())) continue;
     const mamulengo::Lote &lt = desenho.lotes[size_t(lista[size_t(k)].lote)];
+    if (lt.efeito >= 0) {
+      // slot com efeitos: o material proprio do item, com os valores do slot neste quadro
+      const Item &li = lista[size_t(k)];
+      const mamulengo::EfeitosLote &el = desenho.efeitos[size_t(lt.efeito)];
+      if (!material_efeito[k].is_valid()) material_efeito.write[k] = rs->material_create();
+      const RID me = material_efeito[k];
+      if (passo_efeito[k] != int(li.passo)) {
+        rs->material_set_shader(me, shader_efeitos(li.passo));
+        passo_efeito.write[k] = int(li.passo);
+      }
+      PackedFloat32Array ef;
+      ef.resize(mamulengo::CANAIS_EFEITOS);
+      memcpy(ef.ptrw(), el.valores.v, sizeof(float) * mamulengo::CANAIS_EFEITOS);
+      rs->material_set_param(me, "ef", ef);
+      rs->material_set_param(me, "caixa", Vector4(el.caixa[0], el.caixa[1], el.caixa[2], el.caixa[3]));
+      rs->material_set_param(me, "pagina", Vector2(el.pagina[0], el.pagina[1]));
+      rs->material_set_param(me, "pma", li.pma);
+      lista[size_t(k)].material = me;
+    }
     if (material_item[k] != lista[size_t(k)].material) {
       rs->canvas_item_set_material(it, lista[size_t(k)].material);
       material_item.write[k] = lista[size_t(k)].material;

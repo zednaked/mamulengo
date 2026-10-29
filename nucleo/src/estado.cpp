@@ -19,11 +19,11 @@ enum Modo : uint8_t {
                  // cheio (ou some enquanto uma ainda mais nova, que nao anima, entra: modo_mix)
 };
 
-enum class TipoTl : uint8_t { Parte, Cor, Osso, Restricao, Deformar, Ordem, Evento };
+enum class TipoTl : uint8_t { Parte, Cor, Efeito, Osso, Restricao, Deformar, Ordem, Evento };
 
 // propriedades (para saber quem anima o que): categoria e indices
 enum Prop : uint8_t {
-  P_GIRAR = 1, P_X, P_Y, P_EX, P_EY, P_CX, P_CY, P_PARTE, P_RGB, P_ALFA, P_DEFORM, P_ORDEM, P_EVENTO, P_RESTRICAO,
+  P_GIRAR = 1, P_X, P_Y, P_EX, P_EY, P_CX, P_CY, P_PARTE, P_RGB, P_ALFA, P_DEFORM, P_ORDEM, P_EVENTO, P_RESTRICAO, P_EFEITO,
 };
 
 inline uint64_t id(Prop p, int a, int b = 0) {
@@ -81,6 +81,7 @@ Estado::Estado(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo)) {
       if (c.prop == PropCor::Rgba) poe(TipoTl::Cor, i, id(P_RGB, c.slot), id(P_ALFA, c.slot));
       else poe(TipoTl::Cor, i, id(c.prop == PropCor::Rgb ? P_RGB : P_ALFA, c.slot));
     }
+    for (size_t i = 0; i < an.efeitos.size(); ++i) poe(TipoTl::Efeito, i, id(P_EFEITO, an.efeitos[i].slot, int(an.efeitos[i].tipo)));
     for (size_t i = 0; i < an.ossos.size(); ++i) {
       const TimelineOsso& o = an.ossos[i];
       switch (o.prop) {
@@ -565,6 +566,7 @@ void Estado::aplicar_timeline(Esqueleto& e, const Entrada& en, const Tl& tl, dou
   switch (tl.tipo) {
     case TipoTl::Parte: break;  // parte(): precisa saber se marca
     case TipoTl::Cor: e.aplicar_cor(an.cores[i], t, alfa, mist); break;
+    case TipoTl::Efeito: e.aplicar_efeito(an.efeitos[i], t, alfa, mist); break;
     case TipoTl::Osso: e.aplicar_osso(an.ossos[i], t, alfa, mist, sai); break;
     case TipoTl::Restricao: e.aplicar_restricao(an.restricoes[i], t, alfa, mist, sai); break;
     case TipoTl::Deformar: e.aplicar_deformar(an.deformar[i], t, alfa, mist); break;

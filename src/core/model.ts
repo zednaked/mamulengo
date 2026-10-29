@@ -148,6 +148,8 @@ export function channels(timeline: string): { key: string; def: number }[] {
     case "mix":
       return [{ key: "value", def: timeline === "mix" ? 1 : 0 }];
     default:
+      // efeitos: os campos numericos (a cor vai em keyFields, como no rgba)
+      if (isEffect(timeline)) return EFFECTS[timeline].filter(([f]) => f !== "color").map(([key, def]) => ({ key, def: def[0] }));
       return [];
   }
 }
@@ -165,8 +167,62 @@ export function formatColor(rgba: number[], withAlpha = true): string {
   return c.join("");
 }
 
+// ---- efeitos (so do Mamulengo; docs/NUCLEO.md "Efeitos"): no JSON do editor, `effects` no
+// slot (setup) e `animations.<a>.effects.<slot>.<efeito>` (chaves), onde o spine-core nao le
+
+// campos de cada efeito na ordem dos canais, com o padrao (a cor ocupa 4 canais)
+export const EFFECTS: Record<string, [string, number[]][]> = {
+  outline: [["color", [1, 1, 1, 1]], ["width", [0]]],
+  glow: [["color", [1, 1, 1, 1]], ["strength", [0]], ["radius", [8]]],
+  dissolve: [["value", [0]], ["color", [1, 0.5, 0, 1]], ["edge", [0.05]]],
+  tint: [["color", [1, 1, 1, 1]], ["strength", [0]]],
+};
+export const EFFECT_NAMES = Object.keys(EFFECTS);
+export const isEffect = (timeline: string) => timeline in EFFECTS;
+
+// valores de um efeito (canal a canal) a partir de um objeto com os campos; o que falta vem de `base`
+export function effectValues(effect: string, o: any, base?: number[]): number[] {
+  const out: number[] = [];
+  for (const [f, def] of EFFECTS[effect]) {
+    const at = out.length;
+    if (o?.[f] === undefined) out.push(...(base ? base.slice(at, at + def.length) : def));
+    else if (f === "color") out.push(...parseColor(o[f]));
+    else out.push(o[f]);
+  }
+  return out;
+}
+
+// os campos de um efeito a partir dos valores
+export function effectFields(effect: string, v: number[]): Record<string, any> {
+  const out: Record<string, any> = {};
+  let c = 0;
+  for (const [f, def] of EFFECTS[effect]) {
+    out[f] = f === "color" ? formatColor(v.slice(c, c + 4)) : v[c];
+    c += def.length;
+  }
+  return out;
+}
+
+// valores de um efeito no tempo t (chaves lineares ou degrau, como no nucleo; as curvas
+// bezier sao aproximadas pela reta, que basta para preencher uma chave nova)
+export function effectAt(doc: any, anim: string | null, slot: string, effect: string, t: number): number[] {
+  const setup = effectValues(effect, doc.slots?.find((s: any) => s.name === slot)?.effects?.[effect]);
+  const keys: any[] = (anim && doc.animations?.[anim]?.effects?.[slot]?.[effect]) || [];
+  if (!keys.length || t < (keys[0].time ?? 0)) return setup;
+  let prev = setup;
+  const vals = keys.map((k) => (prev = effectValues(effect, k, prev)));
+  let i = keys.length - 1;
+  while (i > 0 && (keys[i].time ?? 0) > t) i--;
+  if (i === keys.length - 1 || keys[i].curve === "stepped") return vals[i];
+  const t0 = keys[i].time ?? 0,
+    t1 = keys[i + 1].time ?? 0;
+  const f = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+  return vals[i].map((v, c) => v + (vals[i + 1][c] - v) * f);
+}
+
 // Valores numericos de uma chave, canal a canal (cores viram 0..1).
 export function keyValues(timeline: string, key: any): number[] {
+  if (isEffect(timeline)) return effectValues(timeline, key);
   if (timeline === "rgba" || timeline === "rgb") return parseColor(key.color).slice(0, timeline === "rgb" ? 3 : 4);
   if (timeline === "rgba2" || timeline === "rgb2") {
     const light = parseColor(key.light);

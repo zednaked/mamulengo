@@ -6,6 +6,7 @@ import { Color } from "@esotericsoftware/spine-webgl";
 import type { Viewer } from "../render/viewer.ts";
 import { toParent, type PoseView, type SlotView } from "../render/pose.ts";
 import { app } from "./state.svelte.ts";
+import { isEffect } from "../core/model.ts";
 
 export type Tool = "move" | "rotate" | "scale";
 
@@ -358,7 +359,7 @@ function decideEdges(v: Viewer, target: any, timeline: string, t: number, make: 
   if (!a || t <= 1e-4) return [];
   let keys: any[] | undefined;
   if (target.bone) keys = a.bones?.[target.bone]?.[timeline];
-  else if (target.slot) keys = a.slots?.[target.slot]?.[timeline];
+  else if (target.slot) keys = (isEffect(timeline) ? a.effects : a.slots)?.[target.slot]?.[timeline];
   else if (target.deform) keys = a.attachments?.[target.deform.skin]?.[target.deform.slot]?.[target.deform.attachment]?.deform;
   if (keys?.length) return [];
   const out = [make(0)];

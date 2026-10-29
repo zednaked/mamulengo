@@ -213,6 +213,9 @@ class BonecoSprite : public Node2D {
   // itens de desenho: um por lote (dois no tela), cada um com uma malha que fica
   Vector<RID> itens, malhas;
   Vector<RID> material_item;
+  // material proprio de cada item que ja desenhou um slot com efeitos (os valores sao do slot)
+  Vector<RID> material_efeito;
+  Vector<int> passo_efeito;  // o passo de blend do shader posto em cada um (-1: nenhum)
   Vector<Vector<int>> indices_item;
   Vector<int> vertices_item;
   // o que foi enviado por ultimo a cada malha: so reenvia o que mudou (peca parada nao custa)
