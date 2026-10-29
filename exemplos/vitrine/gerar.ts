@@ -23,6 +23,7 @@ import { parseAtlas } from "../../src/core/atlas-text.ts";
 import { Document } from "../../src/core/document.ts";
 import { executeAsync, type AssetProvider } from "../../src/core/commands/index.ts";
 import { extractRegion } from "../../server/atlas.ts";
+import { NL, chavesJato } from "./jato.ts";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const ROBO = join(AQUI, "..", "..", "tests", "boneco", "robo");
@@ -239,12 +240,9 @@ const rampa = (t0: number, t1: number, t2: number, pico: number) => [
   { tempo: t2, valor: 0 },
 ];
 const particulas: any = {
-  fumaca: { rajada: [{ tempo: 2.26, quantidade: 16 }, { tempo: 6.16, quantidade: 16 }] },
   anel: { taxa: [{ valor: 0 }, { tempo: 2.4, valor: 0 }, { tempo: 2.7, valor: 1 }, { tempo: 3.5, valor: 1 }, { tempo: 3.9, valor: 0 }, { tempo: 6.3, valor: 0 }, { tempo: 6.6, valor: 1 }, { tempo: 7.5, valor: 1 }, { tempo: 7.9, valor: 0 }] },
   faiscas_e: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
   faiscas_d: { taxa: [...rampa(2.3, 2.7, 3.8, 45), ...rampa(6.2, 6.5, 7.7, 60)] },
-  fogo_e: { taxa: [...rampa(2.25, 2.4, 3.7, 55), ...rampa(6.15, 6.3, 7.6, 65)] },
-  fogo_d: { taxa: [...rampa(2.25, 2.4, 3.7, 55), ...rampa(6.15, 6.3, 7.6, 65)] },
   // o arco liga, treme (a intensidade pisca) e apaga
   arco: { taxa: [{ tempo: 6.35, valor: 0, curva: "degrau" }, { tempo: 6.4, valor: 1 }, { tempo: 6.9, valor: 0.55 }, { tempo: 7.0, valor: 1 }, { tempo: 7.45, valor: 1 }, { tempo: 7.6, valor: 0 }] },
   confete: {
@@ -297,8 +295,7 @@ RGBA("luz_chao.png", 256, 64, (x, y) => [255, 255, 255, Math.pow(Math.max(0, 1 -
 // uma e um feixe de chamas ao longo de x (o bocal a esquerda), branco no comeco, amarelo,
 // laranja e vermelho na ponta, com o recorte e a ponta mudando de quadro para quadro
 const LW = 160,
-  LH = 64,
-  NL = 6;
+  LH = 64;
 {
   const png = new PNG({ width: LW, height: LH * NL });
   const ruido = (a: number, bb: number) => {
@@ -352,30 +349,6 @@ const JANELAS: [number, number][] = [
   [2.25, 3.7],
   [6.15, 7.6],
 ];
-// tremor repetivel: um numero de 0 a 1 por quadro e canal
-const tremor = (k: number, canal: number) => {
-  const v = Math.sin(k * 12.9898 + canal * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
-// envelope do jato: 0 antes, ignicao exagerada (1,35 em 0,12 s), 1 ate perto do fim, 0 no fim
-const envelope = (t: number, [a, z]: [number, number]) => {
-  if (t <= a || t >= z) return 0;
-  if (t < a + 0.12) return (1.35 * (t - a)) / 0.12;
-  if (t < a + 0.3) return 1.35 - (0.35 * (t - a - 0.12)) / 0.18;
-  if (t > z - 0.15) return (z - t) / 0.15;
-  return 1;
-};
-const QUADRO = 1 / 30;
-const tremido = (fn: (t: number, k: number, env: number) => any) => {
-  const ks: any[] = [{ tempo: 0, ...fn(0, 0, 0) }];
-  for (const jan of JANELAS) {
-    ks.push({ tempo: r3(jan[0]), ...fn(jan[0], 0, 0) });
-    for (let k = 1, t = jan[0] + QUADRO; t < jan[1]; k++, t += QUADRO) ks.push({ tempo: r3(t), ...fn(t, k, envelope(t, jan)) });
-    ks.push({ tempo: r3(jan[1]), ...fn(jan[1], 0, 0) });
-  }
-  return ks;
-};
-const hex = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0");
 
 const iPernaD = b.slots.findIndex((x: any) => x.nome === "perna_d");
 const novos: any[] = [];
@@ -394,8 +367,6 @@ for (const lado of ["e", "d"]) {
   b.skins[0].partes[`jato_lingua_${lado}`] = Object.fromEntries(Array.from({ length: NL }, (_, f) => [`lingua_${f}`, { x: 52, largura: 92, altura: 38 }]));
   b.skins[0].partes[`jato_halo_${lado}`] = { jato_halo: { x: 46, largura: 150, altura: 84 } };
   b.skins[0].partes[`jato_nucleo_${lado}`] = { jato_nucleo: { x: 14, largura: 46, altura: 24 } };
-  // o osso do jato: escala pelo envelope e um tremor de 12% a cada quadro
-  (ossos[`jato_${lado}`] ??= {}).escalar = tremido((_t, k, env) => ({ x: r3(env * (0.9 + 0.24 * tremor(k + (lado === "d" ? 50 : 0), 1))), y: r3(env * (0.9 + 0.2 * tremor(k + (lado === "d" ? 50 : 0), 2))) }));
 }
 b.slots.splice(iPernaD + 1, 0, ...novos);
 // a luz no chao e o clarao da ignicao, atras de tudo, presos ao root (o chao); a fumaca nasce
@@ -408,26 +379,12 @@ b.skins[0].partes.clarao = { clarao: { largura: 150, altura: 90 } };
 b.particulas.push({ nome: "anel", tipo: "orbita", slot: "cabeca", atras: "fumaca", osso: "corpo", x: 30, imagem: "estrela", blend: "aditivo", taxa: 0, raios: [125, 24], volta: 1.6, quantidade: 14, faixa: 14, inclinacao: -8, profundidade: 0.45, escala: [0.17, 0.17], giro: [-140, 140], cor: ["ffe680ff", "7d70c0aa"], semente: 2 });
 b.particulas.push({ nome: "fumaca", slot: "fumaca", osso: "chao", y: 8, imagem: "fumaca", taxa: 0, vida: [0.9, 1.6], velocidade: [70, 190], angulo: 90, abertura: 175, gravidade: -25, arrasto: 2.2, escala: [0.45, 1.5], giro: [-40, 40], cor: ["d8d2e0b0", "9890a860", "80789000"], semente: 9 });
 b.skins[0].partes.luz_chao = { luz_chao: { y: 2, largura: 230, altura: 46 } };
-const slotsAnim: any = {};
-for (const lado of ["e", "d"]) {
-  slotsAnim[`jato_halo_${lado}`] = { rgba: tremido((_t, k, env) => ({ cor: "ffffff" + hex(Math.min(1, env) * (0.7 + 0.3 * tremor(k + 7, 3))) })) };
-  slotsAnim[`jato_nucleo_${lado}`] = { rgba: tremido((_t, k, env) => ({ cor: "ffffff" + hex(Math.min(1, env) * (0.8 + 0.2 * tremor(k + 11, 4))) })) };
-  // as pernas esquentam com a luz do jato
-  (efeitos as any)[`perna_${lado}`] = { tingir: tremido((_t, k, env) => ({ cor: "ff9a48ff", forca: r3(Math.min(1, env) * (0.28 + 0.12 * tremor(k + 3, 5))) })) };
-}
-for (const [li, lado] of ["e", "d"].entries()) {
-  // as linguas: um quadro a cada 1/30 s dentro das janelas, cada pe comecando num quadro
-  const ks: any[] = [{ tempo: 0, nome: null }];
-  for (const jan of JANELAS) {
-    for (let k = 0, t = jan[0]; t < jan[1]; k++, t += QUADRO) ks.push({ tempo: r3(t), nome: `lingua_${(k + li * 3) % NL}` });
-    ks.push({ tempo: r3(jan[1]), nome: null });
-  }
-  slotsAnim[`jato_lingua_${lado}`] = { parte: ks };
-}
-// o clarao: acende na ignicao e some em 0,25 s, crescendo
-slotsAnim.clarao = { rgba: [{ tempo: 0, cor: "ffd9a000" }, ...JANELAS.flatMap(([a]) => [{ tempo: a, cor: "ffd9a000", curva: "degrau" }, { tempo: r3(a + 0.02), cor: "ffd9a0ff" }, { tempo: r3(a + 0.28), cor: "ffd9a000" }])] };
-(ossos as any).clarao = { escalar: [{ tempo: 0, x: 0.4, y: 0.4 }, ...JANELAS.flatMap(([a]) => [{ tempo: a, x: 0.4, y: 0.4, curva: "degrau" }, { tempo: r3(a + 0.02), x: 0.7, y: 0.7 }, { tempo: r3(a + 0.28), x: 1.9, y: 1.4 }])] };
-slotsAnim.luz_chao = { rgba: tremido((_t, k, env) => ({ cor: "ff9a40" + hex(Math.min(1, env) * (0.45 + 0.2 * tremor(k + 5, 6))) })) };
+// as chaves do jato (exemplos/vitrine/jato.ts): ossos, camadas, pernas aquecidas, fogo e fumaca
+const chJato = chavesJato(JANELAS, (n) => n, [55, 65]);
+Object.assign(ossos, chJato.ossos);
+Object.assign(efeitos, chJato.efeitos);
+Object.assign(particulas, chJato.particulas);
+const slotsAnim: any = { ...chJato.slots };
 
 b.animacoes = { vitrine: { ossos, slots: slotsAnim, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
 

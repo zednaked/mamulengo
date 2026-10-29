@@ -16305,18 +16305,6 @@
     }
    },
    "particulas": {
-    "fumaca": {
-     "rajada": [
-      {
-       "tempo": 2.26,
-       "quantidade": 16
-      },
-      {
-       "tempo": 6.16,
-       "quantidade": 16
-      }
-     ]
-    },
     "anel": {
      "taxa": [
       {
@@ -16412,6 +16400,55 @@
       }
      ]
     },
+    "arco": {
+     "taxa": [
+      {
+       "tempo": 6.35,
+       "valor": 0,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 6.4,
+       "valor": 1
+      },
+      {
+       "tempo": 6.9,
+       "valor": 0.55
+      },
+      {
+       "tempo": 7,
+       "valor": 1
+      },
+      {
+       "tempo": 7.45,
+       "valor": 1
+      },
+      {
+       "tempo": 7.6,
+       "valor": 0
+      }
+     ]
+    },
+    "confete": {
+     "rajada": [
+      {
+       "tempo": 2.45,
+       "quantidade": 22
+      },
+      {
+       "tempo": 3.05,
+       "quantidade": 22
+      },
+      {
+       "tempo": 6.35,
+       "quantidade": 30
+      },
+      {
+       "tempo": 6.95,
+       "quantidade": 30
+      }
+     ]
+    },
     "fogo_e": {
      "taxa": [
       {
@@ -16468,52 +16505,15 @@
       }
      ]
     },
-    "arco": {
-     "taxa": [
-      {
-       "tempo": 6.35,
-       "valor": 0,
-       "curva": "degrau"
-      },
-      {
-       "tempo": 6.4,
-       "valor": 1
-      },
-      {
-       "tempo": 6.9,
-       "valor": 0.55
-      },
-      {
-       "tempo": 7,
-       "valor": 1
-      },
-      {
-       "tempo": 7.45,
-       "valor": 1
-      },
-      {
-       "tempo": 7.6,
-       "valor": 0
-      }
-     ]
-    },
-    "confete": {
+    "fumaca": {
      "rajada": [
       {
-       "tempo": 2.45,
-       "quantidade": 22
+       "tempo": 2.26,
+       "quantidade": 16
       },
       {
-       "tempo": 3.05,
-       "quantidade": 22
-      },
-      {
-       "tempo": 6.35,
-       "quantidade": 30
-      },
-      {
-       "tempo": 6.95,
-       "quantidade": 30
+       "tempo": 6.16,
+       "quantidade": 16
       }
      ]
     }
