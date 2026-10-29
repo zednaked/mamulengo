@@ -176,6 +176,26 @@ const top = q.vertices.reduce((a: any, b: any) => (b.world[1] > a.world[1] ? b :
 await run("deform.set", { anim: "1.idle", slot: "corpo", attachment: "corpo", time: 0.5, moves: [{ i: top.i, dx: 0, dy: 12 }], curve: "suave" });
 const br = await run("deform.brush", { anim: "1.idle", slot: "corpo", attachment: "corpo", time: 1, center: top.world, radius: 80, dx: 0, dy: 6 });
 check(br.touched > 0, `pincel de deform tocou ${br.touched} vertices`);
+// 2,5D: virar a malha como cilindro. Com 30 graus para a direita, o meio anda para a direita, a
+// largura nao passa do raio e o lado que vem cresce na vertical mais que o que vai
+{
+  await run("animation.create", { name: "t.virar" });
+  const antes = (await run("query.mesh", { slot: "corpo", attachment: "corpo", anim: "t.virar", time: 0 })).vertices.map((v: any) => v.world);
+  await run("deform.turn", { anim: "t.virar", slot: "corpo", attachment: "corpo", time: 0, angle: 30, perspective: 0.3 });
+  const depois = (await run("query.mesh", { slot: "corpo", attachment: "corpo", anim: "t.virar", time: 0 })).vertices.map((v: any) => v.world);
+  const xs = antes.map((q: number[]) => q[0]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2,
+    R = (Math.max(...xs) - Math.min(...xs)) / 2;
+  const meio = antes.map((q: number[], i: number) => [Math.abs(q[0] - cx), i]).sort((a: number[], b: number[]) => a[0] - b[0])[0][1];
+  const altura = (lado: number) => {
+    const ys = depois.filter((_: any, i: number) => Math.sign(antes[i][0] - cx) === lado).map((q: number[]) => q[1]);
+    const ys0 = antes.filter((q: number[]) => Math.sign(q[0] - cx) === lado).map((q: number[]) => q[1]);
+    return (Math.max(...ys) - Math.min(...ys)) / (Math.max(...ys0) - Math.min(...ys0));
+  };
+  const dentro = depois.every((q: number[]) => q[0] <= cx + R + 1e-3 && q[0] >= cx - R - 1e-3);
+  check(depois[meio][0] - antes[meio][0] > R * 0.4 && dentro && altura(-1) > altura(1), `deform.turn vira a malha como cilindro (meio andou ${(depois[meio][0] - antes[meio][0]).toFixed(1)} de raio ${R.toFixed(1)}; alturas ${altura(-1).toFixed(3)} e ${altura(1).toFixed(3)})`);
+  await run("animation.delete", { name: "t.virar" });
+}
 runtimeOk("animacao com deform");
 
 // varias chaves: copiar/colar (outra animacao, outro osso), mover juntas, apagar juntas

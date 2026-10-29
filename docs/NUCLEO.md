@@ -271,8 +271,11 @@ na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `bor
 **No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
 efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
 cresce para fora (os quatro cantos, em posição e uv) pela margem `max(largura, raio)` dos
-ligados, em pixels da textura, para o halo ter onde aparecer; a malha não cresce (o efeito
-fica dentro dela). O desenhista amostra a textura só dentro da caixa (fora dela, transparente),
+ligados, em pixels da textura, para o halo ter onde aparecer. A malha cresce pelo contorno
+(os `contorno` primeiros vértices, em ordem): cada um anda para fora pela normal média das duas
+arestas vizinhas (no espaço da textura), a margem em pixels da textura; a uv anda junto e a
+posição anda pela transformação local textura para mundo dada pelos dois vizinhos. Sem
+`contorno`, a malha não cresce (o efeito fica dentro dela). O desenhista amostra a textura só dentro da caixa (fora dela, transparente),
 então a margem não mostra a imagem vizinha do atlas. Por fragmento, com `T(uv)` a textura (pma
 desfeito; fora da caixa, 0), `px` o tamanho de um pixel da página e `cv` a cor do vértice:
 

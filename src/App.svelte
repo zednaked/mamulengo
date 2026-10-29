@@ -122,7 +122,9 @@
         location.href = `http://localhost:${fora.port}/?espectador&volta=${encodeURIComponent(location.origin + location.pathname)}`;
         return true;
       }
-      if (s.local?.ativo) {
+      // so vira espectadora se o agente trabalha num editor sem janela (headless); ligado direto
+      // na ponte, ele trabalha nesta aba
+      if (s.local?.ativo && (s.local.headless ?? 0) > 0) {
         location.href = `${location.pathname}?espectador`;
         return true;
       }
@@ -138,7 +140,8 @@
       // desligou dentro do acompanhamento: volta ao editor de onde veio (ou a este, sem espelho)
       const volta = new URLSearchParams(location.search).get("volta");
       location.href = (volta ?? location.pathname) + "?acompanhar=0";
-    } else if (follow && !app.spectator && !(await followAgent())) app.toast("nenhum agente trabalhando agora: o editor acompanha quando um comecar (ao abrir)");
+    } else if (follow && !app.spectator && !(await followAgent()))
+      app.toast(app.agentHere && app.agentConnected ? "o Claude esta trabalhando aqui, nesta janela: nao ha outra para acompanhar" : "nenhum agente trabalhando agora: o editor acompanha quando um comecar (ao abrir)");
   }
   // titulo da aba: quem e quem quando ha varias abas abertas
   $effect(() => {

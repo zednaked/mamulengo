@@ -454,6 +454,59 @@ defineCommand({
 });
 
 defineCommand({
+  name: "deform.turn",
+  group: "key",
+  summary:
+    "2,5D: vira uma malha como se fosse um cilindro (cabeca, tronco, objeto redondo), numa chave de deform. angle em graus: no eixo vertical (padrao) positivo vira para a direita da tela, no horizontal positivo olha para cima. Os tracos deslizam para o lado do giro, a borda que se afasta encolhe e a que vem cresce (perspective, 0 a 1). Substitui o deform desse instante (use angle 0 para voltar). Com radius menor que a malha (so o rosto), o que fica fora (orelhas, abas) anda rigido junto com a borda, sem esticar. A malha precisa de vertices por dentro (mesh.create com detail >= 1).",
+  params: z.object({
+    ...DeformBase,
+    angle: z.number().min(-80).max(80),
+    axis: z.enum(["vertical", "horizontal"]).default("vertical"),
+    perspective: z.number().min(0).max(1).default(0.25),
+    center: z.tuple([z.number(), z.number()]).optional().describe("centro do cilindro na tela (padrao: centro da malha)"),
+    radius: z.number().positive().optional().describe("raio do cilindro (padrao: metade da malha no sentido do giro); menor, so o miolo gira e as pontas acompanham rigidas"),
+  }),
+  label: (p) => `virar ${p.slot}/${p.attachment} ${p.angle} graus @${p.time}`,
+  run(ctx, p) {
+    const { e } = ctx;
+    requireAnimation(e.json, p.anim);
+    const { source } = resolveMesh(e.json, p.skin, p.slot, p.attachment);
+    const sk = skeletonAt(e.json, p.anim, p.time);
+    // a malha sem deform nesse instante: o giro e sempre a partir dela
+    const pts = worldVertices(e.json, sk, p.slot, source, null);
+    const xs = pts.map((q) => q[0]),
+      ys = pts.map((q) => q[1]);
+    const c: Pt = p.center ?? [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+    // a = eixo em que os pontos andam (x no giro vertical), b = o outro (cresce ou encolhe)
+    const [a, b] = p.axis === "vertical" ? [0, 1] : [1, 0];
+    const R = p.radius ?? (Math.max(...pts.map((q) => q[a])) - Math.min(...pts.map((q) => q[a]))) / 2;
+    if (!(R > 0)) throw new Error("malha sem largura para virar");
+    const th = (p.angle * Math.PI) / 180;
+    // dentro do raio: a superficie do cilindro; fora dele (orelhas, abas): anda rigida junto
+    // com a borda do lado dela, sem esticar
+    const gira = (fi: number) => Math.max(-Math.PI / 2, Math.min(Math.PI / 2, fi + th));
+    const deltas: Pt[] = pts.map((q) => {
+      const u = (q[a] - c[a]) / R;
+      const out: Pt = [q[0], q[1]];
+      if (Math.abs(u) <= 1) {
+        const fi = Math.asin(u),
+          fi2 = gira(fi);
+        out[a] = c[a] + R * Math.sin(fi2);
+        // perspectiva: o que chega mais perto (cos maior) cresce no outro eixo
+        out[b] = c[b] + (q[b] - c[b]) * (1 + p.perspective * (Math.cos(fi2) - Math.cos(fi)));
+      } else {
+        const borda = Math.sign(u) * (Math.PI / 2),
+          b2 = gira(borda);
+        out[a] = q[a] + R * (Math.sin(b2) - Math.sin(borda));
+        out[b] = c[b] + (q[b] - c[b]) * (1 + p.perspective * (Math.cos(b2) - Math.cos(borda)));
+      }
+      return [out[0] - q[0], out[1] - q[1]];
+    });
+    return writeDeform(ctx, p, worldToDeform(e.json, sk, p.slot, source, deltas));
+  },
+});
+
+defineCommand({
   name: "deform.brush",
   group: "key",
   summary:

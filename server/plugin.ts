@@ -125,7 +125,7 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
                 outras.push(j);
               } catch {}
             }
-            return send(200, { local: { ativo: Date.now() - live.lastCallAt < 90_000, asset: live.asset, fala: live.fala }, outras });
+            return send(200, { local: { ativo: Date.now() - live.lastCallAt < 90_000, asset: live.asset, fala: live.fala, headless: live.headless }, outras });
           }
           const json = async () => JSON.parse(String(await readBody(req)) || "{}");
           const guard = (...ps: string[]) => {
@@ -141,7 +141,9 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             const atlasPath = resolve(url.searchParams.get("atlas") ?? "");
             guard(atlasPath);
             const name = url.searchParams.get("name") ?? "";
-            const { pages, regions } = parseAtlas(readFileSync(atlasPath, "utf8"));
+            // o atlas de um .boneco e virtual (x.boneco.atlas): o texto vem do .boneco
+            const texto = bonecoVirtual(atlasPath) ? lerVirtual(atlasPath)! : readFileSync(atlasPath, "utf8");
+            const { pages, regions } = parseAtlas(texto);
             const r = regions.find((x) => x.name === name);
             if (!r) return send(404, { error: `regiao nao existe no atlas: ${name}` });
             const page = pages.find((p) => p.name === r.page)!;
@@ -410,7 +412,8 @@ function backup(p: string) {
 
 // O que o agente esta fazendo neste servidor (para a rota /api/sessoes e o acompanhamento
 // automatico): ultima chamada, personagem aberto no editor dele e a ultima fala
-export const live = { lastCallAt: 0, asset: null as null | { id: string; name: string; project: string }, fala: "" };
+// `headless`: quantos editores sem janela (os que o agente usa para fotos e testes) estao ligados
+export const live = { lastCallAt: 0, asset: null as null | { id: string; name: string; project: string }, fala: "", headless: 0 };
 // sessoes de agente em outros servidores (a bancada se anuncia aqui ao comecar)
 export const SESSOES = join(homedir(), ".cache", "mamulengo", "sessoes");
 
@@ -460,6 +463,7 @@ function bridge(server: { httpServer: any }) {
         role = m.role;
         if (role === "editor") {
           editors.push({ ws, name: m.name ?? "editor", focusedAt: Date.now() });
+          live.headless = editors.filter((e) => e.name === "headless").length;
           for (const a of agents) a.send(status());
           if (spectators.size) ws.send(JSON.stringify({ t: "espelhar", on: true }));
         } else if (role === "espectador") {
@@ -538,6 +542,7 @@ function bridge(server: { httpServer: any }) {
           p.ws.send(JSON.stringify({ t: "reply", id: p.id, ok: false, error: "o editor fechou" }));
           pending.delete(sid);
         }
+        live.headless = editors.filter((e) => e.name === "headless").length;
         for (const a of agents) a.send(status());
       }
       agents.delete(ws);

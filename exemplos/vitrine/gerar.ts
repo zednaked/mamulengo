@@ -4,7 +4,9 @@
 //   npx tsx exemplos/vitrine/gerar.ts      (escreve exemplos/vitrine/vitrine.boneco)
 //
 // Roteiro (o corpo alterna o balanco "idle" do robo e a comemoracao "ganhou"):
-//   0,0-2,0  idle      dano: o corpo pisca vermelho (tingir); contorno dourado cresce na cabeca
+//   0,0-2,0  idle      dano: o corpo pisca vermelho (tingir); a cabeca olha para os lados em 2,5D
+//                      (malha virada como cilindro pelo deform.turn: o rosto gira, as orelhas
+//                      acompanham rigidas)
 //   2,3-3,6  ganhou    halo azul no corpo (brilho), faiscas das maos, duas rajadas da cabeca
 //   3,9-5,9  idle      os bracos se dissolvem e voltam (dissolver ida e volta)
 //   6,2-7,5  ganhou    tudo junto: dourado no corpo, contorno, halo, faiscas e rajadas
@@ -13,6 +15,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
+import sharp from "sharp";
+import { exportarSpine, importarSpine } from "../../src/boneco/spine.ts";
+import { parseAtlas } from "../../src/core/atlas-text.ts";
+import { Document } from "../../src/core/document.ts";
+import { executeAsync, type AssetProvider } from "../../src/core/commands/index.ts";
+import { extractRegion } from "../../server/atlas.ts";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const ROBO = join(AQUI, "..", "..", "tests", "boneco", "robo");
@@ -113,10 +121,6 @@ const efeitos = {
   },
   cabeca: {
     linha: [
-      { tempo: 0.5, largura: 0 },
-      { tempo: 1.2, largura: 4 * HD },
-      { tempo: 2.0, largura: 4 * HD },
-      { tempo: 2.4, largura: 0 },
       { tempo: 6.2, largura: 0 },
       { tempo: 6.5, largura: 3.5 * HD },
       { tempo: 7.6, largura: 3.5 * HD },
@@ -201,6 +205,29 @@ const particulas = {
 };
 
 b.animacoes = { vitrine: { ossos, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
-b.mix = { padrao: 0.2 };
-writeFileSync(join(AQUI, "vitrine.boneco"), JSON.stringify(b, null, 1) + "\n");
+
+// ---- 2,5D: com os comandos do editor (os mesmos da tela e da ponte), sobre o documento no
+// formato do editor. A cabeca vira malha pelo contorno da imagem e olha para os lados
+const ex = exportarSpine(b);
+const atlas = parseAtlas(ex.atlas);
+const imagens: AssetProvider = {
+  async image(nome) {
+    const r = atlas.regions.find((x) => x.name === nome);
+    const pg = r && atlas.pages.find((p) => p.name === r.page);
+    if (!r || !pg) return null;
+    const png = await extractRegion(sharp(join(AQUI, pg.name)), r);
+    const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    return { width: info.width, height: info.height, data };
+  },
+  region(nome) {
+    const r = atlas.regions.find((x) => x.name === nome);
+    return r ? { width: r.originalWidth, height: r.originalHeight } : null;
+  },
+};
+const doc = Document.fromText(JSON.stringify(ex.json), { text: ex.atlas, pages: {} });
+const olhar = (time: number, angle: number) => ({ cmd: "deform.turn", args: { anim: "vitrine", slot: "cabeca", attachment: "head", time, angle, perspective: 0.2, radius: 32, ...(time < 2 ? { curve: "suave" } : {}) } });
+await executeAsync(doc, [{ cmd: "mesh.create", args: { slot: "cabeca", name: "head", detail: 1.4 } }, olhar(0, 0), olhar(0.5, -18), olhar(1.0, 0), olhar(1.5, 18), olhar(2.0, 0)], "gerador", "2,5D", {}, imagens);
+const final = importarSpine(doc.json, ex.atlas, "vitrine");
+final.mix = { padrao: 0.2 };
+writeFileSync(join(AQUI, "vitrine.boneco"), JSON.stringify(final, null, 1) + "\n");
 console.log(`vitrine.boneco: ${Object.keys(ossos).length} ossos animados, ${b.particulas.length} emissores, efeitos em ${Object.keys(efeitos).length} slots`);

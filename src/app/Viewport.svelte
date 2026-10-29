@@ -1,4 +1,14 @@
 <script lang="ts">
+  // efeitos e particulas (so do Mamulengo): fora do modo nucleo, avisa que nao aparecem
+  const extras = $derived.by(() => {
+    app.version;
+    const j: any = app.doc?.json;
+    if (!j) return "";
+    const ef = (j.slots ?? []).some((x: any) => x.effects) || Object.values<any>(j.animations ?? {}).some((a) => a.effects);
+    const pa = !!j.particles?.length;
+    return ef && pa ? "efeitos e particulas" : ef ? "efeitos" : pa ? "particulas" : "";
+  });
+
   import { onMount } from "svelte";
   import { Viewer } from "../render/viewer.ts";
   import { app } from "./state.svelte.ts";
@@ -185,6 +195,12 @@
   {:else if app.runtime === "nucleo" && app.viewer?.nucleoError && (app.version, true)}
     <div class="err">O nucleo recusou o documento (desenhando pelo spine-webgl): {app.viewer.nucleoError}</div>
   {/if}
+  {#if app.doc && app.runtime !== "nucleo" && extras}
+    <div class="aviso-nucleo">
+      Este personagem tem {extras}, que so aparecem no desenho do nucleo (o {app.runtime === "godot" ? "spine-godot" : "Spine"} nao tem).
+      <button onclick={() => app.setRuntime("nucleo")}>ver no nucleo</button>
+    </div>
+  {/if}
   {#if app.tool === "deform" && app.doc}
     <label class="brush" title="Tamanho do pincel ( [ e ] )">pincel <input type="range" min="15" max="250" bind:value={app.brushRadius} /></label>
   {/if}
@@ -270,6 +286,30 @@
     padding: 8px 12px;
     border-radius: 8px;
     font-size: 13px;
+  }
+  .aviso-nucleo {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    background: rgba(255, 210, 60, 0.95);
+    color: #1d1a24;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 3;
+  }
+  .aviso-nucleo button {
+    padding: 3px 10px;
+    background: #1d1a24;
+    color: #ffd23c;
+    border: none;
+    border-radius: 4px;
+    white-space: nowrap;
+    cursor: pointer;
   }
   .brush {
     position: absolute;

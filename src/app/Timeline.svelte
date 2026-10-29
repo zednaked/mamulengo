@@ -201,6 +201,22 @@
     zoom = { start: s, pps: p };
   }
 
+  // zoom pelos botoes: centrado no cursor de tempo (se ele estiver na tela) ou no meio da regua
+  function zoomBy(f: number) {
+    const vis = (laneW - 2 * PAD) / pps;
+    const t = app.play.time >= start && app.play.time <= start + vis ? app.play.time : start + vis / 2;
+    const p = Math.max(8, Math.min(6000, pps * f));
+    setView(t - (t - start) * (pps / p), p);
+  }
+  // enquadra um intervalo de tempo (as chaves escolhidas, ou em volta de uma chave)
+  function zoomTo(t0: number, t1: number) {
+    const meio = (t0 + t1) / 2,
+      larg = Math.max(t1 - t0, 4 / FPS) * 1.3;
+    const p = (laneW - 2 * PAD) / larg;
+    setView(meio - larg / 2, p);
+  }
+  const selTimes = $derived(picked.map((x) => x.cell.time));
+
   let ruler: HTMLDivElement | undefined = $state();
   let lanes: HTMLDivElement | undefined = $state();
   let scroller: HTMLDivElement | undefined = $state();
@@ -610,7 +626,12 @@
       </span>
     {/if}
     <span class="right">
-      {#if zoom}<button class="mini" title="Ajustar a regua a animacao inteira" onclick={() => (zoom = null)}>ajustar</button>{/if}
+      <span class="zoom" title="Zoom da timeline (tambem Ctrl+roda; Shift+roda ou botao do meio rola; duplo clique numa chave aproxima ali)">
+        <button class="mini" onclick={() => zoomBy(1 / 1.6)}>−</button>
+        <button class="mini" onclick={() => zoomBy(1.6)}>+</button>
+        {#if selTimes.length > 1}<button class="mini" title="Enquadrar as chaves escolhidas" onclick={() => zoomTo(Math.min(...selTimes), Math.max(...selTimes))}>selecao</button>{/if}
+        <button class="mini" class:on={!zoom} title="Ajustar a regua a animacao inteira" onclick={() => (zoom = null)}>tudo</button>
+      </span>
       {#if app.keyClipboard}<button class="mini" title="Colar no tempo atual (Ctrl+V)" onclick={pasteKeys}>colar {app.keyClipboard.items.length}</button>{/if}
       <button class="mini" class:on={exporting.open} disabled={!app.doc} title="Exportar GIF ou video da animacao como esta na tela" onclick={() => (exporting.open = !exporting.open)}>⇩ exportar</button>
     </span>
@@ -700,6 +721,7 @@
                 style:left="{X(c.time)}px"
                 style:background={r.color}
                 onpointerdown={(e) => keyDown(e, r, c)}
+                ondblclick={() => zoomTo(c.time - 6 / FPS, c.time + 6 / FPS)}
                 title="{r.label} @ {c.time}s (q{Math.round(c.time * FPS)}){c.refs.length > 1 ? ` - ${c.refs.length} chaves` : ''}"
               ></div>
             {/each}
@@ -758,6 +780,14 @@
   }
   .add {
     border-style: dashed;
+  }
+  .zoom {
+    display: inline-flex;
+    gap: 2px;
+    margin-right: 6px;
+  }
+  .zoom .mini {
+    min-width: 26px;
   }
   .anims .mini {
     padding: 4px 7px;

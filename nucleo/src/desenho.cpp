@@ -88,6 +88,57 @@ void corta(std::vector<P2>& v, P2 a, P2 b, std::vector<P2>& tmp) {
   v.swap(tmp);
 }
 
+// a malha cresce pelo contorno (os h primeiros vertices, em ordem; 8 floats por vertice: x, y,
+// u, v, cor): cada um anda para fora `margem` pixels da textura (docs/NUCLEO.md "Efeitos")
+void crescer_malha(float* v, int h, float margem, int W, int H) {
+  std::vector<P2> t(static_cast<size_t>(h)), pos(static_cast<size_t>(h));
+  P2 c{0, 0};
+  for (int i = 0; i < h; ++i) {
+    t[size_t(i)] = {double(v[i * 8 + 2]) * W, double(v[i * 8 + 3]) * H};
+    pos[size_t(i)] = {v[i * 8], v[i * 8 + 1]};
+    c.x += t[size_t(i)].x / h, c.y += t[size_t(i)].y / h;
+  }
+  for (int i = 0; i < h; ++i) {
+    const P2 a = t[size_t((i + h - 1) % h)], b = t[size_t(i)], z = t[size_t((i + 1) % h)];
+    // normal de cada aresta vizinha, virada para longe do centro do contorno
+    auto normal = [&](P2 p, P2 q) {
+      double nx = q.y - p.y, ny = -(q.x - p.x);
+      const double l = std::hypot(nx, ny);
+      if (l < 1e-9) return P2{0, 0};
+      nx /= l, ny /= l;
+      if (nx * ((p.x + q.x) / 2 - c.x) + ny * ((p.y + q.y) / 2 - c.y) < 0) nx = -nx, ny = -ny;
+      return P2{nx, ny};
+    };
+    const P2 n1 = normal(a, b), n2 = normal(b, z);
+    double nx = n1.x + n2.x, ny = n1.y + n2.y;
+    const double l = std::hypot(nx, ny);
+    if (l < 1e-9) continue;
+    nx = nx / l * margem, ny = ny / l * margem;
+    // textura -> mundo perto do vertice, pelas duas arestas: [dp1 dp2] = M [dt1 dt2]
+    const P2 pa = pos[size_t((i + h - 1) % h)], pb = pos[size_t(i)], pz = pos[size_t((i + 1) % h)];
+    const double t1x = z.x - b.x, t1y = z.y - b.y, t2x = a.x - b.x, t2y = a.y - b.y;
+    const double p1x = pz.x - pb.x, p1y = pz.y - pb.y, p2x = pa.x - pb.x, p2y = pa.y - pb.y;
+    const double det = t1x * t2y - t2x * t1y;
+    double wx, wy;
+    if (std::fabs(det) > 1e-9) {
+      const double i11 = t2y / det, i12 = -t2x / det, i21 = -t1y / det, i22 = t1x / det;
+      const double m11 = p1x * i11 + p2x * i21, m12 = p1x * i12 + p2x * i22;
+      const double m21 = p1y * i11 + p2y * i21, m22 = p1y * i12 + p2y * i22;
+      wx = m11 * nx + m12 * ny, wy = m21 * nx + m22 * ny;
+    } else {
+      // vizinhos em linha reta: escala e giro de uma aresta so
+      const double lt = std::hypot(t1x, t1y);
+      if (lt < 1e-9) continue;
+      const double s = std::hypot(p1x, p1y) / lt, rot = std::atan2(p1y, p1x) - std::atan2(t1y, t1x);
+      wx = s * (std::cos(rot) * nx - std::sin(rot) * ny), wy = s * (std::sin(rot) * nx + std::cos(rot) * ny);
+    }
+    v[i * 8] += float(wx);
+    v[i * 8 + 1] += float(wy);
+    v[i * 8 + 2] += float(nx / W);
+    v[i * 8 + 3] += float(ny / H);
+  }
+}
+
 }  // namespace
 
 void desenhar(const Esqueleto& e, Desenho& d) {
@@ -296,6 +347,9 @@ void desenhar(const Esqueleto& e, Desenho& d) {
           }
           el.pagina[0] = float(std::max(pg.largura, 1));
           el.pagina[1] = float(std::max(pg.altura, 1));
+          if ((p.tipo == TipoParte::Malha || p.tipo == TipoParte::MalhaLigada) && margem > 0 && p.contorno >= 3 && pg.largura > 0 && pg.altura > 0 &&
+              size_t(p.contorno) * 2 <= n)
+            crescer_malha(d.vertices.data() + size_t(base) * 8, p.contorno, margem, pg.largura, pg.altura);
           efeito = int(d.efeitos.size());
           d.efeitos.push_back(el);
         }
