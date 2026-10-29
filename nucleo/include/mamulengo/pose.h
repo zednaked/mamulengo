@@ -99,7 +99,12 @@ class Esqueleto {
   int parte(int slot, std::string_view nome) const;
   std::vector<int>& ordem_desenho() { return ordem_; }
   // avanca o relogio do esqueleto (a fisica integra pelo relogio)
-  void avancar(double dt) { relogio_ += dt; }
+  void avancar(double dt) { relogio_ = f32(relogio_ + dt); }
+  // relogio em float32: o relogio, o que a fisica acumula e os passos dela arredondados a
+  // float a cada conta, como um runtime que guarda o tempo em float (o oraculo usa double;
+  // docs/NUCLEO.md "Relogio")
+  bool relogio_float = false;
+  double f32(double x) const { return relogio_float ? double(float(x)) : x; }
   double relogio() const { return relogio_; }
   // recalcula o mundo: ossos, depois cada restricao na ordem
   void atualizar_mundo();

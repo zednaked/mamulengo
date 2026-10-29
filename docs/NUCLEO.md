@@ -59,6 +59,16 @@ recalcula o mundo. Sem física, um passo só até `t` dá o mesmo resultado.
 A animação toca em loop: o tempo dentro dela é `t mod duração` (a duração é o maior tempo de
 chave de qualquer timeline).
 
+**Relógio em float32** (opção, desligada: `Esqueleto::relogio_float` e `Estado::relogio_float`).
+O oráculo soma o tempo em `double`. Um runtime que guarda o tempo em `float` dá o passo da
+física em outro quadro quando a soma dos `dt` cruza o passo por um arredondamento: num
+personagem com dezenas de físicas de rotação, depois de alguns segundos a 60 quadros por
+segundo, um passo um quadro antes já leva as pontas a dezenas de px. Com a opção, cada conta de relógio é arredondada a `float`:
+o relógio do esqueleto, o `dt` e a `sobra` da física e o próprio passo; no Estado, o `dt` com a
+escala, o `tempo`, o `atraso` e o `mix_tempo` de cada entrada. As contas da pose continuam em
+`double`. O nó do Godot liga isso com `float_clock` (para ficar igual a um jogo que usava esse
+runtime); a conferência contra o oráculo é sem a opção.
+
 ## Pose local
 
 Cada osso tem no setup `x`, `y`, `rotacao`, `escala_x`, `escala_y`, `cisalha_x`,
@@ -179,6 +189,25 @@ começo. Misturado por `mix_girar`, `mix_x`, `mix_y`.
 posição, escala ou cisalha do osso fonte, em mundo ou local (`fonte_local`, `alvo_local`),
 somando (`somar`) ou substituindo, com `limitar`. Fora do marco 1 se nenhum asset dele usar.
 
+Os campos do topo da restrição (`rotacao`, `x`, `y`, `escala_x`, `escala_y`, `cisalha_y`) são
+deslocamentos **da fonte**, medidos no oráculo com um osso fonte e um alvo:
+- somam no valor que a fonte entrega, antes do deslocamento e da escala de cada propriedade;
+  valem só para a propriedade de mesmo nome da fonte (o `x` do topo não mexe numa fonte
+  `girar` que vai para `x`);
+- em mundo, `x` e `y` são um ponto no espaço da fonte: o valor de `x` é
+  `x + a·dx + b·dy` e o de `y`, `y + c·dx + d·dy` (gira e escala com ela); em `fonte_local`,
+  somam direto;
+- a rotação de mundo com o deslocamento volta a [0, 360); com a fonte espelhada (determinante
+  da matriz de mundo negativo) o deslocamento de rotação entra com o sinal trocado.
+
+Conferido em casos gerados (`tools/nucleo-fixtures.ts`, `transformacao/`): 144 dirigidos (um
+deslocamento por vez, para cada propriedade do alvo, em mundo, fonte local, alvo local e
+somando), todos iguais. Nos 200 aleatórios (várias propriedades, escala e deslocamento por
+alvo, limites, mixes, fonte que fica espelhada na animação), 183 iguais; os 17 que diferem já
+diferem sem os deslocamentos do topo (18 sem eles): são combinações de `limitar`, `somar` e
+escala que a conta acima ainda não cobre (em aberto). Um asset privado com a fonte em mundo
+girando e movendo outro osso diferia centenas de px antes e agora bate em todas as animações.
+
 ## Desenho
 
 `mamulengo/desenho.h`: a lista do que vai para a placa de vídeo, na ordem de desenho. Cada
@@ -234,7 +263,21 @@ mix)`, `enfileirar_vazio(trilha, mix, atraso)`, `limpar()`, `limpar_trilha(t)`, 
 `aplicar(e)`, `atual(trilha)` (animação ou -1), `entrada(trilha)`, `escala_tempo`,
 `mix_padrao`, `definir_mix(de, para, tempo)` (começam no `mix` do `.boneco`), `eventos()` e
 `ler_eventos(saida)`. `tocar` e `enfileirar` devolvem a `Entrada` (vale até o evento de fim),
-em que se pode mudar `mix_duracao`, `atraso`, `alfa`, `escala_tempo`, `somar` e os limiares.
+em que se pode mudar `mix_duracao`, `atraso`, `alfa`, `escala_tempo`, `somar`, `reverso`,
+`tempo` e os limiares. `mudar_mix(entrada, mix, atraso)` muda o mix e refaz o atraso como o
+`enfileirar` (atraso <= 0: do fim da anterior menos o mix; é o que emenda uma animação na volta
+de um loop sem mix). Cada entrada tem um `id` único no Estado, e cada evento diz de qual
+entrada é (`Evento::entrada`): a entrada pode já ter sido apagada quando o evento é lido.
+`ao_descartar(dono, entrada)`, se dado, é chamado quando uma entrada deixa de valer (antes de
+ser apagada), para quem guarda ponteiros (o nó do Godot) os esquecer. `copiar_de(outro)` copia o Estado inteiro de
+outro do mesmo modelo (entradas novas, com a fila e o mix religados): o checkpoint do editor.
+
+**De trás para frente** (`reverso`, medido com o `reverse` da entrada do oráculo): as timelines
+recebem o tempo espelhado no trecho, `fim - (t - inicio)`; o relógio, a `completa` (no fim da
+volta, como para a frente), a fila e o mix andam como sempre. Os eventos de usuário saem quando
+o tempo espelhado da chave, `fim - (tempo da chave - inicio)`, entra em `(ultimo, agora]` do
+relógio da animação (com a volta do loop), da última chave para a primeira; chaves no mesmo
+tempo saem na ordem do arquivo. A chave no 0 sai no fim da volta, antes da `completa`.
 
 **Entrada.** Guarda `tempo` (relógio da entrada, cresce sem parar), `atraso`, `mix_tempo`,
 `mix_duracao`, `tempo_fim` (infinito; na vazia, o mix), `inicio = 0`, `fim = duração`, e o
@@ -330,6 +373,16 @@ defeito do oráculo, mas o oráculo manda).
 
 **Conferência** (60 quadros por segundo, os 20 assets): 272 roteiros com mix 0 (o do jogo) e
 194 com `--mix 0.2`, todos dentro da tolerância em todos os quadros, com os eventos iguais.
+Com os roteiros da entrada mudada pelo jogo (de trás para frente sem loop, em loop, cortado no
+meio com mix próprio e na fila; mix e atraso refeitos na volta do loop; escala de tempo por
+entrada; relógio da trilha adiantado: sete por animação, nas duas primeiras de cada asset) e
+os de personagem escondido (roteiro com `escondido: [de, ate]`: nesses quadros só o relógio das
+trilhas anda, sem aplicar, sem o relógio do esqueleto e sem o mundo; volta a aparecer no meio do laço,
+com uma troca com mix escondido ou ao aparecer), os 3 CC0 dão 90 roteiros com mix 0 e 81 com
+`--mix 0.2`, e o corpus privado 1105 e 925, todos iguais (a física de um personagem com dezenas de
+físicas, escondido 15 s e trocando de animação ao aparecer, bate até 2e-13 px). Os eventos de usuário de trás para frente foram conferidos num asset privado com
+evento e no pessoa e no monstro com cinco eventos por animação (`tools/nucleo-fixtures.ts`,
+`eventos/`, dois no mesmo tempo e um no 0): 48 e 42 roteiros, iguais.
 O `change` da transição sai no quadro 43 de cada volta (o 44º passo, 0,7333 s), igual. Pior
 desvio de osso 4,4e-4 px (transição), de vértice 4,6e-4 px. Além disso: 600 casos aleatórios
 de mix em 3 ossos (girar, mover, escalar com sinal; 599 iguais), 420 roteiros aleatórios nos 20
@@ -344,45 +397,106 @@ transição, 28 µs contra 24 µs (nativo).
 com 8 graus de diferença num osso (o oráculo zera o `total` daquela timeline num quadro em que
 a entrada de baixo termina o mix). (2) Na transição, um quadro com 0,12 px num osso de caminho
 com a mesma posição de caminho nos dois (a conta do caminho, não do Estado). (3) Timelines de
-`reiniciar` da física, `escala_tempo` negativa, animação de trás para frente, `inicio` e `fim`
-diferentes do padrão e `segurar` à moda antiga (`holdPrevious`) não foram medidos.
+`reiniciar` da física, `escala_tempo` negativa, `inicio` e `fim` diferentes do padrão (o
+reverso usa o trecho, mas só foi medido com o padrão) e `segurar` à moda antiga
+(`holdPrevious`) não foram medidos.
+
+## No Godot (`BonecoSprite`)
+
+`nucleo/godot/boneco`: o mesmo código como módulo do motor (template web) e como GDExtension
+(editor e CI). Os nomes de métodos e sinais são os do nó C++ antigo, para o `SpineRuntime` dos
+jogos tratar os dois igual. O que o nó acrescenta ao núcleo:
+
+- **Entradas.** `set_animation`, `add_animation` e `set_empty_animation` devolvem um
+  `BonecoEntrada`, e os sinais e o `get_current` entregam o mesmo objeto para a mesma entrada.
+  Enquanto a entrada vale, `set_reverse`, `set_mix_duration`, `set_mix_duration_and_delay`
+  (o `mudar_mix`), `set_delay`, `set_track_time`, `set_time_scale` e `set_alpha` mudam a
+  entrada do Estado; depois do fim, `is_valid()` é falso e os `set_*` não fazem nada.
+- **Sinais na hora.** `animation_started`, `animation_interrupted` e `animation_ended` saem
+  dentro do `set_animation` (e do `add_animation` e dos `clear_*`), não no quadro seguinte; um
+  sinal que toca outra animação não reentra, e os eventos novos saem na volta seguinte do laço.
+- **Escondido** (fora de `is_visible_in_tree`), com `pose_when_hidden` falso (o padrão): só
+  o relógio das trilhas anda, com os sinais dele; não aplica, não anda a física e não
+  redesenha. Ao reaparecer, continua da pose em que estava. É o que um jogo feito com o
+  runtime de antes espera (um personagem que nasce escondido não chega adiantado).
+- **Na cena:** `boneco` guarda o caminho do `.boneco` (o `data` não vai para a cena), e o
+  mesmo caminho devolve o mesmo `BonecoData` enquanto ele vive (cópias de um molde não releem o
+  arquivo). `preview` toca em laço só no editor; no jogo o nó nasce na pose de setup.
+- `float_clock`: o relógio em float32 (acima, "Relógio").
+- `get_bones_world()`: todos os ossos, `nome -> [x, y, a, b, c, d]` com o eixo y para baixo
+  (`x, -y, a, b, -c, -d` do núcleo), para comparar com o jogo de antes.
 
 ## No editor
 
-O viewport do editor desenha pelo núcleo no modo **núcleo** (seletor "desenho" na barra, ao
-lado de "enquadrar"; `?runtime=nucleo` no endereço; `view {runtime: "nucleo"}` pela ponte). Os
-outros modos continuam: **godot** (o spine-godot dos jogos de hoje, com os defeitos medidos em
-`docs/PARIDADE.md`) e **spine** (o editor do Spine). A escolha fica guardada no navegador.
+O viewport do editor calcula e desenha pelo núcleo no modo **núcleo** (seletor "desenho" na
+barra, ao lado de "enquadrar"; `?runtime=nucleo` no endereço; `view {runtime: "nucleo"}` pela
+ponte). Os outros modos continuam: **godot** (o spine-godot dos jogos de hoje, com os defeitos
+medidos em `docs/PARIDADE.md`) e **spine** (o editor do Spine). A escolha fica guardada no
+navegador.
+
+No modo núcleo o viewport não tem esqueleto do spine-core: nem `SkeletonData`, nem `Skeleton`,
+nem `AnimationState` (`viewer.skeleton`, `data`, `state` e `sim` ficam `null`). Se o núcleo
+recusa o documento, o viewport volta ao spine-webgl (com o esqueleto do spine-core) e mostra o
+motivo; a próxima recarga tenta o núcleo de novo.
 
 - **Documento:** a cada mudança estrutural o JSON do Spine e o atlas viram `.boneco`
   (`importarSpine`) e entram no wasm (`mm_carregar`); o modelo anterior é solto
-  (`mm_liberar_modelo`). Se o núcleo recusa, o viewport volta ao spine-webgl e mostra o motivo.
+  (`mm_liberar_modelo`). As animações (nomes e durações) vêm do `mm_info`.
 - **Pose** (`NucleoCena.poseAt`, `src/render/nucleo.ts`): a mesma conta do `PoseSim`, sobre o
   Estado: personagem novo (`mm_reiniciar`: setup, física reiniciada), `tocar` com mix 0, um
   quadro em 0 e passos de 1/64 desde 0 (sem física, um passo só até `t`). A emenda (prévia de
   transição) usa `enfileirar` com o atraso `duração de A - mix` ou `tocar` no instante do
-  corte, com o mix pedido. Tocando, cada quadro é um `mm_passo` do tamanho do quadro, como o
-  viewer faz com o AnimationState.
+  corte, com o mix pedido. Tocando, cada quadro é um `mm_passo` do tamanho do quadro.
+- **Checkpoint:** com física ou emenda, quando o tempo só anda (agulha para frente, a prévia
+  tocando), o `poseAt` continua do último passo inteiro, como o `PoseSim`: `mm_guardar` copia o
+  Esqueleto (com a memória da física) e o Estado (`Estado::copiar_de`: as entradas são copiadas
+  e os ponteiros da fila e do mix refeitos), `mm_restaurar` volta a eles. Vale a mesma regra do
+  `PoseSim` (só com `t` depois do checkpoint; `t` igual refaz) e o checkpoint é esquecido em
+  qualquer remendo, recarga ou passo livre. `NucleoCena.atalhos = false` desliga (para medir).
+  Conferido: a pose andando 30 quadros com o atalho e a refeita desde 0 sem ele são iguais em
+  todos os algarismos nos 3 personagens CC0, com e sem emenda (`checkpointDiff` 0 no bench).
+- **Leitura da pose** (`NucleoPose`, a mesma interface `PoseView` de `src/render/pose.ts` que o
+  `SpinePose` dá nos outros modos): por osso, `mm_pose_ossos` (mundo `[a, b, c, d, x, y]`,
+  comprimento no mundo e pose local, 14 números) e `mm_setup_ossos` (o setup do modelo agora,
+  com os remendos); por slot, `mm_pose_slots` (a parte atual, a cor e, no fim, a ordem de
+  desenho); `mm_vertices_slot` (vértices em mundo da parte atual: região, malha, e também
+  caminho, recorte e caixa); `mm_caixa` (a caixa das regiões e malhas, como o `getBounds` do
+  spine-core); `mm_parte_triangulos` e `mm_parte_pesos`. Nomes, pais, blend, tipo de parte,
+  contorno da malha e caminho fechado vêm do `mm_info`. Os números ficam em áreas do wasm que o
+  JavaScript lê direto (`HEAPF64`); ossos, setup e slots são copiados uma vez por pose, na
+  primeira leitura.
+- **O que lê essa pose:** o clique (parte e osso sob o ponteiro, inclusive o osso que mais puxa
+  uma malha com pesos), o arrasto de osso (mover, girar, esticar; a chave na animação aberta), o
+  pincel de deformar, a edição de malha e pesos (o mundo dos ossos na Pose base vem do núcleo),
+  os gizmos e destaques, os ossos, malhas, caixas, caminhos e recortes à mostra (um desenho de
+  depuração com as cores e espessuras do spine-webgl, `drawDebug`), o olho (que esconde slots
+  pelo osso, inclusive pelo osso que puxa a malha), o enquadramento (`frameAll`,
+  `currentBounds`, `partBounds`), as camadas, o inspetor e os limites da ficha ao vivo.
+- **Cebola:** os fantasmas são desenhados pelo núcleo numa instância só deles
+  (`mm_pose_direta`: a animação no tempo sobre o setup, mundo calculado uma vez com a física
+  reiniciada ali, como o `Physics.pose` do spine-core), com a cor do fantasma multiplicando a
+  de cada vértice na lista de desenho.
 - **Desenho** (`Desenhista`, o mesmo do palco): a lista de desenho do núcleo no mesmo canvas e
   contexto WebGL2 do viewer (com stencil para o recorte), com a projeção da câmera do
   spine-webgl. Semântica do jogo (a do template web e do módulo Godot): pma desfeito no shader,
   multiplica `destino x mix(1, cor, alfa)`, tela `destino x (1 - s) + s`, multiplica do motor só
   quando o `.boneco` pede, física de rotação no sentido do jogo. O olho esconde slots pela parte
   (`mm_desenhar_escondendo`).
-- **O que ainda vem do spine-core:** o esqueleto do spine-core continua posado ao lado (mesmo
-  tempo, mesma sequência) para gizmos, clique, arrasto, malha, cebola, medidas (`query.*`), ficha
-  e enquadramento. Trocar isso é a etapa B.
 - **Arrasto sem recarregar:** a ponte muda o modelo direto. `mm_osso_setup` (x, y, rotação,
   escalas, cisalhas e comprimento do setup de um osso), `mm_slot_setup` (cor e parte do setup de
   um slot) e `mm_trocar_animacao` (relê só uma animação, `ler_animacao` em `leitor.cpp`). O
   viewer usa isso no lugar de recarregar quando a mudança é só nesses campos (os mesmos que o
   `patch.ts` remenda no spine-core); o resto relê o documento.
+- **Várias poses de uma vez:** `mm_simular(instância, animação, loop, instantes, n)` (e
+  `NucleoCena.simular`) devolve o mundo de cada osso em cada instante, com a conta do `poseAt`
+  (andando de um instante ao seguinte pelo checkpoint). Igual a um `poseAt` por instante em
+  todos os algarismos (`simularDiff` 0 no bench). É a base para as medidas da etapa C.
 
-**Paridade** (`npx tsx tools/nucleo-editor.ts`: editor próprio na porta 5207 com
-`tests/assets`, Chromium headless com SwiftShader, 480x480, o personagem inteiro enquadrado):
-modo núcleo contra modo spine em 9 instantes de cada animação, na fila e no corte com mix 0,2
-s, e o remendo do arrasto contra a recarga. Pior quadro, em % dos pixels com diferença acima de
-8/255:
+**Paridade de imagem** (`npx tsx tools/nucleo-editor.ts`: editor próprio na porta 5207 com
+`tests/assets`, Chromium headless com SwiftShader, 480x480, o personagem inteiro enquadrado,
+cada modo pela pose dele): modo núcleo contra modo spine em 9 instantes de cada animação, na
+fila e no corte com mix 0,2 s, e o remendo do arrasto contra a recarga. Pior quadro, em % dos
+pixels com diferença acima de 8/255:
 
 | personagem | setup | animações | emendas (fila e corte) | remendo = recarga |
 |---|---|---|---|---|
@@ -394,24 +508,63 @@ As diferenças são de borda (o filtro da textura sem pré-multiplicar contra a 
 do spine-webgl), pior canal de 4 a 58/255 em poucos pixels. Os CC0 não têm multiply, tela nem
 gravidade de física; nesses casos o modo núcleo difere do modo spine de propósito (o jogo).
 
-**Custo** (`tools/bench.ts --runtime spine,nucleo`, SwiftShader, ms; o modo núcleo ainda posa o
-spine-core para os gizmos, então os números somam os dois):
+**Interação** (`npx tsx tools/nucleo-interacao.ts`: editor próprio na porta 5208, o mesmo
+Chromium, mouse de verdade pelo protocolo de depuração do Chromium, a mesma câmera nos dois
+modos). Em cada personagem, nos modos spine e núcleo: cliques numa grade de 14 x 14 pontos
+sobre o personagem, na Pose base e no meio da primeira animação, e com os ossos à mostra um
+clique no meio de cada osso; arrasto de um osso (mover, girar e esticar) na Pose base e com a
+animação aberta (vira chave); edição da malha com pesos (arrastar um ponto, criar um no
+contorno, pintar peso); a cebola e o desenho de depuração (ossos, malhas e caixas). Resultado:
 
-| personagem | modo | quadro tocando | parte do núcleo (pose + desenho) | passo de arrasto na setup | com animação aberta | recarga |
-|---|---|---|---|---|---|---|
-| monstro | spine | 0,16 | | 0,47 | 0,98 | 1,01 |
-| monstro | núcleo | 0,08 | 0,003 + 0,020 | 0,57 | 0,82 | 2,17 |
-| pessoa | spine | 0,06 | | 0,50 | 0,66 | 0,38 |
-| pessoa | núcleo | 0,09 | 0,005 + 0,010 | 1,17 | 2,18 | 3,19 |
-| aventureiro | spine | 0,10 | | 0,51 | 0,81 | 0,33 |
-| aventureiro | núcleo | 0,07 | 0,002 + 0,028 | 0,44 | 1,23 | 1,70 |
+| personagem | cliques iguais (acertando uma parte ou osso) | documento depois dos arrastos e da malha | imagens (pior %) | spine-core no viewer e na interação |
+|---|---|---|---|---|
+| aventureiro | 412 de 412 (366) | igual (0) | 0,002 | 0 leituras, 0 poses |
+| monstro | 410 de 410 (315) | igual (pior 2e-7 num vértice da malha) | 0,069 (cebola) | 0 leituras, 0 poses |
+| pessoa | 422 de 422 (226) | igual (pior 3e-5 numa chave de mover) | 0 | 0 leituras, 0 poses |
 
-Nenhum passo de arrasto recarregou o núcleo (`nucleoReloadsInDrag` 0). A recarga do núcleo
-(`importarSpine`, JSON e leitura no wasm) custa de 1,4 a 2,8 ms a mais que a do spine-core; o
-remendo evita isso no arrasto. O passo de arrasto ainda refaz a pose do núcleo desde 0 (com
-física, 1/64 s por passo, cerca de 1,5 µs por passo nos CC0): o núcleo não tem o atalho de
-checkpoint do `PoseSim` (o Estado não é copiável), então `poseAt` repetido no mesmo instante
-custa a simulação inteira (0,2 ms na pessoa a 2,3 s, contra 0,04 ms do spine-core com o atalho).
+As nove edições (três arrastos na Pose base, três com a animação, três na malha) saem iguais nos
+dois modos, com os mesmos rótulos no histórico.
+
+A ferramenta conta, na página, cada `SkeletonJson.readSkeletonData` e cada
+`Skeleton.updateWorldTransform` do spine-core e separa quem pediu: no modo núcleo o viewer e a
+interação não leem nem posam nenhum esqueleto (no modo spine, o mesmo roteiro posa 1.000 a
+1.600 vezes). O que ainda posa o spine-core no modo núcleo é da etapa C: a ficha (as regras
+conferidas a cada edição) e os comandos de malha (`mesh.*`, que calculam a Pose base pelo
+`skeletonAt`).
+
+**Custo** (`tools/bench.ts --runtime spine,nucleo`, pela ponte, SwiftShader, ms; o relógio do
+navegador tem passo de 0,1 ms, então valores abaixo de 0,1 são médias de muitas chamadas):
+
+| personagem | modo | quadro tocando | parte do núcleo (pose + desenho) | `poseAt` andando (por quadro) | sem atalho | emenda andando | sem atalho | passo de arrasto na setup | com animação aberta | recarga |
+|---|---|---|---|---|---|---|---|---|---|---|
+| monstro (física) | spine | 0,09 | | 0,037 | 0,6 | 0,097 | 0,6 | 0,55 | 0,67 | 0,23 |
+| monstro (física) | núcleo | 0,08 | 0,007 + 0,023 | 0,010 | 0,1 | 0,010 | 0,2 | 0,21 | 0,51 | 1,32 |
+| pessoa (física) | spine | 0,15 | | 0,030 | 0,5 | 0,110 | 1,1 | 0,56 | 0,66 | 0,34 |
+| pessoa (física) | núcleo | 0,05 | 0,007 + 0,016 | 0,010 | 0,2 | 0,010 | 0,2 | 0,27 | 0,63 | 1,85 |
+| aventureiro | spine | 0,14 | | 0,037 | 0,4 | 0,137 | 0,7 | 0,52 | 0,68 | 0,23 |
+| aventureiro | núcleo | 0,11 | 0,007 + 0,020 | 0,013 | 0,2 | 0,020 | 0,2 | 0,23 | 0,75 | 1,23 |
+
+Sem o esqueleto paralelo, o quadro do modo núcleo custa o mesmo ou menos que o do modo spine, e
+o passo de arrasto na setup caiu à metade (o remendo direto e nada do spine-core para posar).
+O `poseAt` andando com física custa de 3 a 4 vezes menos que no spine-core, e com emenda de 7
+a 11 vezes menos. Nenhum passo de arrasto recarregou o núcleo (`nucleoReloadsInDrag` 0). A
+recarga continua mais cara (1,2 a 1,9 ms contra 0,2 a 0,3 ms do spine-core): é o
+`importarSpine` e a leitura do `.boneco` no wasm; o remendo evita isso no arrasto.
+
+**Etapa C (o que ainda usa o spine-core no modo núcleo e o que ela vai precisar):**
+
+- As medidas (`query.motion`, `query.relation` e as outras `query.*`), a ficha
+  (`src/core/ficha.ts`, inclusive o painel que confere as regras a cada edição), a transição
+  (`src/core/transition.ts`), o recorte (`src/core/recorte.ts`) e os comandos que calculam a
+  Pose base pelo spine-core (`skeletonAt` em `src/core/pose.ts`: os de malha em
+  `commands/meshedit.ts`, `commands/setup.ts`) criam esqueletos próprios. `meshView` já aceita o
+  mundo dos ossos de fora (`SetupWorld`); os comandos podem receber o mesmo.
+- Para as medidas: `mm_simular` dá o mundo dos ossos em vários instantes; faltam, pelo mesmo
+  caminho, os vértices dos slots (para `query.relation` e o recorte), a cor e a parte (para a
+  ficha) e a emenda (A e B com mix, com o corte) em vários instantes, e os eventos do intervalo.
+- O `look`, o `render`, o GIF e o vídeo exportados já saem pelo núcleo (usam o viewer); só os
+  números que acompanham (`query.*` pedidas junto) ainda vêm do spine-core.
+- O seletor "desenho" pode passar a ter o núcleo como padrão quando a etapa C tirar o resto.
 
 ## Marcos
 

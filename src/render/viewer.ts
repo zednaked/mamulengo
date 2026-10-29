@@ -3,8 +3,11 @@
 // proprio em wasm com o desenhista de src/render/nucleo.ts. A cada mudanca do documento
 // reconstroi o SkeletonData; edicoes so de animacao ou de transformacao de osso na
 // setup (o arrasto) sao aplicadas no SkeletonData existente, sem reler o resto. No modo
-// "nucleo" o esqueleto do spine-core continua posado (gizmos, clique, medidas) e o nucleo
-// recebe as mesmas edicoes direto no modelo (NucleoCena.remendar).
+// "nucleo" nao ha esqueleto do spine-core: a pose, o desenho, a cebola, os gizmos, o clique
+// e as caixas vem do nucleo (NucleoCena e a pose dela), e as edicoes rapidas vao direto ao
+// modelo do nucleo (NucleoCena.remendar). Quem le a pose usa `pose` (src/render/pose.ts),
+// igual nos tres modos; `skeleton` so existe nos modos "godot" e "spine" (e no modo
+// "nucleo" quando o nucleo recusa o documento e o desenho volta ao spine-webgl).
 import {
   AnimationState,
   AnimationStateData,
@@ -18,19 +21,17 @@ import {
   SkeletonData,
   SkeletonJson,
   TextureAtlas,
-  Vector2,
   Color,
   BlendMode,
   TextureFilter,
   MixFrom,
-  RegionAttachment,
-  MeshAttachment,
   type Texture,
 } from "@esotericsoftware/spine-webgl";
 import type { ChangeEvent, Document, Path } from "../core/document.ts";
 import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/sim.ts";
 import { patchSkeletonData } from "../core/patch.ts";
 import { NucleoCena } from "./nucleo.ts";
+import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
 
 export type Runtime = "godot" | "spine" | "nucleo";
 
@@ -88,8 +89,15 @@ export class Viewer {
   // tempo do nucleo no ultimo quadro (pose e desenho), em ms
   nucleoMs = { pose: 0, draw: 0 };
   private urlFor: ((page: string) => string) | null = null;
-  private get useNucleo() {
+  // o nucleo da a pose e o desenho (modo "nucleo" com o documento aceito)
+  get useNucleo() {
     return this.runtime === "nucleo" && !!this.nucleo && !this.nucleoError;
+  }
+  private spinePose: SpinePose | null = null;
+  // a pose atual para ler (clique, gizmos, caixas, camadas), do nucleo ou do spine-core
+  get pose(): PoseView | null {
+    if (this.useNucleo) return this.nucleo!.pose;
+    return this.skeleton ? (this.spinePose ??= new SpinePose(this.skeleton)) : null;
   }
   // experimento: o Godot gera mipmaps em runtime para filtro "com mipmaps"? (parity)
   godotMipmaps = false;
@@ -281,10 +289,26 @@ export class Viewer {
     if (!this.doc || !this.atlas) return;
     this.pending = [];
     this.stats.rebuilds++;
+    this.mover.clear();
+    if (this.runtime === "nucleo" && this.nucleo && this.loadNucleo()) {
+      // o nucleo aceitou: nada do spine-core (nem SkeletonData, nem Skeleton)
+      this.dropSpine();
+      this.error = null;
+      const has = (n: string) => this.nucleo!.temAnimacao(n);
+      if (this.view.animation && !has(this.view.animation)) this.view.animation = null;
+      if (this.view.sequence && (!this.view.animation || !has(this.view.sequence.next))) this.view.sequence = null;
+      // a primeira animacao so ao abrir o documento: depois, sem animacao e a Pose base
+      const first = this.nucleo.info?.animacoes[0]?.nome;
+      if (!this.view.animation && first && this.builtVersion === -1) this.view.animation = first;
+      this.poseAt(this.view.time);
+      this.builtVersion = this.doc.version;
+      return;
+    }
     try {
       const data = new SkeletonJson(new AtlasAttachmentLoader(this.atlas)).readSkeletonData(this.doc.json);
       this.data = data;
       this.skeleton = new Skeleton(data);
+      this.spinePose = null;
       // o spine-godot desenha com y para baixo invertendo o esqueleto; a projecao da
       // camera desfaz a inversao (draw), entao a tela continua em y para cima
       if (this.flip) this.skeleton.scaleY = -1;
@@ -296,9 +320,10 @@ export class Viewer {
       this.sim = new PoseSim(this.skeleton, this.state);
       if (this.view.animation && !data.findAnimation(this.view.animation)) this.view.animation = null;
       if (this.view.sequence && (!this.view.animation || !data.findAnimation(this.view.sequence.next))) this.view.sequence = null;
-      if (!this.view.animation && data.animations.length) this.view.animation = data.animations[0].name;
+      // a primeira animacao so ao abrir o documento: depois, sem animacao e a Pose base (uma
+      // edicao estrutural na Pose base, como mexer na malha, nao pode abrir uma animacao)
+      if (!this.view.animation && data.animations.length && this.builtVersion === -1) this.view.animation = data.animations[0].name;
       this.error = null;
-      this.loadNucleo();
       this.poseAt(this.view.time);
     } catch (e: any) {
       // documento invalido para o runtime: mostra o erro e mantem o ultimo esqueleto
@@ -308,14 +333,25 @@ export class Viewer {
   }
 
   // o documento inteiro no nucleo (modo "nucleo"); em erro o desenho volta ao spine-webgl
-  private loadNucleo() {
-    if (this.runtime !== "nucleo" || !this.nucleo || !this.doc || !this.skeleton) return;
+  private loadNucleo(): boolean {
+    if (this.runtime !== "nucleo" || !this.nucleo || !this.doc) return false;
     try {
-      this.nucleo.carregar(this.doc.json, this.doc.atlas.text, this.doc.file?.skeleton?.split("/").pop() ?? "", this.skeleton.slots.map((s) => s.data.name));
+      this.nucleo.carregar(this.doc.json, this.doc.atlas.text, this.doc.file?.skeleton?.split("/").pop() ?? "");
       this.nucleoError = null;
+      return true;
     } catch (e: any) {
       this.nucleoError = String(e?.message ?? e);
+      return false;
     }
+  }
+
+  private dropSpine() {
+    this.data = null;
+    this.skeleton = null;
+    this.ghost = null;
+    this.state = null;
+    this.sim = null;
+    this.spinePose = null;
   }
 
   // Troca o modo de desenho mantendo animacao, tempo e camera (recarrega as texturas, que
@@ -328,8 +364,27 @@ export class Viewer {
     await this.setDocument(this.doc, this.urlFor);
     Object.assign(this.view, keep.view);
     Object.assign(this.cam, keep.cam);
-    this.sim?.invalidate();
+    // a animacao e a sequencia so valem se existem no que foi carregado
+    if (this.view.animation && !this.hasAnimation(this.view.animation)) this.view.animation = null;
+    if (this.view.sequence && !this.hasAnimation(this.view.sequence.next)) this.view.sequence = null;
+    this.invalidatePose();
     this.poseAt(this.view.time);
+  }
+
+  // esquece os atalhos da pose (checkpoints): o estado mudou por fora
+  invalidatePose() {
+    this.sim?.invalidate();
+    this.nucleo?.invalidar();
+  }
+
+  hasAnimation(name: string): boolean {
+    return this.useNucleo ? this.nucleo!.temAnimacao(name) : !!this.data?.findAnimation(name);
+  }
+
+  // nomes das animacoes do que esta carregado
+  animationNames(): string[] {
+    if (this.useNucleo) return this.nucleo!.info?.animacoes.map((a) => a.nome) ?? [];
+    return this.data?.animations.map((a) => a.name) ?? [];
   }
 
   // caminhos tocados por uma mudanca (para saber se da para remendar)
@@ -353,13 +408,17 @@ export class Viewer {
     const paths = this.pending;
     const doc = this.doc;
     const data = this.data;
-    if (!paths || !doc || !data || !this.atlas || !this.skeleton || this.error) return false;
-    if (!patchSkeletonData(data, doc.json, paths, new SkeletonJson(new AtlasAttachmentLoader(this.atlas)))) return false;
-    // o nucleo recebe as mesmas mudancas direto no modelo; se nao der, so ele rele o documento
-    if (this.runtime === "nucleo" && this.nucleo && (this.nucleoError || !this.nucleo.remendar(doc.json, paths))) this.loadNucleo();
+    if (!paths || !doc || this.error) return false;
+    if (this.useNucleo) {
+      // as mesmas mudancas direto no modelo do nucleo; se nao der, rebuild rele o documento
+      if (!this.nucleo!.remendar(doc.json, paths)) return false;
+    } else {
+      if (!data || !this.atlas || !this.skeleton) return false;
+      if (!patchSkeletonData(data, doc.json, paths, new SkeletonJson(new AtlasAttachmentLoader(this.atlas)))) return false;
+    }
     this.pending = [];
     this.stats.patches++;
-    this.sim?.invalidate();
+    this.invalidatePose();
     this.poseAt(this.view.time);
     this.builtVersion = doc.version;
     return true;
@@ -376,22 +435,23 @@ export class Viewer {
   }
 
   animDuration(name = this.view.animation): number {
-    const a = name ? this.data?.findAnimation(name) : null;
-    return a?.duration ?? 0;
+    if (!name) return 0;
+    if (this.useNucleo) return this.nucleo!.duracao(name);
+    return this.data?.findAnimation(name)?.duration ?? 0;
   }
 
   // onde o mix comeca e termina na sequencia (null sem sequencia)
   sequenceTimes() {
     const s = this.view.sequence;
-    if (!s || !this.view.animation || !this.data?.findAnimation(s.next)) return null;
+    if (!s || !this.view.animation || !this.hasAnimation(s.next)) return null;
     return { ...sequenceTimes(this.animDuration(), this.animDuration(s.next), s), next: s.next, durA: this.animDuration() };
   }
 
   // liga, muda ou desliga a previa de transicao, mantendo o tempo
   setSequence(seq: Sequence | null) {
-    if (seq && !this.data?.findAnimation(seq.next)) throw new Error(`animacao nao existe: ${seq.next}`);
+    if (seq && !this.hasAnimation(seq.next)) throw new Error(`animacao nao existe: ${seq.next}`);
     this.view.sequence = seq ? { ...seq } : null;
-    this.sim?.invalidate();
+    this.invalidatePose();
     this.poseAt(Math.min(this.view.time, this.duration()));
   }
 
@@ -399,14 +459,13 @@ export class Viewer {
   // a fisica chegar no mesmo estado que chegaria tocando (igual ao jogo). Ver PoseSim.
   poseAt(t: number) {
     this.view.time = t;
-    this.sim?.poseAt(this.view.animation, this.view.loop, t, this.view.sequence);
     if (this.useNucleo) {
       const t0 = performance.now();
-      // a sequencia so vale se o spine-core a aceitou (a mesma checagem do sequenceTimes)
-      const seq = this.view.sequence && this.view.animation && this.data?.findAnimation(this.view.sequence.next) ? this.view.sequence : null;
+      // a sequencia so vale se a animacao seguinte existe (a mesma checagem do sequenceTimes)
+      const seq = this.view.sequence && this.view.animation && this.hasAnimation(this.view.sequence.next) ? this.view.sequence : null;
       this.nucleo!.poseAt(this.view.animation, this.view.loop, t, seq);
       this.nucleoMs.pose = performance.now() - t0;
-    }
+    } else this.sim?.poseAt(this.view.animation, this.view.loop, t, this.view.sequence);
   }
 
   // trocar de animacao desliga a previa de transicao
@@ -439,7 +498,7 @@ export class Viewer {
     this.sync();
     const sk = this.skeleton;
     const st = this.state;
-    if (sk && st && this.view.playing && this.view.animation && !this.setupOnly) {
+    if ((this.useNucleo || (sk && st)) && this.view.playing && this.view.animation && !this.setupOnly) {
       const dur = this.duration();
       // animacao sem chaves (duracao 0): tocar nao tem o que mostrar, o relogio fica parado
       // onde a pessoa escolheu na regua (a primeira chave pode ir em qualquer instante)
@@ -461,15 +520,16 @@ export class Viewer {
         this.poseAt(t);
       } else {
         // passo de tamanho livre: o estado sai da sequencia de passos fixos
-        this.sim?.invalidate();
-        st.update(d);
-        st.apply(sk);
-        sk.update(d);
-        sk.updateWorldTransform(Physics.update);
         if (this.useNucleo) {
           const t0 = performance.now();
           this.nucleo!.passo(d);
           this.nucleoMs.pose = performance.now() - t0;
+        } else if (sk && st) {
+          this.sim?.invalidate();
+          st.update(d);
+          st.apply(sk);
+          sk.update(d);
+          sk.updateWorldTransform(Physics.update);
         }
       }
       this.view.time = t;
@@ -501,22 +561,34 @@ export class Viewer {
     scene.camera.viewportHeight = h;
     scene.camera.zoom = 1 / (this.cam.zoom * dpr);
     scene.begin();
-    if (this.skeleton) {
-      this.drawOnion();
+    const pose = this.pose;
+    if (pose) {
       if (this.useNucleo) {
-        // o desenho do nucleo no mesmo contexto e com a mesma camera; o spine-webgl volta
-        // depois para os gizmos
+        // o desenho do nucleo (cebola e personagem) no mesmo contexto e com a mesma camera; o
+        // spine-webgl volta depois so para os gizmos
         scene.end();
+        this.drawOnionNucleo();
         this.drawNucleo();
         scene.begin();
-      } else this.drawMain(this.skeleton);
+      } else {
+        this.drawOnion();
+        this.drawMain(this.skeleton!);
+      }
       const dbg = scene.skeletonDebugRenderer;
-      dbg.drawBones = this.view.showBones;
-      dbg.drawMeshHull = this.view.showMeshes;
-      dbg.drawMeshTriangles = this.view.showMeshes;
-      dbg.drawBoundingBoxes = this.view.showBounds;
-      if (this.view.showBones || this.view.showMeshes || this.view.showBounds) scene.drawSkeletonDebug(this.skeleton);
-      this.drawHighlights();
+      if (this.view.showBones || this.view.showMeshes || this.view.showBounds) {
+        if (this.useNucleo) {
+          const shapes = (scene as any).shapes;
+          (scene as any).enableRenderer(shapes);
+          drawDebug(shapes, this.ctx.gl, pose, { bones: this.view.showBones, meshHull: this.view.showMeshes, meshTriangles: this.view.showMeshes, boundingBoxes: this.view.showBounds, paths: dbg.drawPaths, clipping: dbg.drawClipping, scale: dbg.scale, boneWidth: dbg.boneWidth });
+        } else {
+          dbg.drawBones = this.view.showBones;
+          dbg.drawMeshHull = this.view.showMeshes;
+          dbg.drawMeshTriangles = this.view.showMeshes;
+          dbg.drawBoundingBoxes = this.view.showBounds;
+          scene.drawSkeletonDebug(this.skeleton!);
+        }
+      }
+      this.drawHighlights(pose);
       for (const o of this.overlays) o(this);
     }
     scene.end();
@@ -531,44 +603,43 @@ export class Viewer {
   hiddenSlots = new Set<string>();
   // o osso que move a imagem: o dono do slot, ou numa malha com pesos o que mais puxa
   // (em rigs de animador as imagens ficam na raiz e quem move e o osso do braco)
-  private mover = new WeakMap<object, number>();
-  private moverOf(slot: any): any {
-    const att = slot.appliedPose.attachment;
-    if (!att?.bones) return slot.bone;
-    let idx = this.mover.get(att);
+  // por slot e parte (`indice|nome`): o indice do osso que mais puxa a malha com pesos
+  private mover = new Map<string, number>();
+  private moverOf(pose: PoseView, slot: SlotView) {
+    const part = slot.part;
+    if (!part?.weighted) return slot.bone;
+    const key = `${slot.index}|${part.name}`;
+    let idx = this.mover.get(key);
     if (idx === undefined) {
       const sum = new Map<number, number>();
-      for (let i = 0, v = 0; i < att.bones.length; ) {
-        const n = att.bones[i++];
-        for (let k = 0; k < n; k++, v += 3) sum.set(att.bones[i + k], (sum.get(att.bones[i + k]) ?? 0) + att.vertices[v + 2]);
-        i += n;
-      }
+      for (const v of pose.weights(slot) ?? []) for (const [b, w] of v) sum.set(b, (sum.get(b) ?? 0) + w);
       idx = [...sum].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
-      this.mover.set(att, idx);
+      this.mover.set(key, idx);
     }
-    return idx >= 0 ? this.skeleton?.bones[idx] ?? slot.bone : slot.bone;
+    return idx >= 0 ? (pose.bones[idx] ?? slot.bone) : slot.bone;
   }
-  isSlotHidden(slot: any): boolean {
-    if (this.hiddenSlots.has(slot.data.name)) return true;
-    if (!this.hiddenBones.size) return false;
-    for (const start of [slot.bone, this.moverOf(slot)]) for (let b = start; b; b = b.parent) if (this.hiddenBones.has(b.data.name)) return true;
+  isSlotHidden(slot: SlotView): boolean {
+    if (this.hiddenSlots.has(slot.name)) return true;
+    const pose = this.pose;
+    if (!this.hiddenBones.size || !pose) return false;
+    for (const start of [slot.bone, this.moverOf(pose, slot)]) for (let b: any = start; b; b = b.parent) if (this.hiddenBones.has(b.name)) return true;
     return false;
   }
 
   private drawNucleo() {
     const t0 = performance.now();
-    const sk = this.skeleton!;
-    const hidden = this.hiddenBones.size || this.hiddenSlots.size ? (i: number) => this.isSlotHidden(sk.slots[i]) : null;
+    const pose = this.nucleo!.pose!;
+    const hidden = this.hiddenBones.size || this.hiddenSlots.size ? (i: number) => this.isSlotHidden(pose.slots[i]) : null;
     this.nucleo!.desenhar(this.scene.camera.projectionView.values, hidden);
     this.nucleoMs.draw = performance.now() - t0;
   }
 
   private drawMain(sk: Skeleton) {
     const hide: (() => void)[] = [];
-    if (this.hiddenBones.size || this.hiddenSlots.size)
-      for (const slot of sk.slots) {
-        if (!this.isSlotHidden(slot)) continue;
-        const pose = slot.appliedPose;
+    if ((this.hiddenBones.size || this.hiddenSlots.size) && this.spinePose)
+      for (const sv of this.spinePose.slots) {
+        if (!this.isSlotHidden(sv)) continue;
+        const pose = sv.slot.appliedPose;
         const att = pose.attachment;
         (pose as any).attachment = null;
         hide.push(() => ((pose as any).attachment = att));
@@ -625,34 +696,50 @@ export class Viewer {
   private drawOnion() {
     const g = this.ghost;
     const anim = this.view.animation ? this.data?.findAnimation(this.view.animation) : null;
-    if (!this.onion.enabled || !g || !anim || this.view.playing || this.setupOnly || this.view.sequence) return;
-    const dur = anim.duration || 1;
+    if (!g || !anim) return;
+    for (const f of this.onionFrames()) {
+      g.setupPose();
+      anim.apply(g, 0, f.t, this.view.loop, [], 1, MixFrom.setup, false, false, false);
+      g.updateWorldTransform(Physics.pose);
+      g.color.set(...f.color);
+      this.scene.drawSkeleton(g);
+    }
+  }
+
+  // os instantes e as cores dos fantasmas da cebola (vazio quando ela nao aparece)
+  private onionFrames(): { t: number; color: [number, number, number, number] }[] {
+    const name = this.view.animation;
+    if (!this.onion.enabled || !name || !this.hasAnimation(name) || this.view.playing || this.setupOnly || this.view.sequence) return [];
+    const dur = this.animDuration(name) || 1;
+    const out: { t: number; color: [number, number, number, number] }[] = [];
     for (let k = -this.onion.count; k <= this.onion.count; k++) {
       if (!k) continue;
       let t = this.view.time + k * this.onion.step;
       if (this.view.loop) t = ((t % dur) + dur) % dur;
       else if (t < 0 || t > dur) continue;
-      g.setupPose();
-      anim.apply(g, 0, t, this.view.loop, [], 1, MixFrom.setup, false, false, false);
-      g.updateWorldTransform(Physics.pose);
       const fade = 0.35 * (1 - (Math.abs(k) - 1) / this.onion.count);
-      g.color.set(k < 0 ? 1 : 0.4, k < 0 ? 0.45 : 1, k < 0 ? 0.45 : 0.55, fade);
-      this.scene.drawSkeleton(g);
+      out.push({ t, color: k < 0 ? [1, 0.45, 0.45, fade] : [0.4, 1, 0.55, fade] });
     }
+    return out;
   }
 
-  private drawHighlights() {
-    const sk = this.skeleton!;
+  // a cebola pelo nucleo: a mesma pose direta (sem fisica) numa instancia so dos fantasmas
+  private drawOnionNucleo() {
+    const name = this.view.animation;
+    if (!name) return;
+    for (const f of this.onionFrames()) this.nucleo!.desenharFantasma(name, f.t, this.view.loop, f.color, this.scene.camera.projectionView.values);
+  }
+
+  private drawHighlights(pose: PoseView) {
     const now = performance.now();
     this.highlights = this.highlights.filter((h) => h.until > now);
     const marks = [...this.highlights];
     if (this.selection.bone) marks.push({ bone: this.selection.bone, until: Infinity, color: new Color(1, 0.35, 0.75, 1) });
     for (const h of marks) {
       if (!h.bone) continue;
-      const b = sk.findBone(h.bone);
-      if (!b) continue;
-      const p = b.appliedPose;
-      const len = Math.max(b.data.length, 12 / this.cam.zoom);
+      const p = pose.findBone(h.bone);
+      if (!p) continue;
+      const len = Math.max(p.length, 12 / this.cam.zoom);
       const x2 = p.worldX + p.a * len;
       const y2 = p.worldY + p.c * len;
       const fade = h.until === Infinity ? 1 : Math.min(1, (h.until - now) / 400);
@@ -670,17 +757,12 @@ export class Viewer {
   // Enquadra o esqueleto inteiro (bounds da pose atual, ou do skeleton.json).
   frameAll(margin = 1.15) {
     this.sync();
-    const sk = this.skeleton;
     let x = 0,
       y = 0,
       w = 0,
       h = 0;
-    if (sk) {
-      const off = new Vector2(),
-        size = new Vector2();
-      sk.getBounds(off, size, []);
-      if (isFinite(size.x) && size.x > 0) [x, y, w, h] = [off.x, off.y, size.x, size.y];
-    }
+    const b = this.pose?.bounds();
+    if (b) [x, y, w, h] = b;
     // bounds do runtime estao no espaco do esqueleto (invertido no modo godot)
     if (w && h && this.flip) y = -(y + h);
     const s = this.doc?.json.skeleton;
@@ -704,36 +786,26 @@ export class Viewer {
 
   // Retangulo do mundo [x,y,w,h] (y para cima) de tudo o que aparece na pose atual.
   currentBounds(): number[] | null {
-    const sk = this.skeleton;
-    if (!sk) return null;
-    const off = new Vector2(),
-      size = new Vector2();
-    sk.getBounds(off, size, []);
-    if (!isFinite(size.x) || size.x <= 0 || size.y <= 0) return null;
-    const y = this.flip ? -(off.y + size.y) : off.y;
-    return [off.x, y, size.x, size.y];
+    const b = this.pose?.bounds();
+    if (!b) return null;
+    const y = this.flip ? -(b[1] + b[3]) : b[1];
+    return [b[0], y, b[2], b[3]];
   }
 
   // Retangulo do mundo [x,y,w,h] (y para cima) das imagens visiveis de um osso (com os
   // filhos) e/ou de partes, na pose atual: para recortar mao, rosto, oculos de perto.
   partBounds(p: { bones?: string[]; slots?: string[] }): number[] | null {
-    const sk = this.skeleton;
-    if (!sk) return null;
+    const pose = this.pose;
+    if (!pose) return null;
     const want = new Set<string>(p.slots ?? []);
     if (p.bones?.length) {
-      const under = (b: any): boolean => !!b && (p.bones!.includes(b.data.name) || under(b.parent));
-      const idx = new Set(sk.bones.filter(under).map((b: any) => b.data.index));
-      for (const s of sk.slots) {
-        if (under(s.bone)) want.add(s.data.name);
+      const under = (b: any): boolean => !!b && (p.bones!.includes(b.name) || under(b.parent));
+      const idx = new Set(pose.bones.filter(under).map((b) => b.index));
+      for (const s of pose.slots) {
+        if (under(s.bone)) want.add(s.name);
         // malha com pesos presa a outro osso (o braco no root) mas puxada por estes ossos
-        const att: any = s.appliedPose.attachment;
-        const wb: number[] | null = att instanceof MeshAttachment ? (att as any).bones : null;
-        if (wb)
-          for (let i = 0; i < wb.length; ) {
-            const n = wb[i++];
-            for (let k = 0; k < n; k++) if (idx.has(wb[i + k])) want.add(s.data.name);
-            i += n;
-          }
+        const k = s.part?.kind;
+        if (k === "mesh" || k === "linkedmesh") for (const w of pose.weights(s) ?? []) if (w.some(([b]) => idx.has(b))) want.add(s.name);
       }
     }
     let x0 = Infinity,
@@ -741,15 +813,13 @@ export class Viewer {
       x1 = -Infinity,
       y1 = -Infinity;
     const v: number[] = [];
-    for (const s of sk.slots) {
-      if (!want.has(s.data.name)) continue;
-      const att: any = s.appliedPose.attachment;
-      if (!att || s.appliedPose.color.a <= 0) continue;
-      v.length = 0;
-      if (att instanceof RegionAttachment) att.computeWorldVertices(s, att.getOffsets(s.appliedPose), v, 0, 2);
-      else if (att instanceof MeshAttachment) att.computeWorldVertices(sk, s, 0, att.worldVerticesLength, v, 0, 2);
-      else continue;
-      for (let i = 0; i < v.length; i += 2) {
+    for (const s of pose.slots) {
+      if (!want.has(s.name)) continue;
+      const k = s.part?.kind;
+      if (!k || s.color.a <= 0) continue;
+      if (k !== "region" && k !== "mesh" && k !== "linkedmesh") continue;
+      const n = pose.vertices(s, v);
+      for (let i = 0; i < n; i += 2) {
         const y = this.flip ? -v[i + 1] : v[i + 1];
         x0 = Math.min(x0, v[i]);
         x1 = Math.max(x1, v[i]);

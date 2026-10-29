@@ -51,6 +51,7 @@ const char* nome_tipo(TipoEvento t) {
 struct Roteiro {
   int quadros = 0;
   double passo = 1.0 / 60;
+  int escondido_de = -1, escondido_ate = -1;  // so o relogio das trilhas anda nesses quadros
   std::map<int, std::vector<const Json*>> acoes;
 };
 
@@ -81,14 +82,23 @@ bool tocar(const std::shared_ptr<const Modelo>& modelo, const Json& r, const Rot
     for (const Json* a : acoes) {
       const std::string tipo = a->str("tipo", "");
       const int t = int(a->num("trilha", 0));
+      // o que o roteiro muda na entrada logo depois de tocar ou enfileirar
+      auto entrada = [&](Entrada* en) {
+        if (const Json* x = a->acha("reverso")) en->reverso = x->sim(false);
+        if (const Json* x = a->acha("escala_entrada")) en->escala_tempo = x->num(1);
+        if (const Json* x = a->acha("mix_entrada")) en->mix_duracao = x->num(0);
+        if (const Json* x = a->acha("mix_e_atraso"); x && x->lista()) st.mudar_mix(en, (*x)[0].num(0), (*x)[1].num(0));
+      };
       if (tipo == "tocar") {
         const int i = anim(*a);
         if (i < 0) return false;
-        st.tocar(t, i, a->sim("loop", true));
+        entrada(st.tocar(t, i, a->sim("loop", true)));
       } else if (tipo == "enfileirar") {
         const int i = anim(*a);
         if (i < 0) return false;
-        st.enfileirar(t, i, a->sim("loop", true), a->num("atraso", 0));
+        entrada(st.enfileirar(t, i, a->sim("loop", true), a->num("atraso", 0)));
+      } else if (tipo == "tempo_trilha") {
+        if (Entrada* en = st.entrada(t)) en->tempo = a->num("valor", 0);
       } else if (tipo == "vazio") {
         st.vazio(t, a->num("mix", 0));
       } else if (tipo == "enfileirar_vazio") {
@@ -102,8 +112,10 @@ bool tocar(const std::shared_ptr<const Modelo>& modelo, const Json& r, const Rot
       }
     }
     st.avancar(rt.passo);
-    st.aplicar(e);
+    const bool escondido = q >= rt.escondido_de && q < rt.escondido_ate;
+    if (!escondido) st.aplicar(e);
     for (const Json* a : acoes) {
+      if (escondido) break;
       const std::string tipo = a->str("tipo", "");
       if (tipo != "cor" && tipo != "esconder") continue;
       const int s = m.slot(a->str("slot", ""));
@@ -118,8 +130,10 @@ bool tocar(const std::shared_ptr<const Modelo>& modelo, const Json& r, const Rot
         e.mudar_parte(s, -1);
       }
     }
-    e.avancar(rt.passo);
-    e.atualizar_mundo();
+    if (!escondido) {
+      e.avancar(rt.passo);
+      e.atualizar_mundo();
+    }
     st.ler_eventos(lidos);
     if (out) {
       if (q) *out += ',';
@@ -203,6 +217,10 @@ int main(int argc, char** argv) {
   Roteiro rt;
   rt.quadros = int(r.num("quadros", 0));
   rt.passo = r.num("passo", 1.0 / 60);
+  if (const Json* x = r.acha("escondido"); x && x->lista()) {
+    rt.escondido_de = int((*x)[0].num(-1));
+    rt.escondido_ate = int((*x)[1].num(-1));
+  }
   for (const Json& a : r["acoes"].itens()) rt.acoes[int(a.num("quadro", 0))].push_back(&a);
 
   if (repetir > 0) {

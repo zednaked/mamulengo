@@ -23,8 +23,20 @@ export function currentMesh(): MeshView | null {
   const key = `${doc.version}|${me.skin}|${me.slot}|${me.attachment}`;
   if (cache.key !== key) {
     let view: MeshView | null = null;
+    // a malha e editada na Pose base: no modo "nucleo" o mundo dos ossos vem da pose do nucleo
+    // (o viewer nesta versao do documento e na Pose base); nos outros modos, o comando calcula
+    // pelo spine-core
+    const v = app.viewer;
+    v?.sync();
+    const pose = v?.useNucleo && !v.view.animation ? v.pose : null;
+    const world = pose
+      ? (n: string) => {
+          const b = pose.findBone(n);
+          return b ? { a: b.a, b: b.b, c: b.c, d: b.d, x: b.worldX, y: b.worldY } : null;
+        }
+      : undefined;
     try {
-      view = meshView(doc.json, me.skin, me.slot, me.attachment);
+      view = meshView(doc.json, me.skin, me.slot, me.attachment, world);
     } catch {
       view = null;
     }
@@ -242,10 +254,9 @@ export function drawMeshEdit(v: Viewer) {
       s.circle(true, q[0], q[1], dot / z, weightColor(w[i]), 12);
     });
     // osso escolhido em destaque
-    const b = me.bone ? v.skeleton?.findBone(me.bone) : null;
-    if (b) {
-      const p = b.appliedPose;
-      const len = Math.max(b.data.length, 14 / z);
+    const p = me.bone ? v.pose?.findBone(me.bone) : null;
+    if (p) {
+      const len = Math.max(p.length, 14 / z);
       const col = new Color(1, 0.82, 0.4, 1);
       for (const o of [-1, 0, 1]) s.line(p.worldX + (o * 1.2) / z, p.worldY, p.worldX + p.a * len + (o * 1.2) / z, p.worldY + p.c * len, col);
       s.circle(true, p.worldX, p.worldY, 5 / z, col, 16);

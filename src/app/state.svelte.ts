@@ -340,7 +340,7 @@ class AppState {
   // de ordem no instante atual. index 0 = mais atras.
   layerOrder(): string[] {
     const names: string[] = (this.doc?.json.slots ?? []).map((x: any) => x.name);
-    if (this.mode === "animate" && this.play.animation) return this.viewer?.skeleton?.drawOrder.appliedPose.map((x) => x.data.name) ?? names;
+    if (this.mode === "animate" && this.play.animation) return this.viewer?.pose?.drawOrder().map((x) => x.name) ?? names;
     return names;
   }
   moveLayer(slot: string, to: number) {
@@ -359,7 +359,7 @@ class AppState {
   // sobe ou desce passando pela proxima camada que encosta nesta na tela (camadas que nao
   // se sobrepoem nao mudam nada visivel; o passo pula elas)
   stepLayer(slot: string, dir: 1 | -1) {
-    const sk = this.viewer?.skeleton;
+    const sk = this.viewer?.pose;
     const cur = this.layerOrder();
     const i = cur.indexOf(slot);
     const me = sk ? slotWorldBox(sk, slot) : null;

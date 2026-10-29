@@ -20,7 +20,7 @@
     const name = app.selection.bone;
     if (!name || !app.doc) return null;
     const setup = app.doc.json.bones.find((b: any) => b.name === name);
-    const live = app.viewer?.skeleton?.findBone(name)?.pose;
+    const live = app.viewer?.pose?.findBone(name)?.local;
     const src: any = app.mode === "animate" && live ? live : { x: setup?.x ?? 0, y: setup?.y ?? 0, rotation: setup?.rotation ?? 0, scaleX: setup?.scaleX ?? 1, scaleY: setup?.scaleY ?? 1 };
     return { name, parent: setup?.parent, values: Object.fromEntries(FIELDS.map((f) => [f.k, +(+src[f.k]).toFixed(f.step < 1 ? 3 : 2)])) };
   });
@@ -41,7 +41,7 @@
     app.play.time;
     const name = app.selection.slot;
     if (!name) return null;
-    const live = app.mode === "animate" ? app.viewer?.skeleton?.findSlot(name)?.pose.color : null;
+    const live = app.mode === "animate" ? app.viewer?.pose?.findSlot(name)?.color : null;
     const hex = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0");
     if (live) return { rgb: "#" + hex(live.r) + hex(live.g) + hex(live.b), a: live.a };
     const c = (app.doc?.json.slots.find((x: any) => x.name === name)?.color ?? "ffffffff").padEnd(8, "f");
@@ -96,7 +96,7 @@
   const neighbors = $derived.by(() => {
     app.version;
     app.play.time;
-    const sk = app.viewer?.skeleton;
+    const sk = app.viewer?.pose;
     if (!slot || !sk) return [] as string[];
     const me = slotWorldBox(sk, slot.name);
     if (!me) return [];
@@ -114,7 +114,7 @@
     const b = app.doc.json.bones.find((x: any) => x.name === bone.name);
     const parent = app.doc.json.bones.find((x: any) => x.name === b?.parent);
     if (!parent?.parent) return app.toast("IK precisa de um osso com pai (ex: antebraco com braco).");
-    const sk = app.viewer?.skeleton?.findBone(bone.name)?.appliedPose;
+    const sk = app.viewer?.pose?.findBone(bone.name);
     if (!sk) return;
     const len = b.length || 20;
     // ponta do osso no mundo (visual, y para cima)

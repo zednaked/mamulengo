@@ -49,12 +49,12 @@
     app.play.time;
     app.version;
     const b = app.selection.bone;
-    const sk = app.viewer?.skeleton;
+    const sk = app.viewer?.pose;
     if (!b || !sk) return [];
     const bone = sk.findBone(b);
     if (!bone) return [];
-    const p = bone.pose,
-      s = bone.data.setupPose;
+    const p = bone.local,
+      s = bone.setup;
     const val: Record<string, number> = {
       rotate: wrapDeg(p.rotation - s.rotation),
       x: p.x - s.x,

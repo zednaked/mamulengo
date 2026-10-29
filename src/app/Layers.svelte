@@ -15,33 +15,33 @@
     app.version;
     app.play.time;
     app.play.animation;
-    const sk = app.viewer?.skeleton;
+    const sk = app.viewer?.pose;
     if (!sk) return [];
     const f = filter.trim().toLowerCase();
     const out: Row[] = [];
-    const order = sk.drawOrder.appliedPose;
+    const order = sk.drawOrder();
     app.hidden.bones;
     // osso escolhido no Esqueleto: as camadas que ele (ou um filho dele) move ficam marcadas
     const sel = app.selection.slot ? null : app.selection.bone;
     const under = (b: string) => {
       if (!sel) return false;
-      for (let x: any = sk.findBone(b); x; x = x.parent) if (x.data.name === sel) return true;
+      for (let x: any = sk.findBone(b); x; x = x.parent) if (x.name === sel) return true;
       return false;
     };
     for (let i = order.length - 1; i >= 0; i--) {
       const s = order[i];
-      const att: any = s.appliedPose.attachment;
-      const name = s.data.name;
+      const att = s.part;
+      const name = s.name;
       if (f && !name.toLowerCase().includes(f) && !(att?.name ?? "").toLowerCase().includes(f)) continue;
-      const hidden = !att || s.appliedPose.color.a < 0.05;
+      const hidden = !att || s.color.a < 0.05;
       if (hidden && !showHidden && !f) continue;
       out.push({
         slot: name,
         image: att?.name ?? null,
-        region: att?.region?.name ?? att?.path ?? att?.name ?? null,
+        region: att?.image ?? null,
         bone: movingBone(sk, name),
         hidden,
-        glow: s.data.blendMode === 1 || s.data.blendMode === 3,
+        glow: s.blend === "additive" || s.blend === "screen",
         related: under(movingBone(sk, name)),
         boneHidden: !app.hidden.slots.includes(name) && !!app.viewer?.isSlotHidden(s),
       });

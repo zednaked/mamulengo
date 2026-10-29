@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace mamulengo {
 
@@ -109,6 +110,45 @@ Estado::Estado(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo)) {
 
 Estado::~Estado() = default;
 
+void Estado::copiar_de(const Estado& o) {
+  if (this == &o) return;
+  m_ = o.m_;
+  mix_padrao = o.mix_padrao;
+  escala_tempo = o.escala_tempo;
+  relogio_float = o.relogio_float;
+  tls_ = o.tls_;
+  ids_ = o.ids_;
+  usados_ = o.usados_;
+  disparados_ = o.disparados_;
+  eventos_ = o.eventos_;
+  pares_ = o.pares_;
+  sem_chave_ = o.sem_chave_;
+  mudou_ = o.mudou_;
+  proximo_id_ = o.proximo_id_;
+  // entradas novas com os mesmos campos; depois os ponteiros apontam para as novas
+  std::unordered_map<const Entrada*, Entrada*> novo;
+  vivas_.clear();
+  vivas_.reserve(o.vivas_.size());
+  for (const auto& e : o.vivas_) {
+    vivas_.push_back(std::make_unique<Entrada>(*e));
+    novo[e.get()] = vivas_.back().get();
+  }
+  auto ponte = [&](Entrada* p) -> Entrada* {
+    if (!p) return nullptr;
+    auto it = novo.find(p);
+    return it == novo.end() ? nullptr : it->second;
+  };
+  for (auto& e : vivas_) {
+    e->anterior = ponte(e->anterior);
+    e->proxima = ponte(e->proxima);
+    e->de = ponte(e->de);
+    e->para = ponte(e->para);
+    for (Entrada*& p : e->modo_mix) p = ponte(p);
+  }
+  trilhas_.resize(o.trilhas_.size());
+  for (size_t i = 0; i < trilhas_.size(); ++i) trilhas_[i] = ponte(o.trilhas_[i]);
+}
+
 void Estado::definir_mix(int de, int para, double tempo) {
   for (ParMix& p : pares_)
     if (p.de == de && p.para == para) {
@@ -142,13 +182,17 @@ void Estado::ler_eventos(std::vector<Evento>& saida) {
 void Estado::emitir(TipoEvento tipo, const Entrada* en) {
   Evento ev;
   ev.tipo = tipo;
+  ev.entrada = en->id;
   ev.trilha = en->trilha;
   ev.animacao = en->animacao;
   eventos_.push_back(std::move(ev));
   if (tipo == TipoEvento::Inicio || tipo == TipoEvento::Fim) mudou_ = true;
 }
 
-void Estado::descartar(Entrada* en) { en->descartada = true; }
+void Estado::descartar(Entrada* en) {
+  if (!en->descartada && ao_descartar) ao_descartar(dono, en);
+  en->descartada = true;
+}
 
 void Estado::recolher() {
   vivas_.erase(std::remove_if(vivas_.begin(), vivas_.end(), [](const std::unique_ptr<Entrada>& e) { return e->descartada; }), vivas_.end());
@@ -157,6 +201,7 @@ void Estado::recolher() {
 Entrada* Estado::nova(int trilha, int animacao, bool loop, Entrada* ultima) {
   vivas_.push_back(std::make_unique<Entrada>());
   Entrada* e = vivas_.back().get();
+  e->id = proximo_id_++;
   e->trilha = trilha;
   e->animacao = animacao;
   e->loop = loop;
@@ -231,6 +276,15 @@ Entrada* Estado::enfileirar(int trilha, int animacao, bool loop, double atraso) 
   return en;
 }
 
+void Estado::mudar_mix(Entrada* en, double mix, double atraso) {
+  en->mix_duracao = mix;
+  if (atraso <= 0) {
+    if (en->anterior) atraso = std::max(atraso + en->anterior->tempo_completa() - mix, 0.0);
+    else atraso = 0;
+  }
+  en->atraso = atraso;
+}
+
 Entrada* Estado::vazio(int trilha, double mix) {
   Entrada* en = tocar(trilha, -1, false);
   en->mix_duracao = mix;
@@ -274,15 +328,15 @@ void Estado::limpar() {
 // ---- relogios
 
 void Estado::avancar(double dt) {
-  dt *= escala_tempo;
+  dt = f32(dt * escala_tempo);
   for (size_t i = 0; i < trilhas_.size(); ++i) {
     Entrada* cur = trilhas_[i];
     if (!cur) continue;
     cur->ultimo = cur->prox_ultimo;
     cur->tempo_ant = cur->prox_tempo_ant;
-    double d = dt * cur->escala_tempo;
+    double d = f32(dt * cur->escala_tempo);
     if (cur->atraso > 0) {
-      cur->atraso -= d;
+      cur->atraso = f32(cur->atraso - d);
       if (cur->atraso > 0) continue;
       d = -cur->atraso;
       cur->atraso = 0;
@@ -291,13 +345,13 @@ void Estado::avancar(double dt) {
     if (prox) {
       // a proxima entra quando o relogio da atual (no aplicar anterior) passa do atraso dela,
       // com o tempo que sobrou
-      const double sobra = cur->tempo_ant - prox->atraso;
+      const double sobra = f32(cur->tempo_ant - prox->atraso);
       if (sobra >= 0) {
         prox->atraso = 0;
-        prox->tempo += cur->escala_tempo == 0 ? 0 : (sobra / cur->escala_tempo + dt) * prox->escala_tempo;
-        cur->tempo += d;
+        prox->tempo = f32(prox->tempo + (cur->escala_tempo == 0 ? 0 : f32(f32(f32(sobra / cur->escala_tempo) + dt) * prox->escala_tempo)));
+        cur->tempo = f32(cur->tempo + d);
         por_atual(int(i), prox, true);
-        for (Entrada* e = prox; e->de; e = e->de) e->mix_tempo += dt;
+        for (Entrada* e = prox; e->de; e = e->de) e->mix_tempo = f32(e->mix_tempo + dt);
         continue;
       }
     } else if (cur->tempo_ant >= cur->tempo_fim && !cur->de) {
@@ -317,7 +371,7 @@ void Estado::avancar(double dt) {
         descartar(de);
       }
     }
-    cur->tempo += d;
+    cur->tempo = f32(cur->tempo + d);
   }
   recolher();
 }
@@ -341,8 +395,8 @@ bool Estado::avancar_de(Entrada* para, double dt) {
     }
     return acabou;
   }
-  de->tempo += dt * de->escala_tempo;
-  para->mix_tempo += dt;
+  de->tempo = f32(de->tempo + f32(dt * de->escala_tempo));
+  para->mix_tempo = f32(para->mix_tempo + dt);
   return false;
 }
 
@@ -368,6 +422,26 @@ void Estado::disparar(const Animacao& an, double ultimo, double t) {
   for (; i < n && t >= ev[i].tempo; ++i) disparados_.push_back(int(i));
 }
 
+// de tras para frente: a chave k vale no tempo espelhado fim - (tempo_k - ini), e as chaves vao
+// da ultima para a primeira; o intervalo (ultimo, t] e o do relogio da animacao, como na frente
+void Estado::disparar_reverso(const Animacao& an, double ini, double fim, double ultimo, double t) {
+  const std::vector<ChaveEvento>& ev = an.eventos;
+  if (ev.empty()) return;
+  if (ultimo > t) {
+    disparar_reverso(an, ini, fim, ultimo, DBL_MAX);
+    ultimo = -1;
+  }
+  // medido: chaves no mesmo tempo saem na ordem do arquivo
+  for (size_t k = ev.size(); k > 0;) {
+    size_t j = k - 1;
+    while (j > 0 && ev[j - 1].tempo == ev[k - 1].tempo) --j;
+    const double m = fim - (ev[j].tempo - ini);
+    if (m > ultimo && m <= t)
+      for (size_t q = j; q < k; ++q) disparados_.push_back(int(q));
+    k = j;
+  }
+}
+
 void Estado::enfileirar_eventos(Entrada* en, double t_anim) {
   const double ini = en->inicio, fim = en->fim, dur = fim - ini;
   const double volta = std::fmod(en->tempo_ant, dur);  // NaN com duracao 0
@@ -376,6 +450,7 @@ void Estado::enfileirar_eventos(Entrada* en, double t_anim) {
     const ChaveEvento& c = an->eventos[size_t(k)];
     Evento ev;
     ev.tipo = TipoEvento::Usuario;
+    ev.entrada = en->id;
     ev.trilha = en->trilha;
     ev.animacao = en->animacao;
     ev.evento = c.evento;
@@ -391,7 +466,7 @@ void Estado::enfileirar_eventos(Entrada* en, double t_anim) {
   size_t i = 0;
   const size_t n = disparados_.size();
   for (; i < n; ++i) {
-    const double te = an->eventos[size_t(disparados_[i])].tempo;
+    const double te = tempo_chave(*en, an->eventos[size_t(disparados_[i])].tempo);
     if (te < volta) break;
     if (te > fim) continue;
     usuario(disparados_[i]);
@@ -410,7 +485,7 @@ void Estado::enfileirar_eventos(Entrada* en, double t_anim) {
   if (completa) emitir(TipoEvento::Completa, en);
   // eventos depois da volta
   for (; i < n; ++i) {
-    if (an->eventos[size_t(disparados_[i])].tempo < ini) continue;
+    if (tempo_chave(*en, an->eventos[size_t(disparados_[i])].tempo) < ini) continue;
     usuario(disparados_[i]);
   }
 }
@@ -495,7 +570,9 @@ void Estado::aplicar_timeline(Esqueleto& e, const Entrada& en, const Tl& tl, dou
     case TipoTl::Deformar: e.aplicar_deformar(an.deformar[i], t, alfa, mist); break;
     case TipoTl::Ordem: e.aplicar_ordem(an.ordem[i], t, mist, sai); break;
     case TipoTl::Evento:
-      if (coletar) disparar(an, ultimo, t);
+      // t ja vem espelhado no reverso; os eventos contam no relogio da animacao
+      if (coletar && en.reverso) disparar_reverso(an, en.inicio, en.fim, ultimo, en.tempo_aplicado(t));
+      else if (coletar) disparar(an, ultimo, t);
       break;
   }
 }
@@ -518,7 +595,7 @@ double Estado::aplicar_de(Entrada* para, Esqueleto& e, Mistura mist) {
   }
   const bool partes = mix < de->limiar_partes, ordem = mix < de->limiar_ordem;
   const double alfa_segura = peso_de, alfa_mix = alfa_segura * (1 - mix);
-  const double ultimo = de->ultimo, t = de->tempo_animacao();
+  const double ultimo = de->ultimo, t = de->tempo_animacao(), ta = de->tempo_aplicado(t);
   const bool coletar = mix < de->limiar_eventos;
   disparados_.clear();
   if (de->animacao >= 0) {
@@ -527,7 +604,7 @@ double Estado::aplicar_de(Entrada* para, Esqueleto& e, Mistura mist) {
     if (mist == Mistura::Soma) {
       for (const Tl& tl : tls) {
         if (tl.tipo == TipoTl::Parte) continue;
-        aplicar_timeline(e, *de, tl, ultimo, t, alfa_mix, mist, true, coletar);
+        aplicar_timeline(e, *de, tl, ultimo, ta, alfa_mix, mist, true, coletar);
       }
     } else {
       const bool primeiro = de->rotacoes.size() != tls.size() * 2;
@@ -550,12 +627,12 @@ double Estado::aplicar_de(Entrada* para, Esqueleto& e, Mistura mist) {
         }
         de->alfa_total += alfa;
         if (tl.tipo == TipoTl::Osso && an.ossos[size_t(tl.indice)].prop == PropOsso::Girar) {
-          girar(e, an.ossos[size_t(tl.indice)], t, alfa, tm, *de, i, primeiro);
+          girar(e, an.ossos[size_t(tl.indice)], ta, alfa, tm, *de, i, primeiro);
         } else if (tl.tipo == TipoTl::Parte) {
-          parte(e, an.partes[size_t(tl.indice)], t, tm, partes && alfa >= de->limiar_alfa_partes);
+          parte(e, an.partes[size_t(tl.indice)], ta, tm, partes && alfa >= de->limiar_alfa_partes);
         } else {
           if (ordem && tl.tipo == TipoTl::Ordem && tm == Mistura::Setup) sai = false;
-          aplicar_timeline(e, *de, tl, ultimo, t, alfa, tm, sai, coletar);
+          aplicar_timeline(e, *de, tl, ultimo, ta, alfa, tm, sai, coletar);
         }
       }
     }
@@ -579,7 +656,7 @@ bool Estado::aplicar(Esqueleto& e) {
     if (cur->de) alfa *= aplicar_de(cur, e, mist);
     else if (cur->tempo >= cur->tempo_fim && !cur->proxima) alfa = 0;
     bool partes = alfa >= cur->limiar_alfa_partes;
-    const double ultimo = cur->ultimo, t = cur->tempo_animacao();
+    const double ultimo = cur->ultimo, t = cur->tempo_animacao(), ta = cur->tempo_aplicado(t);
     disparados_.clear();
     if (cur->animacao >= 0) {
       const Animacao& an = m_->animacoes[size_t(cur->animacao)];
@@ -587,8 +664,8 @@ bool Estado::aplicar(Esqueleto& e) {
       if ((ti == 0 && alfa == 1) || mist == Mistura::Soma) {
         if (ti == 0) partes = true;
         for (const Tl& tl : tls) {
-          if (tl.tipo == TipoTl::Parte) parte(e, an.partes[size_t(tl.indice)], t, mist, partes);
-          else aplicar_timeline(e, *cur, tl, ultimo, t, alfa, mist, false, true);
+          if (tl.tipo == TipoTl::Parte) parte(e, an.partes[size_t(tl.indice)], ta, mist, partes);
+          else aplicar_timeline(e, *cur, tl, ultimo, ta, alfa, mist, false, true);
         }
       } else {
         const bool primeiro = cur->rotacoes.size() != tls.size() * 2;
@@ -597,11 +674,11 @@ bool Estado::aplicar(Esqueleto& e) {
           const Tl& tl = tls[i];
           const Mistura tm = (cur->modo[i] & PRIMEIRA) ? Mistura::Setup : mist;
           if (tl.tipo == TipoTl::Osso && an.ossos[size_t(tl.indice)].prop == PropOsso::Girar)
-            girar(e, an.ossos[size_t(tl.indice)], t, alfa, tm, *cur, i, primeiro);
+            girar(e, an.ossos[size_t(tl.indice)], ta, alfa, tm, *cur, i, primeiro);
           else if (tl.tipo == TipoTl::Parte)
-            parte(e, an.partes[size_t(tl.indice)], t, mist, partes);
+            parte(e, an.partes[size_t(tl.indice)], ta, mist, partes);
           else
-            aplicar_timeline(e, *cur, tl, ultimo, t, alfa, tm, false, true);
+            aplicar_timeline(e, *cur, tl, ultimo, ta, alfa, tm, false, true);
         }
       }
     }

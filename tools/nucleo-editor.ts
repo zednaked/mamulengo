@@ -159,8 +159,8 @@ for (const a of assets) {
     if (runtime === "nucleo" && !st.view.nucleo?.drawing) throw new Error(`${a.name}: o nucleo nao esta desenhando: ${st.view.nucleoError}`);
     imagens[runtime] = {};
     for (const c of casos) {
-      // enquadra o personagem inteiro em todos os instantes do caso (pelo esqueleto do
-      // spine-core, que e o mesmo nos dois modos)
+      // enquadra o personagem inteiro em todos os instantes do caso (cada modo pela pose
+      // dele: o spine-core no modo spine, o nucleo no modo nucleo)
       const r = await call("render", { animation: c.animation, times: c.times, focus: { bones: [raiz], margin: 0.06 }, size: [LADO, LADO], background: [0.169, 0.145, 0.192], sequence: c.sequence ?? null });
       imagens[runtime][c.nome] = r.images;
     }
@@ -223,7 +223,7 @@ ws.close();
 console.table(linhas);
 if (bench.length)
   console.table(
-    bench.map(({ personagem, runtime, animation, slots, rebuildMs, poseAtEndMs, poseAtColdMs, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, fps }) => ({
+    bench.map(({ personagem, runtime, animation, slots, rebuildMs, poseAtEndMs, poseAtColdMs, poseAtStepMs, poseAtNoShortcutMs, checkpointDiff, seqStepMs, seqNoShortcutMs, seqCheckpointDiff, simularMs, simularDiff, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, fps }) => ({
       personagem,
       runtime,
       animation,
@@ -231,6 +231,14 @@ if (bench.length)
       rebuildMs,
       poseAtEndMs,
       poseAtColdMs,
+      poseAtStepMs,
+      poseAtNoShortcutMs,
+      checkpointDiff,
+      seqStepMs,
+      seqNoShortcutMs,
+      seqCheckpointDiff,
+      simularMs,
+      simularDiff,
       frameMs,
       nucleoPoseMs,
       nucleoDrawMs,

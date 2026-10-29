@@ -31,10 +31,14 @@ class Estado;
 // Uma animacao tocando numa trilha. Os campos podem ser mudados logo depois de tocar ou
 // enfileirar (o mix_duracao e o atraso, por exemplo); o ponteiro vale ate o evento de fim.
 struct Entrada {
+  uint64_t id = 0;    // numero unico no Estado (os eventos dizem de qual entrada sao)
   int animacao = -1;  // indice em Modelo::animacoes; -1 e a animacao vazia
   int trilha = 0;
   bool loop = false;
   bool somar = false;     // trilha de cima que soma em vez de substituir
+  // de tras para frente: aplica o tempo espelhado no trecho (fim - tempo), sem eventos de
+  // usuario; relogio, completa e fila andam como sempre (docs/NUCLEO.md "Estado", reverso)
+  bool reverso = false;
   // nao recalcula se cada timeline segura (docs/NUCLEO.md "Estado", modos); o Estado liga
   // quando a entrada perde a de baixo enquanto ja sai para outra
   bool manter_segura = false;
@@ -53,6 +57,8 @@ struct Entrada {
 
   // tempo dentro da animacao (com a volta do loop)
   double tempo_animacao() const;
+  // o tempo que as timelines recebem: o de cima, espelhado com `reverso`
+  double tempo_aplicado(double t_animacao) const { return reverso ? fim - (t_animacao - inicio) : t_animacao; }
   // quando a entrada completa (fim da volta atual no loop)
   double tempo_completa() const;
 
@@ -76,6 +82,7 @@ enum class TipoEvento : uint8_t { Inicio, Interrompida, Fim, Completa, Usuario }
 
 struct Evento {
   TipoEvento tipo = TipoEvento::Inicio;
+  uint64_t entrada = 0;  // Entrada::id (a entrada pode ja ter sido apagada)
   int trilha = 0;
   int animacao = -1;  // -1: a animacao vazia
   // usuario: a definicao (indice em Modelo::eventos), o tempo da chave e os valores
@@ -93,6 +100,10 @@ class Estado {
   ~Estado();
   Estado(const Estado&) = delete;
   Estado& operator=(const Estado&) = delete;
+  // copia tudo de outro Estado do mesmo modelo (trilhas, fila, mixes, relogios e eventos ainda
+  // nao lidos), com as entradas novas: o checkpoint do editor (guardar e voltar a um quadro).
+  // Os ponteiros de Entrada do outro nao valem neste; ao_descartar e dono ficam os deste.
+  void copiar_de(const Estado& o);
 
   const Modelo& modelo() const { return *m_; }
 
@@ -103,6 +114,10 @@ class Estado {
 
   // multiplica o dt de todas as trilhas
   double escala_tempo = 1;
+  // relogios em float32 (o dt, o tempo, o atraso e o mix de cada entrada arredondados a float
+  // a cada conta), como um runtime que guarda o tempo em float; o oraculo usa double
+  bool relogio_float = false;
+  double f32(double x) const { return relogio_float ? double(float(x)) : x; }
 
   // corta o que a trilha toca e toca a animacao (com o mix de-para)
   Entrada* tocar(int trilha, int animacao, bool loop);
@@ -112,6 +127,13 @@ class Estado {
   // corta para a animacao vazia: as timelines da atual saem em `mix` segundos de volta ao setup
   Entrada* vazio(int trilha, double mix);
   Entrada* enfileirar_vazio(int trilha, double mix, double atraso = 0);
+  // muda o mix de uma entrada da fila e refaz o atraso como o enfileirar: atraso <= 0 conta do
+  // fim da anterior menos o mix (o setMixDuration(mix, atraso) do oraculo)
+  void mudar_mix(Entrada* en, double mix, double atraso);
+  // chamado quando uma entrada deixa de valer (antes de ser apagada): quem guarda ponteiros
+  // para entradas (o no do Godot) os esquece aqui
+  void (*ao_descartar)(void* dono, const Entrada* en) = nullptr;
+  void* dono = nullptr;
   // para todas as trilhas (eventos de fim); o esqueleto fica como esta
   void limpar();
   void limpar_trilha(int trilha);
@@ -146,6 +168,7 @@ class Estado {
   std::vector<ParMix> pares_;
   int sem_chave_ = 0;
   bool mudou_ = false;
+  uint64_t proximo_id_ = 1;
 
   Entrada* nova(int trilha, int animacao, bool loop, Entrada* ultima);
   Entrada* expandir(int trilha);
@@ -158,6 +181,9 @@ class Estado {
   void girar(Esqueleto& e, const TimelineOsso& to, double t, double alfa, Mistura mist, Entrada& en, size_t i, bool primeiro);
   void parte(Esqueleto& e, const TimelineParte& tp, double t, Mistura mist, bool partes);
   void disparar(const Animacao& an, double ultimo, double t);
+  void disparar_reverso(const Animacao& an, double ini, double fim, double ultimo, double t);
+  // tempo da chave no relogio da animacao (espelhado no reverso)
+  static double tempo_chave(const Entrada& en, double t) { return en.reverso ? en.fim - (t - en.inicio) : t; }
   void enfileirar_eventos(Entrada* en, double t_anim);
   void recalcular_modos();
   void calcular_modos(Entrada* en);

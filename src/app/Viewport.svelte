@@ -97,8 +97,8 @@
       return;
     }
     // clicar perto do osso selecionado ja comeca a arrastar; senao seleciona
-    const sel = app.selection.bone ? v.skeleton?.findBone(app.selection.bone) : null;
-    const near = sel ? Math.hypot(w.x - sel.appliedPose.worldX, w.y - sel.appliedPose.worldY) * v.cam.zoom < 60 : false;
+    const sel = app.selection.bone ? v.pose?.findBone(app.selection.bone) : null;
+    const near = sel ? Math.hypot(w.x - sel.worldX, w.y - sel.worldY) * v.cam.zoom < 60 : false;
     if (!near) select(w.x, w.y);
     if (app.selection.bone) {
       v.view.playing = false;
@@ -113,7 +113,8 @@
       if (b) return app.select({ bone: b });
     }
     // a imagem clicada e o osso que a move naquele ponto (numa malha com pesos, nao o dono do slot)
-    const part = v.skeleton ? pickPart(v.skeleton, x, y, (sl) => v.isSlotHidden(sl)) : null;
+    const pose = v.pose;
+    const part = pose ? pickPart(pose, x, y, (sl) => v.isSlotHidden(sl)) : null;
     if (part) return app.select({ bone: part.bone, slot: part.slot });
     const b = pickBone(v, x, y, 16);
     app.select(b ? { bone: b } : {});

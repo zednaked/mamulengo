@@ -1,7 +1,10 @@
 // Manipulacao direta no viewport: selecionar clicando na imagem, arrastar para
 // mover/girar/esticar. Com uma animacao aberta cada arrasto vira chave no tempo atual; na Pose base muda o setup.
-import { BlendMode, Color, MeshAttachment, RegionAttachment, Vector2, type Bone, type Skeleton } from "@esotericsoftware/spine-webgl";
+// A pose lida aqui (mundo dos ossos, vertices, ordem) vem de `viewer.pose`: o spine-core nos
+// modos "godot" e "spine", o nucleo no modo "nucleo" (src/render/pose.ts).
+import { Color } from "@esotericsoftware/spine-webgl";
 import type { Viewer } from "../render/viewer.ts";
+import { toParent, type PoseView, type SlotView } from "../render/pose.ts";
 import { app } from "./state.svelte.ts";
 
 export type Tool = "move" | "rotate" | "scale";
@@ -11,95 +14,76 @@ const tmp: number[] = [];
 // Slot cuja imagem esta sob o ponto (da frente para tras). Camadas de brilho
 // (blend aditivo/screen) so sao escolhidas se nada solido estiver sob o ponto:
 // costumam cobrir o personagem e roubariam o clique.
-export function pickSlot(sk: Skeleton, x: number, y: number): string | null {
-  return pickPart(sk, x, y)?.slot ?? null;
+export function pickSlot(pose: PoseView, x: number, y: number): string | null {
+  return pickPart(pose, x, y)?.slot ?? null;
 }
 
 // Parte sob o ponto e o osso que de fato a move ali. Numa malha com pesos o slot pode
 // estar preso a um osso (a raiz do personagem) e quem dobra a imagem ser outro (o braco): vale o
 // osso que mais puxa os tres vertices do triangulo clicado, pesados pela distancia.
-export function pickPart(sk: Skeleton, x: number, y: number, hidden?: (slot: any) => boolean): { slot: string; bone: string } | null {
-  return pickSlotPass(sk, x, y, false, hidden) ?? pickSlotPass(sk, x, y, true, hidden);
+export function pickPart(pose: PoseView, x: number, y: number, hidden?: (slot: SlotView) => boolean): { slot: string; bone: string } | null {
+  return pickSlotPass(pose, x, y, false, hidden) ?? pickSlotPass(pose, x, y, true, hidden);
 }
 
 // Osso que move a imagem do slot: o dono do slot, ou numa malha com pesos o que mais puxa
 // (no triangulo tri com pesos bary, ou na malha inteira)
-export function movingBone(sk: Skeleton, slotName: string, tri?: number[], bary?: number[]): string {
-  const slot = sk.findSlot(slotName);
+export function movingBone(pose: PoseView, slotName: string, tri?: number[], bary?: number[]): string {
+  const slot = pose.findSlot(slotName);
   if (!slot) return "";
-  const att = slot.appliedPose.attachment;
-  if (!(att instanceof MeshAttachment) || !att.bones) return slot.bone.data.name;
-  const per: Map<number, number>[] = [];
-  for (let i = 0, v = 0; i < att.bones.length; ) {
-    const n = att.bones[i++];
-    const m = new Map<number, number>();
-    for (let k = 0; k < n; k++, v += 3) m.set(att.bones[i + k], att.vertices[v + 2]);
-    i += n;
-    per.push(m);
-  }
+  const k = slot.part?.kind;
+  const per = k === "mesh" || k === "linkedmesh" ? pose.weights(slot) : null;
+  if (!per) return slot.bone.name;
   const sum = new Map<number, number>();
-  const add = (vi: number, f: number) => per[vi]?.forEach((w, b) => sum.set(b, (sum.get(b) ?? 0) + w * f));
+  const add = (vi: number, f: number) => per[vi]?.forEach(([b, w]) => sum.set(b, (sum.get(b) ?? 0) + w * f));
   if (tri) tri.forEach((vi, k) => add(vi, bary?.[k] ?? 1));
   else per.forEach((_, vi) => add(vi, 1));
   let best = -1,
     bw = -1;
   for (const [b, w] of sum) if (w > bw) ((best = b), (bw = w));
-  return best >= 0 ? sk.bones[best].data.name : slot.bone.data.name;
+  return best >= 0 ? pose.bones[best].name : slot.bone.name;
 }
 
+// regiao ou malha (o que tem imagem e triangulos)
+const drawable = (s: SlotView) => {
+  const k = s.part?.kind;
+  return k === "region" || k === "mesh" || k === "linkedmesh";
+};
+
 // Caixa na tela [x0, y0, x1, y1] da imagem atual de um slot (null se nao tem imagem)
-export function slotWorldBox(sk: Skeleton, slotName: string): number[] | null {
-  const slot = sk.findSlot(slotName);
-  const att = slot?.appliedPose.attachment;
-  if (!slot || !att) return null;
-  let n = 0;
-  if (att instanceof RegionAttachment) {
-    att.computeWorldVertices(slot, att.getOffsets(slot.appliedPose), tmp, 0, 2);
-    n = 8;
-  } else if (att instanceof MeshAttachment) {
-    n = att.worldVerticesLength;
-    if (tmp.length < n) tmp.length = n;
-    att.computeWorldVertices(sk, slot, 0, n, tmp, 0, 2);
-  } else return null;
+export function slotWorldBox(pose: PoseView, slotName: string): number[] | null {
+  const slot = pose.findSlot(slotName);
+  if (!slot || !drawable(slot)) return null;
+  const n = pose.vertices(slot, tmp);
+  if (!n) return null;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (let i = 0; i < n; i += 2) (x0 = Math.min(x0, tmp[i])), (x1 = Math.max(x1, tmp[i])), (y0 = Math.min(y0, tmp[i + 1])), (y1 = Math.max(y1, tmp[i + 1]));
   return [x0, y0, x1, y1];
 }
 
-function pickSlotPass(sk: Skeleton, x: number, y: number, glows: boolean, hidden?: (slot: any) => boolean): { slot: string; bone: string } | null {
-  const order = sk.drawOrder.appliedPose;
+function pickSlotPass(pose: PoseView, x: number, y: number, glows: boolean, hidden?: (slot: SlotView) => boolean): { slot: string; bone: string } | null {
+  const order = pose.drawOrder();
   for (let i = order.length - 1; i >= 0; i--) {
     const slot = order[i];
     if (!slot.bone.active || hidden?.(slot)) continue;
-    const glow = slot.data.blendMode === BlendMode.Additive || slot.data.blendMode === BlendMode.Screen;
+    const glow = slot.blend === "additive" || slot.blend === "screen";
     if (glow !== glows) continue;
-    const pose = slot.appliedPose;
-    const att = pose.attachment;
-    let tris: number[] | null = null;
-    let n = 0;
-    if (att instanceof RegionAttachment) {
-      att.computeWorldVertices(slot, att.getOffsets(pose), tmp, 0, 2);
-      tris = [0, 1, 2, 2, 3, 0];
-      n = 8;
-    } else if (att instanceof MeshAttachment) {
-      n = att.worldVerticesLength;
-      if (tmp.length < n) tmp.length = n;
-      att.computeWorldVertices(sk, slot, 0, n, tmp, 0, 2);
-      tris = att.triangles;
-    }
+    if (!drawable(slot)) continue;
+    const tris = pose.triangles(slot);
+    const n = pose.vertices(slot, tmp);
     if (!tris || !n) continue;
-    if (pose.color.a < 0.05) continue;
+    if (slot.color.a < 0.05) continue;
+    const mesh = slot.part!.kind !== "region";
     for (let t = 0; t < tris.length; t += 3) {
       const a = tris[t] * 2,
         b = tris[t + 1] * 2,
         c = tris[t + 2] * 2;
       if (inTri(x, y, tmp[a], tmp[a + 1], tmp[b], tmp[b + 1], tmp[c], tmp[c + 1])) {
-        if (!(att instanceof MeshAttachment)) return { slot: slot.data.name, bone: slot.bone.data.name };
+        if (!mesh) return { slot: slot.name, bone: slot.bone.name };
         // coordenadas baricentricas do ponto no triangulo: o vertice mais perto pesa mais
         const det = (tmp[b + 1] - tmp[c + 1]) * (tmp[a] - tmp[c]) + (tmp[c] - tmp[b]) * (tmp[a + 1] - tmp[c + 1]) || 1e-9;
         const l1 = ((tmp[b + 1] - tmp[c + 1]) * (x - tmp[c]) + (tmp[c] - tmp[b]) * (y - tmp[c + 1])) / det;
         const l2 = ((tmp[c + 1] - tmp[a + 1]) * (x - tmp[c]) + (tmp[a] - tmp[c]) * (y - tmp[c + 1])) / det;
-        return { slot: slot.data.name, bone: movingBone(sk, slot.data.name, [tris[t], tris[t + 1], tris[t + 2]], [l1, l2, 1 - l1 - l2]) };
+        return { slot: slot.name, bone: movingBone(pose, slot.name, [tris[t], tris[t + 1], tris[t + 2]], [l1, l2, 1 - l1 - l2]) };
       }
     }
   }
@@ -117,18 +101,17 @@ function inTri(px: number, py: number, ax: number, ay: number, bx: number, by: n
 
 // Osso mais proximo (segmento do osso) dentro de um raio em pixels de tela.
 export function pickBone(v: Viewer, x: number, y: number, radiusPx = 10): string | null {
-  const sk = v.skeleton;
-  if (!sk) return null;
+  const pose = v.pose;
+  if (!pose) return null;
   let best: string | null = null;
   let bestD = radiusPx / v.cam.zoom;
-  for (const b of sk.bones) {
-    if (!b.active) continue;
-    const p = b.appliedPose;
-    const len = b.data.length;
+  for (const p of pose.bones) {
+    if (!p.active) continue;
+    const len = p.length;
     const x2 = p.worldX + p.a * len,
       y2 = p.worldY + p.c * len;
     const d = segDist(x, y, p.worldX, p.worldY, x2, y2);
-    if (d < bestD) (bestD = d), (best = b.data.name);
+    if (d < bestD) (bestD = d), (best = p.name);
   }
   return best;
 }
@@ -158,11 +141,10 @@ let seq = 0;
 
 export function beginDrag(v: Viewer, world: { x: number; y: number }, tool: Tool): boolean {
   const name = app.selection.bone;
-  const b = name ? v.skeleton?.findBone(name) : null;
-  if (!b) return false;
-  const p = b.appliedPose;
-  const lp = b.pose;
-  const parentPos = toParent(b, world.x, world.y);
+  const p = name ? v.pose?.findBone(name) : null;
+  if (!p) return false;
+  const lp = p.local;
+  const parentPos = toParent(p, world.x, world.y);
   drag = {
     bone: name!,
     tool,
@@ -176,25 +158,19 @@ export function beginDrag(v: Viewer, world: { x: number; y: number }, tool: Tool
   return true;
 }
 
-function toParent(b: Bone, x: number, y: number) {
-  const v = new Vector2(x, y);
-  return b.parent ? b.parent.appliedPose.worldToLocal(v) : v;
-}
-
 export function moveDrag(v: Viewer, world: { x: number; y: number }, fine: boolean) {
   if (!drag) return;
-  const b = v.skeleton?.findBone(drag.bone);
-  if (!b) return;
+  const p = v.pose?.findBone(drag.bone);
+  if (!p) return;
   const k = fine ? 0.2 : 1;
   const L = drag.local;
   const next: Partial<typeof L> = {};
   if (drag.tool === "move") {
-    const pp = toParent(b, world.x, world.y);
-    const sp = toParent(b, drag.start.x, drag.start.y);
+    const pp = toParent(p, world.x, world.y);
+    const sp = toParent(p, drag.start.x, drag.start.y);
     next.x = L.x + (pp.x - sp.x) * k;
     next.y = L.y + (pp.y - sp.y) * k;
   } else if (drag.tool === "rotate") {
-    const p = b.appliedPose;
     let d = ((Math.atan2(world.y - p.worldY, world.x - p.worldX) - drag.startAngle) * 180) / Math.PI;
     if (d > 180) d -= 360;
     if (d < -180) d += 360;
@@ -202,7 +178,6 @@ export function moveDrag(v: Viewer, world: { x: number; y: number }, fine: boole
     const flip = p.a * p.d - p.b * p.c < 0 ? -1 : 1;
     next.rotation = L.rotation + d * k * flip;
   } else {
-    const p = b.appliedPose;
     const f = 1 + (Math.hypot(world.x - p.worldX, world.y - p.worldY) / drag.startDist - 1) * k;
     next.scaleX = L.scaleX * f;
     next.scaleY = L.scaleY * f;
@@ -240,12 +215,11 @@ export function applyLocal(bone: string, local: { x?: number; y?: number; rotati
   if (local.x !== undefined || local.y !== undefined) edge("translate");
   if (local.scaleX !== undefined || local.scaleY !== undefined) edge("scale");
   if (local.rotation !== undefined) calls.push({ cmd: "key.set", args: { anim, target: T, timeline: "rotate", time, value: local.rotation - (setup.rotation ?? 0) } });
+  const cur = v.pose?.findBone(bone)?.local ?? { x: 0, y: 0, scaleX: 1, scaleY: 1 };
   if (local.x !== undefined || local.y !== undefined) {
-    const cur = v.skeleton!.findBone(bone)!.pose;
     calls.push({ cmd: "key.set", args: { anim, target: T, timeline: "translate", time, x: (local.x ?? cur.x) - (setup.x ?? 0), y: (local.y ?? cur.y) - (setup.y ?? 0) } });
   }
   if (local.scaleX !== undefined || local.scaleY !== undefined) {
-    const cur = v.skeleton!.findBone(bone)!.pose;
     calls.push({ cmd: "key.set", args: { anim, target: T, timeline: "scale", time, x: (local.scaleX ?? cur.scaleX) / (setup.scaleX ?? 1), y: (local.scaleY ?? cur.scaleY) / (setup.scaleY ?? 1) } });
   }
   app.run(calls, `chave ${bone} @${time}`, merge);
@@ -254,9 +228,8 @@ export function applyLocal(bone: string, local: { x?: number; y?: number; rotati
 // Gizmo do osso selecionado: circulo de rotacao, seta de mover, alca de escala.
 export function drawGizmo(v: Viewer) {
   const name = app.selection.bone;
-  const b = name ? v.skeleton?.findBone(name) : null;
-  if (!b) return;
-  const p = b.appliedPose;
+  const p = name ? v.pose?.findBone(name) : null;
+  if (!p) return;
   const r = 34 / v.cam.zoom;
   const s = v.scene;
   const accent = new Color(1, 0.18, 0.53, 0.95);
@@ -288,11 +261,9 @@ let stroke: Stroke | null = null;
 export const cursor = { x: 0, y: 0, inside: false };
 
 function meshUnder(v: Viewer, slotName: string | undefined): { slot: string; attachment: string; isMesh: boolean } | null {
-  if (!slotName || !v.skeleton) return null;
-  const slot = v.skeleton.findSlot(slotName);
-  const att = slot?.appliedPose.attachment;
-  if (!slot || !att) return null;
-  return { slot: slotName, attachment: att.name, isMesh: att instanceof MeshAttachment };
+  const part = slotName ? v.pose?.findSlot(slotName)?.part : null;
+  if (!slotName || !part) return null;
+  return { slot: slotName, attachment: part.name, isMesh: part.kind === "mesh" || part.kind === "linkedmesh" };
 }
 
 export function beginStroke(v: Viewer, visual: { x: number; y: number }): boolean {
@@ -303,11 +274,12 @@ export function beginStroke(v: Viewer, visual: { x: number; y: number }): boolea
   if (app.tool !== "deform") return false;
   // o que estiver sob o pincel; fora do personagem, o slot selecionado
   let target: ReturnType<typeof meshUnder> = null;
-  if (v.skeleton) {
+  const pose = v.pose;
+  if (pose) {
     const skel = v.flip ? { x: visual.x, y: -visual.y } : visual;
-    const s = pickSlot(v.skeleton, skel.x, skel.y);
+    const s = pickSlot(pose, skel.x, skel.y);
     if (s) {
-      app.select({ slot: s, bone: v.skeleton.findSlot(s)!.bone.data.name });
+      app.select({ slot: s, bone: pose.findSlot(s)!.bone.name });
       target = meshUnder(v, s);
     }
   }

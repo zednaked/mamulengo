@@ -42,11 +42,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
   const v = app.viewer;
   v?.sync();
-  if (!v?.skeleton) throw new Error("nada para exportar (abra um asset)");
+  if (!v?.pose) throw new Error("nada para exportar (abra um asset)");
   const saved = { view: { ...v.view }, cam: { ...v.cam }, selection: v.selection, overlays: v.overlays, onion: v.onion.enabled };
   try {
     if (o.animation !== undefined && o.animation !== v.view.animation) {
-      if (o.animation && !v.data?.findAnimation(o.animation)) throw new Error(`animacao nao existe: ${o.animation}`);
+      if (o.animation && !v.hasAnimation(o.animation)) throw new Error(`animacao nao existe: ${o.animation}`);
       v.setAnimation(o.animation);
     }
     applySequence(v, o.sequence);

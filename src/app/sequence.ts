@@ -10,6 +10,6 @@ export function applySequence(v: Viewer, s: SequenceParam) {
   if (s === undefined) return;
   if (s === null) return v.setSequence(null);
   if (!v.view.animation) throw new Error("sequence precisa de uma animacao (animation)");
-  if (!v.data?.findAnimation(s.next)) throw new Error(`animacao nao existe: ${s.next}`);
+  if (!v.hasAnimation(s.next)) throw new Error(`animacao nao existe: ${s.next}`);
   v.setSequence({ next: s.next, mix: s.mix ?? app.mixFor(v.view.animation, s.next), at: s.at ?? null, loop: s.loop ?? false, nextLoop: s.nextLoop ?? true });
 }

@@ -68,7 +68,7 @@ const handlers: Record<string, Handler> = {
   async godotCheck(p: { animation?: string | null; time?: number }) {
     const v = app.viewer;
     const doc = app.doc;
-    if (!v?.skeleton || !doc?.file.tres) throw new Error("nada aberto");
+    if (!v?.pose || !doc?.file.tres) throw new Error("nada aberto");
     if (doc.dirty) throw new Error("ha alteracoes nao salvas: salve antes (o Godot le o arquivo do disco)");
     v.sync();
     const saved = { view: { ...v.view }, cam: { ...v.cam } };
@@ -213,7 +213,7 @@ const handlers: Record<string, Handler> = {
       asset: app.asset ? `${app.asset.project}/${app.asset.name}` : null,
       file: app.doc?.file ?? null,
       dirty: app.doc?.dirty ?? false,
-      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null } : null,
+      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data } } : null,
       selection: app.selection,
       runtimeError: v?.error ?? null,
       history: app.doc?.history().slice(-15) ?? [],
@@ -232,7 +232,7 @@ const handlers: Record<string, Handler> = {
     // ainda nao estaria nele
     v.sync();
     if (p.animation !== undefined) {
-      if (p.animation && !v.data?.findAnimation(p.animation)) throw new Error(`animacao nao existe: ${p.animation}`);
+      if (p.animation && !v.hasAnimation(p.animation)) throw new Error(`animacao nao existe: ${p.animation}`);
       v.setAnimation(p.animation);
     }
     applySequence(v, p.sequence);
@@ -252,7 +252,7 @@ const handlers: Record<string, Handler> = {
   render(p: { animation?: string | null; times: number[]; rect?: number[]; size?: number[]; focus?: { bones?: string[]; slots?: string[]; margin?: number }; background?: number[]; shift?: number[]; sequence?: SequenceParam }) {
     const v = app.viewer;
     v?.sync();
-    if (!v?.skeleton) throw new Error("nada para mostrar (abra um asset)");
+    if (!v?.pose) throw new Error("nada para mostrar (abra um asset)");
     const saved = { view: { ...v.view } };
     const hid = [v.hiddenBones, v.hiddenSlots];
     v.hiddenBones = new Set();
@@ -318,7 +318,7 @@ const handlers: Record<string, Handler> = {
   async bench(p: { animation?: string; time?: number; n?: number; bone?: string; runtime?: Runtime }) {
     const v = app.viewer;
     const doc = app.doc;
-    if (!v?.skeleton || !doc) throw new Error("nada aberto");
+    if (!v?.pose || !doc) throw new Error("nada aberto");
     const runtime0 = v.runtime;
     if (p.runtime) await v.setRuntime(p.runtime);
     const n = p.n ?? 10;
@@ -336,11 +336,64 @@ const handlers: Record<string, Handler> = {
       const dur = v.duration();
       const t = p.time ?? Math.max(0, dur - 0.05);
       v.view.playing = false;
-      const out: Record<string, any> = { runtime: v.runtime, animation: anim, duration: dur, time: t, slots: v.skeleton.slots.length, bones: v.skeleton.bones.length };
+      const out: Record<string, any> = { runtime: v.runtime, animation: anim, duration: dur, time: t, slots: v.pose.slots.length, bones: v.pose.bones.length };
       out.rebuildMs = ms(() => v.rebuild());
       out.poseAtEndMs = ms(() => v.poseAt(t));
       // sem o atalho incremental (fisica refeita desde 0)
-      out.poseAtColdMs = ms(() => (v.sim?.invalidate(), v.poseAt(t)));
+      out.poseAtColdMs = ms(() => (v.invalidatePose(), v.poseAt(t)));
+      // agulha andando para frente quadro a quadro (o atalho do checkpoint): custo por quadro
+      // e a diferenca contra a mesma pose refeita desde 0 sem atalho (tem de ser 0)
+      const mundo = () => v.pose!.bones.flatMap((b) => [b.a, b.b, b.c, b.d, b.worldX, b.worldY]);
+      const atalhos = (on: boolean) => {
+        if (v.sim) v.sim.shortcuts = on;
+        if (v.nucleo) v.nucleo.atalhos = on;
+      };
+      const andando = (seq: any) => {
+        const t0 = Math.max(0, t - 0.5);
+        v.invalidatePose();
+        if (seq !== undefined) v.setSequence(seq);
+        v.poseAt(t0);
+        const k = 30;
+        const a = performance.now();
+        for (let i = 1; i <= k; i++) v.poseAt(t0 + (i * (t - t0)) / k);
+        const passo = (performance.now() - a) / k;
+        const inc = mundo();
+        atalhos(false);
+        v.invalidatePose();
+        const c = performance.now();
+        v.poseAt(t);
+        const frio = performance.now() - c;
+        const ref = mundo();
+        atalhos(true);
+        if (seq !== undefined) v.setSequence(null);
+        return { passo: +passo.toFixed(3), frio: +frio.toFixed(3), dif: Math.max(0, ...inc.map((x, i) => Math.abs(x - ref[i]))) };
+      };
+      // nucleo: mm_simular (varios instantes de uma vez) da o mesmo que um poseAt por instante
+      if (v.useNucleo && anim) {
+        const ts = Array.from({ length: 12 }, (_, i) => +((t * (i + 1)) / 12).toFixed(4));
+        const a = performance.now();
+        const sim = v.nucleo!.simular(anim, v.view.loop, ts);
+        out.simularMs = +(performance.now() - a).toFixed(3);
+        let dif = 0;
+        ts.forEach((ti, i) => {
+          v.invalidatePose();
+          v.poseAt(ti);
+          mundo().forEach((x, k) => (dif = Math.max(dif, Math.abs(x - sim[i][k]))));
+        });
+        out.simularDiff = dif;
+      }
+      const s1 = andando(undefined);
+      out.poseAtStepMs = s1.passo;
+      out.poseAtNoShortcutMs = s1.frio;
+      out.checkpointDiff = s1.dif;
+      // com a emenda (previa de transicao para a outra animacao, mix 0.2)
+      const outra = v.animationNames().find((n) => n !== anim);
+      if (anim && outra) {
+        const s2 = andando({ next: outra, mix: 0.2 });
+        out.seqStepMs = s2.passo;
+        out.seqNoShortcutMs = s2.frio;
+        out.seqCheckpointDiff = s2.dif;
+      }
       // tocando: quadro inteiro (pose + desenho), sem esperar o rAF
       v.poseAt(0);
       v.view.playing = true;
@@ -354,7 +407,7 @@ const handlers: Record<string, Handler> = {
       }
       v.view.playing = false;
       // passo de arrasto com animacao aberta: chave no tempo t, merge com a etapa anterior
-      const bone = p.bone ?? v.skeleton.bones[Math.min(1, v.skeleton.bones.length - 1)].data.name;
+      const bone = p.bone ?? v.pose!.bones[Math.min(1, v.pose!.bones.length - 1)].name;
       const merge = `bench${Date.now()}`;
       v.poseAt(t);
       let k = 0;
@@ -404,7 +457,7 @@ const handlers: Record<string, Handler> = {
   look(p: { animation?: string; time?: number; times?: number[]; frames?: number; fit?: boolean; bones?: boolean; meshes?: boolean; scale?: number; sequence?: SequenceParam }) {
     const v = app.viewer;
     v?.sync();
-    if (!v?.skeleton) throw new Error("nada para mostrar (abra um asset)");
+    if (!v?.pose) throw new Error("nada para mostrar (abra um asset)");
     const saved = { view: { ...v.view }, cam: { ...v.cam }, selection: v.selection, overlays: v.overlays };
     // o Claude ve o personagem inteiro, mesmo com partes escondidas na tela da pessoa
     const hid = [v.hiddenBones, v.hiddenSlots];

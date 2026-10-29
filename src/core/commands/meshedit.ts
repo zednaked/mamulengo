@@ -79,13 +79,21 @@ interface Space {
   boneByName(n: string): Affine;
 }
 
-function space(json: SpineJson, slot: string): Space {
-  const sk = skeletonAt(json, null, 0);
+// O mundo dos ossos na setup pose: do spine-core (skeletonAt), ou de quem ja tem essa pose
+// calculada (`world`, o editor no modo "nucleo" passa a do nucleo)
+export type SetupWorld = (bone: string) => Affine | null;
+
+function space(json: SpineJson, slot: string, world?: SetupWorld): Space {
+  let sk: ReturnType<typeof skeletonAt> | null = null;
   const names = bones(json).map((b) => b.name);
   const cache = new Map<string, Affine>();
   const byName = (n: string) => {
     let m = cache.get(n);
-    if (!m) cache.set(n, (m = boneWorld(sk, n)));
+    if (!m) {
+      m = world?.(n) ?? undefined;
+      m ??= boneWorld((sk ??= skeletonAt(json, null, 0)), n);
+      cache.set(n, m);
+    }
     return m;
   };
   const slotBone = slots(json).find((s) => s.name === slot)?.bone;
@@ -339,9 +347,9 @@ export interface MeshView {
   bones: string[];
 }
 
-export function meshView(json: SpineJson, skin: string, slot: string, attachment: string): MeshView {
+export function meshView(json: SpineJson, skin: string, slot: string, attachment: string, world?: SetupWorld): MeshView {
   const loc = locateMesh(json, skin, slot, attachment);
-  const S = space(json, slot);
+  const S = space(json, slot, world);
   const V = decode(loc.mesh);
   const names = bones(json).map((b) => b.name);
   const weights = V.map((v) => (v.inf ? Object.fromEntries(v.inf.map((e) => [names[e.bone], e.w])) : { [S.slotBone]: 1 }));

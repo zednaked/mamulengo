@@ -29,7 +29,7 @@ import { godotGravity } from "../src/core/pose.ts";
 
 export interface Acao {
   quadro: number;
-  tipo: "tocar" | "enfileirar" | "vazio" | "enfileirar_vazio" | "limpar" | "limpar_trilha" | "escala_tempo" | "cor" | "esconder";
+  tipo: "tocar" | "enfileirar" | "vazio" | "enfileirar_vazio" | "limpar" | "limpar_trilha" | "escala_tempo" | "tempo_trilha" | "cor" | "esconder";
   trilha?: number;
   animacao?: string;
   loop?: boolean;
@@ -38,6 +38,11 @@ export interface Acao {
   valor?: number;
   slot?: string;
   cor?: [number, number, number, number];
+  // so em tocar e enfileirar, mudados na entrada logo depois (a API publica da entrada):
+  reverso?: boolean; // de tras para frente
+  mix_entrada?: number; // o mix da entrada (sem mexer no atraso)
+  mix_e_atraso?: [number, number]; // o mix e o atraso refeito como no enfileirar
+  escala_entrada?: number; // a escala de tempo da entrada
 }
 
 export interface Roteiro {
@@ -46,6 +51,9 @@ export interface Roteiro {
   passo?: number;
   // substitui o mix do .boneco (padrao e pares)
   mix?: { padrao?: number; pares?: { de: string; para: string; tempo: number }[] };
+  // quadros [de, ate) em que o personagem esta escondido: so o relogio das trilhas anda
+  // (state.update), sem aplicar, sem o relogio do esqueleto e sem atualizar o mundo
+  escondido?: [number, number];
   acoes: Acao[];
 }
 
@@ -104,13 +112,24 @@ export function oraculoEstado(boneco: any, r: Roteiro) {
     const acoes = porQuadro.get(quadro) ?? [];
     for (const a of acoes) {
       const t = a.trilha ?? 0;
+      const entrada = (en: any) => {
+        if (a.reverso !== undefined) en.reverse = a.reverso;
+        if (a.escala_entrada !== undefined) en.timeScale = a.escala_entrada;
+        if (a.mix_entrada !== undefined) en.mixDuration = a.mix_entrada;
+        if (a.mix_e_atraso) en.setMixDuration(a.mix_e_atraso[0], a.mix_e_atraso[1]);
+      };
       switch (a.tipo) {
         case "tocar":
-          st.setAnimation(t, a.animacao!, a.loop ?? true);
+          entrada(st.setAnimation(t, a.animacao!, a.loop ?? true));
           break;
         case "enfileirar":
-          st.addAnimation(t, a.animacao!, a.loop ?? true, a.atraso ?? 0);
+          entrada(st.addAnimation(t, a.animacao!, a.loop ?? true, a.atraso ?? 0));
           break;
+        case "tempo_trilha": {
+          const en = st.tracks[t];
+          if (en) en.trackTime = a.valor ?? 0;
+          break;
+        }
         case "vazio":
           st.setEmptyAnimation(t, a.mix ?? 0);
           break;
@@ -129,6 +148,10 @@ export function oraculoEstado(boneco: any, r: Roteiro) {
       }
     }
     st.update(d);
+    if (r.escondido && quadro >= r.escondido[0] && quadro < r.escondido[1]) {
+      quadros.push(pose(sk, quadro));
+      continue;
+    }
     st.apply(sk);
     for (const a of acoes) {
       if (a.tipo !== "cor" && a.tipo !== "esconder") continue;
@@ -246,6 +269,31 @@ export function roteirosPadrao(boneco: any, mix: number | null): Roteiro[] {
           { quadro: 30 + Math.max(1, Q((mix as number) / 2)), tipo: "tocar", animacao: a, loop: true },
         ],
       });
+    // escondido (o no fora da arvore visivel): so o relogio das trilhas anda; volta a aparecer
+    // no meio do laco, e uma troca com mix acontece enquanto esta escondido ou ao aparecer
+    if (i < 2 && da > 0) {
+      out.push({ nome: `escondido ${a}${sufixo}`, quadros: Q(da * 2) + 30, mix: m, escondido: [0, Q(da * 1.3)], acoes: [{ quadro: 0, tipo: "tocar", animacao: a, loop: true }] });
+      out.push({
+        nome: `escondido e troca ${a} / ${b}${sufixo}`,
+        quadros: Q(da + db) + 40,
+        mix: m,
+        escondido: [0, Q(da * 1.3)],
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: a, loop: true },
+          { quadro: Q(da * 1.3), tipo: "tocar", animacao: b, loop: false, mix_entrada: 0.1 },
+        ],
+      });
+      out.push({
+        nome: `troca escondido ${a} / ${b}${sufixo}`,
+        quadros: Q(da + db) + 40,
+        mix: m,
+        escondido: [10, Q(da) + 10],
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: a, loop: true },
+          { quadro: 20, tipo: "tocar", animacao: b, loop: true, mix_entrada: 0.2 },
+        ],
+      });
+    }
     if (mix === null && i === 0 && boneco.slots?.length >= 2)
       out.push({
         nome: `slot do jogo ${a}`,
@@ -257,6 +305,68 @@ export function roteirosPadrao(boneco: any, mix: number | null): Roteiro[] {
           { quadro: 12, tipo: "escala_tempo", valor: 0.5 },
         ],
       });
+    // a entrada mudada pelo jogo: de tras para frente, mix e atraso refeitos, escala propria,
+    // relogio da trilha adiantado (so nas duas primeiras animacoes)
+    if (i < 2 && da > 0) {
+      out.push({
+        nome: `reverso ${a}${sufixo}`,
+        quadros: Q(da * 1.25) + 2,
+        mix: m,
+        acoes: [{ quadro: 0, tipo: "tocar", animacao: a, loop: false, reverso: true }],
+      });
+      out.push({
+        nome: `reverso em loop ${a}${sufixo}`,
+        quadros: Q(da * 2.5) + 2,
+        mix: m,
+        acoes: [{ quadro: 0, tipo: "tocar", animacao: a, loop: true, reverso: true }],
+      });
+      out.push({
+        nome: `reverso cortado ${a} / ${b}${sufixo}`,
+        quadros: Q(da / 2 + db) + 30,
+        mix: m,
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: b, loop: true },
+          { quadro: 10, tipo: "tocar", animacao: a, loop: false, reverso: true, mix_entrada: 0.25 },
+          { quadro: 10 + Q(da / 2), tipo: "tocar", animacao: b, loop: true },
+        ],
+      });
+      out.push({
+        nome: `reverso na fila ${b} > ${a}${sufixo}`,
+        quadros: Q(db + da) + 20,
+        mix: m,
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: b, loop: false },
+          { quadro: 0, tipo: "enfileirar", animacao: a, loop: false, atraso: 0, reverso: true },
+        ],
+      });
+      out.push({
+        nome: `na volta do loop ${a} > ${b}${sufixo}`,
+        quadros: Q(da * 1.6 + db) + 20,
+        mix: m,
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: a, loop: true },
+          { quadro: Q(da * 0.6), tipo: "enfileirar", animacao: b, loop: false, atraso: 0, mix_e_atraso: [0, 0] },
+        ],
+      });
+      out.push({
+        nome: `escala da entrada ${a} > ${b}${sufixo}`,
+        quadros: Q(da * 2 + db) + 20,
+        mix: m,
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: a, loop: false, escala_entrada: 0.5 },
+          { quadro: 0, tipo: "enfileirar", animacao: b, loop: true, atraso: 0, escala_entrada: 1.5 },
+        ],
+      });
+      out.push({
+        nome: `tempo da trilha ${a}${sufixo}`,
+        quadros: Q(da) + 20,
+        mix: m,
+        acoes: [
+          { quadro: 0, tipo: "tocar", animacao: a, loop: true },
+          { quadro: 5, tipo: "tempo_trilha", valor: da * 0.7 },
+        ],
+      });
+    }
   });
   return out;
 }

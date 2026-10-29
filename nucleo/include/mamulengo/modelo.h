@@ -119,6 +119,8 @@ struct Parte {
   int pagina = -1;
   std::vector<float> uvs;
   std::vector<uint16_t> triangulos;
+  // malha: quantos vertices (os primeiros) formam o contorno; so o editor usa
+  int contorno = 0;
   Cor cor;
   // recorte: o slot em que o recorte acaba (-1: vale ate o fim do desenho)
   int fim = -1;
@@ -160,6 +162,9 @@ struct DadosTransformacao {
   int fonte = -1;
   bool fonte_local = false, alvo_local = false, somar = false, limitar = false;
   double mix_girar = 1, mix_x = 1, mix_y = 1, mix_escala_x = 1, mix_escala_y = 1, mix_cisalha_y = 1;
+  // deslocamentos da restricao (os campos do topo), somados ao valor da fonte; em mundo, x e y
+  // sao um ponto no espaco da fonte (docs/NUCLEO.md "Restricoes")
+  double desl_girar = 0, desl_x = 0, desl_y = 0, desl_escala_x = 0, desl_escala_y = 0, desl_cisalha_y = 0;
   std::vector<DadosTransfDe> de;
 };
 

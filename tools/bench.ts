@@ -36,4 +36,4 @@ for (const t of targets) {
   }
 }
 ws.close();
-console.table(rows.map(({ asset, runtime, animation, duration, slots, rebuildMs, poseAtEndMs, poseAtColdMs, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, serializeMs, fps }) => ({ asset, runtime, animation, duration: +duration.toFixed(2), slots, rebuildMs, poseAtEndMs, poseAtColdMs, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, serializeMs, fps })));
+console.table(rows.map(({ asset, runtime, animation, duration, slots, rebuildMs, poseAtEndMs, poseAtColdMs, poseAtStepMs, poseAtNoShortcutMs, checkpointDiff, seqStepMs, seqNoShortcutMs, seqCheckpointDiff, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, serializeMs, fps }) => ({ asset, runtime, animation, duration: +duration.toFixed(2), slots, rebuildMs, poseAtEndMs, poseAtColdMs, poseAtStepMs, poseAtNoShortcutMs, checkpointDiff, seqStepMs, seqNoShortcutMs, seqCheckpointDiff, frameMs, nucleoPoseMs, nucleoDrawMs, dragStepMs, setupStepMs, rebuildsInDrag, nucleoReloadsInDrag, serializeMs, fps })));

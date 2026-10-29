@@ -8,6 +8,7 @@
 #include "mamulengo/json.h"
 
 #ifdef GDEXTENSION
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/time.hpp>
@@ -16,7 +17,9 @@
 #define BONECO_USEC() int64_t(Time::get_singleton()->get_ticks_usec())
 #define BONECO_ERRO(m) UtilityFunctions::push_error(m)
 #define BONECO_EXISTE(p) FileAccess::file_exists(p)
+#define BONECO_EDITOR() Engine::get_singleton()->is_editor_hint()
 #else
+#include "core/config/engine.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
@@ -25,6 +28,7 @@
 #define BONECO_USEC() int64_t(OS::get_singleton()->get_ticks_usec())
 #define BONECO_ERRO(m) ERR_PRINT(m)
 #define BONECO_EXISTE(p) FileAccess::exists(p)
+#define BONECO_EDITOR() Engine::get_singleton()->is_editor_hint()
 #endif
 
 using mamulengo::Blend;
@@ -98,7 +102,22 @@ void boneco_liberar_materiais() {
 
 // ---- BonecoData
 
+namespace {
+// os BonecoData vivos por caminho (sem segurar: o ultimo Ref que sai apaga e tira daqui)
+std::unordered_map<std::string, BonecoData *> &vivos() {
+  static std::unordered_map<std::string, BonecoData *> m;
+  return m;
+}
+}  // namespace
+
+BonecoData::~BonecoData() {
+  auto it = vivos().find(padrao(caminho));
+  if (it != vivos().end() && it->second == this) vivos().erase(it);
+}
+
 Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
+  auto it = vivos().find(padrao(p_caminho));
+  if (it != vivos().end()) return Ref<BonecoData>(it->second);
   Ref<BonecoData> d;
   d.instantiate();
   d->caminho = p_caminho;
@@ -128,6 +147,7 @@ Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
     if (tex.is_null()) BONECO_ERRO("boneco: nao carreguei a pagina " + p);
     d->paginas.push_back(tex);
   }
+  vivos()[padrao(p_caminho)] = d.ptr();
   return d;
 }
 
@@ -157,13 +177,64 @@ void BonecoEntrada::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_animation_name"), &BonecoEntrada::get_animation_name);
   ClassDB::bind_method(D_METHOD("get_track_index"), &BonecoEntrada::get_track_index);
   ClassDB::bind_method(D_METHOD("get_loop"), &BonecoEntrada::get_loop);
+  ClassDB::bind_method(D_METHOD("is_valid"), &BonecoEntrada::is_valid);
+  ClassDB::bind_method(D_METHOD("set_reverse", "reverso"), &BonecoEntrada::set_reverse);
+  ClassDB::bind_method(D_METHOD("get_reverse"), &BonecoEntrada::get_reverse);
+  ClassDB::bind_method(D_METHOD("set_mix_duration", "mix"), &BonecoEntrada::set_mix_duration);
+  ClassDB::bind_method(D_METHOD("get_mix_duration"), &BonecoEntrada::get_mix_duration);
+  ClassDB::bind_method(D_METHOD("set_mix_duration_and_delay", "mix", "atraso"), &BonecoEntrada::set_mix_duration_and_delay);
+  ClassDB::bind_method(D_METHOD("set_delay", "atraso"), &BonecoEntrada::set_delay);
+  ClassDB::bind_method(D_METHOD("get_delay"), &BonecoEntrada::get_delay);
+  ClassDB::bind_method(D_METHOD("set_track_time", "tempo"), &BonecoEntrada::set_track_time);
+  ClassDB::bind_method(D_METHOD("get_track_time"), &BonecoEntrada::get_track_time);
+  ClassDB::bind_method(D_METHOD("get_animation_time"), &BonecoEntrada::get_animation_time);
+  ClassDB::bind_method(D_METHOD("set_time_scale", "escala"), &BonecoEntrada::set_time_scale);
+  ClassDB::bind_method(D_METHOD("get_time_scale"), &BonecoEntrada::get_time_scale);
+  ClassDB::bind_method(D_METHOD("set_alpha", "alfa"), &BonecoEntrada::set_alpha);
+  ClassDB::bind_method(D_METHOD("get_alpha"), &BonecoEntrada::get_alpha);
+  ClassDB::bind_method(D_METHOD("is_complete"), &BonecoEntrada::is_complete);
 }
 
 // ---- BonecoSprite
 
 BonecoSprite::BonecoSprite() { desenho.recorte_cpu = true; }
 
-BonecoSprite::~BonecoSprite() { _liberar_itens(); }
+BonecoSprite::~BonecoSprite() {
+  _esquecer_entradas();
+  _liberar_itens();
+}
+
+// ---- entradas vistas pelo GDScript
+
+void BonecoSprite::_ao_descartar(void *dono, const mamulengo::Entrada *en) {
+  BonecoSprite *s = static_cast<BonecoSprite *>(dono);
+  auto it = s->entradas.find(en->id);
+  if (it == s->entradas.end()) return;
+  it->second->en = nullptr;
+  it->second->estado = nullptr;
+  s->mortas[en->id] = it->second;
+  s->entradas.erase(it);
+}
+
+void BonecoSprite::_esquecer_entradas() {
+  for (auto &par : entradas) {
+    par.second->en = nullptr;
+    par.second->estado = nullptr;
+  }
+  entradas.clear();
+  mortas.clear();
+}
+
+Ref<BonecoEntrada> BonecoSprite::_embrulho(mamulengo::Entrada *en) {
+  if (!en) return Ref<BonecoEntrada>();
+  auto it = entradas.find(en->id);
+  if (it != entradas.end()) return it->second;
+  Ref<BonecoEntrada> r = _entrada(en->trilha, en->animacao, en->loop);
+  r->en = en;
+  r->estado = estado.get();
+  entradas[en->id] = r;
+  return r;
+}
 
 void BonecoSprite::_liberar_itens() {
   RenderingServer *rs = RenderingServer::get_singleton();
@@ -186,7 +257,52 @@ void BonecoSprite::set_data(const Ref<BonecoData> &p_data) {
   _montar();
 }
 
+void BonecoSprite::set_boneco(const String &p_caminho) {
+  boneco = p_caminho;
+  if (p_caminho.is_empty()) {
+    set_data(Ref<BonecoData>());
+    return;
+  }
+  Ref<BonecoData> d = BonecoData::carregar(p_caminho);
+  set_data(d->modelo ? d : Ref<BonecoData>());
+}
+
+void BonecoSprite::set_float_clock(bool p) {
+  float_clock = p;
+  if (esq) esq->relogio_float = p;
+  if (estado) estado->relogio_float = p;
+}
+
+// o dt do quadro com a escala do no (em float com float_clock)
+double BonecoSprite::_dt(float p_dt) const {
+  if (!playing) return 0.0;
+  return float_clock ? double(p_dt * time_scale) : double(p_dt) * time_scale;
+}
+
+void BonecoSprite::set_preview(const String &p_animacao) {
+  preview = p_animacao;
+  _previa();
+}
+
+// no editor: a previa toca em laco; sem previa (ou no jogo), a pose de setup
+void BonecoSprite::_previa() {
+  if (!estado || !BONECO_EDITOR()) return;
+  estado->limpar();
+  esq->setup();
+  const int a = preview.is_empty() ? -1 : data->modelo->animacao(padrao(preview));
+  if (a >= 0) {
+    estado->tocar(0, a, true);
+    estado->avancar(0);
+    estado->aplicar(*esq);
+  }
+  esq->atualizar_mundo();
+  estado->ler_eventos(eventos);
+  mortas.clear();
+  _desenhar();
+}
+
 void BonecoSprite::_montar() {
+  _esquecer_entradas();
   estado.reset();
   esq.reset();
   if (data.is_null() || !data->modelo) {
@@ -196,9 +312,17 @@ void BonecoSprite::_montar() {
   }
   esq = std::make_unique<mamulengo::Esqueleto>(data->modelo);
   estado = std::make_unique<mamulengo::Estado>(data->modelo);
+  estado->ao_descartar = &BonecoSprite::_ao_descartar;
+  estado->dono = this;
+  esq->relogio_float = float_clock;
+  estado->relogio_float = float_clock;
   _aplicar_mix();
   esq->setup();
   esq->atualizar_mundo();
+  if (BONECO_EDITOR() && !preview.is_empty()) {
+    _previa();
+    return;
+  }
   _desenhar();
 }
 
@@ -249,30 +373,53 @@ Ref<BonecoEntrada> BonecoSprite::_entrada(int trilha, int animacao, bool loop) c
   return r;
 }
 
-void BonecoSprite::set_animation(const String &p_nome, bool p_loop, int p_trilha) {
-  if (!estado) return;
+Ref<BonecoEntrada> BonecoSprite::set_animation(const String &p_nome, bool p_loop, int p_trilha) {
+  if (!estado) return Ref<BonecoEntrada>();
   const int a = data->modelo->animacao(padrao(p_nome));
   if (a < 0) {
     BONECO_ERRO("boneco: animacao desconhecida " + p_nome);
-    return;
+    return Ref<BonecoEntrada>();
   }
-  estado->tocar(p_trilha, a, p_loop);
+  Ref<BonecoEntrada> r = _embrulho(estado->tocar(p_trilha, a, p_loop));
+  _avisar();
+  return r;
 }
 
-void BonecoSprite::add_animation(const String &p_nome, float p_atraso, bool p_loop, int p_trilha) {
-  if (!estado) return;
+Ref<BonecoEntrada> BonecoSprite::add_animation(const String &p_nome, float p_atraso, bool p_loop, int p_trilha) {
+  if (!estado) return Ref<BonecoEntrada>();
   const int a = data->modelo->animacao(padrao(p_nome));
   if (a < 0) {
     BONECO_ERRO("boneco: animacao desconhecida " + p_nome);
-    return;
+    return Ref<BonecoEntrada>();
   }
-  estado->enfileirar(p_trilha, a, p_loop, p_atraso);
+  Ref<BonecoEntrada> r = _embrulho(estado->enfileirar(p_trilha, a, p_loop, p_atraso));
+  _avisar();
+  return r;
+}
+
+Ref<BonecoEntrada> BonecoSprite::set_empty_animation(int p_trilha, float p_mix) {
+  if (!estado) return Ref<BonecoEntrada>();
+  Ref<BonecoEntrada> r = _embrulho(estado->vazio(p_trilha, p_mix));
+  _avisar();
+  return r;
+}
+
+void BonecoSprite::clear_tracks() {
+  if (!estado) return;
+  estado->limpar();
+  _avisar();
+}
+
+void BonecoSprite::clear_track(int p_trilha) {
+  if (!estado) return;
+  estado->limpar_trilha(p_trilha);
+  _avisar();
 }
 
 Ref<BonecoEntrada> BonecoSprite::get_current(int p_trilha) const {
-  const mamulengo::Entrada *e = estado ? estado->entrada(p_trilha) : nullptr;
+  mamulengo::Entrada *e = estado ? estado->entrada(p_trilha) : nullptr;
   if (!e || e->animacao < 0) return Ref<BonecoEntrada>();
-  return _entrada(p_trilha, e->animacao, e->loop);
+  return const_cast<BonecoSprite *>(this)->_embrulho(e);
 }
 
 PackedStringArray BonecoSprite::get_animation_names() const { return data.is_valid() ? data->get_animation_names() : PackedStringArray(); }
@@ -286,14 +433,20 @@ void BonecoSprite::set_to_setup_pose() {
 
 void BonecoSprite::update_skeleton(float p_dt) {
   if (!esq) return;
+  // escondido: so o relogio das trilhas (e os avisos), como o spine-godot
+  if (!pose_when_hidden && is_inside_tree() && !is_visible_in_tree()) {
+    estado->avancar(_dt(p_dt));
+    _avisar();
+    return;
+  }
   // o relogio so com `medir` ligado: no web cada leitura e uma chamada ao JavaScript
   if (!medir) {
-    _passo(playing ? double(p_dt) * time_scale : 0.0);
+    _passo(_dt(p_dt));
     _desenhar();
     return;
   }
   const int64_t t0 = BONECO_USEC();
-  _passo(playing ? double(p_dt) * time_scale : 0.0);
+  _passo(_dt(p_dt));
   const int64_t t1 = BONECO_USEC();
   _desenhar();
   last_update_usec = t1 - t0;
@@ -308,10 +461,43 @@ void BonecoSprite::_passo(double dt) {
   emit_signal(antes_do_mundo, this);
   esq->avancar(dt);
   esq->atualizar_mundo();
-  estado->ler_eventos(eventos);
-  for (const mamulengo::Evento &ev : eventos) {
-    const mamulengo::Entrada *en = estado->entrada(ev.trilha);
-    Ref<BonecoEntrada> r = _entrada(ev.trilha, ev.animacao, en && en->animacao == ev.animacao ? en->loop : false);
+  _avisar();
+}
+
+// os eventos desde a ultima leitura viram sinais, com a mesma entrada que o GDScript recebeu.
+// Tambem logo depois de set_animation, add_animation e limpar, como o spine-godot (o inicio sai
+// no mesmo quadro em que o jogo toca); um sinal que toca outra animacao nao reentra: os eventos
+// novos saem na volta seguinte do laco
+void BonecoSprite::_avisar() {
+  if (avisando || !estado) return;
+  avisando = true;
+  while (estado && !estado->eventos().empty()) {
+    std::vector<mamulengo::Evento> lidos;
+    estado->ler_eventos(lidos);
+    _emitir(lidos);
+  }
+  mortas.clear();
+  avisando = false;
+}
+
+void BonecoSprite::_emitir(const std::vector<mamulengo::Evento> &lidos) {
+  for (const mamulengo::Evento &ev : lidos) {
+    if (!estado) return;
+    Ref<BonecoEntrada> r;
+    auto it = entradas.find(ev.entrada);
+    if (it != entradas.end()) {
+      r = it->second;
+    } else if ((it = mortas.find(ev.entrada)) != mortas.end()) {
+      r = it->second;
+    } else {
+      // ninguem pediu esta entrada ainda: a viva com esse numero (na trilha, saindo ou na
+      // fila), ou uma que so tem o nome
+      mamulengo::Entrada *en = estado->entrada(ev.trilha);
+      while (en && en->id != ev.entrada) en = en->de;
+      if (!en)
+        for (en = estado->entrada(ev.trilha); en && en->id != ev.entrada;) en = en->proxima;
+      r = en ? _embrulho(en) : _entrada(ev.trilha, ev.animacao, false);
+    }
     switch (ev.tipo) {
       case mamulengo::TipoEvento::Inicio: emit_signal("animation_started", r); break;
       case mamulengo::TipoEvento::Interrompida: emit_signal("animation_interrupted", r); break;
@@ -337,6 +523,19 @@ PackedFloat64Array BonecoSprite::get_bone_world(const String &p_osso) const {
   // o nucleo e y para cima; o no, y para baixo: a matriz vira F M F com F = (1, -1)
   const mamulengo::Matriz &w = esq->mundo()[size_t(i)];
   for (double v : {w.x, -w.y, w.a, -w.b, -w.c, w.d}) out.push_back(v);
+  return out;
+}
+
+Dictionary BonecoSprite::get_bones_world() const {
+  Dictionary out;
+  if (!esq) return out;
+  const mamulengo::Modelo &m = esq->modelo();
+  for (size_t i = 0; i < m.ossos.size(); ++i) {
+    const mamulengo::Matriz &w = esq->mundo()[i];
+    PackedFloat64Array v;
+    for (double x : {w.x, -w.y, w.a, w.b, -w.c, -w.d}) v.push_back(x);
+    out[String::utf8(m.ossos[i].nome.c_str())] = v;
+  }
   return out;
 }
 
@@ -560,11 +759,24 @@ void BonecoSprite::_notification(int p_what) {
 void BonecoSprite::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_data", "data"), &BonecoSprite::set_data);
   ClassDB::bind_method(D_METHOD("get_data"), &BonecoSprite::get_data);
+  ClassDB::bind_method(D_METHOD("set_boneco", "caminho"), &BonecoSprite::set_boneco);
+  ClassDB::bind_method(D_METHOD("get_boneco"), &BonecoSprite::get_boneco);
+  ClassDB::bind_method(D_METHOD("set_preview", "animacao"), &BonecoSprite::set_preview);
+  ClassDB::bind_method(D_METHOD("get_preview"), &BonecoSprite::get_preview);
+  ClassDB::bind_method(D_METHOD("set_pose_when_hidden", "pousar"), &BonecoSprite::set_pose_when_hidden);
+  ClassDB::bind_method(D_METHOD("set_float_clock", "float32"), &BonecoSprite::set_float_clock);
+  ClassDB::bind_method(D_METHOD("get_float_clock"), &BonecoSprite::get_float_clock);
+  ClassDB::bind_method(D_METHOD("get_pose_when_hidden"), &BonecoSprite::get_pose_when_hidden);
   ClassDB::bind_method(D_METHOD("set_time_scale", "escala"), &BonecoSprite::set_time_scale);
   ClassDB::bind_method(D_METHOD("get_time_scale"), &BonecoSprite::get_time_scale);
   ClassDB::bind_method(D_METHOD("set_playing", "tocando"), &BonecoSprite::set_playing);
   ClassDB::bind_method(D_METHOD("get_playing"), &BonecoSprite::get_playing);
-  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "BonecoData"), "set_data", "get_data");
+  // o data nao vai para a cena (o BonecoData nao se salva): a cena guarda o caminho em `boneco`
+  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "BonecoData", PROPERTY_USAGE_NONE), "set_data", "get_data");
+  ADD_PROPERTY(PropertyInfo(Variant::STRING, "boneco", PROPERTY_HINT_FILE, "*.boneco"), "set_boneco", "get_boneco");
+  ADD_PROPERTY(PropertyInfo(Variant::STRING, "preview"), "set_preview", "get_preview");
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pose_when_hidden"), "set_pose_when_hidden", "get_pose_when_hidden");
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "float_clock"), "set_float_clock", "get_float_clock");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale"), "set_time_scale", "get_time_scale");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing", "get_playing");
   ClassDB::bind_method(D_METHOD("set_medir", "medir"), &BonecoSprite::set_medir);
@@ -576,6 +788,9 @@ void BonecoSprite::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_animation", "nome", "loop", "trilha"), &BonecoSprite::set_animation, DEFVAL(true), DEFVAL(0));
   ClassDB::bind_method(D_METHOD("add_animation", "nome", "atraso", "loop", "trilha"), &BonecoSprite::add_animation, DEFVAL(0.0), DEFVAL(true), DEFVAL(0));
   ClassDB::bind_method(D_METHOD("get_current", "trilha"), &BonecoSprite::get_current, DEFVAL(0));
+  ClassDB::bind_method(D_METHOD("set_empty_animation", "trilha", "mix"), &BonecoSprite::set_empty_animation, DEFVAL(0), DEFVAL(0.0));
+  ClassDB::bind_method(D_METHOD("clear_tracks"), &BonecoSprite::clear_tracks);
+  ClassDB::bind_method(D_METHOD("clear_track", "trilha"), &BonecoSprite::clear_track, DEFVAL(0));
   ClassDB::bind_method(D_METHOD("set_default_mix", "tempo"), &BonecoSprite::set_default_mix);
   ClassDB::bind_method(D_METHOD("get_default_mix"), &BonecoSprite::get_default_mix);
   ClassDB::bind_method(D_METHOD("set_mix", "de", "para", "tempo"), &BonecoSprite::set_mix);
@@ -586,6 +801,7 @@ void BonecoSprite::_bind_methods() {
   ClassDB::bind_method(D_METHOD("has_slot", "slot"), &BonecoSprite::has_slot);
   ClassDB::bind_method(D_METHOD("get_bone_world", "osso"), &BonecoSprite::get_bone_world);
   ClassDB::bind_method(D_METHOD("get_bone_local", "osso"), &BonecoSprite::get_bone_local);
+  ClassDB::bind_method(D_METHOD("get_bones_world"), &BonecoSprite::get_bones_world);
   ClassDB::bind_method(D_METHOD("get_slot_color", "slot"), &BonecoSprite::get_slot_color);
   ClassDB::bind_method(D_METHOD("set_slot_color", "slot", "cor"), &BonecoSprite::set_slot_color);
   ClassDB::bind_method(D_METHOD("set_slot_attachment", "slot", "parte"), &BonecoSprite::set_slot_attachment);

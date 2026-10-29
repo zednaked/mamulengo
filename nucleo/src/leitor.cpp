@@ -396,7 +396,10 @@ class Leitor {
           p.tipo = ler_tipo_parte(j.str("tipo", "regiao"));
           switch (p.tipo) {
             case TipoParte::Regiao: cantos_regiao(p, j); break;
-            case TipoParte::Malha: ler_geometria(p, j, int(j["uvs"].tamanho() / 2)); break;
+            case TipoParte::Malha:
+              ler_geometria(p, j, int(j["uvs"].tamanho() / 2));
+              p.contorno = int(j.num("contorno", 0));
+              break;
             case TipoParte::MalhaLigada: {
               Ligacao lg;
               lg.parte = int(m.partes.size());
@@ -451,6 +454,8 @@ class Leitor {
       p.pesos_inicio = src.pesos_inicio;
       p.pesos_osso = src.pesos_osso;
       p.pesos_xyp = src.pesos_xyp;
+      p.contorno = src.contorno;
+      if (p.triangulos.empty()) p.triangulos = src.triangulos;
       p.deform_de = lg.herda ? f : lg.parte;
     }
   }
@@ -548,6 +553,12 @@ class Leitor {
     t.alvo_local = j.sim("alvo_local", false);
     t.somar = j.sim("somar", false);
     t.limitar = j.sim("limitar", false);
+    t.desl_girar = j.num("rotacao", 0);
+    t.desl_x = j.num("x", 0);
+    t.desl_y = j.num("y", 0);
+    t.desl_escala_x = j.num("escala_x", 0);
+    t.desl_escala_y = j.num("escala_y", 0);
+    t.desl_cisalha_y = j.num("cisalha_y", 0);
     bool para_x = false, para_escala_x = false;
     for (const auto& [nome, pj] : j["propriedades"].campos()) {
       DadosTransfDe d;

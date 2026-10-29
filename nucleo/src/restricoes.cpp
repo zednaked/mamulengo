@@ -445,8 +445,8 @@ void Esqueleto::restricao_fisica(int ri) {
   const DadosFisica& d = m.restricoes[size_t(ri)].fisica;
   EstadoRestricao& e = rest_[size_t(ri)];
   Matriz& w = mundo_[size_t(d.osso)];
-  const double h = d.passo;
-  const double dt = std::max(relogio_ - e.relogio, 0.0);
+  const double h = f32(d.passo);
+  const double dt = std::max(f32(relogio_ - e.relogio), 0.0);
   e.relogio = relogio_;
   const double base = std::atan2(w.c, w.a);  // angulo do osso sem a fisica
   const double comp_mundo = m.ossos[size_t(d.osso)].comprimento * std::sqrt(w.a * w.a + w.c * w.c);
@@ -468,7 +468,7 @@ void Esqueleto::restricao_fisica(int ri) {
     e.rot_ant += desvio;
     e.saida += desvio;
   }
-  e.sobra += dt;
+  e.sobra = f32(e.sobra + dt);
   const double comp = m.ossos[size_t(d.osso)].comprimento / m.escala_ref;
   const double fd = std::pow(e.amortecimento, 60 * h);
   // a gravidade do primeiro passo usa o angulo mostrado (o do quadro anterior mais a inercia)
@@ -477,7 +477,7 @@ void Esqueleto::restricao_fisica(int ri) {
   // num quadro: a 1/60 e a 1/50 s; docs/NUCLEO.md "Fisica de rotacao")
   if (e.sobra >= h) e.rot_ant = e.rot;
   while (e.sobra >= h) {
-    e.sobra -= h;
+    e.sobra = f32(e.sobra - h);
     if (d.girar != 0) {
       const double forca = (e.vento * std::sin(ang) + e.gravidade * std::cos(ang)) * comp + e.rot * e.forca;
       e.vrot -= forca * e.massa_inv * h;
@@ -504,29 +504,34 @@ void Esqueleto::restricao_transformacao(int ri) {
   const EstadoRestricao& e = rest_[size_t(ri)];
   const Matriz& fw = mundo_[size_t(d.fonte)];
   const Local& fl = local[size_t(d.fonte)];
+  // medido: os deslocamentos do topo somam no valor da fonte; em mundo, x e y sao o ponto
+  // (desl_x, desl_y) no espaco da fonte (gira e escala com ela)
   auto valor_fonte = [&](PropTransf p) -> double {
     if (d.fonte_local) {
       switch (p) {
-        case PropTransf::Girar: return fl.rotacao;
-        case PropTransf::X: return fl.x;
-        case PropTransf::Y: return fl.y;
-        case PropTransf::EscalaX: return fl.escala_x;
-        case PropTransf::EscalaY: return fl.escala_y;
-        case PropTransf::CisalhaY: return fl.cisalha_y;
+        case PropTransf::Girar: return fl.rotacao + d.desl_girar;
+        case PropTransf::X: return fl.x + d.desl_x;
+        case PropTransf::Y: return fl.y + d.desl_y;
+        case PropTransf::EscalaX: return fl.escala_x + d.desl_escala_x;
+        case PropTransf::EscalaY: return fl.escala_y + d.desl_escala_y;
+        case PropTransf::CisalhaY: return fl.cisalha_y + d.desl_cisalha_y;
       }
     }
     switch (p) {
       case PropTransf::Girar: {
         // medido: a rotacao de mundo da fonte sai em [0, 360)
-        const double g = std::atan2(fw.c, fw.a) * RAD;
+        // medido: com a fonte espelhada (determinante negativo) o deslocamento gira ao contrario
+        const double desl = fw.a * fw.d - fw.b * fw.c < 0 ? -d.desl_girar : d.desl_girar;
+        double g = std::atan2(fw.c, fw.a) * RAD + desl;
+        g = std::fmod(g, 360.0);
         return g < 0 ? g + 360 : g;
       }
-      case PropTransf::X: return fw.x;
-      case PropTransf::Y: return fw.y;
-      case PropTransf::EscalaX: return std::hypot(fw.a, fw.c);
-      case PropTransf::EscalaY: return std::hypot(fw.b, fw.d);
+      case PropTransf::X: return fw.x + fw.a * d.desl_x + fw.b * d.desl_y;
+      case PropTransf::Y: return fw.y + fw.c * d.desl_x + fw.d * d.desl_y;
+      case PropTransf::EscalaX: return std::hypot(fw.a, fw.c) + d.desl_escala_x;
+      case PropTransf::EscalaY: return std::hypot(fw.b, fw.d) + d.desl_escala_y;
       // medido: sem embrulhar (pode sair -345 em vez de 15; so importa com `limitar`)
-      case PropTransf::CisalhaY: return (std::atan2(fw.d, fw.b) - std::atan2(fw.c, fw.a)) * RAD - 90;
+      case PropTransf::CisalhaY: return (std::atan2(fw.d, fw.b) - std::atan2(fw.c, fw.a)) * RAD - 90 + d.desl_cisalha_y;
     }
     return 0;
   };
