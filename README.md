@@ -214,4 +214,4 @@ editor drawing through the core in place of the reference renderer, a binary
 ## License
 
 MIT, see [LICENSE](LICENSE). The CC0 art in `tests/` and the Spine libraries the
-editor installs from npm keep their own licenses (listed there).
+editor installs from npm keep their own licenses (listed in [NOTICE](NOTICE)).

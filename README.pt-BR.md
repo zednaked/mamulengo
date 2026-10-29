@@ -214,4 +214,4 @@ um `.boneco` binário para pacotes menores e a GDExtension para macOS. Plano:
 ## Licença
 
 MIT, ver [LICENSE](LICENSE). A arte CC0 em `tests/` e as bibliotecas do Spine que o
-editor instala do npm seguem as licenças delas (listadas lá).
+editor instala do npm seguem as licenças delas (listadas no [NOTICE](NOTICE)).

@@ -1,0 +1,10 @@
+Mamulengo is MIT licensed (see LICENSE).
+
+Not covered by this license:
+
+- The art in tests/assets and tests/boneco is CC0 1.0 by Kenney (kenney.nl);
+  see tests/assets/LICENSES.md.
+- The editor installs spine-core and spine-webgl from npm as its reference
+  renderer. They are under the Spine Runtimes License, not this one, and using
+  them requires a Spine license. The core in nucleo/ and the .boneco format do
+  not depend on them.
