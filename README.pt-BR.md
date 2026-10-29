@@ -210,3 +210,8 @@ o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos teste
 Próximos: o editor desenhando pelo núcleo no lugar do renderizador de referência,
 um `.boneco` binário para pacotes menores e a GDExtension para macOS. Plano:
 [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Licença
+
+MIT, ver [LICENSE](LICENSE). A arte CC0 em `tests/` e as bibliotecas do Spine que o
+editor instala do npm seguem as licenças delas (listadas lá).

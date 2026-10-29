@@ -210,3 +210,8 @@ module, and its `.boneco` build, all on the core, passes its tests. Next: the
 editor drawing through the core in place of the reference renderer, a binary
 `.boneco` for smaller packs, and macOS builds of the GDExtension. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE). The CC0 art in `tests/` and the Spine libraries the
+editor installs from npm keep their own licenses (listed there).
