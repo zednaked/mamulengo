@@ -167,10 +167,12 @@ quadro. Num jogo de slot com 17 personagens animados, em staging, o módulo do m
 substituiu o plugin oficial: um wasm em vez de três, export de 51 MB em vez de 64
 MB, primeiro quadro em 3,4 s em vez de 6,7 s. Esses tempos foram medidos com uma
 versão anterior do módulo; o do núcleo sai com o mesmo wasm de 38,6 MB e o mesmo
-download comprimido, e no nativo custa o mesmo por quadro (0,63 ms para os 17 personagens).
-No navegador ele ainda ocupa mais a thread principal que aquela versão, e isso
-está sendo resolvido. Guardar as malhas levou os objetos de GPU criados por quadro
-de 160 para 0,3. De 153 quadros comparados pixel a pixel com o renderizador
+download comprimido, e no nativo agora custa menos por quadro (0,54 ms para os 17
+personagens, contra 0,63 ms). No navegador, com os dois a 120 fps, ele ocupa cerca
+de 3 pontos a mais da thread principal que aquela versão (eram 6 a 8 antes de um
+perfil do desenho e do recorte), e com a CPU 4x mais lenta os quadros acima de
+25 ms empatam. Guardar as malhas levou os objetos de GPU criados por quadro de 160
+para 0,3, e peça parada não envia nada. De 153 quadros comparados pixel a pixel com o renderizador
 anterior, 142 são iguais; os outros 11 vêm de flipbooks um passo adiante (4 acima
 de 1% dos pixels, 7 abaixo de 0,5%), e onde foi conferido, é o núcleo que bate com
 a referência.

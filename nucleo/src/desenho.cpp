@@ -94,6 +94,8 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   const Modelo& m = e.modelo();
   std::vector<double> mundo;
   std::vector<std::vector<P2>> recorte;  // pedacos convexos do recorte aberto (modo cpu)
+  std::vector<double> caixas;            // por pedaco: x0, y0, x1, y1
+  std::vector<uint8_t> dentro_v;         // por vertice da peca: dentro do pedaco
   std::vector<P2> poli, tmp;
   int recorte_fim = -2;  // slot que acaba o recorte aberto (-1: o fim do desenho; -2: nenhum)
   auto lote = [&](Comando c, int pagina, Blend blend) -> Lote& {
@@ -116,13 +118,19 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   };
   // acrescenta o triangulo (vertices ja em d.vertices: base + i, j, k) cortado pelo recorte
   auto tri_cortado = [&](uint32_t i0, uint32_t i1, uint32_t i2) {
-    const float* v0 = &d.vertices[size_t(i0) * 8];
-    const float* v1 = &d.vertices[size_t(i1) * 8];
-    const float* v2 = &d.vertices[size_t(i2) * 8];
+    const float* v0 = d.vertices.data() + size_t(i0) * 8;
+    const float* v1 = d.vertices.data() + size_t(i1) * 8;
+    const float* v2 = d.vertices.data() + size_t(i2) * 8;
     const P2 a{v0[0], v0[1]}, b{v1[0], v1[1]}, c{v2[0], v2[1]};
     const double den = cruz(a, b, c);
     if (std::fabs(den) < 1e-12) return;
-    for (const auto& pc : recorte) {
+    const double tx0 = std::min({a.x, b.x, c.x}), tx1 = std::max({a.x, b.x, c.x});
+    const double ty0 = std::min({a.y, b.y, c.y}), ty1 = std::max({a.y, b.y, c.y});
+    for (size_t ip = 0; ip < recorte.size(); ++ip) {
+      const auto& pc = recorte[ip];
+      const double* cx = &caixas[ip * 4];
+      // atalho: o triangulo fora da caixa do pedaco nao toca nele
+      if (tx1 < cx[0] || tx0 > cx[2] || ty1 < cx[1] || ty0 > cx[3]) continue;
       // atalho: o triangulo inteiro dentro do pedaco vai como esta
       bool todo = true;
       for (size_t e = 0, n = pc.size(); e < n && todo; ++e)
@@ -135,12 +143,31 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       for (size_t e = 0, n = pc.size(); e < n && poli.size() >= 3; ++e) corta(poli, pc[e], pc[(e + 1) % n], tmp);
       if (poli.size() < 3) continue;
       const uint32_t base = uint32_t(d.vertices.size() / 8);
+      // copias antes de crescer o vetor (os ponteiros v0, v1, v2 podem mudar)
+      float c0[8], c1[8], c2[8];
+      std::copy(v0, v0 + 8, c0);
+      std::copy(v1, v1 + 8, c1);
+      std::copy(v2, v2 + 8, c2);
+      d.vertices.resize(d.vertices.size() + poli.size() * 8);
+      float* w = d.vertices.data() + size_t(base) * 8;
       for (const P2& q : poli) {
         // baricentro de q no triangulo original
         const double wa = cruz(q, b, c) / den, wb = cruz(a, q, c) / den, wc = 1 - wa - wb;
-        d.vertices.insert(d.vertices.end(), {float(q.x), float(q.y), float(v0[2] * wa + v1[2] * wb + v2[2] * wc), float(v0[3] * wa + v1[3] * wb + v2[3] * wc), v0[4], v0[5], v0[6], v0[7]});
+        w[0] = float(q.x);
+        w[1] = float(q.y);
+        w[2] = float(c0[2] * wa + c1[2] * wb + c2[2] * wc);
+        w[3] = float(c0[3] * wa + c1[3] * wb + c2[3] * wc);
+        std::copy(c0 + 4, c0 + 8, w + 4);
+        w += 8;
       }
-      for (uint32_t k = 1; k + 1 < poli.size(); ++k) d.indices.insert(d.indices.end(), {base, base + k, base + k + 1});
+      for (uint32_t k = 1; k + 1 < poli.size(); ++k) {
+        d.indices.push_back(base);
+        d.indices.push_back(base + k);
+        d.indices.push_back(base + k + 1);
+      }
+      v0 = d.vertices.data() + size_t(i0) * 8;
+      v1 = d.vertices.data() + size_t(i1) * 8;
+      v2 = d.vertices.data() + size_t(i2) * 8;
     }
   };
   for (int si : e.ordem()) {
@@ -156,6 +183,16 @@ void desenhar(const Esqueleto& e, Desenho& d) {
           std::vector<P2> pol(size_t(p.num_vertices));
           for (int i = 0; i < p.num_vertices; ++i) pol[size_t(i)] = {mundo[size_t(i) * 2], mundo[size_t(i) * 2 + 1]};
           recorte = pedacos(std::move(pol));
+          caixas.assign(recorte.size() * 4, 0);
+          for (size_t ip = 0; ip < recorte.size(); ++ip) {
+            double* cx = &caixas[ip * 4];
+            cx[0] = cx[2] = recorte[ip][0].x;
+            cx[1] = cx[3] = recorte[ip][0].y;
+            for (const P2& q : recorte[ip]) {
+              cx[0] = std::min(cx[0], q.x), cx[2] = std::max(cx[2], q.x);
+              cx[1] = std::min(cx[1], q.y), cx[3] = std::max(cx[3], q.y);
+            }
+          }
           recorte_fim = p.fim == si ? -1 : p.fim;
           continue;
         }
@@ -172,22 +209,92 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       }
       const Cor cs = s.cor, cp = p.cor;
       const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
+      // invisivel ou sem imagem: nem calcula os vertices (os brilhos apagados sao muitos)
+      if (a <= 0 || p.pagina < 0 || p.uvs.empty()) {
+        if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
+        continue;
+      }
       const size_t n = e.vertices(si, mundo);
-      if (n && a > 0 && p.pagina >= 0 && p.uvs.size() == n) {
+      if (n && p.uvs.size() == n) {
         const uint32_t base = uint32_t(d.vertices.size() / 8);
-        for (size_t i = 0; i < n; i += 2) d.vertices.insert(d.vertices.end(), {float(mundo[i]), float(mundo[i + 1]), p.uvs[i], p.uvs[i + 1], r, g, b, a});
+        d.vertices.resize(d.vertices.size() + n * 4);
+        float* w = d.vertices.data() + size_t(base) * 8;
+        for (size_t i = 0; i < n; i += 2, w += 8) {
+          w[0] = float(mundo[i]);
+          w[1] = float(mundo[i + 1]);
+          w[2] = p.uvs[i];
+          w[3] = p.uvs[i + 1];
+          w[4] = r;
+          w[5] = g;
+          w[6] = b;
+          w[7] = a;
+        }
         Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend);
         const size_t li = size_t(&l - d.lotes.data());
-        if (d.recorte_cpu && recorte_fim != -2) {
-          if (p.tipo == TipoParte::Regiao) {
-            tri_cortado(base, base + 1, base + 2);
-            tri_cortado(base + 2, base + 3, base);
-          } else {
-            for (size_t t = 0; t + 2 < p.triangulos.size(); t += 3) tri_cortado(base + p.triangulos[t], base + p.triangulos[t + 1], base + p.triangulos[t + 2]);
+        // recorte na CPU: primeiro a peca inteira pela caixa dela (fora de todos os pedacos:
+        // nada; dentro de um pedaco convexo: os triangulos vao direto), so o resto por triangulo
+        int recorte_peca = recorte_fim != -2 && d.recorte_cpu ? 1 : 0;  // 1: cortar por triangulo
+        if (recorte_peca) {
+          const float* v = d.vertices.data() + size_t(base) * 8;
+          double x0 = v[0], x1 = v[0], y0 = v[1], y1 = v[1];
+          for (size_t i = 1; i < n / 2; ++i) {
+            x0 = std::min(x0, double(v[i * 8])), x1 = std::max(x1, double(v[i * 8]));
+            y0 = std::min(y0, double(v[i * 8 + 1])), y1 = std::max(y1, double(v[i * 8 + 1]));
           }
-        } else if (p.tipo == TipoParte::Regiao) {
+          bool toca = false;
+          for (size_t ip = 0; ip < recorte.size(); ++ip) {
+            const double* cx = &caixas[ip * 4];
+            if (x1 < cx[0] || x0 > cx[2] || y1 < cx[1] || y0 > cx[3]) continue;
+            toca = true;
+            const auto& pc = recorte[ip];
+            const P2 cantos[4] = {{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}};
+            bool dentro = true;
+            for (size_t ed = 0, ne = pc.size(); ed < ne && dentro; ++ed)
+              for (const P2& q : cantos)
+                if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
+                  dentro = false;
+                  break;
+                }
+            if (dentro) {
+              recorte_peca = 0;
+              break;
+            }
+          }
+          if (!toca) recorte_peca = 2;  // 2: fora, nao desenha
+        }
+        if (recorte_peca == 1) {
+          static const uint16_t quad[6] = {0, 1, 2, 2, 3, 0};
+          const uint16_t* tri = p.tipo == TipoParte::Regiao ? quad : p.triangulos.data();
+          const size_t ntri = p.tipo == TipoParte::Regiao ? 6 : p.triangulos.size();
+          if (recorte.size() == 1) {
+            // um pedaco so (o caso comum, recorte convexo): cada vertice testado uma vez; o
+            // triangulo com os tres dentro vai direto, o resto e cortado
+            const auto& pc = recorte[0];
+            dentro_v.assign(n / 2, 1);
+            const float* v = d.vertices.data() + size_t(base) * 8;
+            for (size_t i = 0; i < n / 2; ++i) {
+              const P2 q{v[i * 8], v[i * 8 + 1]};
+              for (size_t ed = 0, ne = pc.size(); ed < ne; ++ed)
+                if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
+                  dentro_v[i] = 0;
+                  break;
+                }
+            }
+            for (size_t t = 0; t + 2 < ntri; t += 3) {
+              if (dentro_v[tri[t]] && dentro_v[tri[t + 1]] && dentro_v[tri[t + 2]]) {
+                d.indices.push_back(base + tri[t]);
+                d.indices.push_back(base + tri[t + 1]);
+                d.indices.push_back(base + tri[t + 2]);
+              } else {
+                tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+              }
+            }
+          } else {
+            for (size_t t = 0; t + 2 < ntri; t += 3) tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+          }
+        } else if (recorte_peca == 0 && p.tipo == TipoParte::Regiao) {
           d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
-        } else {
+        } else if (recorte_peca == 0) {
           for (uint16_t t : p.triangulos) d.indices.push_back(base + t);
         }
         d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;

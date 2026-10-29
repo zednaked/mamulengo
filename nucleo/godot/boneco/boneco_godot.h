@@ -90,6 +90,9 @@ class BonecoSprite : public Node2D {
   // manual: o no nao anda sozinho; quem usa chama update_skeleton
   void set_manual(bool p) { manual = p; }
   bool get_manual() const { return manual; }
+  // medir: guarda o tempo de pose e de desenho (get_last_update_usec, get_last_draw_usec)
+  void set_medir(bool p) { medir = p; }
+  bool get_medir() const { return medir; }
 
   // trilha 0: toca agora (corta a atual) ou enfileira depois da atual
   void set_animation(const String &p_nome, bool p_loop, int p_trilha);
@@ -127,6 +130,7 @@ class BonecoSprite : public Node2D {
   float time_scale = 1;
   bool playing = true;
   bool manual = false;
+  bool medir = false;
 
   // trilhas, fila, mix e eventos (o Estado do nucleo; docs/NUCLEO.md "Estado")
   std::unique_ptr<mamulengo::Estado> estado;
@@ -139,6 +143,9 @@ class BonecoSprite : public Node2D {
   Vector<int> vertices_item;
   // o que foi enviado por ultimo a cada malha: so reenvia o que mudou (peca parada nao custa)
   Vector<PackedByteArray> enviado_v, enviado_a;
+  // por item: os vertices crus (x, y, u, v, cor) do ultimo envio e a caixa deles
+  std::vector<std::vector<float>> cru_item;
+  std::vector<Rect2> caixa_item;
   PackedByteArray bytes_v, bytes_a;
   int64_t last_update_usec = 0, last_draw_usec = 0;
 

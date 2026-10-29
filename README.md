@@ -167,10 +167,12 @@ In a slot game with 17 animated characters, on staging, the engine module replac
 the official plugin: one wasm instead of three, a 51 MB export instead of 64 MB,
 the first frame in 3.4 s instead of 6.7 s. Those times were measured with an
 earlier build of the module; the core's module ships the same 38.6 MB wasm and the
-same compressed download, and natively it costs the same per frame (0.63 ms for
-the 17 characters). On the web it still keeps the main thread busier than that
-earlier build, and that is being worked on. Keeping the meshes took the GPU
-objects created per frame from 160 to 0.3. Out of 153 frames compared pixel by
+same compressed download, and natively it is now cheaper per frame (0.54 ms for
+the 17 characters, against 0.63 ms). In the browser, with both at 120 fps, it uses
+about 3 points more of the main thread than that earlier build (it was 6 to 8
+before a profiling pass on drawing and clipping), and on a CPU slowed 4x the
+frames over 25 ms are the same. Keeping the meshes took the GPU objects created
+per frame from 160 to 0.3, and pieces that do not move send nothing. Out of 153 frames compared pixel by
 pixel against the previous renderer, 142 are identical; the other 11 come from
 flipbooks one step apart (4 above 1% of pixels, 7 below 0.5%), and where checked,
 the core is the one that matches the reference.

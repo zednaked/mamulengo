@@ -177,6 +177,8 @@ void BonecoSprite::_liberar_itens() {
   vertices_item.clear();
   enviado_v.clear();
   enviado_a.clear();
+  cru_item.clear();
+  caixa_item.clear();
 }
 
 void BonecoSprite::set_data(const Ref<BonecoData> &p_data) {
@@ -247,6 +249,12 @@ void BonecoSprite::set_to_setup_pose() {
 
 void BonecoSprite::update_skeleton(float p_dt) {
   if (!esq) return;
+  // o relogio so com `medir` ligado: no web cada leitura e uma chamada ao JavaScript
+  if (!medir) {
+    _passo(playing ? double(p_dt) * time_scale : 0.0);
+    _desenhar();
+    return;
+  }
   const int64_t t0 = BONECO_USEC();
   _passo(playing ? double(p_dt) * time_scale : 0.0);
   const int64_t t1 = BONECO_USEC();
@@ -259,7 +267,8 @@ void BonecoSprite::update_skeleton(float p_dt) {
 void BonecoSprite::_passo(double dt) {
   estado->avancar(dt);
   estado->aplicar(*esq);
-  emit_signal("before_world_transforms_change", this);
+  static const StringName antes_do_mundo("before_world_transforms_change");
+  emit_signal(antes_do_mundo, this);
   esq->avancar(dt);
   esq->atualizar_mundo();
   estado->ler_eventos(eventos);
@@ -388,6 +397,8 @@ void BonecoSprite::_desenhar() {
     vertices_item.push_back(0);
     enviado_v.push_back(PackedByteArray());
     enviado_a.push_back(PackedByteArray());
+    cru_item.emplace_back();
+    caixa_item.emplace_back();
   }
 
   const int64_t fmt = int64_t(BONECO_RS::ARRAY_FORMAT_VERTEX) | int64_t(BONECO_RS::ARRAY_FORMAT_COLOR) | int64_t(BONECO_RS::ARRAY_FORMAT_TEX_UV) |
@@ -415,12 +426,19 @@ void BonecoSprite::_desenhar() {
     int *iw = indices.ptrw();
     for (uint32_t q = 0; q < lt.quantos; q++) iw[q] = int(id[lt.inicio + q] - vmin);
     const float *v0 = vd + size_t(vmin) * 8;
-    Rect2 caixa(Vector2(v0[0], -v0[1]), Vector2());
-    for (int q = 1; q < nv; q++) caixa.expand_to(Vector2(v0[q * 8], -v0[q * 8 + 1]));
-
     const RID malha = malhas[k];
     const bool igual = vertices_item[k] == nv && indices_item[k].size() == indices.size() && memcmp(indices_item[k].ptr(), indices.ptr(), sizeof(int) * size_t(indices.size())) == 0;
-    if (igual) {
+    // peca parada: os mesmos vertices crus do ultimo envio, nada a empacotar nem enviar
+    std::vector<float> &cru = cru_item[size_t(k)];
+    const bool parado = igual && cru.size() == size_t(nv) * 8 && memcmp(cru.data(), v0, sizeof(float) * cru.size()) == 0;
+    if (!parado) {
+      cru.assign(v0, v0 + size_t(nv) * 8);
+      Rect2 c(Vector2(v0[0], -v0[1]), Vector2());
+      for (int q = 1; q < nv; q++) c.expand_to(Vector2(v0[q * 8], -v0[q * 8 + 1]));
+      caixa_item[size_t(k)] = c;
+    }
+    const Rect2 caixa = caixa_item[size_t(k)];
+    if (!parado && igual) {
       // mesmo desenho: so regrava posicao, cor e uv
       const int64_t vs = rs->mesh_surface_get_format_vertex_stride(fmt, nv);
       const int64_t as = rs->mesh_surface_get_format_attribute_stride(fmt, nv);
@@ -450,7 +468,7 @@ void BonecoSprite::_desenhar() {
         enviado_a.write[k] = bytes_a;
         enviado_a.write[k].resize(bytes_a.size());
       }
-    } else {
+    } else if (!parado) {
       PackedVector2Array pos, uv;
       PackedColorArray cor;
       PackedInt32Array ind;
@@ -492,11 +510,9 @@ void BonecoSprite::_notification(int p_what) {
       set_process_internal(true);
       break;
     case NOTIFICATION_ENTER_TREE:
-      _liberar_itens();
-      _desenhar();
-      break;
-    case NOTIFICATION_EXIT_TREE:
-      _liberar_itens();
+      // os itens sao filhos do canvas item do no, que vive tanto quanto ele: sair e voltar
+      // para a arvore (o jogo reorganiza pecas) nao precisa recriar nada
+      if (itens.is_empty()) _desenhar();
       break;
     case NOTIFICATION_INTERNAL_PROCESS:
       if (!manual) update_skeleton(float(get_process_delta_time()));
@@ -514,6 +530,9 @@ void BonecoSprite::_bind_methods() {
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "BonecoData"), "set_data", "get_data");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale"), "set_time_scale", "get_time_scale");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing", "get_playing");
+  ClassDB::bind_method(D_METHOD("set_medir", "medir"), &BonecoSprite::set_medir);
+  ClassDB::bind_method(D_METHOD("get_medir"), &BonecoSprite::get_medir);
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "medir"), "set_medir", "get_medir");
   ClassDB::bind_method(D_METHOD("set_manual", "manual"), &BonecoSprite::set_manual);
   ClassDB::bind_method(D_METHOD("get_manual"), &BonecoSprite::get_manual);
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "manual"), "set_manual", "get_manual");
