@@ -32,6 +32,7 @@ Mudou um arquivo de `server/`: o servidor reinicia sozinho, num processo novo (n
 - **Editar a malha:** na Pose base, "Editar malha" mostra pontos e triangulos: arrastar move o ponto, clique na borda cria ponto no contorno, clique dentro cria ponto interno, Delete apaga; a malha se retriangula sozinha. Na aba Pesos, escolha um osso e pinte quanto ele puxa cada ponto (somar ou tirar, Shift inverte), com as cores do peso na malha. Deforms das animacoes e linked meshes acompanham (comandos `mesh.vertices`, `mesh.addVertex`, `mesh.removeVertex`, `mesh.paintWeights`).
 - **Movimentos prontos:** respirar, balancar, quicar, entrar estourando, tremer, pulsar brilho, piscar, flipbook; fisica pronta (cabelo, orelha, tecido, mola, pendurado); IK em um clique ("Alcancar").
 - **Ver no Godot:** renderiza o quadro no Godot de verdade e compara com o editor.
+- **Quem desenha:** o seletor "desenho" na barra (ao lado de "enquadrar") escolhe o modo do viewport: **godot** (padrão; como o spine-godot dos jogos de hoje, com os defeitos medidos), **spine** (como o editor do Spine) ou **núcleo** (o núcleo próprio em wasm e o nosso desenho WebGL, com a semântica do jogo novo: multiply e tela certos, pma desfeito). `?runtime=nucleo` no endereço abre direto nele; pela ponte, `view {runtime}`. No modo núcleo os gizmos, o clique e as medidas ainda vêm do spine-core. Detalhes e paridade medida: `docs/NUCLEO.md`, "No editor"; conferência: `npx tsx tools/nucleo-editor.ts`.
 - **Rascunho automatico:** alteracoes nao salvas ficam guardadas no navegador e sao oferecidas ao reabrir.
 
 O formato completo do Spine 4.3 esta disponivel como comandos (`mamulengo_help`): malhas, pesos, linked mesh, clipping, bounding box, point, path, sequence, IK, transform, physics, path constraint, slider, draw order, eventos, skins, renomear e apagar com referencias.
@@ -105,6 +106,7 @@ Medido com `tools/bench.ts` (Chromium headless com SwiftShader, ms por operacao)
 | cenário com animação longa | passo de arrasto | 13.4 | 0.5 |
 | garra mecânica (física) | poseAt avancando no tempo | 3.2 | 0.1 |
 
-- Edicao so em animacoes ou em transformacao de osso na setup remenda o SkeletonData (`src/core/patch.ts`) em vez de reler o documento.
+- Edicao so em animacoes, em transformacao de osso na setup ou na cor e na parte do setup de um slot remenda o SkeletonData (`src/core/patch.ts`) em vez de reler o documento. No modo núcleo a mesma edição vai direto ao modelo do núcleo (`mm_osso_setup`, `mm_slot_setup`, `mm_trocar_animacao`), sem reler o `.boneco`.
+- Os dois modos lado a lado: `npx tsx tools/bench.ts <-data.tres> --runtime spine,nucleo` (números em `docs/NUCLEO.md`, "No editor").
 - `PoseSim` (`src/core/sim.ts`): sem fisica a pose sai de um passo so; com fisica ou com a prévia de transição, tempo que so avanca continua do ultimo passo inteiro (na sequência, o checkpoint guarda as entradas da trilha e a pose local). Os atalhos dao exatamente a mesma pose (tests/features.ts).
 - Serializar memoriza a forma canonica de cada no (antes era O(n x profundidade)).

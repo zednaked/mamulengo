@@ -98,7 +98,13 @@ Osso raiz: mundo = local, com a posição `(x, y)`. Filho: `mundo = pai ⊗ loca
 `a = pa*la + pb*lc`, `b = pa*lb + pb*ld`, `c = pc*la + pd*lc`, `d = pc*lb + pd*ld`,
 `x = pa*lx + pb*ly + px`, `y = pc*lx + pd*ly + py`. Contas em `double`.
 
-`heranca` diferente de normal: fora do v0 (nenhum asset medido usa).
+`heranca` `noScale` e `noScaleOrReflection` (a mão do zumbi e o braço do monstro2 CC0): a
+posição segue o pai como no normal; o eixo x do osso é a direção que a rotação local `r` tem
+no mundo do pai, `(pa*cos r + pb*sin r, pc*cos r + pd*sin r)` normalizada, e o eixo y é o
+perpendicular (+90 graus), invertido em `noScale` quando o pai espelha (`pa*pd - pb*pc < 0`).
+A escala e a cisalha locais entram por cima desses dois eixos, como na matriz local sem a
+rotação. Conferido contra o oráculo nos dois personagens (todas as animações e emendas). As
+outras heranças e a timeline `heranca`: fora do v0 (nenhum asset medido usa).
 
 ## Ordem de atualização
 
@@ -195,12 +201,12 @@ vira dois comandos: o polígono, que o desenhista marca no stencil como leque co
 As fórmulas da uv girada e do fim do recorte vieram do conhecimento geral de atlas, não de
 medida. Foram conferidas no palco (`palco.html`): os 20 personagens desenhados pelo núcleo
 e pela referência (spine-webgl) diferem só nas bordas, de 0 a 1,1% dos pixels acima de
-8/255. Isso inclui a transição (caminho e recorte), o lucky7 (recorte), a guitarra
-(multiply) e os símbolos com imagens giradas e cortadas.
+8/255. Isso inclui personagens com caminho e recorte, com recorte convexo, com multiply e
+com imagens giradas e cortadas no atlas.
 
 O palco: `npm run dev` e `/palco.html` (os `.boneco` das raízes do editor). O wasm:
 `emcmake cmake -S nucleo -B nucleo/build-web -G Ninja && cmake --build nucleo/build-web --target nucleo`
-(199 KB).
+(244 KB).
 
 ## Estado
 
@@ -340,6 +346,72 @@ a entrada de baixo termina o mix). (2) Na transição, um quadro com 0,12 px num
 com a mesma posição de caminho nos dois (a conta do caminho, não do Estado). (3) Timelines de
 `reiniciar` da física, `escala_tempo` negativa, animação de trás para frente, `inicio` e `fim`
 diferentes do padrão e `segurar` à moda antiga (`holdPrevious`) não foram medidos.
+
+## No editor
+
+O viewport do editor desenha pelo núcleo no modo **núcleo** (seletor "desenho" na barra, ao
+lado de "enquadrar"; `?runtime=nucleo` no endereço; `view {runtime: "nucleo"}` pela ponte). Os
+outros modos continuam: **godot** (o spine-godot dos jogos de hoje, com os defeitos medidos em
+`docs/PARIDADE.md`) e **spine** (o editor do Spine). A escolha fica guardada no navegador.
+
+- **Documento:** a cada mudança estrutural o JSON do Spine e o atlas viram `.boneco`
+  (`importarSpine`) e entram no wasm (`mm_carregar`); o modelo anterior é solto
+  (`mm_liberar_modelo`). Se o núcleo recusa, o viewport volta ao spine-webgl e mostra o motivo.
+- **Pose** (`NucleoCena.poseAt`, `src/render/nucleo.ts`): a mesma conta do `PoseSim`, sobre o
+  Estado: personagem novo (`mm_reiniciar`: setup, física reiniciada), `tocar` com mix 0, um
+  quadro em 0 e passos de 1/64 desde 0 (sem física, um passo só até `t`). A emenda (prévia de
+  transição) usa `enfileirar` com o atraso `duração de A - mix` ou `tocar` no instante do
+  corte, com o mix pedido. Tocando, cada quadro é um `mm_passo` do tamanho do quadro, como o
+  viewer faz com o AnimationState.
+- **Desenho** (`Desenhista`, o mesmo do palco): a lista de desenho do núcleo no mesmo canvas e
+  contexto WebGL2 do viewer (com stencil para o recorte), com a projeção da câmera do
+  spine-webgl. Semântica do jogo (a do template web e do módulo Godot): pma desfeito no shader,
+  multiplica `destino x mix(1, cor, alfa)`, tela `destino x (1 - s) + s`, multiplica do motor só
+  quando o `.boneco` pede, física de rotação no sentido do jogo. O olho esconde slots pela parte
+  (`mm_desenhar_escondendo`).
+- **O que ainda vem do spine-core:** o esqueleto do spine-core continua posado ao lado (mesmo
+  tempo, mesma sequência) para gizmos, clique, arrasto, malha, cebola, medidas (`query.*`), ficha
+  e enquadramento. Trocar isso é a etapa B.
+- **Arrasto sem recarregar:** a ponte muda o modelo direto. `mm_osso_setup` (x, y, rotação,
+  escalas, cisalhas e comprimento do setup de um osso), `mm_slot_setup` (cor e parte do setup de
+  um slot) e `mm_trocar_animacao` (relê só uma animação, `ler_animacao` em `leitor.cpp`). O
+  viewer usa isso no lugar de recarregar quando a mudança é só nesses campos (os mesmos que o
+  `patch.ts` remenda no spine-core); o resto relê o documento.
+
+**Paridade** (`npx tsx tools/nucleo-editor.ts`: editor próprio na porta 5207 com
+`tests/assets`, Chromium headless com SwiftShader, 480x480, o personagem inteiro enquadrado):
+modo núcleo contra modo spine em 9 instantes de cada animação, na fila e no corte com mix 0,2
+s, e o remendo do arrasto contra a recarga. Pior quadro, em % dos pixels com diferença acima de
+8/255:
+
+| personagem | setup | animações | emendas (fila e corte) | remendo = recarga |
+|---|---|---|---|---|
+| aventureiro | 0,008 | idle 0,010, susto 0,011 | 0,012 e 0,010 | igual (0 pixels) |
+| monstro (física) | 0,081 | idle 0,088, ganhou 0,051 | 0,053 e 0,051 | igual |
+| pessoa (física) | 0 | idle 0, acenar 0 | 0 e 0 | igual |
+
+As diferenças são de borda (o filtro da textura sem pré-multiplicar contra a pré-multiplicada
+do spine-webgl), pior canal de 4 a 58/255 em poucos pixels. Os CC0 não têm multiply, tela nem
+gravidade de física; nesses casos o modo núcleo difere do modo spine de propósito (o jogo).
+
+**Custo** (`tools/bench.ts --runtime spine,nucleo`, SwiftShader, ms; o modo núcleo ainda posa o
+spine-core para os gizmos, então os números somam os dois):
+
+| personagem | modo | quadro tocando | parte do núcleo (pose + desenho) | passo de arrasto na setup | com animação aberta | recarga |
+|---|---|---|---|---|---|---|
+| monstro | spine | 0,16 | | 0,47 | 0,98 | 1,01 |
+| monstro | núcleo | 0,08 | 0,003 + 0,020 | 0,57 | 0,82 | 2,17 |
+| pessoa | spine | 0,06 | | 0,50 | 0,66 | 0,38 |
+| pessoa | núcleo | 0,09 | 0,005 + 0,010 | 1,17 | 2,18 | 3,19 |
+| aventureiro | spine | 0,10 | | 0,51 | 0,81 | 0,33 |
+| aventureiro | núcleo | 0,07 | 0,002 + 0,028 | 0,44 | 1,23 | 1,70 |
+
+Nenhum passo de arrasto recarregou o núcleo (`nucleoReloadsInDrag` 0). A recarga do núcleo
+(`importarSpine`, JSON e leitura no wasm) custa de 1,4 a 2,8 ms a mais que a do spine-core; o
+remendo evita isso no arrasto. O passo de arrasto ainda refaz a pose do núcleo desde 0 (com
+física, 1/64 s por passo, cerca de 1,5 µs por passo nos CC0): o núcleo não tem o atalho de
+checkpoint do `PoseSim` (o Estado não é copiável), então `poseAt` repetido no mesmo instante
+custa a simulação inteira (0,2 ms na pessoa a 2,3 s, contra 0,04 ms do spine-core com o atalho).
 
 ## Marcos
 

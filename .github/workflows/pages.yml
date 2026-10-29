@@ -1,0 +1,53 @@
+# A demo ao vivo no GitHub Pages (https://zednaked.github.io/mamulengo/): compila o nucleo em
+# wasm, gera dist-demo (npm run build:demo) e publica. So no repositorio publico.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'zednaked/mamulengo'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.11
+      - name: wasm do nucleo
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build
+          emcmake cmake -S nucleo -B nucleo/build-web -G Ninja
+          cmake --build nucleo/build-web --target nucleo
+      - run: npm ci
+      - run: npm run build:demo
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-demo
+
+  deploy:
+    needs: build
+    if: github.repository == 'zednaked/mamulengo'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

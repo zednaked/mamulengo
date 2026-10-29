@@ -4,7 +4,7 @@ import { Document, type ChangeEvent } from "../core/document.ts";
 import { execute, executeAsync, type AssetProvider, type Call } from "../core/commands/index.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
 import { dropDraft, getDraft, putDraft, type Draft } from "./drafts.ts";
-import type { Viewer } from "../render/viewer.ts";
+import type { Runtime, Viewer } from "../render/viewer.ts";
 import type { Op } from "../core/ops.ts";
 import { fichaPath } from "../core/ficha.ts";
 
@@ -60,6 +60,17 @@ export interface MeshEdit {
 
 export const fileUrl =(p: string) => `/api/file?p=${encodeURIComponent(p)}`;
 
+function initialRuntime(): Runtime {
+  const ok = (r: string | null): r is Runtime => r === "godot" || r === "spine" || r === "nucleo";
+  try {
+    const q = new URLSearchParams(location.search).get("runtime");
+    if (ok(q)) return q;
+    const s = localStorage.getItem("mamulengo.runtime");
+    if (ok(s)) return s;
+  } catch {}
+  return "godot";
+}
+
 class AppState {
   assets = $state<AssetInfo[]>([]);
   asset = $state<AssetInfo | null>(null);
@@ -109,6 +120,16 @@ class AppState {
   // a imagem sob o pincel ainda nao e malha: oferecer converter
   offerMesh = $state<{ slot: string; attachment: string } | null>(null);
   onion = $state(false);
+  // modo de desenho do viewport (godot, spine ou nucleo); ?runtime=nucleo no endereco ou o
+  // ultimo escolhido (guardado no navegador)
+  runtime = $state<Runtime>(initialRuntime());
+  async setRuntime(r: Runtime) {
+    this.runtime = r;
+    try {
+      localStorage.setItem("mamulengo.runtime", r);
+    } catch {}
+    await this.viewer?.setRuntime(r);
+  }
   // editar malha (na Pose base): pontos ou pintura de pesos do slot escolhido
   meshEdit = $state<MeshEdit | null>(null);
   // chaves copiadas na timeline (resultado de keys.copy): vale entre animacoes e personagens

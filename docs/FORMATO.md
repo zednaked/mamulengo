@@ -89,8 +89,9 @@ descobre se há pesos comparando tamanhos. Sem pesos: `vertices` como no Spine.
 | Binário | `.skel` fechado | `.bonecob`, especificado aqui | carregar rápido no jogo |
 
 Fora do v0, por não aparecerem em nenhum dos 102 assets: slider, sequência de imagens, cor
-escura (two color), herança de osso diferente da normal, osso só de skin. Um import que os
-traga guarda o trecho em `extras` e avisa.
+escura (two color), herança de osso diferente da normal e de `noScale`/`noScaleOrReflection`
+(que entraram com o zumbi e o monstro2 CC0), osso só de skin. Um import que os traga guarda o
+trecho em `extras` e avisa.
 
 ## No editor
 

@@ -323,4 +323,9 @@ struct Modelo {
 // Le um .boneco ja carregado em memoria. Em erro devolve nullptr e preenche `erro`.
 std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* erro);
 
+// Le uma animacao (o objeto dela em `animacoes` do .boneco) e troca a de mesmo nome do modelo,
+// ou acrescenta no fim. Em erro devolve false, preenche `erro` e nao muda o modelo. Quem usa o
+// modelo com um Estado precisa criar outro (o Estado prepara as timelines de cada animacao).
+bool ler_animacao(Modelo& m, std::string_view nome, std::string_view texto, std::string* erro);
+
 }  // namespace mamulengo

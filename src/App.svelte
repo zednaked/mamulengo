@@ -262,6 +262,11 @@
       <button class:on={showMeshes} onclick={() => (showMeshes = !showMeshes)}>malhas</button>
       <button class:on={app.onion} onclick={() => (app.onion = !app.onion)} title="Fantasmas dos quadros vizinhos (pausado)">cebola</button>
       <button onclick={() => app.viewer?.frameAll()} title="Enquadrar (F)">enquadrar</button>
+      <select class="runtime" value={app.runtime} onchange={(e) => app.setRuntime((e.currentTarget as HTMLSelectElement).value as any)} title="Quem desenha o viewport. godot: como o spine-godot dos jogos de hoje (com os defeitos medidos); spine: como o editor do Spine; nucleo: o nucleo proprio (wasm) com a semantica do jogo novo">
+        <option value="godot">desenho: godot</option>
+        <option value="spine">desenho: spine</option>
+        <option value="nucleo">desenho: nucleo</option>
+      </select>
       <GodotCheck />
     </div>
     <div class="spacer"></div>
@@ -383,6 +388,12 @@
   }
   .seg button.on {
     background: var(--accent);
+  }
+  .seg select.runtime {
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
   }
   .tools button {
     font-size: 15px;

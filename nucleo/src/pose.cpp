@@ -413,12 +413,34 @@ void Esqueleto::mundo_osso(int i) {
     return;
   }
   const Matriz& p = mundo_[size_t(pai)];
+  w.x = p.a * l.x + p.b * l.y + p.x;
+  w.y = p.c * l.x + p.d * l.y + p.y;
+  const Heranca h = m.ossos[size_t(i)].heranca;
+  if (h == Heranca::SemEscala || h == Heranca::SemEscalaOuReflexo) {
+    // sem a escala do pai (docs/NUCLEO.md, "Mundo"): o eixo x do osso e a direcao que a
+    // rotacao local tem no mundo do pai, normalizada; o eixo y e o perpendicular (+90 graus),
+    // invertido se o pai espelha (so em SemEscala). Escala e cisalha locais por cima.
+    const double r = l.rotacao * GRAU;
+    double za = p.a * std::cos(r) + p.b * std::sin(r);
+    double zc = p.c * std::cos(r) + p.d * std::sin(r);
+    const double s = std::sqrt(za * za + zc * zc);
+    if (s > 0.00001) za /= s, zc /= s;
+    const double sinal = (h == Heranca::SemEscala && p.a * p.d - p.b * p.c < 0) ? -1 : 1;
+    const double ry2 = std::atan2(zc, za) + 90 * GRAU;
+    const double zb = std::cos(ry2) * sinal, zd = std::sin(ry2) * sinal;
+    const double hx = l.cisalha_x * GRAU, hy = (90 + l.cisalha_y) * GRAU;
+    const double sa = std::cos(hx) * l.escala_x, sb = std::cos(hy) * l.escala_y;
+    const double sc = std::sin(hx) * l.escala_x, sd = std::sin(hy) * l.escala_y;
+    w.a = za * sa + zb * sc;
+    w.b = za * sb + zb * sd;
+    w.c = zc * sa + zd * sc;
+    w.d = zc * sb + zd * sd;
+    return;
+  }
   w.a = p.a * la + p.b * lc;
   w.b = p.a * lb + p.b * ld;
   w.c = p.c * la + p.d * lc;
   w.d = p.c * lb + p.d * ld;
-  w.x = p.a * l.x + p.b * l.y + p.x;
-  w.y = p.c * l.x + p.d * l.y + p.y;
 }
 
 void Esqueleto::atualizar_mundo() {

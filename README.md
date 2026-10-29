@@ -1,5 +1,7 @@
 # Mamulengo
 
+**[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
+
 ![A robot, a zombie and a monster, rigged and animated by Claude Code in Mamulengo](docs/media/elenco.webp)
 
 **A 2D skeletal animation toolkit for games, run by people and Claude Code
@@ -198,8 +200,9 @@ cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
 npx tsx tools/nucleo-compara.ts tests/boneco  # the core against the reference
 ```
 
-`tests/assets` and `tests/boneco` hold three CC0 characters by Kenney (cartoon,
-mascot, human), rigged with Mamulengo commands only. Parity tests and the engine
+`tests/assets` holds three CC0 characters by Kenney (cartoon, mascot, human), rigged
+with Mamulengo commands only; `tests/boneco` has them plus the robot, the zombie and the
+monster the agent bench made, six in all (the cast of the live demo). Parity tests and the engine
 differences the editor reproduces: [docs/PARIDADE.md](docs/PARIDADE.md).
 
 ## Status

@@ -1,5 +1,7 @@
 # Mamulengo
 
+**[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
+
 ![Um robô, um zumbi e um monstro, rigados e animados pelo Claude Code no Mamulengo](docs/media/elenco.webp)
 
 **Um kit de animação 2D por esqueleto para jogos, operado por gente e pelo Claude
@@ -198,8 +200,9 @@ cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
 npx tsx tools/nucleo-compara.ts tests/boneco  # o núcleo contra a referência
 ```
 
-`tests/assets` e `tests/boneco` têm três personagens CC0 de Kenney (cartoon,
-mascote, humano), montados só com comandos do Mamulengo. Testes de paridade e as
+`tests/assets` tem três personagens CC0 de Kenney (cartoon, mascote, humano), montados
+só com comandos do Mamulengo; `tests/boneco` tem esses três mais o robô, o zumbi e o
+monstro que a bancada de agentes fez, seis ao todo (o elenco da demo ao vivo). Testes de paridade e as
 diferenças de motor que o editor reproduz: [docs/PARIDADE.md](docs/PARIDADE.md).
 
 ## Estado

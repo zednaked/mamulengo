@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Mamulengo: live demo</title>
+    <meta name="description" content="2D skeletal animation for games, run by people and Claude Code together. Six characters played in your browser by a C++ core compiled to WebAssembly." />
+    <meta name="theme-color" content="#16131c" />
+    <meta property="og:title" content="Mamulengo: live demo" />
+    <meta property="og:description" content="2D skeletal animation for games, run by people and Claude Code together." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://zednaked.github.io/mamulengo/" />
+    <meta property="og:image" content="https://zednaked.github.io/mamulengo/social.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d1a24'/%3E%3Cpath d='M8 4v6M16 3v8M24 4v6' stroke='%23ff2e88' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='15' r='5' fill='%23ff2e88'/%3E%3Cpath d='M11 21l5-1 5 1-1 7h-8z' fill='%23ffd166'/%3E%3Cpath d='M8 10l3 9M24 10l-3 9' stroke='%23ff2e88' stroke-width='1.5'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/demo/demo.css" />
+  </head>
+  <body>
+    <header class="topo">
+      <a class="marca" href="https://github.com/zednaked/mamulengo">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4v6M16 3v8M24 4v6" stroke="#ff2e88" stroke-width="2" stroke-linecap="round" /><circle cx="16" cy="15" r="5" fill="#ff2e88" /><path d="M11 21l5-1 5 1-1 7h-8z" fill="#ffd166" /><path d="M8 10l3 9M24 10l-3 9" stroke="#ff2e88" stroke-width="1.5" /></svg>
+        <span>Mamulengo</span>
+      </a>
+      <p class="lema" data-t="lema"></p>
+      <nav>
+        <a class="botao" href="https://github.com/zednaked/mamulengo" data-t="repo"></a>
+        <a class="botao discreto" href="https://github.com/zednaked/mamulengo#readme" data-t="readme"></a>
+        <button class="botao discreto" id="lingua" type="button"></button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="palco" id="palco">
+        <canvas id="sombras" aria-hidden="true"></canvas>
+        <canvas id="tela"></canvas>
+        <p class="dica" id="dica"><span class="mao" aria-hidden="true"></span><span data-t="dica"></span></p>
+        <p class="medidor" id="medidor" aria-live="off"></p>
+        <p class="selo" id="selo"></p>
+        <p class="erro" id="erro" hidden></p>
+      </section>
+
+      <aside class="controles">
+        <div class="grupo">
+          <h2 data-t="elenco"></h2>
+          <div class="fichas" id="personagens"></div>
+        </div>
+        <div class="grupo">
+          <h2><span data-t="animacoes"></span> <small id="quem"></small></h2>
+          <div class="fichas" id="animacoes"></div>
+        </div>
+        <div class="grupo">
+          <h2 data-t="emenda"></h2>
+          <p class="ajuda" data-t="emendaAjuda"></p>
+          <div class="emenda">
+            <label>A <select id="emenda-a"></select></label>
+            <span class="seta" aria-hidden="true">→</span>
+            <label>B <select id="emenda-b"></select></label>
+          </div>
+          <label class="mix"><span data-t="mix"></span> <input id="mix" type="range" min="0" max="1" step="0.05" value="0.2" /> <output id="mix-valor">0.20 s</output></label>
+          <button class="botao cheio" id="tocar-emenda" type="button" data-t="tocarEmenda"></button>
+        </div>
+        <div class="grupo linha">
+          <button class="botao cheio" id="copias" type="button"></button>
+          <button class="botao" id="reiniciar" type="button" data-t="reiniciar"></button>
+        </div>
+        <p class="sobre" data-t="sobre"></p>
+        <p class="sobre fraco" data-t="arte"></p>
+      </aside>
+    </main>
+
+    <div class="social" id="social" hidden>
+      <h1>Mamulengo</h1>
+      <p>2D skeletal animation for games,<br />run by people and Claude Code together</p>
+      <p class="rodape">Open source · C++ core, Godot and WebAssembly · Claude Code over MCP</p>
+    </div>
+
+    <script type="module" src="/src/demo/demo.ts"></script>
+  </body>
+</html>

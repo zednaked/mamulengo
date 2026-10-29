@@ -5,6 +5,7 @@ import { execute, describeCommands, type Call } from "../core/commands/index.ts"
 import { exportAnimation, type ExportOptions } from "../app/exporter.ts";
 import { applySequence, type SequenceParam } from "../app/sequence.ts";
 import { createFromPsd, updateFromPsd } from "../app/psd.ts";
+import type { Runtime } from "../render/viewer.ts";
 void execute;
 
 type Handler = (params: any) => Promise<any> | any;
@@ -212,16 +213,21 @@ const handlers: Record<string, Handler> = {
       asset: app.asset ? `${app.asset.project}/${app.asset.name}` : null,
       file: app.doc?.file ?? null,
       dirty: app.doc?.dirty ?? false,
-      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam } : null,
+      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null } : null,
       selection: app.selection,
       runtimeError: v?.error ?? null,
       history: app.doc?.history().slice(-15) ?? [],
     };
   },
 
-  view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; sequence?: SequenceParam }) {
+  // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; sequence?: SequenceParam; runtime?: Runtime }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
+    if (p.runtime !== undefined) {
+      if (!["godot", "spine", "nucleo"].includes(p.runtime)) throw new Error(`runtime desconhecido: ${p.runtime} (godot, spine ou nucleo)`);
+      await app.setRuntime(p.runtime);
+    }
     // o viewer so reconstroi ao desenhar: numa aba sem quadros, a animacao recem-criada
     // ainda nao estaria nele
     v.sync();
@@ -309,10 +315,12 @@ const handlers: Record<string, Handler> = {
   // Medidas de desempenho no navegador (tools/bench.ts): reconstrucao, quadro tocando,
   // passo de arrasto (comando com merge + sync), poseAt no fim da animacao e salvar.
   // Mexe so em copias de estado e desfaz o que editou.
-  async bench(p: { animation?: string; time?: number; n?: number; bone?: string }) {
+  async bench(p: { animation?: string; time?: number; n?: number; bone?: string; runtime?: Runtime }) {
     const v = app.viewer;
     const doc = app.doc;
     if (!v?.skeleton || !doc) throw new Error("nada aberto");
+    const runtime0 = v.runtime;
+    if (p.runtime) await v.setRuntime(p.runtime);
     const n = p.n ?? 10;
     const clean = !doc.dirty;
     const saved = { view: { ...v.view }, mode: app.mode };
@@ -328,7 +336,7 @@ const handlers: Record<string, Handler> = {
       const dur = v.duration();
       const t = p.time ?? Math.max(0, dur - 0.05);
       v.view.playing = false;
-      const out: Record<string, any> = { animation: anim, duration: dur, time: t, slots: v.skeleton.slots.length, bones: v.skeleton.bones.length };
+      const out: Record<string, any> = { runtime: v.runtime, animation: anim, duration: dur, time: t, slots: v.skeleton.slots.length, bones: v.skeleton.bones.length };
       out.rebuildMs = ms(() => v.rebuild());
       out.poseAtEndMs = ms(() => v.poseAt(t));
       // sem o atalho incremental (fisica refeita desde 0)
@@ -336,7 +344,14 @@ const handlers: Record<string, Handler> = {
       // tocando: quadro inteiro (pose + desenho), sem esperar o rAF
       v.poseAt(0);
       v.view.playing = true;
-      out.frameMs = ms(() => v.frame(1 / 60), 60);
+      // so a parte do nucleo (modo nucleo): pose e desenho medidos dentro do quadro
+      let np = 0,
+        nd = 0;
+      out.frameMs = ms(() => (v.frame(1 / 60), (np += v.nucleoMs.pose), (nd += v.nucleoMs.draw)), 60);
+      if (v.runtime === "nucleo") {
+        out.nucleoPoseMs = +(np / 61).toFixed(3);
+        out.nucleoDrawMs = +(nd / 61).toFixed(3);
+      }
       v.view.playing = false;
       // passo de arrasto com animacao aberta: chave no tempo t, merge com a etapa anterior
       const bone = p.bone ?? v.skeleton.bones[Math.min(1, v.skeleton.bones.length - 1)].data.name;
@@ -355,8 +370,10 @@ const handlers: Record<string, Handler> = {
         execute(doc, { cmd: "bone.set", args: { bone, rotation: ++k % 30 } }, "ui", "bench", { merge: merge2 });
         v.sync();
       };
+      const c0 = { ...(v.nucleo?.stats ?? { cargas: 0, remendos: 0 }) };
       out.setupStepMs = ms(stepSetup);
       out.rebuildsInDrag = v.stats.rebuilds - s0.rebuilds;
+      if (v.runtime === "nucleo") out.nucleoReloadsInDrag = (v.nucleo?.stats.cargas ?? 0) - c0.cargas;
       out.serializeMs = ms(() => doc.serialize(), 5);
       out.serializedBytes = doc.serialize().length;
       // fps de verdade (rAF), tocando por 1.5 s
@@ -380,6 +397,7 @@ const handlers: Record<string, Handler> = {
       Object.assign(v.view, saved.view);
       v.sync();
       v.poseAt(saved.view.time);
+      if (v.runtime !== runtime0) await v.setRuntime(runtime0);
     }
   },
 

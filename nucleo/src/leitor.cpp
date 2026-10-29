@@ -886,4 +886,29 @@ std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* er
   return m;
 }
 
+bool ler_animacao(Modelo& m, std::string_view nome, std::string_view texto, std::string* erro) {
+  std::string e;
+  Json r = Json::ler(texto, &e);
+  if (!r.objeto()) {
+    if (erro) *erro = "JSON invalido: " + e;
+    return false;
+  }
+  const size_t nomes = m.nomes_partes.size();
+  try {
+    Leitor l(m);
+    for (size_t i = 0; i < m.nomes_partes.size(); ++i) l.ids_partes.emplace(m.nomes_partes[i], int(i));
+    l.ler_animacao(std::string(nome), r);
+  } catch (const Erro& x) {
+    if (erro) *erro = x.msg;
+    m.nomes_partes.resize(nomes);
+    return false;
+  }
+  const int velha = m.animacao(nome);
+  if (velha >= 0 && velha != int(m.animacoes.size()) - 1) {
+    m.animacoes[size_t(velha)] = std::move(m.animacoes.back());
+    m.animacoes.pop_back();
+  }
+  return true;
+}
+
 }  // namespace mamulengo

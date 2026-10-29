@@ -194,6 +194,12 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "roteiro invalido: %s\n", erro.c_str());
     return 1;
   }
+  // os pares do roteiro substituem os do .boneco (lista vazia: nenhum par), como no comparador
+  if (const Json* mx = r.acha("mix"); mx && mx->objeto() && mx->acha("pares")) {
+    auto copia = std::make_shared<Modelo>(*modelo);
+    copia->mix_pares.clear();
+    modelo = std::move(copia);
+  }
   Roteiro rt;
   rt.quadros = int(r.num("quadros", 0));
   rt.passo = r.num("passo", 1.0 / 60);

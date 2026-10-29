@@ -1,7 +1,10 @@
 // Viewport: desenha o documento com o runtime oficial (spine-webgl 4.3), o mesmo
-// codigo de pose/deform/fisica/clipping do spine-godot. A cada mudanca do documento
+// codigo de pose/deform/fisica/clipping do spine-godot, ou (modo "nucleo") pelo nucleo
+// proprio em wasm com o desenhista de src/render/nucleo.ts. A cada mudanca do documento
 // reconstroi o SkeletonData; edicoes so de animacao ou de transformacao de osso na
-// setup (o arrasto) sao aplicadas no SkeletonData existente, sem reler o resto.
+// setup (o arrasto) sao aplicadas no SkeletonData existente, sem reler o resto. No modo
+// "nucleo" o esqueleto do spine-core continua posado (gizmos, clique, medidas) e o nucleo
+// recebe as mesmas edicoes direto no modelo (NucleoCena.remendar).
 import {
   AnimationState,
   AnimationStateData,
@@ -27,6 +30,9 @@ import {
 import type { ChangeEvent, Document, Path } from "../core/document.ts";
 import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/sim.ts";
 import { patchSkeletonData } from "../core/patch.ts";
+import { NucleoCena } from "./nucleo.ts";
+
+export type Runtime = "godot" | "spine" | "nucleo";
 
 export interface ViewState {
   animation: string | null;
@@ -72,7 +78,19 @@ export class Viewer {
   // "godot": reproduz o spine-godot (medido com tools/parity.ts): alpha simples mesmo
   // com pma:true, esqueleto com scaleY -1 (inverte a gravidade da fisica).
   // "spine": como o editor do Spine (respeita pma, y para cima).
-  runtime: "godot" | "spine" = "godot";
+  // "nucleo": o nucleo proprio (wasm) e o nosso desenho, com a semantica do jogo (o template
+  // web e o modulo Godot): multiply e screen certos, pma desfeito, fisica no sentido do jogo.
+  // Troque com setRuntime (recarrega as texturas).
+  runtime: Runtime = "godot";
+  nucleo: NucleoCena | null = null;
+  // o nucleo recusou o documento (o desenho volta ao spine-webgl enquanto isso)
+  nucleoError: string | null = null;
+  // tempo do nucleo no ultimo quadro (pose e desenho), em ms
+  nucleoMs = { pose: 0, draw: 0 };
+  private urlFor: ((page: string) => string) | null = null;
+  private get useNucleo() {
+    return this.runtime === "nucleo" && !!this.nucleo && !this.nucleoError;
+  }
   // experimento: o Godot gera mipmaps em runtime para filtro "com mipmaps"? (parity)
   godotMipmaps = false;
   get flip() {
@@ -97,7 +115,8 @@ export class Viewer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = new ManagedWebGLRenderingContext(canvas, { alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+    // stencil: o recorte do desenho do nucleo
+    this.ctx = new ManagedWebGLRenderingContext(canvas, { alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true, stencil: true });
     this.scene = new SceneRenderer(canvas, this.ctx, true);
     this.scene.skeletonDebugRenderer.drawRegionAttachments = false;
     this.scene.skeletonDebugRenderer.drawClipping = true;
@@ -176,6 +195,10 @@ export class Viewer {
   // Carrega texturas das paginas do atlas. urlFor resolve o nome da pagina.
   async setDocument(doc: Document, urlFor: (page: string) => string) {
     this.doc = doc;
+    this.urlFor = urlFor;
+    const nucleo = this.runtime === "nucleo";
+    // texels do arquivo (sem pre-multiplicar, com o fix_alpha_border se for o caso) para o nucleo
+    const crus = new Map<string, ImageBitmap>();
     this.unsubDoc?.();
     this.unsubDoc = doc.onChange((e) => this.noteChange(e));
     const atlas = new TextureAtlas(doc.atlas.text);
@@ -199,9 +222,10 @@ export class Viewer {
         this.textureInfo[page.name] = { origin, note: note ? decodeURIComponent(note) : null };
         // "godot": o spine-godot (medido com tools/parity.ts) ignora pma:true do atlas e
         // desenha com alpha simples; "atlas" respeita o pma declarado (como o Spine).
-        const pma = page.pma && this.runtime === "spine";
+        const pma = page.pma && this.runtime !== "godot";
         const premultiplyAlpha = pma ? "none" : "premultiply";
         let bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+        if (nucleo) crus.set(page.name, fix ? await fixAlphaBorder(bmp, false) : bmp);
         let premultiplied = pma;
         if (fix) {
           // fix_alpha_border poe cor sob alpha 0; premultiplica na mao (recriar o
@@ -230,6 +254,21 @@ export class Viewer {
       }),
     );
     this.godotTintBlack = tintBlack;
+    this.nucleo?.limparTexturas();
+    this.nucleoError = null;
+    if (nucleo) {
+      try {
+        this.nucleo ??= await NucleoCena.criar(this.ctx.gl);
+        const gl = this.ctx.gl;
+        for (const page of atlas.pages) {
+          const img = crus.get(page.name);
+          // o filtro da pagina do atlas (o mesmo que o spine-webgl usa)
+          if (img) this.nucleo.poeTextura(page.name, img, { min: page.minFilter ?? gl.LINEAR, mag: page.magFilter ?? gl.LINEAR });
+        }
+      } catch (e: any) {
+        this.nucleoError = String(e?.message ?? e);
+      }
+    }
     this.atlas = atlas;
     this.builtVersion = -1;
     this.view.animation = null;
@@ -259,12 +298,38 @@ export class Viewer {
       if (this.view.sequence && (!this.view.animation || !data.findAnimation(this.view.sequence.next))) this.view.sequence = null;
       if (!this.view.animation && data.animations.length) this.view.animation = data.animations[0].name;
       this.error = null;
+      this.loadNucleo();
       this.poseAt(this.view.time);
     } catch (e: any) {
       // documento invalido para o runtime: mostra o erro e mantem o ultimo esqueleto
       this.error = String(e?.message ?? e);
     }
     this.builtVersion = this.doc.version;
+  }
+
+  // o documento inteiro no nucleo (modo "nucleo"); em erro o desenho volta ao spine-webgl
+  private loadNucleo() {
+    if (this.runtime !== "nucleo" || !this.nucleo || !this.doc || !this.skeleton) return;
+    try {
+      this.nucleo.carregar(this.doc.json, this.doc.atlas.text, this.doc.file?.skeleton?.split("/").pop() ?? "", this.skeleton.slots.map((s) => s.data.name));
+      this.nucleoError = null;
+    } catch (e: any) {
+      this.nucleoError = String(e?.message ?? e);
+    }
+  }
+
+  // Troca o modo de desenho mantendo animacao, tempo e camera (recarrega as texturas, que
+  // dependem do modo).
+  async setRuntime(r: Runtime) {
+    if (r === this.runtime) return;
+    this.runtime = r;
+    if (!this.doc || !this.urlFor) return;
+    const keep = { view: { ...this.view }, cam: { ...this.cam } };
+    await this.setDocument(this.doc, this.urlFor);
+    Object.assign(this.view, keep.view);
+    Object.assign(this.cam, keep.cam);
+    this.sim?.invalidate();
+    this.poseAt(this.view.time);
   }
 
   // caminhos tocados por uma mudanca (para saber se da para remendar)
@@ -290,6 +355,8 @@ export class Viewer {
     const data = this.data;
     if (!paths || !doc || !data || !this.atlas || !this.skeleton || this.error) return false;
     if (!patchSkeletonData(data, doc.json, paths, new SkeletonJson(new AtlasAttachmentLoader(this.atlas)))) return false;
+    // o nucleo recebe as mesmas mudancas direto no modelo; se nao der, so ele rele o documento
+    if (this.runtime === "nucleo" && this.nucleo && (this.nucleoError || !this.nucleo.remendar(doc.json, paths))) this.loadNucleo();
     this.pending = [];
     this.stats.patches++;
     this.sim?.invalidate();
@@ -333,6 +400,13 @@ export class Viewer {
   poseAt(t: number) {
     this.view.time = t;
     this.sim?.poseAt(this.view.animation, this.view.loop, t, this.view.sequence);
+    if (this.useNucleo) {
+      const t0 = performance.now();
+      // a sequencia so vale se o spine-core a aceitou (a mesma checagem do sequenceTimes)
+      const seq = this.view.sequence && this.view.animation && this.data?.findAnimation(this.view.sequence.next) ? this.view.sequence : null;
+      this.nucleo!.poseAt(this.view.animation, this.view.loop, t, seq);
+      this.nucleoMs.pose = performance.now() - t0;
+    }
   }
 
   // trocar de animacao desliga a previa de transicao
@@ -392,6 +466,11 @@ export class Viewer {
         st.apply(sk);
         sk.update(d);
         sk.updateWorldTransform(Physics.update);
+        if (this.useNucleo) {
+          const t0 = performance.now();
+          this.nucleo!.passo(d);
+          this.nucleoMs.pose = performance.now() - t0;
+        }
       }
       this.view.time = t;
     }
@@ -424,7 +503,13 @@ export class Viewer {
     scene.begin();
     if (this.skeleton) {
       this.drawOnion();
-      this.drawMain(this.skeleton);
+      if (this.useNucleo) {
+        // o desenho do nucleo no mesmo contexto e com a mesma camera; o spine-webgl volta
+        // depois para os gizmos
+        scene.end();
+        this.drawNucleo();
+        scene.begin();
+      } else this.drawMain(this.skeleton);
       const dbg = scene.skeletonDebugRenderer;
       dbg.drawBones = this.view.showBones;
       dbg.drawMeshHull = this.view.showMeshes;
@@ -468,6 +553,14 @@ export class Viewer {
     if (!this.hiddenBones.size) return false;
     for (const start of [slot.bone, this.moverOf(slot)]) for (let b = start; b; b = b.parent) if (this.hiddenBones.has(b.data.name)) return true;
     return false;
+  }
+
+  private drawNucleo() {
+    const t0 = performance.now();
+    const sk = this.skeleton!;
+    const hidden = this.hiddenBones.size || this.hiddenSlots.size ? (i: number) => this.isSlotHidden(sk.slots[i]) : null;
+    this.nucleo!.desenhar(this.scene.camera.projectionView.values, hidden);
+    this.nucleoMs.draw = performance.now() - t0;
   }
 
   private drawMain(sk: Skeleton) {

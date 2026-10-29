@@ -1059,14 +1059,16 @@ runtimeOk("remocoes (slot, osso com pesos)");
   const { execute } = await import("../src/core/commands/index.ts");
   execute(doc, { cmd: "bone.set", args: { bone: "pescoco", rotation: 7, x: 150 } }, "ui", undefined, { merge: "arrasto" });
   execute(doc, { cmd: "bone.set", args: { bone: "pescoco", rotation: 9 } }, "ui", undefined, { merge: "arrasto" });
+  // cor e parte do setup de um slot tambem se remendam
+  execute(doc, { cmd: "slot.set", args: { slot: "olhinho", attachment: "olho_2", color: "ff8080c0" } }, "ui");
   off();
   off2();
-  check(ev.length === 3 && ev[2].merged === true && ev[2].replaced === ev[1].tx, "etapa de arrasto avisa qual transacao substituiu (replaced)");
+  check(ev.length === 4 && ev[2].merged === true && ev[2].replaced === ev[1].tx, "etapa de arrasto avisa qual transacao substituiu (replaced)");
   const ok = patchSkeletonData(patched, doc.json, paths, new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))));
   const full = read();
   let eq = ok;
   for (const a of full.animations) for (const t of [0, 0.25, 0.6]) if (fresh(patched, a.name, t) !== fresh(full, a.name, t)) eq = false;
-  check(eq, "remendar o SkeletonData (animacao + osso na setup) = reler o documento inteiro");
+  check(eq, "remendar o SkeletonData (animacao, osso e slot na setup) = reler o documento inteiro");
   const before = doc.json.slots.length;
   const paths2: any[] = [];
   const off3 = doc.onChange((e) => e.tx.ops.forEach((o) => paths2.push(o.path)));

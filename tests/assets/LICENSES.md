@@ -34,3 +34,12 @@ mao = Skin/Tint 2/tint2_hand.png, rosto = Face/Completes/face1.png,
 cabelo = Hair/Brown 2/brown2Man5.png, camisa = Shirts/Red/redShirt1.png,
 manga = Shirts/Red/redArm_long.png, quadril = Pants/Light Blue/pantsLightBlue3.png,
 perna = Pants/Light Blue/pantsLightBlue_long.png, sapato = Shoes/Brown 1/brownShoe5.png.
+
+## Os personagens em `tests/boneco`
+
+`aventureiro`, `monstro` e `pessoa` sao os rigs de `<nome>/rig/` em `.boneco`. `robo` e
+`zumbi` usam as partes de `robo/partes` e `zumbi/partes` (Toon Characters 1, empacotadas
+num atlas). `monstro2` usa as partes de `monstro/partes` (Monster
+Builder Pack), passadas por um PSD de teste e reempacotadas (bracos e pernas dos dois lados,
+a mesma arte). Rigs, fichas e animacoes desses tres foram feitos pela bancada de agentes
+(docs/BANCADA.md) e sao dedicados ao dominio publico (CC0 1.0), como a arte.

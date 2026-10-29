@@ -1,8 +1,9 @@
 // Remenda um SkeletonData ja lido quando a edicao e so em animacoes (rele so essas
-// animacoes) ou em transformacao de osso na setup (o arrasto mais comum). Reler o
+// animacoes), em transformacao de osso na setup (o arrasto mais comum) ou na cor e na
+// parte do setup de um slot. Reler o
 // documento inteiro custa dezenas de ms nos maiores assets; isto custa quase nada.
 // O resultado e o mesmo de reler tudo (conferido em tests/features.ts).
-import { SkeletonJson, SliderData, type SkeletonData } from "@esotericsoftware/spine-core";
+import { Color, SkeletonJson, SliderData, type SkeletonData } from "@esotericsoftware/spine-core";
 import type { Path } from "./ops.ts";
 import type { SpineJson } from "./format.ts";
 
@@ -15,11 +16,14 @@ const BONE_DEFAULT: Record<string, number> = { x: 0, y: 0, rotation: 0, scaleX: 
 export function patchSkeletonData(data: SkeletonData, json: SpineJson, paths: Path[], reader: SkeletonJson): boolean {
   const anims = new Set<string>();
   const bones: [number, string][] = [];
+  const slots = new Set<number>();
   for (const p of paths) {
     if (p[0] === "animations" && typeof p[1] === "string" && p.length >= 3) anims.add(p[1]);
     else if (p[0] === "bones" && typeof p[1] === "number" && p.length === 3 && BONE_SETUP.has(p[2] as string)) bones.push([p[1], p[2] as string]);
+    else if (p[0] === "slots" && typeof p[1] === "number" && p.length === 3 && (p[2] === "color" || p[2] === "attachment")) slots.add(p[1]);
     else return false;
   }
+  for (const i of slots) if (!json.slots?.[i] || data.slots[i]?.name !== json.slots[i].name) return false;
   for (const a of anims) {
     if (!json.animations?.[a] || !data.findAnimation(a)) return false;
     // slider guarda a referencia da animacao
@@ -43,6 +47,12 @@ export function patchSkeletonData(data: SkeletonData, json: SpineJson, paths: Pa
     const scaled = k === "x" || k === "y" || k === "length" ? v * scale : v;
     if (k === "length") data.bones[i].length = scaled;
     else (data.bones[i].setupPose as any)[k] = scaled;
+  }
+  for (const i of slots) {
+    const s = json.slots[i];
+    const d = data.slots[i];
+    d.setupPose.color.setFromColor(s.color ? Color.fromString(s.color) : new Color(1, 1, 1, 1));
+    d.attachmentName = s.attachment ?? null;
   }
   return true;
 }

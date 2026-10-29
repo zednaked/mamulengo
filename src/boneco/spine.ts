@@ -181,6 +181,13 @@ export function importarSpine(json: any, atlas: string, nome: string, opts: Opco
   return { boneco: VERSAO, nome, ...atlasParaBoneco(atlas), ...t };
 }
 
+// Uma animacao so, como fica no .boneco (o editor remenda o nucleo sem reler o resto). A
+// gravidade das fisicas de rotacao depende das restricoes, que vao junto.
+export function importarAnimacao(json: any, nome: string): any {
+  const parcial = { bones: [], constraints: json.constraints, physics: json.physics, animations: { [nome]: json.animations?.[nome] ?? {} } };
+  return importarSpine(parcial, "", "").animacoes[nome];
+}
+
 // ---- volta
 
 export interface Exportado {

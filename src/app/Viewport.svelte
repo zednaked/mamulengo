@@ -13,6 +13,7 @@
 
   onMount(() => {
     const v = new Viewer(canvas);
+    v.runtime = app.runtime;
     // editando malha, os gizmos de osso saem e entra o desenho da malha
     v.overlays.push((v) => {
       if (app.meshEdit) return drawMeshEdit(v);
@@ -180,6 +181,8 @@
   <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (cursor.inside = false)} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
   {#if app.viewer?.error}
     <div class="err">O runtime recusou o documento: {app.viewer.error}</div>
+  {:else if app.runtime === "nucleo" && app.viewer?.nucleoError && (app.version, true)}
+    <div class="err">O nucleo recusou o documento (desenhando pelo spine-webgl): {app.viewer.nucleoError}</div>
   {/if}
   {#if app.tool === "deform" && app.doc}
     <label class="brush" title="Tamanho do pincel ( [ e ] )">pincel <input type="range" min="15" max="250" bind:value={app.brushRadius} /></label>
