@@ -12,7 +12,7 @@ transitions and a written brief. A C++ core, written from scratch, plays them in
 Godot (engine module or GDExtension) and in the browser (220 KB of WebAssembly).
 It opens and writes Spine 4.3 projects, so nothing already made gets left behind.
 
-[Leia em português](README.pt-BR.md) · Godot 4.5+ · Linux and Windows
+[Leia em português](README.pt-BR.md) · Godot 4.5+ · Linux, Windows and macOS
 
 ```
 466 of 466 playback scripts match the reference runtime every frame, events too
@@ -25,7 +25,8 @@ GPU objects created per frame in that game: 160 before, 0.3 now
 **On this page:** [what it does](#what-it-does) ·
 [Claude Code](#working-with-claude-code) ·
 [the agent bench](#the-agent-bench) · [the .boneco format](#the-boneco-format) ·
-[the core](#the-core) · [in a Godot game](#in-a-godot-game) · [run it](#run-it) ·
+[the core](#the-core) · [use in your Godot game](#use-in-your-godot-game) ·
+[in a Godot game](#in-a-godot-game) · [run it](#run-it) ·
 [status](#status)
 
 ![Claude Code rigging and animating a robot from loose parts, on its own, over MCP](docs/media/robo-processo.webp)
@@ -155,13 +156,31 @@ The spec, and what had to be discovered to match (float32 pi, bezier sampled at
 `palco.html` plays any `.boneco` through the core next to the reference, with a
 pixel diff.
 
+## Use in your Godot game
+
+Download `mamulengo-boneco-<version>.zip` from the
+[latest release](../../releases/latest) (or get "Boneco" from the Godot Asset
+Library) and copy its `addons/boneco` folder into your project. Godot 4.5 or
+newer, on Linux x86_64, Windows x86_64 and macOS (universal). Then:
+
+```gdscript
+var sprite := BonecoSprite.new()
+sprite.data = BonecoData.carregar("res://hero/hero.boneco")
+add_child(sprite); sprite.set_animation("idle", true, 0)
+```
+
+Mixing, queues, tracks and the signals (events included):
+[addons/boneco/README.md](addons/boneco/README.md). A project with three CC0
+characters, a click that switches animation and the events on screen:
+[exemplos/godot-boneco](exemplos/godot-boneco).
+
 ## In a Godot game
 
 `nucleo/godot` builds the same code two ways:
 
 - an **engine module**, baked into a web export template: one wasm, no
   GDExtension loading in the browser;
-- a **GDExtension** (Linux and Windows) for the editor, F5 and headless CI with
+- a **GDExtension** (Linux, Windows and macOS) for the editor, F5 and headless CI with
   the stock Godot.
 
 `BonecoSprite` keeps one mesh per batch and only rewrites vertices each frame.
@@ -180,7 +199,8 @@ flipbooks one step apart (4 above 1% of pixels, 7 below 0.5%), and where checked
 the core is the one that matches the reference.
 
 ```sh
-scons -C nucleo/godot platform=linux target=template_debug disable_exceptions=no          # GDExtension
+nucleo/godot/compilar.sh linux    # GDExtension (also windows, macos), as the CI does
+nucleo/godot/montar-addon.sh out  # the addon zip, from nucleo/godot/bin
 scons platform=web target=template_release threads=no custom_modules=<repo>/nucleo/godot  # web template, from Godot's source
 ```
 
@@ -210,8 +230,8 @@ differences the editor reproduces: [docs/PARIDADE.md](docs/PARIDADE.md).
 Working: the editor, the MCP server, the agent bench, `.boneco`, the core with
 its Godot module and GDExtension. A slot game runs on staging with the engine
 module, and its `.boneco` build, all on the core, passes its tests. Next: the
-editor drawing through the core in place of the reference renderer, a binary
-`.boneco` for smaller packs, and macOS builds of the GDExtension. Plan:
+editor drawing through the core in place of the reference renderer, and a binary
+`.boneco` for smaller packs. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License

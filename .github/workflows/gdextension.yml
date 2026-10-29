@@ -1,0 +1,169 @@
+# GDExtension do .boneco: compila o nucleo para Linux, Windows e macOS, monta o addon
+# (addons/boneco), roda o projeto de exemplo no Godot 4.5 e, numa tag v*, publica o .zip numa
+# release. Em pull request e push serve de teste de compilacao (o addon fica como artifact).
+# Os passos sao os mesmos da maquina: nucleo/godot/compilar.sh e nucleo/godot/montar-addon.sh.
+name: gdextension
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gdextension-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCONS_VERSION: "4.11.1"
+  ZIG_VERSION: "0.14.1"
+  GODOT_VERSION: "4.5-stable"
+
+jobs:
+  linux:
+    if: github.repository == 'zednaked/mamulengo'
+    name: Linux x86_64 (zig, glibc 2.28)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "scons==${SCONS_VERSION}"
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Compilar
+        run: nucleo/godot/compilar.sh linux
+      - name: Conferir o glibc pedido (no maximo 2.28)
+        run: |
+          for so in nucleo/godot/bin/*.so; do
+            maior=$(objdump -T "$so" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+            echo "$so: $maior"
+            [ "$(printf '%s\nGLIBC_2.28\n' "$maior" | sort -V | tail -1)" = "GLIBC_2.28" ]
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libboneco-linux
+          path: nucleo/godot/bin/*.so
+          if-no-files-found: error
+
+  windows:
+    if: github.repository == 'zednaked/mamulengo'
+    name: Windows x86_64 (mingw)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "scons==${SCONS_VERSION}"
+      - name: mingw-w64 (threads posix)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+          x86_64-w64-mingw32-g++ --version
+      - name: Compilar
+        run: nucleo/godot/compilar.sh windows
+      - name: Conferir as DLLs pedidas (so as do sistema)
+        run: |
+          for dll in nucleo/godot/bin/*.dll; do
+            echo "$dll:"
+            x86_64-w64-mingw32-objdump -p "$dll" | grep 'DLL Name' | tee /tmp/dlls
+            if grep -Ei 'libstdc|libgcc|libwinpthread' /tmp/dlls; then exit 1; fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libboneco-windows
+          path: nucleo/godot/bin/*.dll
+          if-no-files-found: error
+
+  macos:
+    if: github.repository == 'zednaked/mamulengo'
+    name: macOS universal (arm64 e x86_64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "scons==${SCONS_VERSION}"
+      - name: Compilar
+        run: nucleo/godot/compilar.sh macos
+      - name: Conferir as arquiteturas e o minimo do macOS
+        run: |
+          for fw in nucleo/godot/bin/*.framework; do
+            bin="$fw/$(basename "$fw" .framework)"
+            lipo -info "$bin"
+            lipo "$bin" -verify_arch arm64 x86_64
+            otool -l "$bin" | grep -A3 -E 'LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX' | grep -E 'minos|version' || true
+            codesign -dv "$bin"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libboneco-macos
+          path: nucleo/godot/bin/*.framework
+          if-no-files-found: error
+
+  addon:
+    if: github.repository == 'zednaked/mamulengo'
+    name: Addon (zip, exemplo no Godot 4.5, release na tag)
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: libboneco-*
+          path: libs
+          merge-multiple: true
+      - name: Versao
+        id: versao
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "versao=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "versao=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Montar o addon
+        run: |
+          ls -R libs
+          nucleo/godot/montar-addon.sh out "${{ steps.versao.outputs.versao }}" libs
+      - name: Rodar o exemplo no Godot ${{ env.GODOT_VERSION }} (Linux, headless)
+        run: |
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          godot="$PWD/Godot_v${GODOT_VERSION}_linux.x86_64"
+          cp -R out/mamulengo-boneco/addons exemplos/godot-boneco/
+          # a extensao ja na lista: sem isso o --import a carrega no meio da varredura e o Godot
+          # cai ao sair (visto no 4.7.2 com esta e com outras GDExtensions); o projeto fica igual
+          mkdir -p exemplos/godot-boneco/.godot
+          echo "res://addons/boneco/boneco.gdextension" > exemplos/godot-boneco/.godot/extension_list.cfg
+          timeout 300 "$godot" --headless --path exemplos/godot-boneco --import 2>&1 | tee import.log
+          timeout 120 "$godot" --headless --path exemplos/godot-boneco -- --teste 2>&1 | tee teste.log
+          grep -q "boneco exemplo: ok" teste.log
+          if grep -E "^(ERROR|SCRIPT ERROR)" import.log teste.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mamulengo-boneco-${{ steps.versao.outputs.versao }}
+          path: out/mamulengo-boneco
+          if-no-files-found: error
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip_="out/mamulengo-boneco-${GITHUB_REF_NAME}.zip"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$zip_" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$zip_" --title "Boneco ${GITHUB_REF_NAME}" --generate-notes
+          fi

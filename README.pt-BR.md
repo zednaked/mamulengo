@@ -13,7 +13,7 @@ zero, toca esses arquivos no Godot (módulo do motor ou GDExtension) e no
 navegador (220 KB de WebAssembly). Abre e grava projetos do Spine 4.3, então nada
 do que já foi feito fica para trás.
 
-[Read in English](README.md) · Godot 4.5+ · Linux e Windows
+[Read in English](README.md) · Godot 4.5+ · Linux, Windows e macOS
 
 ```
 466 de 466 roteiros batem com o runtime de referência em todo quadro, eventos também
@@ -25,7 +25,8 @@ objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
 
 **Nesta página:** [o que faz](#o-que-faz) · [Claude Code](#com-o-claude-code) ·
 [a bancada de agentes](#a-bancada-de-agentes) · [o formato .boneco](#o-formato-boneco) ·
-[o núcleo](#o-núcleo) · [num jogo Godot](#num-jogo-godot) · [rodar](#rodar) ·
+[o núcleo](#o-núcleo) · [use no seu jogo Godot](#use-no-seu-jogo-godot) ·
+[num jogo Godot](#num-jogo-godot) · [rodar](#rodar) ·
 [estado](#estado)
 
 ![O Claude Code montando e animando um robô a partir de peças soltas, sozinho, pelo MCP](docs/media/robo-processo.webp)
@@ -155,13 +156,31 @@ amostrada em 9 pontos, um passo de física zero no primeiro quadro):
 [docs/NUCLEO.md](docs/NUCLEO.md). O `palco.html` toca qualquer `.boneco` pelo
 núcleo ao lado da referência, com a diferença pixel a pixel.
 
+## Use no seu jogo Godot
+
+Baixe o `mamulengo-boneco-<versão>.zip` da
+[última release](../../releases/latest) (ou pegue o "Boneco" na Asset Library
+do Godot) e copie a pasta `addons/boneco` dele para o seu projeto. Godot 4.5 ou
+mais novo, no Linux x86_64, Windows x86_64 e macOS (universal). Depois:
+
+```gdscript
+var sprite := BonecoSprite.new()
+sprite.data = BonecoData.carregar("res://heroi/heroi.boneco")
+add_child(sprite); sprite.set_animation("idle", true, 0)
+```
+
+Mix, fila, trilhas e os sinais (eventos também):
+[addons/boneco/README.md](addons/boneco/README.md) (em inglês). Um projeto com
+três personagens CC0, um clique que troca a animação e os eventos na tela:
+[exemplos/godot-boneco](exemplos/godot-boneco).
+
 ## Num jogo Godot
 
 `nucleo/godot` compila o mesmo código de dois jeitos:
 
 - **módulo do motor**, dentro de um template de exportação web: um wasm só, sem
   carregar GDExtension no navegador;
-- **GDExtension** (Linux e Windows) para o editor, o F5 e o CI headless com o
+- **GDExtension** (Linux, Windows e macOS) para o editor, o F5 e o CI headless com o
   Godot oficial.
 
 O `BonecoSprite` guarda uma malha por lote e só regrava os vértices a cada
@@ -180,7 +199,8 @@ de 1% dos pixels, 7 abaixo de 0,5%), e onde foi conferido, é o núcleo que bate
 a referência.
 
 ```sh
-scons -C nucleo/godot platform=linux target=template_debug disable_exceptions=no          # GDExtension
+nucleo/godot/compilar.sh linux    # GDExtension (também windows, macos), como o CI faz
+nucleo/godot/montar-addon.sh out  # o zip do addon, a partir de nucleo/godot/bin
 scons platform=web target=template_release threads=no custom_modules=<repo>/nucleo/godot  # template web, no código do Godot
 ```
 
@@ -211,7 +231,7 @@ Funcionando: o editor, o servidor MCP, a bancada de agentes, o `.boneco`, o
 núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
 o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
 Próximos: o editor desenhando pelo núcleo no lugar do renderizador de referência,
-um `.boneco` binário para pacotes menores e a GDExtension para macOS. Plano:
+e um `.boneco` binário para pacotes menores. Plano:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licença

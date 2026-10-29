@@ -1,0 +1,5 @@
+# o addon vem da release (ou de nucleo/godot/montar-addon.sh)
+addons/
+.godot/
+*.import
+*.uid

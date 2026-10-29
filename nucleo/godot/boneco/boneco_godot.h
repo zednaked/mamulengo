@@ -98,6 +98,11 @@ class BonecoSprite : public Node2D {
   void set_animation(const String &p_nome, bool p_loop, int p_trilha);
   void add_animation(const String &p_nome, float p_atraso, bool p_loop, int p_trilha);
   Ref<BonecoEntrada> get_current(int p_trilha) const;
+  // mix (segundos de emenda entre animacoes): o padrao e os pares de-para valem sobre o `mix`
+  // do .boneco e continuam valendo depois de um set_data
+  void set_default_mix(float p_tempo);
+  float get_default_mix() const;
+  void set_mix(const String &p_de, const String &p_para, float p_tempo);
   PackedStringArray get_animation_names() const;
   void set_to_setup_pose();
   // anda `p_dt` segundos e redesenha (o processo do no chama com o delta do quadro)
@@ -135,6 +140,13 @@ class BonecoSprite : public Node2D {
   // trilhas, fila, mix e eventos (o Estado do nucleo; docs/NUCLEO.md "Estado")
   std::unique_ptr<mamulengo::Estado> estado;
   std::vector<mamulengo::Evento> eventos;
+  // o mix que o jogo pediu (-1: o do .boneco) e os pares, reaplicados a cada _montar
+  float mix_jogo = -1;
+  struct ParMix {
+    String de, para;
+    float tempo;
+  };
+  std::vector<ParMix> pares_mix;
 
   // itens de desenho: um por lote (dois no tela), cada um com uma malha que fica
   Vector<RID> itens, malhas;
@@ -151,6 +163,7 @@ class BonecoSprite : public Node2D {
 
   Ref<BonecoEntrada> _entrada(int trilha, int animacao, bool loop) const;
   void _montar();
+  void _aplicar_mix();
   void _liberar_itens();
   void _desenhar();
   void _passo(double dt);

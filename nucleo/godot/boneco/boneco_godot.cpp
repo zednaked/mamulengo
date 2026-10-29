@@ -196,9 +196,46 @@ void BonecoSprite::_montar() {
   }
   esq = std::make_unique<mamulengo::Esqueleto>(data->modelo);
   estado = std::make_unique<mamulengo::Estado>(data->modelo);
+  _aplicar_mix();
   esq->setup();
   esq->atualizar_mundo();
   _desenhar();
+}
+
+void BonecoSprite::_aplicar_mix() {
+  if (!estado) return;
+  if (mix_jogo >= 0) estado->mix_padrao = mix_jogo;
+  for (const ParMix &p : pares_mix) {
+    const int de = data->modelo->animacao(padrao(p.de)), para = data->modelo->animacao(padrao(p.para));
+    if (de >= 0 && para >= 0) estado->definir_mix(de, para, p.tempo);
+  }
+}
+
+void BonecoSprite::set_default_mix(float p_tempo) {
+  mix_jogo = p_tempo < 0 ? 0 : p_tempo;
+  if (estado) estado->mix_padrao = mix_jogo;
+}
+
+float BonecoSprite::get_default_mix() const {
+  if (estado) return float(estado->mix_padrao);
+  return mix_jogo < 0 ? 0 : mix_jogo;
+}
+
+void BonecoSprite::set_mix(const String &p_de, const String &p_para, float p_tempo) {
+  bool achou = false;
+  for (ParMix &p : pares_mix)
+    if (p.de == p_de && p.para == p_para) {
+      p.tempo = p_tempo;
+      achou = true;
+    }
+  if (!achou) pares_mix.push_back(ParMix{p_de, p_para, p_tempo});
+  if (!estado) return;
+  const int de = data->modelo->animacao(padrao(p_de)), para = data->modelo->animacao(padrao(p_para));
+  if (de < 0 || para < 0) {
+    BONECO_ERRO("boneco: set_mix com animacao desconhecida " + p_de + " -> " + p_para);
+    return;
+  }
+  estado->definir_mix(de, para, p_tempo);
 }
 
 void BonecoSprite::set_playing(bool p) { playing = p; }
@@ -539,6 +576,9 @@ void BonecoSprite::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_animation", "nome", "loop", "trilha"), &BonecoSprite::set_animation, DEFVAL(true), DEFVAL(0));
   ClassDB::bind_method(D_METHOD("add_animation", "nome", "atraso", "loop", "trilha"), &BonecoSprite::add_animation, DEFVAL(0.0), DEFVAL(true), DEFVAL(0));
   ClassDB::bind_method(D_METHOD("get_current", "trilha"), &BonecoSprite::get_current, DEFVAL(0));
+  ClassDB::bind_method(D_METHOD("set_default_mix", "tempo"), &BonecoSprite::set_default_mix);
+  ClassDB::bind_method(D_METHOD("get_default_mix"), &BonecoSprite::get_default_mix);
+  ClassDB::bind_method(D_METHOD("set_mix", "de", "para", "tempo"), &BonecoSprite::set_mix);
   ClassDB::bind_method(D_METHOD("get_animation_names"), &BonecoSprite::get_animation_names);
   ClassDB::bind_method(D_METHOD("set_to_setup_pose"), &BonecoSprite::set_to_setup_pose);
   ClassDB::bind_method(D_METHOD("update_skeleton", "delta"), &BonecoSprite::update_skeleton);

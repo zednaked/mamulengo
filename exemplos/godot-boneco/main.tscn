@@ -1,0 +1,38 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="BonecoData" path="res://personagens/aventureiro/aventureiro.boneco" id="2_aventureiro"]
+[ext_resource type="BonecoData" path="res://personagens/monstro/monstro.boneco" id="3_monstro"]
+[ext_resource type="BonecoData" path="res://personagens/pessoa/pessoa.boneco" id="4_pessoa"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Aventureiro" type="BonecoSprite" parent="."]
+position = Vector2(213, 610)
+data = ExtResource("2_aventureiro")
+
+[node name="Monstro" type="BonecoSprite" parent="."]
+position = Vector2(640, 610)
+data = ExtResource("3_monstro")
+
+[node name="Pessoa" type="BonecoSprite" parent="."]
+position = Vector2(1067, 610)
+data = ExtResource("4_pessoa")
+
+[node name="Titulo" type="Label" parent="."]
+offset_left = 32.0
+offset_top = 24.0
+offset_right = 1248.0
+offset_bottom = 64.0
+theme_override_font_sizes/font_size = 28
+text = "Boneco: click a character to play its action, mixed in over 0.25 s"
+
+[node name="Eventos" type="Label" parent="."]
+offset_left = 32.0
+offset_top = 596.0
+offset_right = 1248.0
+offset_bottom = 710.0
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 17
+text = "Click a character"

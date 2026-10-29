@@ -4,3 +4,5 @@ godot/bin/
 godot/.sconsign*.dblite
 *.os
 *.o
+godot/godot-cpp/
+godot/zig/cache/
