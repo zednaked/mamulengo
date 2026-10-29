@@ -60,15 +60,28 @@ export interface MeshEdit {
 
 export const fileUrl =(p: string) => `/api/file?p=${encodeURIComponent(p)}`;
 
-function initialRuntime(): Runtime {
-  const ok = (r: string | null): r is Runtime => r === "godot" || r === "spine" || r === "nucleo";
+const RUNTIMES: Runtime[] = ["godot", "spine", "nucleo"];
+const ehRuntime = (r: string | null): r is Runtime => RUNTIMES.includes(r as Runtime);
+
+// ?runtime= no endereco vale para tudo o que abrir
+function runtimeDoEndereco(): Runtime | null {
   try {
     const q = new URLSearchParams(location.search).get("runtime");
-    if (ok(q)) return q;
-    const s = localStorage.getItem("mamulengo.runtime");
-    if (ok(s)) return s;
+    if (ehRuntime(q)) return q;
   } catch {}
-  return "godot";
+  return null;
+}
+
+// modo de desenho de um personagem: o do endereco, o escolhido antes no projeto dele (guardado
+// no navegador) ou o do formato: .boneco no nucleo, -data.tres (spine-godot) no godot
+export function runtimeDe(asset: AssetInfo): Runtime {
+  const q = runtimeDoEndereco();
+  if (q) return q;
+  try {
+    const s = localStorage.getItem(`mamulengo.runtime.${asset.project}`);
+    if (ehRuntime(s)) return s;
+  } catch {}
+  return asset.tres.endsWith(".boneco") ? "nucleo" : "godot";
 }
 
 class AppState {
@@ -120,13 +133,13 @@ class AppState {
   // a imagem sob o pincel ainda nao e malha: oferecer converter
   offerMesh = $state<{ slot: string; attachment: string } | null>(null);
   onion = $state(false);
-  // modo de desenho do viewport (godot, spine ou nucleo); ?runtime=nucleo no endereco ou o
-  // ultimo escolhido (guardado no navegador)
-  runtime = $state<Runtime>(initialRuntime());
+  // modo de desenho do viewport (godot, spine ou nucleo): segue o personagem aberto (runtimeDe);
+  // escolher no seletor vale para o projeto dele
+  runtime = $state<Runtime>(runtimeDoEndereco() ?? "godot");
   async setRuntime(r: Runtime) {
     this.runtime = r;
     try {
-      localStorage.setItem("mamulengo.runtime", r);
+      if (this.asset) localStorage.setItem(`mamulengo.runtime.${this.asset.project}`, r);
     } catch {}
     await this.viewer?.setRuntime(r);
   }
@@ -165,6 +178,9 @@ class AppState {
       this.meshEdit = null;
       this.version++;
       const dir = asset.atlas.slice(0, asset.atlas.lastIndexOf("/") + 1);
+      // o modo muda antes de carregar, para as texturas virem uma vez so
+      this.runtime = runtimeDe(asset);
+      if (this.viewer) this.viewer.runtime = this.runtime;
       await this.viewer?.setDocument(doc, (page) => `/api/texture?p=${encodeURIComponent(dir + page)}`);
       this.log({ label: `abriu ${asset.project} / ${asset.name}`, source: "ui", kind: "info", ops: 0 });
       const d = await getDraft(asset.id);
