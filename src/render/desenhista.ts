@@ -97,18 +97,27 @@ void main() {
   float ft = ef[22] * ef[21];
   if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[18], ef[19], ef[20]), ft);
   vec4 U = vec4(0.0);
-  if (ef[9] > 0.0 && ef[8] > 0.0) {
+  // miolo opaco: a linha e o halo ficam por baixo e nao aparecem (F = C); nem amostra
+  bool opaco = C.a >= 1.0;
+  if (!opaco && ef[9] > 0.0 && ef[8] > 0.0) {
+    // aneis de perto para longe, cada um com peso menor: quando B ja alcanca o peso do anel,
+    // nenhum anel seguinte passa dele e o resultado e o mesmo
     float B = 0.0;
-    for (int i = 1; i <= 6; i++)
+    for (int i = 1; i <= 6; i++) {
+      float w = pow(1.0 - float(i - 1) / 6.0, 2.0);
+      if (B >= w) break;
       for (int k = 0; k < 16; k++) {
         float g = (float(k) + 0.5 * float(i % 2)) * 6.2831853 / 16.0;
-        B = max(B, T(vuv + vec2(cos(g), sin(g)) * ef[10] * float(i) / 6.0 * px).a * pow(1.0 - float(i - 1) / 6.0, 2.0));
+        B = max(B, T(vuv + vec2(cos(g), sin(g)) * ef[10] * float(i) / 6.0 * px).a * w);
+        if (B >= w) break;
       }
+    }
     U = vec4(ef[5], ef[6], ef[7], min(1.0, ef[8] * ef[9] * B));
   }
-  if (ef[4] > 0.0 && ef[3] > 0.0) {
+  if (!opaco && ef[4] > 0.0 && ef[3] > 0.0) {
     float A = 0.0;
     for (int k = 0; k < 24; k++) {
+      if (A >= 1.0) break;
       float g = float(k) * 6.2831853 / 24.0;
       vec2 d = vec2(cos(g), sin(g)) * ef[4] * px;
       A = max(A, max(T(vuv + d).a, max(T(vuv + d * 0.6666667).a, T(vuv + d * 0.3333333).a)));
@@ -116,7 +125,7 @@ void main() {
     U = sobre(vec4(ef[0], ef[1], ef[2], ef[3] * A), U);
   }
   U.a *= vcor.a;
-  vec4 F = sobre(C, U);
+  vec4 F = opaco ? C : sobre(C, U);
   if (ef[11] > 0.0) {
     float n = ruido(vuv * pagina / max(ef[17], 1.0));
     if (n < ef[11]) discard;

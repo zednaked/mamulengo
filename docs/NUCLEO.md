@@ -296,6 +296,14 @@ desfeito; fora da caixa, 0), `px` o tamanho de um pixel da página e `cv` a cor 
    cantos da célula e interpolação suave); `n < valor` some; `n < valor + borda` pinta
    `F.rgb = mix(F.rgb, dissolver.rgb, dissolver.a)`.
 
+**Leituras que não mudam o resultado ficam de fora** (o mesmo pixel, conferido pixel a pixel no
+editor e no Godot): num pixel com `C.a = 1` a linha e o halo ficam por baixo e `F = C`, então nem
+são calculados; o brilho percorre os anéis de perto para longe e para quando `B` já alcança o peso
+do anel (nenhum anel seguinte, de peso menor, passa dele); a linha para quando `A` chega a 1. Na
+vitrine, isso tira de 2 a 3,4 vezes as leituras de textura por pixel (brilho de raio 48: de 97 para
+44; linha de 10,5: de 73 para 22), o que conta no celular, em que a GPU é o gargalo
+(docs/CELULAR.md).
+
 O hash do ruído: `x = i * 1664525 + j * 1013904223` (inteiros de 32 bits sem sinal), depois
 `x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0x846ca68b; x ^= x >> 16`, e
 `x / (2^32 - 1)`. Com inteiros, o mesmo padrão sai igual na web e no Godot, inclusive em placa

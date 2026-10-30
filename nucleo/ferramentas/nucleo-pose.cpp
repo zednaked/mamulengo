@@ -2,7 +2,8 @@
 // Escreve em stdout o JSON do contrato (docs/NUCLEO.md "Contrato da ferramenta de teste").
 // --repetir N: calcula cada pose N vezes (do zero) e escreve o tempo medio em stderr.
 // --quadros N: toca a animacao N quadros seguidos a 60 por segundo, como no jogo (aplicar,
-//   relogio, mundo e vertices de todos os slots), e escreve o tempo medio por quadro.
+//   relogio, mundo e vertices de todos os slots), e escreve o tempo medio por quadro; depois,
+//   o mesmo laco separando a pose (aplicar e mundo) do desenho (desenhar, o que o jogo chama).
 #include <chrono>
 #include <algorithm>
 #include <cmath>
@@ -14,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "mamulengo/desenho.h"
 #include "mamulengo/pose.h"
 #include "saida.h"
 
@@ -125,6 +127,26 @@ int main(int argc, char** argv) {
     }
     auto t1 = std::chrono::steady_clock::now();
     std::fprintf(stderr, "%.6f ms por quadro (%g)\n", std::chrono::duration<double, std::milli>(t1 - t0).count() / quadros, soma);
+    // o mesmo laco separando a pose (aplicar e mundo) do desenho (desenhar, o que o jogo chama)
+    e.setup();
+    e.atualizar_mundo();
+    Desenho d;
+    double ms_pose = 0, ms_desenho = 0;
+    size_t verts = 0;
+    for (int q = 0; q < quadros; ++q) {
+      const auto a0 = std::chrono::steady_clock::now();
+      e.aplicar(anim, q / 60.0);
+      e.avancar(1 / 60.0);
+      e.atualizar_mundo();
+      const auto a1 = std::chrono::steady_clock::now();
+      d.limpar();
+      desenhar(e, d);
+      const auto a2 = std::chrono::steady_clock::now();
+      ms_pose += std::chrono::duration<double, std::milli>(a1 - a0).count();
+      ms_desenho += std::chrono::duration<double, std::milli>(a2 - a1).count();
+      verts += d.vertices.size() / 8;
+    }
+    std::fprintf(stderr, "pose %.4f ms, desenho %.4f ms por quadro (%zu vertices, %zu lotes)\n", ms_pose / quadros, ms_desenho / quadros, verts / size_t(quadros), d.lotes.size());
   }
 
   std::string out = "{\"quadros\":[";
