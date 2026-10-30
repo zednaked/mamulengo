@@ -398,11 +398,19 @@ A ambiente tem `cor` (`ffffffff`) e `forca` (1); o padrão não muda nada. Anim�
 mistura é a da cor). Limites: cor de 0 a 1, força e raio a partir de 0.
 
 **O relevo** (`tools/relevo.ts`). Para cada imagem das partes das skins (fora dos slots aditivo e
-tela, que são luz), no retângulo dela: a altura sobe da borda pela distância euclidiana até o
-transparente (alfa < 128), num perfil de almofada `sqrt(1 - (1 - t)^2)` com `t = min(d / borda, 1)`,
-vezes `profundidade`, mais `detalhe * luminancia * 0,25`, tudo vezes `borda` pixels; suaviza 3 x 3 e
+tela, que são luz): a altura sobe da borda da **silhueta do personagem montado** (o padrão): as
+partes da pose de montagem (os ossos pelo `nucleo-pose`; regiões e malhas com pesos) postas no
+mundo, a união dos pontos opacos delas (cada célula do mundo lê a textura no ponto dela, sem
+furos) e, para cada texel de cada parte, a distância no mundo até a borda dessa união, em texels
+(dividida pelo tamanho do texel ali). Onde as peças se juntam (punho e mão, pescoço e corpo) a
+superfície continua, sem vinco; as trocas de imagem de um slot usam o lugar que teriam nele, e a
+média vale para a mesma imagem em dois lugares (o braço dos dois lados). Texels que nenhum
+triângulo cobre pegam a média dos vizinhos. Imagem fora de slot, girada ou cortada no atlas (e o
+`--modo peca`) usa a borda dela mesma: a distância euclidiana até o transparente (alfa < 128).
+Nos dois casos, o perfil de almofada é `sqrt(1 - (1 - t)^2)` com `t = min(d / borda, 1)`,
+vezes `profundidade`, mais `detalhe * luminancia * 0,25`, tudo vezes `borda` pixels; suaviza e
 a normal é `normalize(-dh/dx, dh/dy, 1)` (o y da imagem desce, o do relevo sobe), em RGB
-`n * 0,5 + 0,5`. Fora das imagens e nas giradas, plano. Padrões: borda 12, profundidade 1,
+`n * 0,5 + 0,5` (a suavização é 5 x 5 pela silhueta, 3 x 3 pela peça). Fora das imagens, plano. Padrões: borda 12, profundidade 1,
 detalhe 0,2 (numa página 2x ou 3x, a borda vezes isso).
 
 **No desenho.** Um personagem monta um grupo de luz se alguma página tem relevo e a luz muda

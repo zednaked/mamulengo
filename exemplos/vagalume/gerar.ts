@@ -130,17 +130,120 @@ pagina("ceu.png", 8, 256, (_x, y) => {
   const f = y ** 1.6;
   return [mistura(10, 52, f), mistura(14, 34, f), mistura(38, 78, f), 255];
 });
-// o chao: a beirada clara (luar) e o escuro para baixo
-pagina("chao.png", 8, 64, (_x, y) => {
-  const borda = Math.max(0, 1 - y / 0.08);
-  return [mistura(22, 70, borda), mistura(26, 86, borda), mistura(40, 110, borda), 255];
+// ruido 1D suave e repetivel (para os perfis dos morros, da grama e das estrelas)
+const hash = (i: number, s: number) => {
+  const v = Math.sin(i * 127.1 + s * 311.7) * 43758.5453;
+  return v - Math.floor(v);
+};
+const ruido = (x: number, s: number) => {
+  const i = Math.floor(x),
+    f = x - i;
+  return mistura(hash(i, s), hash(i + 1, s), f * f * (3 - 2 * f));
+};
+// recorte macio de uma silhueta: 1 dentro, 0 fora, 1,5 px de transicao (d em pixels)
+const borda = (d: number) => clamp(d / 1.5 + 0.5, 0, 1);
+// o chao: grama recortada em cima (tufos), a beirada de luar e o escuro para baixo
+pagina("chao.png", 512, 96, (x, y) => {
+  const topo = 0.1 - 0.07 * Math.max(0, ruido(x * 90, 1) * 1.6 - 0.6) - 0.02 * ruido(x * 13, 2);
+  const a = borda((y - topo) * 96);
+  const luar = Math.max(0, 1 - (y - topo) / 0.06);
+  return [mistura(18, 58, luar), mistura(26, 80, luar), mistura(38, 104, luar), 255 * a];
 });
-// a lua: disco claro com a borda macia e um halo largo (somando luz)
+// a lua: disco claro com crateras, a borda macia e um halo largo (somando luz)
 pagina("lua.png", 128, 128, (x, y) => {
   const r = Math.hypot(x - 0.5, y - 0.5) * 2;
   const disco = clamp((0.42 - r) / 0.03, 0, 1);
   const halo = 0.35 * Math.max(0, 1 - r) ** 2.2;
-  return [mistura(150, 236, disco), mistura(170, 240, disco), 255, 255 * clamp(disco + halo, 0, 1)];
+  const crateras = [
+    [0.4, 0.42, 0.07],
+    [0.58, 0.55, 0.05],
+    [0.47, 0.62, 0.035],
+    [0.6, 0.38, 0.03],
+  ].reduce((m, [cx, cy, cr]) => Math.max(m, clamp((cr - Math.hypot(x - cx, y - cy)) / 0.012, 0, 1)), 0);
+  return [mistura(150, 236 - 40 * crateras, disco), mistura(170, 240 - 34 * crateras, disco), 255 - 20 * crateras, 255 * clamp(disco + halo, 0, 1)];
+});
+// as estrelas miudas: pontos de 1 a 2 px, mais densas no alto
+pagina("estrelas.png", 512, 256, (x, y) => {
+  const gx = Math.floor(x * 512),
+    gy = Math.floor(y * 256);
+  let a = 0;
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) {
+      const cx = Math.floor((gx + dx) / 5),
+        cy = Math.floor((gy + dy) / 5);
+      if (hash(cx * 7 + cy * 131, 3) > 0.93 - 0.12 * (1 - y)) {
+        const px = cx * 5 + 2 + Math.floor(hash(cx, cy) * 3) - 1,
+          py = cy * 5 + 2 + Math.floor(hash(cy, cx) * 3) - 1;
+        const r = Math.hypot(gx - px, gy - py);
+        a = Math.max(a, clamp(1.4 - r, 0, 1) * (0.4 + 0.6 * hash(cx, cy + 9)));
+      }
+    }
+  return [220, 228, 255, 255 * a * (1 - y * 0.6)];
+});
+// uma estrela de quatro pontas (as que cintilam)
+pagina("cintila.png", 48, 48, (x, y) => {
+  const dx = Math.abs(x - 0.5) * 2,
+    dy = Math.abs(y - 0.5) * 2;
+  const a = clamp((1 - (Math.pow(dx, 0.5) + Math.pow(dy, 0.5))) / 0.08, 0, 1) + 0.6 * Math.max(0, 1 - Math.hypot(dx, dy) / 0.35);
+  return [235, 240, 255, 255 * clamp(a, 0, 1)];
+});
+// os morros de longe: perfil ondulado, azul-arroxeado claro (o ar entre a gente e eles)
+pagina("morros_longe.png", 512, 128, (x, y) => {
+  const topo = 1 - (0.5 + 0.2 * Math.sin(2 * Math.PI * x * 1.3 + 1) + 0.1 * Math.sin(2 * Math.PI * x * 3.1 + 2) + 0.05 * ruido(x * 24, 4));
+  const d = (y - topo) * 128;
+  return [mistura(64, 44, clamp(d / 40, 0, 1)), mistura(62, 44, clamp(d / 40, 0, 1)), mistura(118, 88, clamp(d / 40, 0, 1)), 255 * borda(d)];
+});
+// os morros de perto: mais escuros, com arvores redondas em silhueta
+const ARVORES = [
+  [0.08, 0.34, 0.05],
+  [0.13, 0.3, 0.035],
+  [0.31, 0.42, 0.06],
+  [0.36, 0.38, 0.04],
+  [0.67, 0.36, 0.055],
+  [0.74, 0.33, 0.04],
+  [0.91, 0.4, 0.05],
+];
+pagina("morros_perto.png", 1024, 192, (x, y) => {
+  const topo = 1 - (0.42 + 0.12 * Math.sin(2 * Math.PI * x * 2.2 + 0.5) + 0.04 * ruido(x * 40, 5));
+  let d = (y - topo) * 192;
+  // copa redonda (dois circulos) e tronco
+  for (const [ax, ay, ar] of ARVORES) {
+    const base = 1 - (0.42 + 0.12 * Math.sin(2 * Math.PI * ax * 2.2 + 0.5));
+    const copa = Math.max(ar * 192 - Math.hypot((x - ax) * 1024 * 0.5, (y - (base - ay * 0.55)) * 192), ar * 150 - Math.hypot((x - ax - ar * 0.35) * 1024 * 0.5, (y - (base - ay * 0.45)) * 192));
+    const tronco = Math.min(3 - Math.abs(x - ax) * 1024, (y - (base - ay * 0.4)) * 192, (base + 0.02 - y) * 192);
+    d = Math.max(d, copa, tronco);
+  }
+  return [24, 26, 52, 255 * borda(d)];
+});
+// a cerca de madeira: estacas tortinhas e duas ripas, com o luar no topo
+pagina("cerca.png", 512, 64, (x, y) => {
+  const px = x * 512,
+    py = y * 64;
+  let d = -9;
+  for (let k = 0; k < 9; k++) {
+    const cx = 28 + k * 57 + (hash(k, 6) - 0.5) * 10,
+      inc = (hash(k, 7) - 0.5) * 0.12;
+    const topo = 6 + hash(k, 8) * 8;
+    const larg = 6 - Math.abs(px - (cx + (py - 32) * inc));
+    d = Math.max(d, Math.min(larg, py - topo, 64 - py));
+  }
+  for (const ry of [22, 40]) d = Math.max(d, Math.min(4 - Math.abs(py - ry - (px / 512) * 3), px - 10, 502 - px));
+  const luar = clamp(1 - (py - 4) / 14, 0, 1) * 0.5;
+  return [mistura(46, 96, luar), mistura(36, 88, luar), mistura(58, 124, luar), 255 * borda(d)];
+});
+// tufos de grama da frente: escuros, em pontas
+pagina("grama_frente.png", 256, 96, (x, y) => {
+  let d = -9;
+  for (let k = 0; k < 14; k++) {
+    const cx = 0.04 + k * 0.07 + (hash(k, 9) - 0.5) * 0.04,
+      alt = 0.45 + 0.5 * hash(k, 10),
+      inc = (hash(k, 11) - 0.5) * 0.5;
+    const t = (1 - y) / alt;
+    if (t < 0 || t > 1) continue;
+    const meia = 0.03 * (1 - t);
+    d = Math.max(d, (meia - Math.abs(x - cx - inc * t * alt * 0.4)) * 256);
+  }
+  return [10, 14, 26, 255 * borda(d)];
 });
 // a nevoa: uma nuvem macia e achatada
 pagina("nevoa.png", 128, 64, (x, y) => {
@@ -160,21 +263,42 @@ b.ossos.push(
   { nome: "lua", pai: "root", x: -150, y: 290 },
   { nome: "nevoa_atras", pai: "root", y: 40 },
   { nome: "nevoa_frente", pai: "root", y: 4 },
+  { nome: "cintila", pai: "root" },
 );
 const regiao = (slot: string, imagem: string, largura: number, altura: number, extra: any = {}) => (b.skins[0].partes[slot] = { [imagem]: { largura, altura, ...extra } });
+// estrelas que cintilam (a cor anima)
+const CINTILA = [
+  [-60, 300, 18],
+  [90, 280, 14],
+  [170, 230, 20],
+  [-190, 220, 12],
+  [30, 250, 10],
+];
 const cena = [
   { nome: "ceu", osso: "root", parte: "ceu" },
+  { nome: "estrelas", osso: "root", parte: "estrelas", blend: "aditivo" },
+  ...CINTILA.map((_, k) => ({ nome: `cintila_${k}`, osso: "cintila", parte: "cintila", blend: "aditivo" })),
   { nome: "lua", osso: "lua", parte: "lua", blend: "aditivo" },
-  { nome: "chao", osso: "root", parte: "chao" },
+  { nome: "morros_longe", osso: "root", parte: "morros_longe" },
+  { nome: "vagalumes_longe", osso: "root" },
+  { nome: "morros_perto", osso: "root", parte: "morros_perto" },
   // a nevoa de tras: quatro copias a cada 500 px, o osso anda 500 em 8 s (a parte visivel no fim do
   // laco e igual a do comeco)
   ...[-2, -1, 0, 1].map((k) => ({ nome: `nevoa_atras_${k + 2}`, osso: "nevoa_atras", parte: "nevoa", cor: "8a9ad048" })),
+  // a cerca fica atras do chao (a base some na grama: esta mais longe que o zumbi)
+  { nome: "cerca", osso: "root", parte: "cerca" },
+  { nome: "chao", osso: "root", parte: "chao" },
   { nome: "vagalume_atras", osso: "vagalume", parte: "vagalume", blend: "aditivo", cor: "e6ff8a00" },
   { nome: "sombra", osso: "sombra", parte: "sombra", cor: "ffffff73" },
 ];
 regiao("ceu", "ceu", 1000, 640, { y: 250 });
 regiao("lua", "lua", 96, 96);
-regiao("chao", "chao", 1000, 160, { y: -78 });
+regiao("chao", "chao", 1000, 190, { y: -86 });
+regiao("estrelas", "estrelas", 1000, 360, { y: 300 });
+CINTILA.forEach(([x, y, l], k) => regiao(`cintila_${k}`, "cintila", l, l, { x, y }));
+regiao("morros_longe", "morros_longe", 1000, 170, { y: 70 });
+regiao("morros_perto", "morros_perto", 1100, 190, { y: 40, x: 30 });
+regiao("cerca", "cerca", 520, 56, { y: 26, x: 40 });
 regiao("vagalume_atras", "vagalume", 40, 40);
 regiao("sombra", "sombra", 150, 30);
 b.slots.unshift(...cena);
@@ -183,6 +307,10 @@ b.slots.push({ nome: "vagalume_frente", osso: "vagalume", parte: "vagalume", ble
 regiao("vagalume_frente", "vagalume", 40, 40);
 for (const k of [-2, -1, 0, 1]) regiao(`nevoa_atras_${k + 2}`, "nevoa", 420, 90, { x: k * 500 });
 for (const k of [-1, 0]) regiao(`nevoa_frente_${k + 2}`, "nevoa", 640, 70, { x: k * 1000 - 120 });
+// os tufos de grama da frente, nos dois cantos de baixo (na frente do zumbi e da nevoa de tras)
+b.slots.push({ nome: "grama_frente_e", osso: "root", parte: "grama_frente" }, { nome: "grama_frente_d", osso: "root", parte: "grama_frente" });
+regiao("grama_frente_e", "grama_frente", 260, 90, { x: -170, y: -40 });
+regiao("grama_frente_d", "grama_frente", 220, 80, { x: 185, y: -45, escala_x: -1 });
 
 // ---- particulas: o rastro de faiscas do vagalume (um emissor por plano)
 const faiscas = (nome: string, slot: string) => ({
@@ -202,7 +330,34 @@ const faiscas = (nome: string, slot: string) => ({
   cor: ["f4ffb0ff", "c8ff5a00"],
   semente: nome.length,
 });
-b.particulas = [faiscas("faiscas_atras", "vagalume_atras"), faiscas("faiscas_frente", "vagalume_frente")];
+// vagalumes ao longe, sobre o campo: pontinhos que acendem e apagam devagar, sem luz propria
+const LONGE = [
+  [-170, 70],
+  [-90, 95],
+  [-20, 60],
+  [70, 90],
+  [150, 65],
+  [200, 100],
+];
+const longe = (k: number) => ({
+  nome: `longe_${k}`,
+  slot: "vagalumes_longe",
+  osso: "root",
+  x: LONGE[k][0],
+  y: LONGE[k][1],
+  imagem: "vagalume",
+  blend: "aditivo",
+  taxa: 0.7,
+  vida: [2.5, 4],
+  velocidade: [3, 14],
+  angulo: 90,
+  abertura: 360,
+  gravidade: -3,
+  escala: [0.09, 0.07],
+  cor: ["dcff8000", "dcff80ff", "dcff8000"],
+  semente: 20 + k,
+});
+b.particulas = [faiscas("faiscas_atras", "vagalume_atras"), faiscas("faiscas_frente", "vagalume_frente"), ...LONGE.map((_, k) => longe(k))];
 
 // ---- luzes (docs/NUCLEO.md "Luzes"): noite (a ambiente baixa e azulada), a lua por tras e a
 // esquerda (contraluz) e a luz do vagalume, que anda com o osso dele
@@ -314,6 +469,16 @@ slots.cabeca.parte = [
 ];
 b.slots.find((s: any) => s.nome === "cabeca").parte = "headFocus";
 
+// as estrelas cintilam: alfa entre 0,25 e 1, num numero inteiro de ciclos em 8 s (o laco fecha)
+CINTILA.forEach((_, k) => {
+  const ciclos = 2 + k,
+    fase = hash(k, 12);
+  slots[`cintila_${k}`] = {
+    rgba: amostras()
+      .filter((_, i) => i % 3 === 0)
+      .map((t) => ({ tempo: t, cor: "ffffff" + Math.round(255 * (0.25 + 0.75 * Math.abs(Math.sin(Math.PI * ((ciclos * t) / DUR + fase))))).toString(16).padStart(2, "0") })),
+  };
+});
 // a luz do vagalume: acende ao entrar, a altura segue a profundidade (atras: contraluz), mais
 // forte e pulsando pousado no nariz
 const luzes: Record<string, any[]> = { vagalume: [] };
@@ -324,8 +489,10 @@ for (const t of T) {
   const forca = entra * (1.1 + pouso * (0.35 + 0.25 * Math.sin(2 * Math.PI * (t - 5.15) * 2.5)));
   luzes.vagalume.push({ tempo: t, forca: r3(forca), altura: r3(v.z >= 0 ? 15 + 55 * v.z - pouso * 25 : 75 * v.z), raio: r3(240 + 60 * pouso) });
 }
-// as faiscas: so do lado em que o vagalume esta
+// as faiscas: so do lado em que o vagalume esta; os vagalumes de longe ja comecam acesos (uma
+// rajada no comeco do laco)
 const particulas: Record<string, any> = { faiscas_frente: { taxa: [] }, faiscas_atras: { taxa: [] } };
+LONGE.forEach((_, k) => (particulas[`longe_${k}`] = { rajada: [{ tempo: 0, quantidade: 2 }] }));
 antes = "";
 for (const t of T) {
   const v = vagalume(t);
