@@ -104,6 +104,12 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
 *[exemplos/vitrine](exemplos/vitrine): o robô CC0 passando por cada recurso num
 laço de 8,6 s. Exportado pelo editor, com moldura e legendas.*
 
+![O zumbi CC0 numa noite: um vagalume dá a volta nele, pela frente e por trás, a cabeça gira em 2,5D atrás dele, a luz troca de lado e vira contraluz, e ele pousa no nariz](exemplos/vagalume/vagalume.gif)
+
+*[exemplos/vagalume](exemplos/vagalume): 2,5D, luz e profundidade juntos. O
+vagalume dá a volta no zumbi pela frente e por trás; a luz dele segue a
+profundidade (rosto, lado rasante, contraluz) num relevo calculado da própria arte.*
+
 ![Uma fase de plataforma: o robô pula entre plataformas, pega moedas, pisa num inimigo alado que se dissolve e voa com um propulsor](exemplos/jogo/jogo.gif)
 
 *[exemplos/jogo](exemplos/jogo): uma tela de jogo inteira num `.boneco`, com

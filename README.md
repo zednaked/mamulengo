@@ -105,6 +105,12 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
 *[exemplos/vitrine](exemplos/vitrine): the CC0 robot going through every feature
 in one 8.6 s loop. Exported from the editor, frame and captions included.*
 
+![The CC0 zombie on a night: a firefly circles him, front and behind, his head turns in 2.5D after it, its light changes sides and becomes a rim light, and it lands on his nose](exemplos/vagalume/vagalume.gif)
+
+*[exemplos/vagalume](exemplos/vagalume): 2.5D, light and depth together. The
+firefly circles the zombie in front and behind; its light follows the depth (face,
+grazing side, rim light) on a normal map built from the art itself.*
+
 ![A side-scrolling platformer scene: the robot jumps over platforms, picks coins, stomps a winged enemy that dissolves and flies with a jetpack](exemplos/jogo/jogo.gif)
 
 *[exemplos/jogo](exemplos/jogo): a whole game screen in one `.boneco`, with

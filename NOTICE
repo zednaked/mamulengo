@@ -2,8 +2,9 @@ Mamulengo is MIT licensed (see LICENSE).
 
 Not covered by this license:
 
-- The art in tests/assets, tests/boneco, tests/nucleo, exemplos/godot-boneco/personagens
-  and exemplos/vitrine (robo-hd.webp) is CC0 1.0 by Kenney (kenney.nl); see
+- The art in tests/assets, tests/boneco, tests/nucleo, exemplos/godot-boneco/personagens,
+  exemplos/vitrine (robo-hd.webp) and exemplos/vagalume (zumbi-hd.webp) is CC0 1.0 by
+  Kenney (kenney.nl); see
   tests/assets/LICENSES.md. The art in exemplos/jogo (jogo_*.webp) comes from Kenney's
   Jumper Pack, UI Pack (with the Kenney Future font) and Particle Pack, also CC0 1.0.
 - The editor installs spine-core and spine-webgl from npm as its reference

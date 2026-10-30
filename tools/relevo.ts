@@ -4,11 +4,12 @@
 // almofada: inclinada na borda, plana no miolo) mais um pouco do brilho da cor (detalhe); a
 // normal sai da inclinacao. Fora das imagens (e nas imagens giradas), plano.
 //
-//   npx tsx tools/relevo.ts <x.boneco> [--borda 12] [--profundidade 1] [--detalhe 0.2] [--gravar]
+//   npx tsx tools/relevo.ts <x.boneco> [--borda 12] [--profundidade 1] [--detalhe 0.2] [--paginas 0,2] [--gravar]
 //
 //   --borda         largura da borda inclinada, em pixels da pagina (multiplique numa pagina HD)
 //   --profundidade  quanto a borda sobe (1: a borda sobe a largura dela, 45 graus)
 //   --detalhe       quanto o brilho da cor vira relevo (0: so a forma)
+//   --paginas       so estas paginas (indices; padrao: as das partes das skins, abaixo)
 //   --gravar        poe "relevo" nas paginas do .boneco
 // So as paginas das partes das skins, fora dos slots aditivo e tela (luz nao recebe luz). Cada
 // relevo vai ao lado da pagina: <pagina>_relevo.png (vermelho: x para a direita; verde: y para
@@ -26,6 +27,7 @@ const gravar = args.includes("--gravar") && (args.splice(args.indexOf("--gravar"
 const borda = Number(opt("borda", "12"));
 const profundidade = Number(opt("profundidade", "1"));
 const detalhe = Number(opt("detalhe", "0.2"));
+const soPaginas = opt("paginas", "");
 const [arq] = args;
 if (!arq) {
   console.error("uso: tools/relevo.ts <x.boneco> [--borda 12] [--profundidade 1] [--detalhe 0.2] [--gravar]");
@@ -41,7 +43,7 @@ const usadas = new Set<string>();
 for (const sk of b.skins ?? [])
   for (const [slot, ps] of Object.entries<any>(sk.partes ?? {})) if (!emissivos.has(slot)) for (const [n, p] of Object.entries<any>(ps)) usadas.add(p.caminho ?? n);
 const imagens = (b.imagens ?? []).filter((im: any) => usadas.has(im.nome));
-const paginas = [...new Set(imagens.map((im: any) => im.pagina ?? 0))] as number[];
+const paginas = ([...new Set(imagens.map((im: any) => im.pagina ?? 0))] as number[]).filter((p) => !soPaginas || soPaginas.split(",").map(Number).includes(p));
 
 // distancia euclidiana exata ate o pixel "fora" mais proximo (Felzenszwalb e Huttenlocher)
 function distancia(dentro: Uint8Array, w: number, h: number): Float64Array {
