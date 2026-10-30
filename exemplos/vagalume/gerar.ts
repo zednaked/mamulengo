@@ -23,6 +23,7 @@
 //   npx tsx tools/atlas-hd.ts tests/boneco/zumbi/zumbi.boneco character_zombie.svg --id "{nome}_0_Layer0_*_FILL" --saida exemplos/vagalume/zumbi-hd.webp
 // e o relevo dela, depois de gerar:  npx tsx tools/relevo.ts exemplos/vagalume/vagalume.boneco --borda 24 --paginas 0
 import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
@@ -55,6 +56,7 @@ for (const im of b.imagens) im.ret = im.ret.map((v: number) => v * HD);
 // frente, -1 atras), e se esta em cena
 type Ponto = { x: number; y: number; z: number; cena: boolean };
 const FACE = { x: 0, y: 128 }; // o nariz
+const POUSO = 5.4; // o vagalume pousa no nariz
 function vagalume(t: number): Ponto {
   const pairar = (x: number, y: number, t0: number) => ({ x: x + 5 * Math.sin(2 * Math.PI * (t - t0) * 0.9), y: y + 8 * Math.sin(2 * Math.PI * (t - t0) * 1.4) });
   if (t < 0.9) return { x: 320, y: 210, z: 1, cena: false };
@@ -86,12 +88,17 @@ function vagalume(t: number): Ponto {
     const f = suave((t - 4.35) / 0.25);
     return { x: mistura(-4 + 14 * Math.sin(Math.PI * 3), 8, f), y: mistura(68, 248, f), z: 1, cena: true };
   }
-  if (t < 5.15) {
-    // desce num arco e pousa no nariz
-    const f = suave((t - 4.6) / 0.55);
-    return { x: 8 + 70 * Math.sin(Math.PI * f) * (1 - f), y: mistura(248, FACE.y, f), z: 1, cena: true };
+  if (t < 4.95) {
+    // paira la em cima, zombando, enquanto ele olha as maos vazias
+    return { x: 8 + 12 * Math.sin(2 * Math.PI * (t - 4.6) * 1.6), y: 248 + 6 * Math.sin(2 * Math.PI * (t - 4.6) * 2.4), z: 1, cena: true };
   }
-  if (t < 6.4) return { x: FACE.x + 2 * Math.sin(2 * Math.PI * (t - 5.15) * 2), y: FACE.y + 2 * Math.sin(2 * Math.PI * (t - 5.15) * 3), z: 1, cena: true };
+  if (t < POUSO) {
+    // desce num arco e pousa no nariz
+    const ini = vagalume(4.9499);
+    const f = suave((t - 4.95) / (POUSO - 4.95));
+    return { x: mistura(ini.x, FACE.x, f) + 60 * Math.sin(Math.PI * f) * (1 - f), y: mistura(ini.y, FACE.y, f), z: 1, cena: true };
+  }
+  if (t < 6.4) return { x: FACE.x + 2 * Math.sin(2 * Math.PI * (t - POUSO) * 2), y: FACE.y + 2 * Math.sin(2 * Math.PI * (t - POUSO) * 3), z: 1, cena: true };
   if (t < 7.4) {
     const f = suave((t - 6.4) / 1.0);
     return { x: mistura(0, -320, f * f), y: mistura(FACE.y, 300, f) + 25 * Math.sin(Math.PI * f), z: 1, cena: true };
@@ -105,7 +112,11 @@ const olhar = (t: number) => {
   const v = vagalume(t);
   if (!v.cena) return { giro: 0, tilt: 0 };
   // o giro segue o x da luz; atras dele ainda tenta, por cima do ombro; o tilt segue a altura
-  return { giro: clamp(0.3 * v.x, -28, 28) * acordado(t), tilt: clamp(0.15 * (v.y - FACE.y), -10, 12) * acordado(t) };
+  const segue = { giro: clamp(0.3 * v.x, -28, 28), tilt: clamp(0.15 * (v.y - FACE.y), -10, 12) };
+  // depois da palma ele olha as maos vazias (para baixo) e so no 4,85 percebe o vagalume em cima
+  // (a cabeca sobe de estalo)
+  const maos = entre(t, 4.45, 4.62) * (1 - entre(t, 4.82, 4.92));
+  return { giro: mistura(segue.giro, 0, maos) * acordado(t), tilt: mistura(segue.tilt, -11, maos) * acordado(t) };
 };
 
 // ---- imagens desenhadas aqui (a luz do vagalume, o ceu, o chao, a lua, a nevoa, a sombra)
@@ -130,6 +141,10 @@ pagina("ceu.png", 8, 256, (_x, y) => {
   const f = y ** 1.6;
   return [mistura(10, 52, f), mistura(14, 34, f), mistura(38, 78, f), 255];
 });
+// as pecas do cenario que recebem luz (cerca, chao, grama da frente) tem a cor natural delas
+// (madeira, grama): a ambiente baixa e azulada escurece tudo, e onde a lua ou o vagalume batem
+// aparece a cor de verdade
+const AMBIENTE = { cor: [0x74, 0x84, 0xc0], forca: 0.55 };
 // ruido 1D suave e repetivel (para os perfis dos morros, da grama e das estrelas)
 const hash = (i: number, s: number) => {
   const v = Math.sin(i * 127.1 + s * 311.7) * 43758.5453;
@@ -147,7 +162,7 @@ pagina("chao.png", 512, 96, (x, y) => {
   const topo = 0.1 - 0.07 * Math.max(0, ruido(x * 90, 1) * 1.6 - 0.6) - 0.02 * ruido(x * 13, 2);
   const a = borda((y - topo) * 96);
   const luar = Math.max(0, 1 - (y - topo) / 0.06);
-  return [mistura(18, 58, luar), mistura(26, 80, luar), mistura(38, 104, luar), 255 * a];
+  return [mistura(46, 110, luar), mistura(74, 140, luar), mistura(56, 120, luar), 255 * a];
 });
 // a lua: disco claro com crateras, a borda macia e um halo largo (somando luz)
 pagina("lua.png", 128, 128, (x, y) => {
@@ -163,22 +178,23 @@ pagina("lua.png", 128, 128, (x, y) => {
   return [mistura(150, 236 - 40 * crateras, disco), mistura(170, 240 - 34 * crateras, disco), 255 - 20 * crateras, 255 * clamp(disco + halo, 0, 1)];
 });
 // as estrelas miudas: pontos de 1 a 2 px, mais densas no alto
-pagina("estrelas.png", 512, 256, (x, y) => {
+pagina("estrelas.png", 512, 512, (x, y) => {
   const gx = Math.floor(x * 512),
-    gy = Math.floor(y * 256);
+    gy = Math.floor(y * 512);
   let a = 0;
   for (let dy = -2; dy <= 2; dy++)
     for (let dx = -2; dx <= 2; dx++) {
       const cx = Math.floor((gx + dx) / 5),
         cy = Math.floor((gy + dy) / 5);
-      if (hash(cx * 7 + cy * 131, 3) > 0.93 - 0.12 * (1 - y)) {
+      if (hash(cx * 7 + cy * 131, 3) > 0.92 - 0.06 * (1 - y)) {
         const px = cx * 5 + 2 + Math.floor(hash(cx, cy) * 3) - 1,
           py = cy * 5 + 2 + Math.floor(hash(cy, cx) * 3) - 1;
         const r = Math.hypot(gx - px, gy - py);
         a = Math.max(a, clamp(1.4 - r, 0, 1) * (0.4 + 0.6 * hash(cx, cy + 9)));
       }
     }
-  return [220, 228, 255, 255 * a * (1 - y * 0.6)];
+  // somem perto do horizonte (a parte de baixo do ceu fica atras dos morros)
+  return [220, 228, 255, 255 * a * clamp((0.82 - y) / 0.3, 0, 1)];
 });
 // uma estrela de quatro pontas (as que cintilam)
 pagina("cintila.png", 48, 48, (x, y) => {
@@ -229,7 +245,7 @@ pagina("cerca.png", 512, 64, (x, y) => {
   }
   for (const ry of [22, 40]) d = Math.max(d, Math.min(4 - Math.abs(py - ry - (px / 512) * 3), px - 10, 502 - px));
   const luar = clamp(1 - (py - 4) / 14, 0, 1) * 0.5;
-  return [mistura(46, 96, luar), mistura(36, 88, luar), mistura(58, 124, luar), 255 * borda(d)];
+  return [mistura(122, 170, luar), mistura(88, 132, luar), mistura(66, 110, luar), 255 * borda(d)];
 });
 // tufos de grama da frente: escuros, em pontas
 pagina("grama_frente.png", 256, 96, (x, y) => {
@@ -243,7 +259,7 @@ pagina("grama_frente.png", 256, 96, (x, y) => {
     const meia = 0.03 * (1 - t);
     d = Math.max(d, (meia - Math.abs(x - cx - inc * t * alt * 0.4)) * 256);
   }
-  return [10, 14, 26, 255 * borda(d)];
+  return [34, 58, 42, 255 * borda(d)];
 });
 // a nevoa: uma nuvem macia e achatada
 pagina("nevoa.png", 128, 64, (x, y) => {
@@ -256,14 +272,22 @@ pagina("sombra.png", 128, 32, (x, y) => {
   return [0, 0, 0, 255 * Math.max(0, 1 - r) ** 1.2];
 });
 
+for (const arquivo of ["cerca.png", "chao.png", "grama_frente.png"]) b.paginas.find((p: any) => p.arquivo === arquivo).relevo = arquivo.replace(".png", "_relevo.png");
+
 // ---- ossos e slots da cena
 b.ossos.push(
   { nome: "vagalume", pai: "root", x: 320, y: 210 },
   { nome: "sombra", pai: "root", y: 2 },
-  { nome: "lua", pai: "root", x: -150, y: 290 },
-  { nome: "nevoa_atras", pai: "root", y: 40 },
-  { nome: "nevoa_frente", pai: "root", y: 4 },
-  { nome: "cintila", pai: "root" },
+  // a camera balanca em volta do zumbi: cada camada anda pela distancia (docs: paralaxe)
+  { nome: "cam_ceu", pai: "root" },
+  { nome: "cam_longe", pai: "root" },
+  { nome: "cam_perto", pai: "root" },
+  { nome: "cam_cerca", pai: "root" },
+  { nome: "cam_frente", pai: "root" },
+  { nome: "lua", pai: "cam_ceu", x: -150, y: 290 },
+  { nome: "nevoa_atras", pai: "cam_cerca", y: 40 },
+  { nome: "nevoa_frente", pai: "cam_frente", y: 4 },
+  { nome: "cintila", pai: "cam_ceu" },
 );
 const regiao = (slot: string, imagem: string, largura: number, altura: number, extra: any = {}) => (b.skins[0].partes[slot] = { [imagem]: { largura, altura, ...extra } });
 // estrelas que cintilam (a cor anima)
@@ -275,18 +299,18 @@ const CINTILA = [
   [30, 250, 10],
 ];
 const cena = [
-  { nome: "ceu", osso: "root", parte: "ceu" },
-  { nome: "estrelas", osso: "root", parte: "estrelas", blend: "aditivo" },
+  { nome: "ceu", osso: "cam_ceu", parte: "ceu" },
+  { nome: "estrelas", osso: "cam_ceu", parte: "estrelas", blend: "aditivo" },
   ...CINTILA.map((_, k) => ({ nome: `cintila_${k}`, osso: "cintila", parte: "cintila", blend: "aditivo" })),
   { nome: "lua", osso: "lua", parte: "lua", blend: "aditivo" },
-  { nome: "morros_longe", osso: "root", parte: "morros_longe" },
-  { nome: "vagalumes_longe", osso: "root" },
-  { nome: "morros_perto", osso: "root", parte: "morros_perto" },
+  { nome: "morros_longe", osso: "cam_longe", parte: "morros_longe" },
+  { nome: "vagalumes_longe", osso: "cam_longe" },
+  { nome: "morros_perto", osso: "cam_perto", parte: "morros_perto" },
   // a nevoa de tras: quatro copias a cada 500 px, o osso anda 500 em 8 s (a parte visivel no fim do
   // laco e igual a do comeco)
   ...[-2, -1, 0, 1].map((k) => ({ nome: `nevoa_atras_${k + 2}`, osso: "nevoa_atras", parte: "nevoa", cor: "8a9ad048" })),
   // a cerca fica atras do chao (a base some na grama: esta mais longe que o zumbi)
-  { nome: "cerca", osso: "root", parte: "cerca" },
+  { nome: "cerca", osso: "cam_cerca", parte: "cerca" },
   { nome: "chao", osso: "root", parte: "chao" },
   { nome: "vagalume_atras", osso: "vagalume", parte: "vagalume", blend: "aditivo", cor: "e6ff8a00" },
   { nome: "sombra", osso: "sombra", parte: "sombra", cor: "ffffff73" },
@@ -294,7 +318,8 @@ const cena = [
 regiao("ceu", "ceu", 1000, 640, { y: 250 });
 regiao("lua", "lua", 96, 96);
 regiao("chao", "chao", 1000, 190, { y: -86 });
-regiao("estrelas", "estrelas", 1000, 360, { y: 300 });
+// as estrelas cobrem o ceu inteiro (o mesmo retangulo dele)
+regiao("estrelas", "estrelas", 1000, 640, { y: 250 });
 CINTILA.forEach(([x, y, l], k) => regiao(`cintila_${k}`, "cintila", l, l, { x, y }));
 regiao("morros_longe", "morros_longe", 1000, 170, { y: 70 });
 regiao("morros_perto", "morros_perto", 1100, 190, { y: 40, x: 30 });
@@ -308,7 +333,7 @@ regiao("vagalume_frente", "vagalume", 40, 40);
 for (const k of [-2, -1, 0, 1]) regiao(`nevoa_atras_${k + 2}`, "nevoa", 420, 90, { x: k * 500 });
 for (const k of [-1, 0]) regiao(`nevoa_frente_${k + 2}`, "nevoa", 640, 70, { x: k * 1000 - 120 });
 // os tufos de grama da frente, nos dois cantos de baixo (na frente do zumbi e da nevoa de tras)
-b.slots.push({ nome: "grama_frente_e", osso: "root", parte: "grama_frente" }, { nome: "grama_frente_d", osso: "root", parte: "grama_frente" });
+b.slots.push({ nome: "grama_frente_e", osso: "cam_frente", parte: "grama_frente" }, { nome: "grama_frente_d", osso: "cam_frente", parte: "grama_frente" });
 regiao("grama_frente_e", "grama_frente", 260, 90, { x: -170, y: -40 });
 regiao("grama_frente_d", "grama_frente", 220, 80, { x: 185, y: -45, escala_x: -1 });
 
@@ -342,7 +367,7 @@ const LONGE = [
 const longe = (k: number) => ({
   nome: `longe_${k}`,
   slot: "vagalumes_longe",
-  osso: "root",
+  osso: "cam_longe",
   x: LONGE[k][0],
   y: LONGE[k][1],
   imagem: "vagalume",
@@ -361,9 +386,9 @@ b.particulas = [faiscas("faiscas_atras", "vagalume_atras"), faiscas("faiscas_fre
 
 // ---- luzes (docs/NUCLEO.md "Luzes"): noite (a ambiente baixa e azulada), a lua por tras e a
 // esquerda (contraluz) e a luz do vagalume, que anda com o osso dele
-b.ambiente = { cor: "7484c0ff", forca: 0.55 };
+b.ambiente = { cor: AMBIENTE.cor.map((v) => v.toString(16).padStart(2, "0")).join("") + "ff", forca: AMBIENTE.forca };
 b.luzes = [
-  { nome: "lua", osso: "root", x: -150, y: 290, cor: "aac6ffff", forca: 1.25, raio: 900, altura: -70 },
+  { nome: "lua", osso: "lua", cor: "aac6ffff", forca: 1.25, raio: 900, altura: -70 },
   { nome: "vagalume", osso: "vagalume", cor: "f4ffb8ff", forca: 0, raio: 240, altura: 60 },
 ];
 
@@ -382,18 +407,24 @@ for (const t of T) {
   chave("sombra", "mover", t, { x: r3(-0.35 * v.x * luz), y: 0 });
   chave("sombra", "escalar", t, { x: r3(1 + 0.25 * luz), y: 1 });
 }
+// a camera: 35 px para cada lado em 8 s; o ceu quase acompanha (longe), o zumbi e o chao ficam, a
+// grama da frente corre ao contrario (perto)
+const PARALAXE: Record<string, number> = { cam_ceu: 0.95, cam_longe: 0.8, cam_perto: 0.55, cam_cerca: 0.28, cam_frente: -0.45 };
+for (const t of T) for (const [osso, k] of Object.entries(PARALAXE)) chave(osso, "mover", t, { x: r3(k * 35 * Math.sin((2 * Math.PI * t) / DUR)), y: 0 });
 // a nevoa desliza (linear: o fim do laco cai numa copia igual ao comeco)
 chave("nevoa_atras", "mover", 0, { x: 0, y: 0 });
 chave("nevoa_atras", "mover", DUR, { x: 500, y: 0 });
 chave("nevoa_frente", "mover", 0, { x: 0, y: 0 });
 chave("nevoa_frente", "mover", DUR, { x: 1000, y: 0 });
-// o zumbi: o corpo respira e balanca; a cabeca pende quando cochila; no pouso um pulinho
+// o zumbi: o corpo respira e balanca; a cabeca pende quando cochila; agacha um pouco no preparo
+// antes de tentar pegar; no pouso um pulo de susto
 for (const t of T) {
   const a = acordado(t);
-  const susto = Math.sin(Math.PI * clamp((t - 5.15) / 0.35, 0, 1));
+  const susto = Math.sin(Math.PI * clamp((t - POUSO) / 0.4, 0, 1));
+  const prep = Math.sin(Math.PI * clamp((t - 3.42) / 0.22, 0, 1));
   chave("corpo", "girar", t, { valor: r3(2.2 * Math.sin((2 * Math.PI * t) / 4) * (1 - 0.5 * a)) });
-  chave("corpo", "escalar", t, { x: r3(1 - 0.02 * susto), y: r3(1 + 0.015 * Math.sin((2 * Math.PI * t) / 2) + 0.05 * susto) });
-  chave("quadril", "mover", t, { x: 0, y: r3(-2.5 * (1 - a) + 7 * susto) });
+  chave("corpo", "escalar", t, { x: r3(1 - 0.03 * susto + 0.02 * prep), y: r3(1 + 0.015 * Math.sin((2 * Math.PI * t) / 2) + 0.07 * susto - 0.04 * prep) });
+  chave("quadril", "mover", t, { x: 0, y: r3(-2.5 * (1 - a) + 11 * susto - 3 * prep) });
   // pende para um lado cochilando; acordado fica reto, com um balanco curto
   chave("cabeca", "girar", t, { valor: r3(13 * (1 - a) + 3 * Math.sin((2 * Math.PI * t) / 2.67) * a) });
 }
@@ -411,8 +442,10 @@ function ik(lado: "e" | "d", alvo: { x: number; y: number }) {
   const d = clamp(Math.hypot(dx, dy), 1e-3, BRACO + ANTEBRACO - 0.5);
   const base = Math.atan2(dy, dx);
   const cos = clamp((BRACO * BRACO + d * d - ANTEBRACO * ANTEBRACO) / (2 * BRACO * d), -1, 1);
-  // o cotovelo para fora: a mao do lado e (direita da tela) dobra com o cotovelo para a direita
-  const s = lado === "e" ? -1 : 1;
+  // o cotovelo para baixo (abaixo da linha do ombro a mao, como braco pendurado): no lado e (direita
+  // da tela) a mao vai para a esquerda e o cotovelo desce girando no sentido anti-horario; no d, o
+  // contrario
+  const s = lado === "e" ? 1 : -1;
   const a1 = base + s * Math.acos(cos);
   const cx = o.x + BRACO * Math.cos(a1),
     cy = o.y + BRACO * Math.sin(a1);
@@ -425,28 +458,77 @@ const repouso = (lado: "e" | "d", t: number) => {
 };
 function mao(lado: "e" | "d", t: number) {
   const r = repouso(lado, t);
-  // a tentativa (3,6 a 4,4): as maos vao atras do vagalume, atrasadas, e batem palma no 4,4
-  const ida = entre(t, 3.55, 3.95) * (1 - entre(t, 4.55, 5.2));
-  if (ida <= 0) return r;
-  const v = vagalume(Math.min(t, 4.35) - 0.12);
   const s = lado === "e" ? 1 : -1;
-  const palma = entre(t, 4.2, 4.4);
-  // cada mao de um lado do vagalume, que se encontram nele na palma
-  const alvo = { x: mistura(v.x + s * 34, v.x + s * 13, palma), y: v.y - 4 };
-  // depois da palma as maos sobem um pouco atras do vagalume que escapou
-  const sobe = entre(t, 4.4, 4.65) * (1 - entre(t, 4.75, 5.2));
-  alvo.y += 30 * sobe;
-  return { x: mistura(r.x, alvo.x, ida), y: mistura(r.y, alvo.y, ida) };
-}
-for (const t of T)
-  for (const lado of ["e", "d"] as const) {
-    const ang = ik(lado, mao(lado, t));
-    // girar e relativo ao setup: o braco no corpo (mundo menos o do setup), o antebraco no braco
-    const giroCorpo = 2.2 * Math.sin((2 * Math.PI * t) / 4) * (1 - 0.5 * acordado(t));
-    const norm = (x: number) => ((((x + 180) % 360) + 360) % 360) - 180;
-    chave(`braco_${lado}`, "girar", t, { valor: r3(norm(ang.braco - SETUP_MUNDO[lado].braco - giroCorpo)) });
-    chave(`antebraco_${lado}`, "girar", t, { valor: r3(norm(ang.antebraco - ang.braco)) });
+  // o preparo (3,42 a 3,62): as maos recuam, para baixo e para fora, antes de ir
+  const prep = Math.sin(Math.PI * clamp((t - 3.42) / 0.2, 0, 1));
+  let p = { x: r.x + s * 6 * prep, y: r.y - 8 * prep };
+  // a tentativa: as maos vao atras do vagalume, atrasadas, batem palma no 4,4, seguram, e abrem
+  // devagar (vazias) enquanto ele olha para elas; descem quando ele ve o vagalume em cima
+  const ida = entre(t, 3.58, 3.95) * (1 - entre(t, 4.95, 5.35));
+  if (ida > 0) {
+    const v = vagalume(Math.min(t, 4.35) - 0.12);
+    const palma = entre(t, 4.2, 4.4),
+      abre = entre(t, 4.55, 4.78);
+    const alvo = { x: mistura(mistura(v.x + s * 36, v.x + s * 16, palma), v.x + s * 32, abre), y: v.y - 8 + 5 * abre };
+    p = { x: mistura(p.x, alvo.x, ida), y: mistura(p.y, alvo.y, ida) };
   }
+  // o susto no pouso: as maos sacodem para cima e para fora
+  const sacode = Math.sin(Math.PI * clamp((t - POUSO) / 0.45, 0, 1));
+  return { x: p.x + s * 10 * sacode, y: p.y + 24 * sacode };
+}
+// os angulos dos bracos a 60 por segundo, desenrolados e suavizados (o braco tem inercia: perto do
+// ombro a cinematica inversa e instavel e um passo pequeno do alvo vira um giro grande), e as
+// chaves saem dessa curva
+const FINO = 1 / 60;
+const finos = Array.from({ length: Math.round(DUR / FINO) + 1 }, (_, k) => k * FINO);
+const desenrola = (v: number[]) => {
+  for (let i = 1; i < v.length; i++) {
+    while (v[i] - v[i - 1] > 180) v[i] -= 360;
+    while (v[i] - v[i - 1] < -180) v[i] += 360;
+  }
+  return v;
+};
+// janela gaussiana de +-6 amostras (sigma 3: 0,05 s); no laco as pontas se emendam
+const suaviza = (v: number[]) =>
+  v.map((_, i) => {
+    let s = 0,
+      p = 0;
+    for (let k = -6; k <= 6; k++) {
+      const j = Math.min(v.length - 1, Math.max(0, i + k));
+      const w = Math.exp(-(k * k) / 18);
+      s += v[j] * w;
+      p += w;
+    }
+    return s / p;
+  });
+const noTempo = (v: number[], t: number) => v[Math.min(v.length - 1, Math.round(t / FINO))];
+for (const lado of ["e", "d"] as const) {
+  const giroCorpo = (t: number) => 2.2 * Math.sin((2 * Math.PI * t) / 4) * (1 - 0.5 * acordado(t));
+  const angs = finos.map((t) => ik(lado, mao(lado, t)));
+  // girar e relativo ao setup: o braco no corpo (mundo menos o do setup), o antebraco no braco
+  const braco = suaviza(desenrola(angs.map((a, i) => a.braco - SETUP_MUNDO[lado].braco - giroCorpo(finos[i]))));
+  const ante = suaviza(desenrola(angs.map((a) => a.antebraco - a.braco)));
+  // a mao chega atrasada, como coisa pendurada: gira contra a velocidade do antebraco no mundo
+  const anteMundo = desenrola(braco.map((v, i) => v + ante[i]));
+  const maoG = suaviza(anteMundo.map((v, i) => clamp(0.6 * (anteMundo[Math.max(0, i - 6)] - v), -35, 35)));
+  for (const t of T) {
+    chave(`braco_${lado}`, "girar", t, { valor: r3(noTempo(braco, t)) });
+    chave(`antebraco_${lado}`, "girar", t, { valor: r3(noTempo(ante, t)) });
+    chave(`mao_${lado}`, "girar", t, { valor: r3(noTempo(maoG, t)) });
+  }
+}
+
+// os giros calculados vem entre -180 e 180: desenrola ao longo do tempo (cada chave a menos de 180
+// graus da anterior), senao a passagem de 179 para -179 vira uma volta inteira num quadro
+for (const tl of Object.values(ossos))
+  if (tl.girar)
+    for (let i = 1; i < tl.girar.length; i++) {
+      let v = tl.girar[i].valor;
+      const ant = tl.girar[i - 1].valor;
+      while (v - ant > 180) v -= 360;
+      while (v - ant < -180) v += 360;
+      tl.girar[i].valor = r3(v);
+    }
 
 // os slots: a luz do vagalume de um lado ou de outro da ordem de desenho (em degrau na troca)
 const slots: Record<string, any> = { vagalume_atras: { rgba: [] }, vagalume_frente: { rgba: [] }, cabeca: { parte: [] } };
@@ -463,8 +545,8 @@ for (const t of T) {
 slots.cabeca.parte = [
   { tempo: 0, nome: "headFocus" },
   { tempo: 1.32, nome: "head" },
-  { tempo: 5.15, nome: "headShock" },
-  { tempo: 5.55, nome: "head" },
+  { tempo: POUSO, nome: "headShock" },
+  { tempo: r3(POUSO + 0.45), nome: "head" },
   { tempo: 7.35, nome: "headFocus" },
 ];
 b.slots.find((s: any) => s.nome === "cabeca").parte = "headFocus";
@@ -485,8 +567,8 @@ const luzes: Record<string, any[]> = { vagalume: [] };
 for (const t of T) {
   const v = vagalume(t);
   const entra = entre(t, 0.9, 1.15) * (1 - entre(t, 7.0, 7.4));
-  const pouso = entre(t, 5.1, 5.25) * (1 - entre(t, 6.3, 6.5));
-  const forca = entra * (1.1 + pouso * (0.35 + 0.25 * Math.sin(2 * Math.PI * (t - 5.15) * 2.5)));
+  const pouso = entre(t, POUSO - 0.05, POUSO + 0.1) * (1 - entre(t, 6.3, 6.5));
+  const forca = entra * (1.1 + pouso * (0.35 + 0.25 * Math.sin(2 * Math.PI * (t - POUSO) * 2.5)));
   luzes.vagalume.push({ tempo: t, forca: r3(forca), altura: r3(v.z >= 0 ? 15 + 55 * v.z - pouso * 25 : 75 * v.z), raio: r3(240 + 60 * pouso) });
 }
 // as faiscas: so do lado em que o vagalume esta; os vagalumes de longe ja comecam acesos (uma
@@ -504,11 +586,11 @@ for (const t of T) {
 }
 
 // a ordem de desenho: na tentativa de pegar, os bracos e as maos passam na frente da cabeca (ela
-// vai para logo depois do corpo), e voltam para tras quando o vagalume pousa
+// vai para logo depois do corpo), e voltam para tras quando as maos descem, antes do pouso
 const ordem_desenho = [
   { tempo: 0 },
   { tempo: 3.55, deslocamentos: [{ slot: "cabeca", deslocamento: -4 }] },
-  { tempo: 5.15 },
+  { tempo: 5.3 },
 ];
 
 b.animacoes = { vagalume: { ossos, slots, luzes, particulas, ordem_desenho }, idle: b.animacoes.idle, anda: b.animacoes.anda };
@@ -546,4 +628,11 @@ await executeAsync(doc, chamadas, "gerador", "2,5D", {}, imagens);
 const final = importarSpine(doc.json, ex.atlas, "vagalume");
 final.mix = { padrao: 0.2 };
 writeFileSync(join(AQUI, "vagalume.boneco"), JSON.stringify(final, null, 1) + "\n");
+// o relevo (tools/relevo.ts, pela silhueta): o zumbi e as pecas de cenario que recebem luz, cada
+// uma com a borda na escala dela
+for (const [arquivo, borda] of [["zumbi-hd.webp", 24], ["cerca.png", 5], ["chao.png", 8], ["grama_frente.png", 4]] as const) {
+  const i = final.paginas.findIndex((p: any) => p.arquivo === arquivo);
+  const r = spawnSync("npx", ["tsx", join(AQUI, "..", "..", "tools", "relevo.ts"), join(AQUI, "vagalume.boneco"), "--borda", String(borda), "--paginas", String(i)], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`relevo de ${arquivo}: ${r.stderr}`);
+}
 console.log(`vagalume.boneco: ${Object.keys(ossos).length} ossos animados, ${T.length} amostras, ${b.luzes.length} luzes`);
