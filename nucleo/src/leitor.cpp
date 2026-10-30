@@ -179,11 +179,22 @@ struct Imagem {
   double ox = 0, oy = 0, ow = 0, oh = 0;    // corte: deslocamento e tamanho original
 };
 
+// uma leitura com instancias: quem abre os arquivos, o que ja foi lido (cada arquivo uma vez) e
+// os arquivos sendo lidos agora (um filho que volta a um deles e um ciclo)
+struct Carga {
+  const AbrirArquivo* abrir = nullptr;
+  std::unordered_map<std::string, std::shared_ptr<const Modelo>> lidos;
+  std::vector<std::string> pilha;
+};
+
 class Leitor {
  public:
   Modelo& m;
   std::unordered_map<std::string, Imagem> imagens;
   std::unordered_map<std::string, int> ids_partes;
+  Carga* carga = nullptr;
+  std::string caminho;  // deste arquivo (os filhos sao relativos ao diretorio dele)
+  std::vector<std::string> prefixo_filho;  // por filho: o diretorio dele relativo a este
 
   explicit Leitor(Modelo& mm) : m(mm) {}
 
@@ -248,6 +259,7 @@ class Leitor {
     ler_restricoes(r["restricoes"]);
     ler_particulas(r["particulas"]);
     ler_luzes(r["luzes"], r["ambiente"]);
+    ler_instancias(r["instancias"]);
     for (const auto& [nome, d] : r["eventos"].campos()) {
       DadosEvento e;
       e.nome = nome;
@@ -271,6 +283,100 @@ class Leitor {
       m.mix_pares.push_back(pm);
     }
     preparar_desenho();
+    paginas_do_desenho();
+    // a pose so depende da animacao e do tempo? (docs/NUCLEO.md "Instancias")
+    bool memoria = !m.emissores.empty() || !m.instancias.empty();
+    for (const DadosRestricao& d : m.restricoes) memoria = memoria || d.tipo == TipoRestricao::Fisica;
+    for (const DadosSlot& d : m.slots) memoria = memoria || d.efeitos.borrar() || d.efeitos.rastro();
+    for (const Animacao& an : m.animacoes)
+      for (const TimelineEfeito& te : an.efeitos) memoria = memoria || te.tipo == TipoEfeito::Borrar || te.tipo == TipoEfeito::Rastro;
+    m.sem_memoria = !memoria;
+  }
+
+  // ---- instancias (docs/NUCLEO.md "Instancias")
+
+  std::shared_ptr<const Modelo> abrir_filho(const std::string& completo) {
+    if (auto it = carga->lidos.find(completo); it != carga->lidos.end()) return it->second;
+    if (std::find(carga->pilha.begin(), carga->pilha.end(), completo) != carga->pilha.end())
+      falha("instancias: ciclo (" + completo + " inclui a si mesmo)");
+    std::string texto;
+    if (!(*carga->abrir)(completo, texto)) falha("instancias: nao abriu " + completo);
+    std::string e;
+    Json r = Json::ler(texto, &e);
+    if (r.nulo()) falha(completo + ": JSON invalido: " + e);
+    auto filho = std::make_shared<Modelo>();
+    carga->pilha.push_back(completo);
+    try {
+      Leitor l(*filho);
+      l.carga = carga;
+      l.caminho = completo;
+      l.ler(r);
+    } catch (const Erro& x) {
+      falha(x.msg.rfind(completo, 0) == 0 ? x.msg : completo + ": " + x.msg);
+    }
+    carga->pilha.pop_back();
+    carga->lidos[completo] = filho;
+    return filho;
+  }
+
+  void ler_instancias(const Json& lista) {
+    m.instancias_do_slot.assign(m.slots.size(), {});
+    for (const Json& j : lista.itens()) {
+      DadosInstancia d;
+      d.nome = j.str("nome", "");
+      if (m.instancia(d.nome) >= 0) falha("instancias: instancia repetida " + d.nome);
+      d.slot = slot(j["slot"], "instancias");
+      d.osso = j.acha("osso") ? osso(j["osso"], "instancias") : m.slots[size_t(d.slot)].osso;
+      d.x = j.num("x", 0);
+      d.y = j.num("y", 0);
+      d.rotacao = j.num("rotacao", 0);
+      d.escala_x = j.num("escala_x", 1);
+      d.escala_y = j.num("escala_y", 1);
+      const std::string rel = j.str("boneco", "");
+      if (rel.empty()) falha("instancias: " + d.nome + " sem boneco");
+      if (!carga) falha("instancias: " + d.nome + ": este leitor nao abre outros arquivos");
+      const std::string completo = normalizar_caminho(diretorio(caminho) + rel);
+      auto filho = abrir_filho(completo);
+      auto it = std::find(m.filhos.begin(), m.filhos.end(), filho);
+      d.filho = int(it - m.filhos.begin());
+      if (it == m.filhos.end()) {
+        m.filhos.push_back(filho);
+        prefixo_filho.push_back(diretorio(normalizar_caminho(rel)));
+      }
+      d.animacao = animacao_filho(*filho, j.str("animacao", ""), "instancias: " + d.nome);
+      if (const std::string sk = j.str("skin", ""); !sk.empty()) {
+        d.skin = -1;
+        for (size_t k = 0; k < filho->skins.size(); ++k)
+          if (filho->skins[k].nome == sk) d.skin = int(k);
+        if (d.skin < 0) falha("instancias: " + d.nome + ": skin desconhecida " + sk);
+      }
+      d.inicio = j.num("inicio", 0);
+      d.velocidade = j.num("velocidade", 1);
+      d.laco = j.sim("repetir", true);
+      m.instancias_do_slot[size_t(d.slot)].push_back(int(m.instancias.size()));
+      m.instancias.push_back(std::move(d));
+    }
+  }
+
+  static int animacao_filho(const Modelo& f, const std::string& nome, const std::string& onde) {
+    if (nome.empty()) return -1;
+    const int a = f.animacao(nome);
+    if (a < 0) falha(onde + ": animacao desconhecida no filho " + nome);
+    return a;
+  }
+
+  // as paginas deste modelo e as dos filhos, com o caminho relativo a este arquivo
+  void paginas_do_desenho() {
+    m.paginas_desenho = m.paginas;
+    m.filho_pagina_base.clear();
+    for (size_t f = 0; f < m.filhos.size(); ++f) {
+      m.filho_pagina_base.push_back(int(m.paginas_desenho.size()));
+      for (Pagina pg : m.filhos[f]->paginas_desenho) {
+        pg.arquivo = normalizar_caminho(prefixo_filho[f] + pg.arquivo);
+        if (!pg.relevo.empty()) pg.relevo = normalizar_caminho(prefixo_filho[f] + pg.relevo);
+        m.paginas_desenho.push_back(std::move(pg));
+      }
+    }
   }
 
   // ---- particulas (docs/NUCLEO.md "Particulas")
@@ -862,6 +968,33 @@ class Leitor {
       an.luzes.push_back(std::move(tl));
     }
 
+    // instancias: nome -> chaves em degrau (animacao, inicio, velocidade, repetir); o campo que falta
+    // vale o da chave anterior (na primeira, o da instancia)
+    for (const auto& [nome_in, chaves] : a["instancias"].campos()) {
+      const int ii = m.instancia(nome_in);
+      if (ii < 0) falha("animacao " + nome + ": instancia desconhecida " + nome_in);
+      const DadosInstancia& di = m.instancias[size_t(ii)];
+      const Modelo& f = *m.filhos[size_t(di.filho)];
+      TimelineInstancia ti;
+      ti.instancia = ii;
+      int an_f = di.animacao;
+      double ini = di.inicio, vel = di.velocidade;
+      bool laco = di.laco;
+      for (const Json& k : chaves.itens()) {
+        if (const Json* x = k.acha("animacao"); x && x->texto()) an_f = animacao_filho(f, x->str(), "animacao " + nome + ": instancia " + nome_in);
+        ini = k.num("inicio", ini);
+        vel = k.num("velocidade", vel);
+        laco = k.sim("repetir", laco);
+        ti.tempos.push_back(f32(k.num("tempo", 0)));
+        ti.animacoes.push_back(an_f);
+        ti.inicios.push_back(ini);
+        ti.velocidades.push_back(vel);
+        ti.lacos.push_back(laco ? 1 : 0);
+      }
+      if (!ti.tempos.empty()) conta(ti.tempos.back());
+      an.instancias.push_back(std::move(ti));
+    }
+
     // particulas: emissor -> { taxa: [...], rajada: [...] }
     for (const auto& [nome_em, tls] : a["particulas"].campos()) {
       const int ie = emissor(nome_em);
@@ -1089,6 +1222,12 @@ int Modelo::animacao(std::string_view n) const {
   return -1;
 }
 
+int Modelo::instancia(std::string_view n) const {
+  for (size_t i = 0; i < instancias.size(); ++i)
+    if (instancias[i].nome == n) return int(i);
+  return -1;
+}
+
 int Modelo::evento(std::string_view n) const {
   for (size_t i = 0; i < eventos.size(); ++i)
     if (eventos[i].nome == n) return int(i);
@@ -1117,7 +1256,9 @@ int Modelo::parte_de(int skin, int slot, int id) const {
   return -1;
 }
 
-std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* erro) {
+std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* erro) { return ler_boneco(texto, "", AbrirArquivo(), erro); }
+
+std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string_view caminho, const AbrirArquivo& abrir, std::string* erro) {
   std::string e;
   Json r = Json::ler(texto, &e);
   if (r.nulo()) {
@@ -1126,13 +1267,47 @@ std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* er
   }
   auto m = std::make_shared<Modelo>();
   try {
+    Carga carga;
+    carga.abrir = &abrir;
+    const std::string c = normalizar_caminho(caminho);
+    carga.pilha.push_back(c);
     Leitor l(*m);
+    if (abrir) l.carga = &carga;
+    l.caminho = c;
     l.ler(r);
   } catch (const Erro& x) {
     if (erro) *erro = x.msg;
     return nullptr;
   }
   return m;
+}
+
+std::string normalizar_caminho(std::string_view c) {
+  std::vector<std::string> partes;
+  size_t i = 0;
+  const bool absoluto = !c.empty() && c[0] == '/';
+  while (i <= c.size()) {
+    size_t j = c.find('/', i);
+    if (j == std::string_view::npos) j = c.size();
+    const std::string_view p = c.substr(i, j - i);
+    if (p == "..") {
+      if (!partes.empty() && partes.back() != "..") partes.pop_back();
+      else if (!absoluto) partes.emplace_back("..");
+    } else if (!p.empty() && p != ".") {
+      partes.emplace_back(p);
+    }
+    i = j + 1;
+  }
+  std::string out = absoluto ? "/" : "";
+  for (size_t k = 0; k < partes.size(); ++k) out += (k ? "/" : "") + partes[k];
+  // um diretorio continua terminando em '/'
+  if (!c.empty() && c.back() == '/' && !partes.empty()) out += '/';
+  return out;
+}
+
+std::string diretorio(std::string_view c) {
+  const size_t k = c.rfind('/');
+  return k == std::string_view::npos ? "" : std::string(c.substr(0, k + 1));
 }
 
 bool ler_animacao(Modelo& m, std::string_view nome, std::string_view texto, std::string* erro) {

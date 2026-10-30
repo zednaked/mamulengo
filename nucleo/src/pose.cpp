@@ -7,8 +7,26 @@
 
 namespace mamulengo {
 
+EstadoInstancia::EstadoInstancia(const EstadoInstancia& o)
+    : e(o.e ? std::make_unique<Esqueleto>(*o.e) : nullptr), animacao(o.animacao), inicio(o.inicio), velocidade(o.velocidade), laco(o.laco),
+      por_timeline(o.por_timeline), tempo_filho(o.tempo_filho), pronto(o.pronto), ultima_anim(o.ultima_anim), ultimo_t(o.ultimo_t) {
+  std::copy(o.ultima_base, o.ultima_base + 6, ultima_base);
+}
+EstadoInstancia& EstadoInstancia::operator=(const EstadoInstancia& o) {
+  if (this != &o) *this = EstadoInstancia(o);
+  return *this;
+}
+EstadoInstancia::~EstadoInstancia() = default;
+
 Esqueleto::Esqueleto(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo)) {
   const Modelo& m = *m_;
+  inst_.resize(m.instancias.size());
+  for (size_t i = 0; i < m.instancias.size(); ++i) {
+    const DadosInstancia& d = m.instancias[i];
+    inst_[i].e = std::make_unique<Esqueleto>(m.filhos[size_t(d.filho)]);
+    inst_[i].e->skin(d.skin);
+    inst_[i].e->tem_base = true;
+  }
   local.resize(m.ossos.size());
   mundo_.resize(m.ossos.size());
   slots_.resize(m.slots.size());
@@ -58,6 +76,8 @@ void Esqueleto::setup() {
     s.rastro.clear();
   }
   luzes_setup();
+  instancias_setup();
+  for (EstadoInstancia& in : inst_) in.e->setup(), in.pronto = false;
   for (size_t i = 0; i < m.emissores.size(); ++i) {
     emis_[i] = EstadoEmissor{};
     emis_[i].taxa = m.emissores[i].taxa;
@@ -576,6 +596,7 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
     }
   }
   for (size_t i = 0; i < m.emissores.size(); ++i) emis_[i].taxa = m.emissores[i].taxa;
+  instancias_setup();
   // o deformar vem todo da animacao
   for (EstadoSlot& s : slots_) s.deform.clear();
   if (ai < 0 || ai >= int(m.animacoes.size())) {
@@ -603,6 +624,95 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   for (const TimelineRestricao& tr : an.restricoes) aplicar_restricao(tr, t, 1, Mistura::Setup, false);
   for (const TimelineDeformar& td : an.deformar) aplicar_deformar(td, t, 1, Mistura::Setup);
   for (const TimelineOrdem& to : an.ordem) aplicar_ordem(to, t, Mistura::Setup, false);
+  for (const TimelineInstancia& ti : an.instancias) aplicar_instancia(ti, t, Mistura::Setup, false);
+}
+
+// ---- instancias (docs/NUCLEO.md "Instancias")
+
+void Esqueleto::instancias_setup() {
+  for (size_t i = 0; i < inst_.size(); ++i) {
+    const DadosInstancia& d = m_->instancias[i];
+    EstadoInstancia& in = inst_[i];
+    in.animacao = d.animacao;
+    in.inicio = d.inicio;
+    in.velocidade = d.velocidade;
+    in.laco = d.laco;
+    in.por_timeline = false;
+  }
+}
+
+void Esqueleto::aplicar_instancia(const TimelineInstancia& ti, double t, Mistura mist, bool sai) {
+  if (sai) return;
+  int k = -1;
+  for (size_t i = 0; i < ti.tempos.size() && ti.tempos[i] <= t; ++i) k = int(i);
+  EstadoInstancia& in = inst_[size_t(ti.instancia)];
+  if (k < 0) {
+    if (mist == Mistura::Setup || mist == Mistura::Primeira) {
+      const DadosInstancia& d = m_->instancias[size_t(ti.instancia)];
+      in.animacao = d.animacao, in.inicio = d.inicio, in.velocidade = d.velocidade, in.laco = d.laco;
+      in.por_timeline = false;
+    }
+    return;
+  }
+  const size_t c = size_t(k);
+  in.animacao = ti.animacoes[c];
+  in.inicio = ti.inicios[c];
+  in.velocidade = ti.velocidades[c];
+  in.laco = ti.lacos[c] != 0;
+  in.tempo_filho = in.inicio + in.velocidade * (t - ti.tempos[c]);
+  in.por_timeline = true;
+}
+
+void Esqueleto::avancar(double dt) {
+  relogio_ = f32(relogio_ + dt);
+  for (EstadoInstancia& in : inst_) in.e->avancar(dt * in.velocidade);
+}
+
+// cada instancia visivel: a base (o osso vezes a posicao da instancia), a animacao do filho no
+// tempo dele e o mundo do filho. Filho sem memoria no mesmo instante e lugar: nada a refazer
+void Esqueleto::atualizar_instancias() {
+  const Modelo& m = *m_;
+  for (size_t i = 0; i < inst_.size(); ++i) {
+    const DadosInstancia& d = m.instancias[i];
+    EstadoInstancia& in = inst_[i];
+    const bool por_tl = in.por_timeline;
+    in.por_timeline = false;
+    if (slots_[size_t(d.slot)].cor.a <= 0) continue;
+    const Matriz& w = mundo_[size_t(d.osso)];
+    const double r = d.rotacao * GRAU;
+    const double la = std::cos(r) * d.escala_x, lb = -std::sin(r) * d.escala_y;
+    const double lc = std::sin(r) * d.escala_x, ld = std::cos(r) * d.escala_y;
+    Matriz b;
+    b.a = w.a * la + w.b * lc;
+    b.b = w.a * lb + w.b * ld;
+    b.c = w.c * la + w.d * lc;
+    b.d = w.c * lb + w.d * ld;
+    b.x = w.a * d.x + w.b * d.y + w.x;
+    b.y = w.c * d.x + w.d * d.y + w.y;
+    Esqueleto& f = *in.e;
+    double t = por_tl ? in.tempo_filho : in.inicio + in.velocidade * relogio_;
+    const Modelo& fm = f.modelo();
+    if (in.animacao >= 0) {
+      const double dur = fm.animacoes[size_t(in.animacao)].duracao;
+      if (in.laco && dur > 0) {
+        t = std::fmod(t, dur);
+        if (t < 0) t += dur;
+      } else {
+        t = std::min(std::max(t, 0.0), dur);
+      }
+    } else {
+      t = 0;
+    }
+    const double nb[6] = {b.a, b.b, b.c, b.d, b.x, b.y};
+    if (fm.sem_memoria && in.pronto && in.ultima_anim == in.animacao && in.ultimo_t == t && std::equal(nb, nb + 6, in.ultima_base)) continue;
+    f.base = b;
+    f.aplicar(in.animacao, t, false);
+    f.atualizar_mundo();
+    in.pronto = true;
+    in.ultima_anim = in.animacao;
+    in.ultimo_t = t;
+    std::copy(nb, nb + 6, in.ultima_base);
+  }
 }
 
 void Esqueleto::mundo_osso(int i) {
@@ -615,7 +725,18 @@ void Esqueleto::mundo_osso(int i) {
   Matriz& w = mundo_[size_t(i)];
   const int pai = m.ossos[size_t(i)].pai;
   if (pai < 0) {
-    w = Matriz{la, lb, lc, ld, l.x, l.y};
+    if (!tem_base) {
+      w = Matriz{la, lb, lc, ld, l.x, l.y};
+      return;
+    }
+    // raiz de uma instancia: no mundo do pai pela base
+    const Matriz& p = base;
+    w.a = p.a * la + p.b * lc;
+    w.b = p.a * lb + p.b * ld;
+    w.c = p.c * la + p.d * lc;
+    w.d = p.c * lb + p.d * ld;
+    w.x = p.a * l.x + p.b * l.y + p.x;
+    w.y = p.c * l.x + p.d * l.y + p.y;
     return;
   }
   const Matriz& p = mundo_[size_t(pai)];
@@ -674,6 +795,7 @@ void Esqueleto::atualizar_mundo() {
   }
   local.swap(antes_);
   atualizar_particulas();
+  if (!inst_.empty()) atualizar_instancias();
   // borrar: os vertices deste relogio; o do relogio anterior vira o `ant` quando o relogio anda
   // (varios atualizar_mundo no mesmo relogio so trocam o atual). Relogio que volta: sem anterior
   for (size_t i = 0; i < slots_.size(); ++i) {

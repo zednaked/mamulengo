@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "nao abri %s\n", argv[2]);
     return 1;
   }
-  auto modelo = ler_boneco(texto, &erro);
+  auto modelo = ler_boneco(texto, argv[1], abrir_do_disco(), &erro);
   if (!modelo) {
     std::fprintf(stderr, "%s: %s\n", argv[1], erro.c_str());
     return 1;

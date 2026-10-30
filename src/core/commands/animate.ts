@@ -96,6 +96,10 @@ const KeyValue = z
     interval: z.number().min(0).optional().describe("trail: segundos entre uma copia e a seguinte (padrao 0.05)"),
     alpha: z.number().min(0).max(1).optional().describe("trail: alfa da copia mais nova (0 a 1, padrao 0.5)"),
     height: z.number().optional().describe("light: altura da luz sobre o plano (negativa: rasante por tras)"),
+    animation: z.string().optional().describe("instance: a animacao do filho"),
+    start: z.number().optional().describe("instance: o tempo do filho na chave"),
+    speed: z.number().optional().describe("instance: velocidade do filho"),
+    loop: z.boolean().optional().describe("instance: repetir (false para no fim)"),
   })
   .partial();
 
@@ -113,7 +117,7 @@ defineCommand({
     space: z.enum(["parent", "world"]).default("parent").describe("translate: x/y no espaco do pai (padrao) ou na tela (world)"),
     ...KeyValue.shape,
   }),
-  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : "particles" in p.target ? p.target.particles : "light" in p.target ? `luz ${p.target.light}` : "ambient" in p.target ? "ambiente" : p.target.deform.attachment} @${p.time}`,
+  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : "particles" in p.target ? p.target.particles : "light" in p.target ? `luz ${p.target.light}` : "ambient" in p.target ? "ambiente" : "instance" in p.target ? `instancia ${p.target.instance}` : p.target.deform.attachment} @${p.time}`,
   run({ e }, p) {
     requireAnimation(e.json, p.anim);
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);

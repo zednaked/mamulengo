@@ -22,12 +22,45 @@
   let showBones = $state(false);
   let leftTab = $state<"bones" | "layers" | "images" | "versions">("bones");
 
+  // tela pequena (notebook com escala, janela dividida): a interface fica compacta, com tamanhos
+  // de painel proprios, para o mesmo arquivo de preferencias servir no monitor grande e no pequeno
+  const PEQUENA = "(max-width: 1500px), (max-height: 860px)";
+  const mq = window.matchMedia(PEQUENA);
+  let compacto = $state(mq.matches);
+  mq.addEventListener("change", (e) => (compacto = e.matches));
+  // os botoes de exibicao viram o menu "ver" antes: com eles a barra do topo nao cabe em 1920
+  const mqVer = window.matchMedia("(max-width: 2000px)");
+  let menuVer = $state(mqVer.matches);
+  mqVer.addEventListener("change", (e) => (menuVer = e.matches));
+  let verAberto = $state(false);
+
   // tamanhos dos paineis (arrastar as alças; clique duplo volta ao padrao), guardados no navegador
   const LAYOUT0 = { left: 240, right: 280, foot: 220, act: 110 };
-  let layout = $state({ ...LAYOUT0 });
+  const LAYOUT_C0 = { left: 215, right: 230, foot: 215, act: 70 };
+  let layoutNormal = $state({ ...LAYOUT0 });
+  let layoutCompacto = $state({ ...LAYOUT_C0 });
+  // o que vale agora (as alças mexem neste)
+  const layout = $derived(compacto ? layoutCompacto : layoutNormal);
+  const padrao = () => (compacto ? LAYOUT_C0 : LAYOUT0);
+  // paineis laterais recolhidos (botoes no topo; Ctrl+[ e Ctrl+])
+  let recolhe = $state({ left: false, right: false });
   try {
-    Object.assign(layout, JSON.parse(localStorage.getItem("mamulengo.layout") ?? "{}"));
+    Object.assign(layoutNormal, JSON.parse(localStorage.getItem("mamulengo.layout") ?? "{}"));
+    Object.assign(layoutCompacto, JSON.parse(localStorage.getItem("mamulengo.layoutCompacto") ?? "{}"));
+    Object.assign(recolhe, JSON.parse(localStorage.getItem("mamulengo.recolhe") ?? "{}"));
   } catch {}
+  function guardaLayout() {
+    try {
+      localStorage.setItem("mamulengo.layout", JSON.stringify(layoutNormal));
+      localStorage.setItem("mamulengo.layoutCompacto", JSON.stringify(layoutCompacto));
+      localStorage.setItem("mamulengo.recolhe", JSON.stringify(recolhe));
+    } catch {}
+    savePrefs({ layout: { ...layoutNormal }, layoutCompacto: { ...layoutCompacto }, recolhe: { ...recolhe } });
+  }
+  function alterna(lado: "left" | "right") {
+    recolhe[lado] = !recolhe[lado];
+    guardaLayout();
+  }
   const LIMITS: Record<keyof typeof LAYOUT0, [number, () => number]> = {
     left: [150, () => window.innerWidth * 0.45],
     right: [200, () => window.innerWidth * 0.5],
@@ -52,7 +85,9 @@
   fetch("/api/prefs")
     .then((r) => r.json())
     .then((p) => {
-      if (p.layout) Object.assign(layout, p.layout);
+      if (p.layout) Object.assign(layoutNormal, p.layout);
+      if (p.layoutCompacto) Object.assign(layoutCompacto, p.layoutCompacto);
+      if (p.recolhe) Object.assign(recolhe, p.recolhe);
       if (p.leftTab) leftTab = p.leftTab;
       if (p.rightTab) app.rightTab = p.rightTab;
       if (typeof p.legenda === "boolean") app.showNarration = p.legenda;
@@ -78,20 +113,14 @@
     const up = () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
-      try {
-        localStorage.setItem("mamulengo.layout", JSON.stringify(layout));
-      } catch {}
-      savePrefs({ layout: { ...layout } });
+      guardaLayout();
     };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
   }
   function resetSize(key: keyof typeof LAYOUT0) {
-    layout[key] = LAYOUT0[key];
-    try {
-      localStorage.setItem("mamulengo.layout", JSON.stringify(layout));
-    } catch {}
-    savePrefs({ layout: { ...layout } });
+    layout[key] = padrao()[key];
+    guardaLayout();
   }
   let guide = $state(false);
   let showMeshes = $state(false);
@@ -208,6 +237,9 @@
     } else if (mod && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (!app.spectator) save();
+    } else if (mod && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+      e.preventDefault();
+      alterna(e.code === "BracketLeft" ? "left" : "right");
     } else if (!mod && e.key === "f") app.viewer?.frameAll();
     else if (!mod && (e.key === "PageUp" || e.key === "PageDown") && app.selection.slot) {
       // ordem de desenho da camada escolhida: passo inteligente; com Shift, topo ou fundo
@@ -242,25 +274,33 @@
 
 <svelte:window onkeydown={keys} />
 
-<div class="app" style:grid-template-columns="{layout.left}px minmax(0, 1fr) {layout.right}px" style:grid-template-rows="auto minmax(0, 1fr) {layout.foot}px">
+<div
+  class="app"
+  class:compacto
+  class:sem-esq={recolhe.left}
+  class:sem-dir={recolhe.right}
+  style:grid-template-columns="{recolhe.left ? 0 : layout.left}px minmax(0, 1fr) {recolhe.right ? 0 : layout.right}px"
+  style:grid-template-rows="auto minmax(0, 1fr) {layout.foot}px"
+>
   <header>
-    <div class="brand"><img src="/favicon.svg" alt="" /> Mamulengo</div>
+    <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
+    <button class="painel" class:on={!recolhe.left} onclick={() => alterna("left")} title="Mostrar ou esconder o painel da esquerda: esqueleto, ordem, imagens (Ctrl+[)">◧</button>
     <AssetPicker />
     <PsdImport />
     <div class="seg tools">
-      <button class:on={app.tool === "move"} onclick={() => (app.tool = "move")} title="Mover (1)">✥ Mover</button>
-      <button class:on={app.tool === "rotate"} onclick={() => (app.tool = "rotate")} title="Girar (2)">⟳ Girar</button>
-      <button class:on={app.tool === "scale"} onclick={() => (app.tool = "scale")} title="Esticar (3)">⤢ Esticar</button>
-      <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 Deformar</button>
-      <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animacoes">🦴 Osso</button>
-      <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a camera arrastando (6 ou H). Tambem: botao do meio ou direito, ou segurar Espaco">✋ Camera</button>
+      <button class:on={app.tool === "move"} onclick={() => (app.tool = "move")} title="Mover (1)">✥ <span class="rot">Mover</span></button>
+      <button class:on={app.tool === "rotate"} onclick={() => (app.tool = "rotate")} title="Girar (2)">⟳ <span class="rot">Girar</span></button>
+      <button class:on={app.tool === "scale"} onclick={() => (app.tool = "scale")} title="Esticar (3)">⤢ <span class="rot">Esticar</span></button>
+      <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 <span class="rot">Deformar</span></button>
+      <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animacoes">🦴 <span class="rot">Osso</span></button>
+      <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a camera arrastando (6 ou H). Tambem: botao do meio ou direito, ou segurar Espaco">✋ <span class="rot">Camera</span></button>
 
     </div>
     <div class="seg">
       <button disabled={!canUndo} onclick={() => app.undo()} title="Desfazer (Ctrl+Z)">↶</button>
       <button disabled={!canRedo} onclick={() => app.redo()} title="Refazer (Ctrl+Shift+Z)">↷</button>
     </div>
-    <div class="seg">
+    {#snippet botoesVer()}
       <button class:on={showBones} onclick={() => (showBones = !showBones)}>ossos</button>
       <button class:on={showMeshes} onclick={() => (showMeshes = !showMeshes)}>malhas</button>
       <button class:on={app.onion} onclick={() => (app.onion = !app.onion)} title="Fantasmas dos quadros vizinhos (pausado)">cebola</button>
@@ -275,18 +315,31 @@
         referencia
         <input type="file" accept="image/*" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f)); (e.currentTarget as HTMLInputElement).value = ""; }} />
       </label>
-    </div>
+    {/snippet}
+    {#if compacto || menuVer}
+      <div class="menu-ver">
+        <button class:on={verAberto} onclick={() => (verAberto = !verAberto)} title="Ossos, malhas, cebola, enquadrar, desenho, Godot, referencia">ver ▾</button>
+        {#if verAberto}
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="fundo-menu" onclick={() => (verAberto = false)}></div>
+          <div class="seg pop-ver">{@render botoesVer()}</div>
+        {/if}
+      </div>
+    {:else}
+      <div class="seg">{@render botoesVer()}</div>
+    {/if}
     <div class="spacer"></div>
     <button class="help" title="Como usar" onclick={() => (guide = true)}>?</button>
-    <div class="agent" class:on={app.agentConnected} title="O Claude esta operando este editor">🤖 {app.agentConnected ? "Claude conectado" : "Claude"}</div>
+    <div class="agent" class:on={app.agentConnected} title={app.agentConnected ? "Claude conectado: ele esta operando este editor" : "Claude: nenhuma instancia conectada a este editor"}>🤖{#if app.agentConnected}<span class="pontinho"></span>{/if}</div>
     {#if app.narration.text}<button class="talk" class:off={!app.showNarration} onclick={toggleNarration} title="Mostrar ou esconder a legenda com o que o Claude diz">💬</button>{/if}
     {#if app.spectator}
       <div class="spect" title="Esta aba so assiste ao editor que o Claude esta usando: navegue a vontade (animacao, instante, camera, partes); nada aqui e salvo">acompanhando o Claude</div>
     {/if}
-    <button class="follow" class:on={follow} onclick={toggleFollow} title={follow ? "Acompanhar o Claude: ligado. Ao abrir, se ele estiver trabalhando, o editor vai para a cena dele. Clique para desligar e trabalhar em outro lugar" : "Acompanhar o Claude: desligado. Clique para ligar"}>👁 acompanhar {follow ? "✓" : "✗"}</button>
+    <button class="follow" class:on={follow} onclick={toggleFollow} title={follow ? "Acompanhar o Claude: ligado. Ao abrir, se ele estiver trabalhando, o editor vai para a cena dele. Clique para desligar e trabalhar em outro lugar" : "Acompanhar o Claude: desligado. Clique para ligar"}>👁 {follow ? "✓" : "✗"}</button>
     {#if !app.spectator}
       <button class="save" class:dirty disabled={!app.doc || saving} onclick={save} title="Salvar no projeto (Ctrl+S)">{saving ? "salvando…" : dirty ? "● Salvar" : "Salvo"}</button>
     {/if}
+    <button class="painel" class:on={!recolhe.right} onclick={() => alterna("right")} title="Mostrar ou esconder o painel da direita: inspetor, ficha, notas (Ctrl+])">◨</button>
   </header>
 
   <aside class="left panel">
@@ -360,6 +413,90 @@
     gap: 8px;
     padding: 8px;
     height: 100vh;
+  }
+  /* paineis recolhidos: a coluna vai a 0 e o painel sai do fluxo */
+  .sem-esq aside.left,
+  .sem-dir aside.right {
+    display: none;
+  }
+  .agent {
+    position: relative;
+  }
+  .pontinho {
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #5bd68a;
+  }
+  header button.painel {
+    padding: 4px 8px;
+    color: var(--dim);
+  }
+  header button.painel.on {
+    color: inherit;
+  }
+  /* tela pequena: uma linha so no topo (o que nao couber rola de lado), so os icones nas
+     ferramentas, menos folga entre os paineis */
+  .compacto {
+    gap: 5px;
+    padding: 5px;
+  }
+  .compacto header {
+    flex-wrap: nowrap;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .compacto header :global(.picker) {
+    min-width: 0;
+  }
+  .compacto header :global(.picker > button) {
+    min-width: 170px;
+    max-width: 220px;
+  }
+  .menu-ver {
+    position: relative;
+  }
+  .fundo-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+  }
+  .pop-ver {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 41;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 170px;
+    box-shadow: 0 8px 24px #0008;
+  }
+  .pop-ver :global(button),
+  .pop-ver :global(select),
+  .pop-ver :global(label) {
+    text-align: left;
+  }
+  .compacto header > * {
+    flex-shrink: 0;
+  }
+  .compacto .brand {
+    margin-right: 0;
+  }
+  .compacto .brand .nome,
+  .compacto .rot {
+    display: none;
+  }
+  .compacto .tools button {
+    font-size: 15px;
+    padding: 4px 9px;
+  }
+  .compacto .seg button,
+  .compacto header button,
+  .compacto header .botao {
+    padding: 3px 7px;
   }
   header {
     grid-area: head;
@@ -598,6 +735,12 @@
     background: none;
     padding: 4px 2px;
     font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .compacto .tabs button {
+    font-size: 11px;
   }
   .tabs button.on {
     background: var(--panel2);

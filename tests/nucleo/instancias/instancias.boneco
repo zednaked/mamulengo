@@ -1,0 +1,33 @@
+{
+ "boneco": 0,
+ "nome": "instancias",
+ "esqueleto": {"versao_spine": "4.3.23"},
+ "ossos": [
+  {"nome": "root"},
+  {"nome": "braco", "pai": "root", "y": 100, "comprimento": 80},
+  {"nome": "outro", "pai": "root", "x": 300, "escala_x": -1}
+ ],
+ "slots": [
+  {"nome": "s1", "osso": "braco"},
+  {"nome": "s2", "osso": "root"},
+  {"nome": "s3", "osso": "outro"},
+  {"nome": "s4", "osso": "root"}
+ ],
+ "skins": [{"nome": "default", "partes": {}}],
+ "instancias": [
+  {"nome": "robo_a", "slot": "s1", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle", "x": 50, "y": 10, "rotacao": 20, "escala_x": 0.5, "escala_y": 0.6, "inicio": 0.3, "velocidade": 1.5},
+  {"nome": "robo_b", "slot": "s2", "boneco": "../../boneco/robo/robo.boneco", "animacao": "ganhou", "repetir": false},
+  {"nome": "robo_c", "slot": "s3", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle"},
+  {"nome": "meio", "slot": "s4", "boneco": "meio.boneco", "animacao": "vai", "x": -200, "rotacao": -10}
+ ],
+ "animacoes": {
+  "cena": {
+   "ossos": {"braco": {"girar": [{"tempo": 0, "valor": 0}, {"tempo": 2.4, "valor": 90}]}},
+   "slots": {"s3": {"rgba": [{"tempo": 0, "cor": "ffffffff", "curva": "degrau"}, {"tempo": 1.0, "cor": "ffffff00", "curva": "degrau"}, {"tempo": 1.7, "cor": "ffffffff"}]}},
+   "instancias": {
+    "robo_b": [{"tempo": 0, "animacao": "idle", "inicio": 0}, {"tempo": 0.8, "animacao": "ganhou", "inicio": 0, "velocidade": 2}, {"tempo": 1.6, "repetir": true}],
+    "meio": [{"tempo": 0.5, "inicio": 1}]
+   }
+  }
+ }
+}

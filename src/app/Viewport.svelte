@@ -69,10 +69,15 @@
       const nv = v.view;
       const st = v.sequenceTimes();
       const seq = st && nv.sequence ? { next: st.next, mix: st.mix, at: nv.sequence.at ?? null, loop: !!nv.sequence.loop, start: st.start, end: st.end, total: st.total, durA: st.durA } : null;
-      const seqChanged = JSON.stringify(seq) !== JSON.stringify(p.seq);
-      if (p.time !== nv.time || p.playing !== nv.playing || p.animation !== nv.animation || p.loop !== nv.loop || p.speed !== nv.speed || seqChanged) {
-        app.play = { animation: nv.animation, time: nv.time, duration: v.duration(), playing: nv.playing, loop: nv.loop, speed: nv.speed, seq };
-      } else if (p.duration !== v.duration()) app.play = { ...p, duration: v.duration() };
+      // campo a campo, so o que mudou: trocar o objeto inteiro a cada quadro fazia tudo que le
+      // app.play.animation (as linhas da timeline, com todas as chaves) se refazer tocando
+      if (JSON.stringify(seq) !== JSON.stringify(p.seq)) p.seq = seq;
+      if (p.animation !== nv.animation) p.animation = nv.animation;
+      if (p.time !== nv.time) p.time = nv.time;
+      if (p.playing !== nv.playing) p.playing = nv.playing;
+      if (p.loop !== nv.loop) p.loop = nv.loop;
+      if (p.speed !== nv.speed) p.speed = nv.speed;
+      if (p.duration !== v.duration()) p.duration = v.duration();
     });
     v.start();
     // ja ha documento aberto (viewport remontado): reconecta

@@ -88,6 +88,8 @@
     const emissores = new Set(((json as any).particles ?? []).map((p: any) => p.name));
     for (const [n, tls] of Object.entries<any>(a.particles ?? {}))
       if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: tl, keys });
+    // instancias (so do Mamulengo): uma linha por instancia, as chaves que trocam o que o filho toca
+    for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instancia", keys });
     if (a.events?.length) out.push({ part: "ev", partLabel: "eventos", partColor: "#ffffff", timeline: "events", label: "eventos", keys: a.events });
     if (a.drawOrder?.length) out.push({ part: "do", partLabel: "ordem", partColor: "#ff9f6c", timeline: "drawOrder", label: "ordem", keys: a.drawOrder });
     return out;
@@ -178,7 +180,11 @@
   let laneW = $state(600);
   let zoom = $state<{ start: number; pps: number } | null>(null);
   // inclui o tempo atual: andar alem do fim (para estender a animacao) aumenta a regua
-  const dur = $derived(Math.max(app.play.duration, app.play.time, ...rows.flatMap((r) => r.cells.map((c) => c.time)), 0.5));
+  // a ultima chave a parte: so muda com as linhas, nao a cada quadro tocando
+  const ultimaChave = $derived(rows.reduce((m, r) => r.cells.reduce((mm, c) => Math.max(mm, c.time), m), 0));
+  // tocando, o tempo fica dentro da duracao: so parado ele pode passar do fim. Ler o tempo
+  // tocando faria cada quadro revisar todas as marcas de chave (elas dependem da escala)
+  const dur = $derived(Math.max(app.play.duration, app.play.playing ? 0 : app.play.time, ultimaChave, 0.5));
   const pps = $derived(zoom?.pps ?? Math.max(4, (laneW - 2 * PAD) / dur));
   const start = $derived(zoom?.start ?? 0);
   const X = (t: number) => PAD + (t - start) * pps;
@@ -469,6 +475,7 @@
 
   // eventos: nome digitado vira evento (criado se preciso) disparado no tempo atual
   let eventName = $state("");
+  let eventInput: HTMLInputElement | undefined = $state();
   function addEvent() {
     const n = eventName.trim();
     const anim = app.play.animation;
@@ -606,8 +613,9 @@
       {#if single && app.play.animation}<div class="floating"><CurveEditor anim={app.play.animation} target={single.row.target} timeline={single.row.timeline!} time={single.cell.time} keys={singleKeys} /></div>{/if}
     {:else if app.play.animation}
       <span class="ev">
-        <input placeholder="evento (ex: som_pulo)" bind:value={eventName} onkeydown={(e) => e.key === "Enter" && addEvent()} />
-        <button onclick={addEvent} disabled={!eventName.trim()} title="Dispara o evento neste instante (o jogo recebe no sinal animation_event)">+ evento</button>
+        <input placeholder="evento (ex: som_pulo)" bind:this={eventInput} class:cheio={!!eventName} bind:value={eventName} onkeydown={(e) => e.key === "Enter" && addEvent()} />
+        <!-- sem nome, o botao leva ao campo (no modo compacto o campo fica fechado ate isso) -->
+        <button onclick={() => (eventName.trim() ? addEvent() : eventInput?.focus())} title="Dispara o evento neste instante (o jogo recebe no sinal animation_event)">+ evento</button>
       </span>
     {/if}
     {#if app.play.animation && others.length}
@@ -692,7 +700,7 @@
             }}
           ></button>
         {/each}
-        <div class="head-mark" style:left="{X(app.play.time)}px"></div>
+        <div class="head-mark" style:transform="translateX({X(app.play.time)}px)"></div>
       </div>
     </div>
     <div class="body">
@@ -728,7 +736,7 @@
                 class:many={c.refs.length > 1}
                 class:late={!!emenda && emenda.at !== null && c.time > emenda.start + 1e-4}
                 style:left="{X(c.time)}px"
-                style:background={r.color}
+                style:--c={r.color}
                 onpointerdown={(e) => keyDown(e, r, c)}
                 ondblclick={() => zoomTo(c.time - 6 / FPS, c.time + 6 / FPS)}
                 title="{r.label} @ {c.time}s (q{Math.round(c.time * FPS)}){c.refs.length > 1 ? ` - ${c.refs.length} chaves` : ''}"
@@ -739,7 +747,7 @@
         {#if drag?.kind === "box" && drag.moved}
           <div class="box" style:left="{Math.min(drag.x0, drag.x1)}px" style:top="{Math.min(drag.y0, drag.y1)}px" style:width="{Math.abs(drag.x1 - drag.x0)}px" style:height="{Math.abs(drag.y1 - drag.y0)}px"></div>
         {/if}
-        <div class="head-line" style:left="{X(app.play.time)}px"></div>
+        <div class="head-line" style:transform="translateX({X(app.play.time)}px)"></div>
       </div>
     </div>
   </div>
@@ -819,6 +827,62 @@
     gap: 8px;
     flex-wrap: wrap;
     position: relative;
+  }
+  /* tela pequena (App.svelte, .compacto): abas e controles na mesma linha, tudo mais baixo */
+  :global(.compacto) .tl {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 5px 10px;
+    align-items: start;
+    font-size: 13px;
+  }
+  :global(.compacto) .tl > .base-note {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  :global(.compacto) .tl > .grid {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    align-self: stretch;
+  }
+  :global(.compacto) .tl > .anims {
+    grid-column: 1;
+    grid-row: 1;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    max-width: 46vw;
+  }
+  /* o que nao couber desce para outra linha (cortar escondia o exportar) */
+  :global(.compacto) .tl > .transport {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 5px 6px;
+  }
+  :global(.compacto) .transport :global(button) {
+    white-space: nowrap;
+  }
+  :global(.compacto) .ev input {
+    width: 0;
+    padding: 3px 0;
+    border-width: 0;
+    transition: width 0.15s;
+  }
+  :global(.compacto) .ev:focus-within input,
+  :global(.compacto) .ev input.cheio {
+    width: 130px;
+    padding: 3px 7px;
+    border-width: 1px;
+  }
+  :global(.compacto) .anims button {
+    padding: 3px 9px;
+    flex-shrink: 0;
+  }
+  :global(.compacto) .play {
+    width: 36px;
+    height: 28px;
+    font-size: 13px;
   }
   .play {
     width: 46px;
@@ -1067,6 +1131,7 @@
     left: 0;
     right: 0;
     height: 24px;
+    contain: layout paint;
   }
   .row.all {
     background: #ffffff08;
@@ -1083,26 +1148,34 @@
     border-top: 2px dashed;
     background: none !important;
   }
+  /* o losango pintado so com gradientes (quatro quartos da borda e quatro do miolo): girar a
+     marca com transform, ou recortar com clip-path, criava um no de camada por chave, e com
+     milhares de chaves o navegador gastava ~16 ms por quadro so montando as camadas */
   .key {
+    --c: #bbb;
+    --o: #16141b;
     position: absolute;
-    top: 6px;
-    width: 12px;
-    height: 12px;
-    margin-left: -6px;
-    transform: rotate(45deg);
-    border-radius: 2px;
+    top: 3px;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
     cursor: grab;
-    box-shadow: 0 0 0 1.5px #16141b;
+    background:
+      linear-gradient(to bottom right, transparent 50%, var(--c) 50%) 1.5px 1.5px / 7.5px 7.5px no-repeat,
+      linear-gradient(to bottom left, transparent 50%, var(--c) 50%) 9px 1.5px / 7.5px 7.5px no-repeat,
+      linear-gradient(to top right, transparent 50%, var(--c) 50%) 1.5px 9px / 7.5px 7.5px no-repeat,
+      linear-gradient(to top left, transparent 50%, var(--c) 50%) 9px 9px / 7.5px 7.5px no-repeat,
+      linear-gradient(to bottom right, transparent 50%, var(--o) 50%) 0 0 / 9px 9px no-repeat,
+      linear-gradient(to bottom left, transparent 50%, var(--o) 50%) 9px 0 / 9px 9px no-repeat,
+      linear-gradient(to top right, transparent 50%, var(--o) 50%) 0 9px / 9px 9px no-repeat,
+      linear-gradient(to top left, transparent 50%, var(--o) 50%) 9px 9px / 9px 9px no-repeat;
   }
+  /* varias chaves no mesmo instante: borda mais clara */
   .key.many {
-    width: 13px;
-    height: 13px;
-    margin-left: -6.5px;
+    --o: #4a4458;
   }
   .key.sel {
-    box-shadow:
-      0 0 0 2px #16141b,
-      0 0 0 4px white;
+    --o: white;
     z-index: 1;
   }
   .box {
@@ -1162,9 +1235,13 @@
   .seq-mix.lane {
     background: #ff6bb522;
   }
+  /* o cursor anda por transform, numa camada propria: mover pelo left repintava a faixa
+     inteira, com todas as chaves, a cada quadro tocando */
   .head-mark,
   .head-line {
     position: absolute;
+    left: 0;
+    will-change: transform;
     top: 0;
     bottom: 0;
     width: 2px;

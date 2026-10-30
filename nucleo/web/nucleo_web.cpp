@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -82,6 +83,8 @@ std::vector<float> grupos;
 // leituras da pose (o JavaScript le os numeros direto da memoria)
 std::vector<double> saida, saida_ossos, saida_setup, saida_slots;
 std::string erro, info;
+// os arquivos que as instancias pedem (mm_arquivo), por caminho normalizado
+std::unordered_map<std::string, std::string> arquivos;
 // as medidas (mm_medir_eventos) colhem os eventos de usuario que o mm_passo le: por evento,
 // [evento, tempo da chave, instante em que saiu, animacao]
 bool colher = false;
@@ -111,6 +114,23 @@ extern "C" {
 // le um .boneco (texto UTF-8); devolve o id do modelo ou -1 (mm_erro diz o motivo)
 EMSCRIPTEN_KEEPALIVE int mm_carregar(const char* texto) {
   auto m = ler_boneco(texto, &erro);
+  if (!m) return -1;
+  modelos.push_back(std::move(m));
+  return int(modelos.size()) - 1;
+}
+
+// instancias (docs/NUCLEO.md "Instancias"): quem carrega poe antes o texto de cada arquivo que as
+// instancias pedem (o caminho normalizado, como o leitor pede) e carrega com o caminho do pai
+EMSCRIPTEN_KEEPALIVE void mm_arquivo(const char* caminho, const char* texto) { arquivos[normalizar_caminho(caminho)] = texto; }
+EMSCRIPTEN_KEEPALIVE void mm_limpar_arquivos() { arquivos.clear(); }
+EMSCRIPTEN_KEEPALIVE int mm_carregar_de(const char* texto, const char* caminho) {
+  const AbrirArquivo abrir = [](const std::string& c, std::string& t) {
+    auto it = arquivos.find(c);
+    if (it == arquivos.end()) return false;
+    t = it->second;
+    return true;
+  };
+  auto m = ler_boneco(texto, caminho, abrir, &erro);
   if (!m) return -1;
   modelos.push_back(std::move(m));
   return int(modelos.size()) - 1;
@@ -161,14 +181,16 @@ EMSCRIPTEN_KEEPALIVE int mm_trocar_animacao(int modelo, const char* nome, const 
   return ler_animacao(mutavel(modelo), nome, json, &erro) ? 1 : 0;
 }
 
-// JSON: { nome, paginas: [{arquivo, largura, altura, pma}], animacoes: [{nome, duracao}] }
+// JSON: { nome, paginas: [{arquivo, largura, altura, pma}], animacoes: [{nome, duracao}] }. As
+// paginas sao as do desenho: as do modelo e depois as dos filhos das instancias (caminho relativo
+// ao pai)
 EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
   const Modelo& m = *modelos[size_t(modelo)];
   info = "{\"nome\":";
   texto_json(info, m.nome);
   info += ",\"paginas\":[";
-  for (size_t i = 0; i < m.paginas.size(); ++i) {
-    const Pagina& p = m.paginas[i];
+  for (size_t i = 0; i < m.paginas_desenho.size(); ++i) {
+    const Pagina& p = m.paginas_desenho[i];
     info += i ? ",{\"arquivo\":" : "{\"arquivo\":";
     texto_json(info, p.arquivo);
     info += ",\"largura\":" + std::to_string(p.largura) + ",\"altura\":" + std::to_string(p.altura) + ",\"pma\":" + (p.pma ? "true" : "false");
@@ -183,6 +205,8 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
   // "fisica": a pose depende do caminho ate o instante (o editor simula em passos desde o 0); as
   // particulas tambem
   fisica = fisica || !m.emissores.empty();
+  // e as dos filhos das instancias (com memoria: fisica, particulas, borrar ou rastro)
+  for (const auto& f : m.filhos) fisica = fisica || !f->sem_memoria;
   info += std::string("],\"fisica\":") + (fisica ? "true" : "false") + ",\"ossos\":[";
   for (size_t i = 0; i < m.ossos.size(); ++i) {
     info += i ? ",{\"nome\":" : "{\"nome\":";

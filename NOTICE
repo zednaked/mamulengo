@@ -7,6 +7,9 @@ Not covered by this license:
   Kenney (kenney.nl); see
   tests/assets/LICENSES.md. The art in exemplos/jogo (jogo_*.webp) comes from Kenney's
   Jumper Pack, UI Pack (with the Kenney Future font) and Particle Pack, also CC0 1.0.
+- The letters in exemplos/vinheta (letra.png and vinheta.png) are rendered from the
+  Noto Sans font, under the SIL Open Font License 1.1 (fonts.google.com/noto). The
+  puppet and the rest of that example are drawn by its generator, under this license.
 - The editor installs spine-core and spine-webgl from npm as its reference
   renderer. They are under the Spine Runtimes License, not this one, and using
   them requires a Spine license. The core in nucleo/ and the .boneco format do

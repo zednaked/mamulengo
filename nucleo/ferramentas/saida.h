@@ -4,6 +4,8 @@
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -11,6 +13,20 @@
 #include "mamulengo/pose.h"
 
 namespace mamulengo {
+
+// abre os filhos das instancias (docs/NUCLEO.md "Instancias") do disco: o caminho ja vem relativo
+// ao diretorio de trabalho, pelo do arquivo pai
+inline const AbrirArquivo& abrir_do_disco() {
+  static const AbrirArquivo abrir = [](const std::string& caminho, std::string& texto) {
+    std::ifstream f(caminho, std::ios::binary);
+    if (!f) return false;
+    std::stringstream ss;
+    ss << f.rdbuf();
+    texto = ss.str();
+    return true;
+  };
+  return abrir;
+}
 
 inline void escreve_num(std::string& s, double v) {
   char b[40];
@@ -234,6 +250,32 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
         out += ']';
       }
       out += ']';
+    }
+    out += '}';
+  }
+  // instancias (docs/NUCLEO.md "Instancias"): o relogio e, por instancia visivel, a animacao e o
+  // tempo do filho e a pose dele (a mesma saida, recursiva)
+  if (!m.instancias.empty()) {
+    out += ",\"relogio\":";
+    escreve_num(out, e.relogio());
+    out += ",\"instancias\":{";
+    bool primeira = true;
+    for (size_t i = 0; i < m.instancias.size(); ++i) {
+      const EstadoInstancia& in = e.instancias()[i];
+      if (e.slots()[size_t(m.instancias[i].slot)].cor.a <= 0 || !in.pronto) continue;
+      if (!primeira) out += ',';
+      primeira = false;
+      escreve_texto(out, m.instancias[i].nome);
+      out += ":{\"animacao\":";
+      const Modelo& fm = in.e->modelo();
+      if (in.ultima_anim >= 0) escreve_texto(out, fm.animacoes[size_t(in.ultima_anim)].nome);
+      else out += "null";
+      out += ",\"tempo\":";
+      escreve_num(out, in.ultimo_t);
+      out += ',';
+      std::vector<double> vf;
+      escreve_pose(out, *in.e, vf);
+      out += '}';
     }
     out += '}';
   }

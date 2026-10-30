@@ -219,8 +219,28 @@ void posicoes_orbita(const Esqueleto& e, int ie, std::vector<double>& out) {
   }
 }
 
-void desenhar(const Esqueleto& e, Desenho& d) {
+namespace {
+
+// de onde um esqueleto e desenhado: o personagem (contexto vazio) ou uma instancia dentro dele
+// (docs/NUCLEO.md "Instancias")
+struct Contexto {
+  Cor tinta;                         // a cor do slot da instancia (vezes as cores do filho)
+  const Efeitos* efeitos = nullptr;  // os de shader do slot da instancia (pecas sem efeitos proprios)
+  int pagina_base = 0;               // as paginas deste esqueleto na tabela do desenho
+  int grupo = -1;                    // o grupo de luz do pai (-1: o deste esqueleto)
+};
+
+void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx);
+
+}  // namespace
+
+void desenhar(const Esqueleto& e, Desenho& d) { desenhar_em(e, d, Contexto{}); }
+
+namespace {
+
+void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   const Modelo& m = e.modelo();
+  const size_t vertice0 = d.vertices.size();
   std::vector<double> mundo;
   std::vector<float> esmaece;  // borrar: quanto o alfa de cada vertice cai
   std::vector<CopiaRastro> copias;  // rastro
@@ -233,8 +253,8 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   // `efeito` >= 0: o lote de um slot com efeitos, sempre novo (os valores sao do slot)
   // luzes (docs/NUCLEO.md "Luzes"): um grupo para este personagem se alguma pagina tem relevo e
   // a luz muda alguma coisa (alguma luz acesa, ou a ambiente diferente de branco inteiro)
-  int grupo = -1;
-  {
+  int grupo = ctx.grupo;
+  if (grupo < 0) {
     bool relevo = false;
     for (const Pagina& pg : m.paginas) relevo = relevo || !pg.relevo.empty();
     const float* am = e.ambiente();
@@ -262,6 +282,7 @@ void desenhar(const Esqueleto& e, Desenho& d) {
     return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela ? grupo : -1;
   };
   auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1, int luz = -1) -> Lote& {
+    if (pagina >= 0) pagina += ctx.pagina_base;
     if (c == Comando::Triangulos && efeito < 0 && !d.lotes.empty()) {
       Lote& u = d.lotes.back();
       if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0 && u.luz == luz) return u;
@@ -446,6 +467,22 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
     }
   };
+  // as instancias do slot (docs/NUCLEO.md "Instancias"): o filho no mesmo desenho, logo depois da
+  // parte do slot
+  auto instancias = [&](int si) {
+    if (m.instancias_do_slot.empty() || m.instancias_do_slot[size_t(si)].empty()) return;
+    const EstadoSlot& s = e.slots()[size_t(si)];
+    if (s.cor.a <= 0) return;
+    for (int ii : m.instancias_do_slot[size_t(si)]) {
+      const DadosInstancia& di = m.instancias[size_t(ii)];
+      Contexto c;
+      c.tinta = s.cor;
+      c.efeitos = s.efeitos.algum() ? &s.efeitos : ctx.efeitos;
+      c.pagina_base = ctx.pagina_base + m.filho_pagina_base[size_t(di.filho)];
+      c.grupo = grupo;
+      desenhar_em(*e.instancias()[size_t(ii)].e, d, c);
+    }
+  };
   for (int si : e.ordem()) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
@@ -487,6 +524,7 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
       // invisivel ou sem imagem: nem calcula os vertices (os brilhos apagados sao muitos)
       if (a <= 0 || p.pagina < 0 || p.uvs.empty()) {
+        instancias(si);
         particulas(si);
         if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
         continue;
@@ -521,18 +559,20 @@ void desenhar(const Esqueleto& e, Desenho& d) {
             }
           }
           int efeito = -1;
-          if (principal && s.efeitos.algum()) {
+          // os efeitos da peca, ou os do slot da instancia (a peca sem efeitos proprios)
+          const Efeitos* ef = s.efeitos.algum() ? &s.efeitos : ctx.efeitos;
+          if (principal && ef) {
             // a caixa da imagem na pagina (antes de crescer) e, na regiao com linha ou brilho,
             // os cantos para fora pela margem (docs/NUCLEO.md "Efeitos")
             EfeitosLote el;
-            el.valores = s.efeitos;
+            el.valores = *ef;
             el.caixa[0] = el.caixa[2] = p.uvs[0];
             el.caixa[1] = el.caixa[3] = p.uvs[1];
             for (size_t i = 2; i < n; i += 2) {
               el.caixa[0] = std::min(el.caixa[0], p.uvs[i]), el.caixa[2] = std::max(el.caixa[2], p.uvs[i]);
               el.caixa[1] = std::min(el.caixa[1], p.uvs[i + 1]), el.caixa[3] = std::max(el.caixa[3], p.uvs[i + 1]);
             }
-            const float margem = s.efeitos.margem();
+            const float margem = ef->margem();
             const Pagina& pg = m.paginas[size_t(p.pagina)];
             if (p.tipo == TipoParte::Regiao && margem > 0 && pg.largura > 0 && pg.altura > 0) {
               // cantos: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita; ex vai do
@@ -637,10 +677,18 @@ void desenhar(const Esqueleto& e, Desenho& d) {
         geometria(mundo.data(), a, true);
       }
     }
+    instancias(si);
     particulas(si);
     if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
   }
   if (recorte_fim != -2) fecha_recorte();
+  // a cor do slot da instancia em tudo o que ela desenhou (os filhos dela inclusive: cada nivel
+  // multiplica pela cor do slot dele)
+  const Cor& t = ctx.tinta;
+  if (t.r != 1 || t.g != 1 || t.b != 1 || t.a != 1)
+    for (size_t i = vertice0; i < d.vertices.size(); i += 8) d.vertices[i + 4] *= t.r, d.vertices[i + 5] *= t.g, d.vertices[i + 6] *= t.b, d.vertices[i + 7] *= t.a;
 }
+
+}  // namespace
 
 }  // namespace mamulengo

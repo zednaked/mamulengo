@@ -244,7 +244,17 @@ Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
   const PackedByteArray bytes = FileAccess::get_file_as_bytes(p_caminho);
   const std::string t(reinterpret_cast<const char *>(bytes.ptr()), size_t(bytes.size()));
   std::string erro;
-  d->modelo = mamulengo::ler_boneco(t, &erro);
+  // instancias (docs/NUCLEO.md "Instancias"): os filhos pelo FileAccess, relativos a pasta deste
+  // arquivo (o leitor recebe so o nome; "res://" nao passa pela normalizacao de caminho)
+  const String pasta = p_caminho.get_base_dir();
+  const mamulengo::AbrirArquivo abrir = [&pasta](const std::string &c, std::string &texto) {
+    const String p = pasta.path_join(String::utf8(c.c_str())).simplify_path();
+    if (!BONECO_EXISTE(p)) return false;
+    const PackedByteArray b = FileAccess::get_file_as_bytes(p);
+    texto.assign(reinterpret_cast<const char *>(b.ptr()), size_t(b.size()));
+    return true;
+  };
+  d->modelo = mamulengo::ler_boneco(t, p_caminho.get_file().utf8().get_data(), abrir, &erro);
   if (!d->modelo) {
     d->erro = String::utf8(erro.c_str());
     BONECO_ERRO("boneco: " + p_caminho + ": " + d->erro);
@@ -256,16 +266,16 @@ Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
     const mamulengo::Json &e = j["esqueleto"];
     d->caixa = Rect2(e.num("x", 0), e.num("y", 0), e.num("largura", 0), e.num("altura", 0));
   }
-  const String pasta = p_caminho.get_base_dir();
-  for (const mamulengo::Pagina &pg : d->modelo->paginas) {
-    const String p = pasta.path_join(String::utf8(pg.arquivo.c_str()));
+  // as paginas do desenho: as deste arquivo e as dos filhos das instancias (relativas a ele)
+  for (const mamulengo::Pagina &pg : d->modelo->paginas_desenho) {
+    const String p = pasta.path_join(String::utf8(pg.arquivo.c_str())).simplify_path();
     Ref<Texture2D> tex = BONECO_CARREGA(p);
     if (tex.is_null()) BONECO_ERRO("boneco: nao carreguei a pagina " + p);
     d->paginas.push_back(tex);
     // o relevo da pagina (docs/NUCLEO.md "Luzes"): sem ele a pagina fica sem luz
     Ref<Texture2D> rel;
     if (!pg.relevo.empty()) {
-      rel = BONECO_CARREGA(pasta.path_join(String::utf8(pg.relevo.c_str())));
+      rel = BONECO_CARREGA(pasta.path_join(String::utf8(pg.relevo.c_str())).simplify_path());
       if (rel.is_null()) BONECO_ERRO("boneco: nao carreguei o relevo " + String::utf8(pg.relevo.c_str()));
     }
     d->relevos.push_back(rel);
@@ -738,7 +748,7 @@ void BonecoSprite::_desenhar() {
   for (int l = 0; l < int(desenho.lotes.size()); ++l) {
     const mamulengo::Lote &lt = desenho.lotes[size_t(l)];
     if (lt.comando != Comando::Triangulos || lt.quantos == 0) continue;
-    const bool pma = lt.pagina >= 0 && lt.pagina < int(data->modelo->paginas.size()) && data->modelo->paginas[size_t(lt.pagina)].pma;
+    const bool pma = lt.pagina >= 0 && lt.pagina < int(data->modelo->paginas_desenho.size()) && data->modelo->paginas_desenho[size_t(lt.pagina)].pma;
     switch (lt.blend) {
       case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma), ADITIVO, pma}); break;
       case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma), MULTIPLICA, pma}); break;

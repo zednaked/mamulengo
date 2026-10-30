@@ -16,6 +16,7 @@
 #include "mamulengo/binario.h"
 #include "mamulengo/json.h"
 #include "mamulengo/modelo.h"
+#include "saida.h"
 
 using namespace mamulengo;
 
@@ -108,7 +109,7 @@ int main(int argc, char** argv) {
     double melhor = 1e30;
     for (int i = 0; i < n; ++i) {
       const auto t0 = std::chrono::steady_clock::now();
-      auto m = ler_boneco(dados, &erro);
+      auto m = ler_boneco(dados, argv[2], abrir_do_disco(), &erro);
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       if (!m) {
         std::fprintf(stderr, "%s: %s\n", argv[2], erro.c_str());

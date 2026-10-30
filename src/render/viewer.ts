@@ -32,7 +32,7 @@ import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/s
 import { patchSkeletonData } from "../core/patch.ts";
 import { usarMedidas } from "../core/instantes.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
-import { NucleoCena } from "./nucleo.ts";
+import { NucleoCena, diretorio, normalizarCaminho } from "./nucleo.ts";
 import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
 
 export type Runtime = "godot" | "spine" | "nucleo";
@@ -269,6 +269,9 @@ export class Viewer {
     if (nucleo) {
       try {
         this.nucleo ??= await NucleoCena.criar(this.ctx.gl);
+        // os filhos das instancias de novo a cada abertura (podem ter mudado no disco)
+        this.instArquivos.clear();
+        await this.prepararInstancias();
         const gl = this.ctx.gl;
         for (const page of atlas.pages) {
           const img = crus.get(page.name);
@@ -355,13 +358,64 @@ export class Viewer {
   // o documento inteiro no nucleo (modo "nucleo"); em erro o desenho volta ao spine-webgl
   private loadNucleo(): boolean {
     if (this.runtime !== "nucleo" || !this.nucleo || !this.doc) return false;
+    // instancias de arquivos que ainda nao vieram (acabaram de ser postas): busca e refaz
+    if (this.arquivosFaltando().length) {
+      this.nucleoError = "carregando os arquivos das instancias";
+      void this.prepararInstancias().then(() => this.rebuild());
+      return false;
+    }
     try {
-      this.nucleo.carregar(this.doc.json, this.doc.atlas.text, this.doc.file?.skeleton?.split("/").pop() ?? "");
+      this.nucleo.carregar(this.doc.json, this.doc.atlas.text, this.doc.file?.skeleton?.split("/").pop() ?? "", this.caminhoDoc());
       this.nucleoError = null;
+      void this.texturasInstancias();
       return true;
     } catch (e: any) {
       this.nucleoError = String(e?.message ?? e);
       return false;
+    }
+  }
+
+  // ---- instancias (docs/NUCLEO.md "Instancias"): os .boneco filhos vao para o nucleo antes de
+  // carregar o pai, e as paginas deles depois
+
+  private instArquivos = new Set<string>();
+  private caminhoDoc() {
+    return this.doc?.file?.tres ?? this.doc?.file?.skeleton ?? "";
+  }
+  // os arquivos que as instancias pedem (do documento, no formato do editor) ainda nao registrados
+  private arquivosFaltando(): string[] {
+    const insts: any[] = this.doc?.json?.instances ?? [];
+    if (!insts.length) return [];
+    const dir = diretorio(this.caminhoDoc());
+    return insts.map((i) => normalizarCaminho(dir + (i.boneco ?? ""))).filter((c) => !this.instArquivos.has(c));
+  }
+  private async prepararInstancias() {
+    const N = this.nucleo;
+    if (!N || !this.doc) return;
+    // os filhos, e os filhos deles (o .boneco do filho ja e o formato do nucleo)
+    const fila = this.arquivosFaltando();
+    while (fila.length) {
+      const c = fila.shift()!;
+      if (this.instArquivos.has(c)) continue;
+      const r = await fetch(`/api/file?p=${encodeURIComponent(c)}`);
+      if (!r.ok) continue;
+      const texto = await r.text();
+      N.registrarArquivo(c, texto);
+      this.instArquivos.add(c);
+      try {
+        for (const i of JSON.parse(texto).instancias ?? []) fila.push(normalizarCaminho(diretorio(c) + (i.boneco ?? "")));
+      } catch {}
+    }
+  }
+  // as paginas dos filhos (relativas ao pai, como as dele)
+  private async texturasInstancias() {
+    const N = this.nucleo;
+    if (!N || !this.urlFor) return;
+    for (const arq of N.paginasSemTextura()) {
+      try {
+        const r = await fetch(this.urlFor(arq));
+        if (r.ok) N.poeTextura(arq, await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" }));
+      } catch {}
     }
   }
 

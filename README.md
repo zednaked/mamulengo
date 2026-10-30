@@ -1,5 +1,7 @@
 # Mamulengo
 
+![The Mamulengo opening: a string puppet comes out of the distance and bounces on its strings, the letters of the name come at the screen one by one, lightning runs down the strings and the camera dives into the puppet's head](exemplos/vinheta/vinheta.gif)
+
 **[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
 
 ![A robot, a zombie and a monster, rigged and animated by Claude Code in Mamulengo](docs/media/elenco.webp)
@@ -99,6 +101,11 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   body.
 - **2.5D turns:** `deform.turn` turns a mesh like a cylinder, so a head can look
   sideways with the ears staying rigid.
+- **Instances, a `.boneco` inside another:** what repeats lives in one file and the
+  scene only places the copies and tells each one what to play and when, on a
+  timeline with a handful of keys. The child is read once and shared, a hidden
+  instance is not computed at all, and children draw into the parent's draw list
+  with the slot's color, effects and the parent's lights. They nest.
 
 ![The robot looking around in 2.5D, flying on jets with a glow and a ring of stars, dissolving its arms and firing a lightning arc between its hands](exemplos/vitrine/vitrine.gif)
 
@@ -106,6 +113,11 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
 in one 8.6 s loop. Exported from the editor, frame and captions included.*
 
 ![The CC0 zombie on a night: a firefly circles him, front and behind, his head turns in 2.5D after it, its light changes sides and becomes a rim light, and it lands on his nose](exemplos/vagalume/vagalume.gif)
+
+*[exemplos/vinheta](exemplos/vinheta), the opening at the top of this page: a
+scene made of instances, nine of one letter and one of the puppet from the icon,
+each letter's timeline four keys long. About 7 µs of pose and 8 µs of drawing a
+frame.*
 
 *[exemplos/vagalume](exemplos/vagalume): 2.5D, light and depth together. The
 firefly circles the zombie in front and behind; its light follows the depth (face,

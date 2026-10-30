@@ -97,6 +97,31 @@ struct EstadoRestricao {
   double ax = 0, ay = 0;          // deslocamento herdado pela inercia, ainda a aplicar
 };
 
+class Esqueleto;
+
+// estado de uma instancia (docs/NUCLEO.md "Instancias"): o esqueleto do filho e o que a timeline
+// dela pede. Copiar copia o filho inteiro (o checkpoint do editor guarda o estado todo)
+struct EstadoInstancia {
+  std::unique_ptr<Esqueleto> e;
+  int animacao = -1;
+  double inicio = 0, velocidade = 1;
+  bool laco = true;
+  // a timeline da instancia pos o tempo do filho neste quadro (senao: inicio + velocidade x relogio)
+  bool por_timeline = false;
+  double tempo_filho = 0;
+  // o ultimo calculo (um filho sem memoria parado no mesmo instante e lugar nao e refeito)
+  bool pronto = false;
+  int ultima_anim = -2;
+  double ultimo_t = 0;
+  double ultima_base[6] = {0};
+  EstadoInstancia() = default;
+  EstadoInstancia(const EstadoInstancia& o);
+  EstadoInstancia& operator=(const EstadoInstancia& o);
+  EstadoInstancia(EstadoInstancia&&) noexcept = default;
+  EstadoInstancia& operator=(EstadoInstancia&&) noexcept = default;
+  ~EstadoInstancia();
+};
+
 class Esqueleto {
  public:
   explicit Esqueleto(std::shared_ptr<const Modelo> modelo);
@@ -120,6 +145,8 @@ class Esqueleto {
   void aplicar_rajada(const TimelineRajada& tl, double de, double ate);
   void aplicar_deformar(const TimelineDeformar& tl, double t, double alfa, Mistura mist);
   void aplicar_ordem(const TimelineOrdem& tl, double t, Mistura mist, bool sai);
+  // a instancia passa a tocar o que a chave em vigor pede (degrau; `sai`: nao mexe)
+  void aplicar_instancia(const TimelineInstancia& ti, double t, Mistura mist, bool sai);
   void aplicar_restricao(const TimelineRestricao& tl, double t, double alfa, Mistura mist, bool sai);
   // a parte que a timeline `parte` pede no tempo t (-1 esconde); `antes`: t antes da primeira chave
   int parte_no_tempo(const TimelineParte& tl, double t, bool* antes) const;
@@ -136,8 +163,8 @@ class Esqueleto {
   // a parte com o nome dado para o slot, na skin ativa ou na default (-1 se nao ha)
   int parte(int slot, std::string_view nome) const;
   std::vector<int>& ordem_desenho() { return ordem_; }
-  // avanca o relogio do esqueleto (a fisica integra pelo relogio)
-  void avancar(double dt) { relogio_ = f32(relogio_ + dt); }
+  // avanca o relogio do esqueleto (a fisica integra pelo relogio); o das instancias anda junto
+  void avancar(double dt);
   // relogio em float32: o relogio, o que a fisica acumula e os passos dela arredondados a
   // float a cada conta, como um runtime que guarda o tempo em float (o oraculo usa double;
   // docs/NUCLEO.md "Relogio")
@@ -153,6 +180,12 @@ class Esqueleto {
   int skin() const { return skin_; }
 
   std::vector<Local> local;
+  // instancias (docs/NUCLEO.md "Instancias"): a matriz que leva os ossos raiz para o mundo do
+  // pai (o osso da instancia vezes a posicao dela); sem base, os raiz ficam no mundo
+  Matriz base;
+  bool tem_base = false;
+  std::vector<EstadoInstancia>& instancias() { return inst_; }
+  const std::vector<EstadoInstancia>& instancias() const { return inst_; }
   const std::vector<Matriz>& mundo() const { return mundo_; }
   const std::vector<EstadoSlot>& slots() const { return slots_; }
   const std::vector<int>& ordem() const { return ordem_; }
@@ -187,7 +220,10 @@ class Esqueleto {
   std::vector<EstadoEmissor> emis_;
   std::vector<std::array<float, CANAIS_LUZ>> luzes_;
   float ambiente_[CANAIS_AMBIENTE] = {1, 1, 1, 1, 1};
+  std::vector<EstadoInstancia> inst_;
   void luzes_setup();
+  void instancias_setup();
+  void atualizar_instancias();
   // aplicar() sem Estado: a animacao e o tempo da ultima vez (para as rajadas)
   int ultima_anim_ = -1;
   double ultimo_tempo_ = 0;

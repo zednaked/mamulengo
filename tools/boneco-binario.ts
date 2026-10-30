@@ -5,9 +5,9 @@
 //
 //   npx tsx tools/boneco-binario.ts [pastas...] [--nucleo nucleo/build]
 //   (padrao: tests/boneco tests/nucleo exemplos)
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { brotliCompressSync, gzipSync, constants } from "node:zlib";
 
@@ -32,9 +32,16 @@ let falhas = 0;
 const tot = { texto: 0, bin: 0, gz: [0, 0], br: [0, 0], ms: [0, 0] };
 console.log("arquivo | texto KB | binario KB | gzip texto / binario | brotli texto / binario | carga ms texto / binario");
 try {
-  for (const arq of pastas.flatMap(achar).sort()) {
-    const bin = join(tmp, basename(arq));
-    roda("nucleo-binario", [arq, bin]);
+  // todos em binario antes de comparar, nos mesmos caminhos relativos (o pai binario acha o
+  // filho binario das instancias onde o texto acha o dele)
+  const arquivos = pastas.flatMap(achar).sort();
+  const binDe = (arq: string) => join(tmp, relative(process.cwd(), resolve(arq)));
+  for (const arq of arquivos) {
+    mkdirSync(dirname(binDe(arq)), { recursive: true });
+    roda("nucleo-binario", [arq, binDe(arq)]);
+  }
+  for (const arq of arquivos) {
+    const bin = binDe(arq);
     const [t, b] = [readFileSync(arq), readFileSync(bin)];
     // as animacoes e 7 instantes de cada, ate o fim da mais longa
     const j = JSON.parse(t.toString("utf8"));

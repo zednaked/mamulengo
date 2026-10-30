@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   ss << f.rdbuf();
   const std::string texto = ss.str();
   std::string erro;
-  auto modelo = ler_boneco(texto, &erro);
+  auto modelo = ler_boneco(texto, argv[1], abrir_do_disco(), &erro);
   if (!modelo) {
     std::fprintf(stderr, "%s: %s\n", argv[1], erro.c_str());
     return 1;

@@ -16,8 +16,9 @@ export const Target = z
     z.object({ particles: z.string() }),
     z.object({ light: z.string() }),
     z.object({ ambient: z.literal(true) }),
+    z.object({ instance: z.string() }),
   ])
-  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}}, {"particles":"faiscas"} (rate, burst), {"light":"chave"} (timeline light: color, strength, radius, height) ou {"ambient":true} (timeline ambient: color, strength)');
+  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}}, {"particles":"faiscas"} (rate, burst), {"light":"chave"} (timeline light: color, strength, radius, height), {"ambient":true} (timeline ambient: color, strength) ou {"instance":"letra_0"} (timeline instance: animation, start, speed, loop)');
 export type Target = z.infer<typeof Target>;
 
 export const TIMELINE_NAMES = {
@@ -66,6 +67,12 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
   if ("ambient" in target) {
     if (timeline !== "ambient") throw new Error(`timeline da luz ambiente: ambient (color, strength)`);
     return { path: [...base, "ambient"], kind: "ambient" };
+  }
+  // instancias (so do Mamulengo; docs/NUCLEO.md "Instancias"): chaves em degrau
+  if ("instance" in target) {
+    if (!(doc as any).instances?.some((x: any) => x.name === target.instance)) throw new Error(`instancia nao existe: "${target.instance}"`);
+    if (timeline !== "instance") throw new Error(`timeline de instancia: instance (animation, start, speed, loop)`);
+    return { path: [...base, "instances", target.instance], kind: "instance" };
   }
   if ("particles" in target) {
     if (!(doc as any).particles?.some((p: any) => p.name === target.particles)) throw new Error(`emissor de particulas nao existe: "${target.particles}"`);
@@ -201,6 +208,12 @@ export function keyFields(kind: string, a: Record<string, any>): Record<string, 
   }
   if (kind === "sequence") {
     for (const f of ["mode", "index", "delay"]) if (a[f] !== undefined) out[f] = a[f];
+    return out;
+  }
+  if (kind === "instance") {
+    if (a.animation !== undefined) out.animation = a.animation;
+    for (const f of ["start", "speed"]) if (a[f] !== undefined) out[f] = round(a[f]);
+    if (a.loop !== undefined) out.loop = a.loop;
     return out;
   }
   if (kind === "reset") return out;

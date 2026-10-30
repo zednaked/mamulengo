@@ -47,6 +47,7 @@ defineCommand({
     for (const [an] of anims(e)) renameKey(e, ["animations", an, "bones"], p.bone, p.to);
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.bone === p.bone && e.set(["particles", k, "bone"], p.to));
     ((e.json as any).lights ?? []).forEach((l: any, k: number) => l.bone === p.bone && e.set(["lights", k, "bone"], p.to));
+    ((e.json as any).instances ?? []).forEach((x: any, k: number) => x.bone === p.bone && e.set(["instances", k, "bone"], p.to));
     return { renamed: p.to };
   },
 });
@@ -105,6 +106,7 @@ defineCommand({
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("particles.delete", { name: em.name });
     // luzes presas neles
     for (const l of ((e.json as any).lights ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("light.delete", { name: l.name });
+    for (const x of ((e.json as any).instances ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("instance.delete", { name: x.name });
     // constraints que dependem deles
     for (const { c } of allC(e).filter(({ c }) => dead.has(c.target) || dead.has(c.source) || dead.has(c.bone) || c.bones?.some((b: string) => dead.has(b))))
       ctx.run("constraint.delete", { name: c.name });
@@ -151,6 +153,7 @@ defineCommand({
       renameKey(e, ["animations", an, "effects"], p.slot, p.to);
     }
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.slot === p.slot && e.set(["particles", k, "slot"], p.to));
+    ((e.json as any).instances ?? []).forEach((x: any, k: number) => x.slot === p.slot && e.set(["instances", k, "slot"], p.to));
     for (const [an, a] of anims(e)) {
       for (const skin of Object.keys(a.attachments ?? {})) renameKey(e, ["animations", an, "attachments", skin], p.slot, p.to);
       (a.drawOrder ?? []).forEach((k: any, ki: number) =>
@@ -177,6 +180,7 @@ defineCommand({
           if (a.type === "clipping" && a.end === p.slot && slot !== p.slot) throw new Error(`a mascara ${slot}/${name} termina neste slot; mude o end antes`);
     for (const { c, type } of allC(e)) if (type === "path" && (c.slot ?? c.target) === p.slot) ctx.run("constraint.delete", { name: c.name });
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("particles.delete", { name: em.name });
+    for (const x of ((e.json as any).instances ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("instance.delete", { name: x.name });
     // ordem de desenho: decodifica com a ordem antiga, tira o slot, recodifica
     const after = before.filter((n) => n !== p.slot);
     for (const [an, a] of anims(e))

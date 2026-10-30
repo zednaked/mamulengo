@@ -549,6 +549,60 @@ a cor do slot e a intensidade; o giro, `giro[0] + (giro[1] - giro[0]) s2` graus 
 o relógio. Com `z < 0` desenha logo depois do slot `atras`; senão, logo depois do `slot`.
 `posicoes_orbita` (`desenho.h`) dá as posições, que o desenho usa.
 
+## Instâncias
+
+Um `.boneco` dentro de outro: o que se repete (uma letra, um vagalume, uma multidão) fica num
+arquivo só e a cena só posiciona e comanda as cópias. Ficam numa lista própria, `instancias`,
+fora das skins (como as partículas); a exportação para o Spine as tira e avisa.
+
+| campo | padrão | o quê |
+|---|---|---|
+| `nome`, `slot`, `boneco` | (obrigatórios) | o slot dá o lugar na ordem de desenho (logo depois da parte dele, antes das partículas), a cor e os efeitos; `boneco` é o arquivo do filho, relativo ao do pai |
+| `osso` | o osso do slot | onde a instância fica; `x`, `y`, `rotacao`, `escala_x`, `escala_y` (0, 0, 0, 1, 1) a posicionam no osso |
+| `animacao` | (nenhuma: a pose de setup) | a animação do filho |
+| `skin` | a default | a skin do filho |
+| `inicio`, `velocidade` | 0, 1 | o tempo do filho: `inicio + velocidade × relógio` |
+| `repetir` | true | sem repetir, o filho para no fim (e antes do 0 fica no 0) |
+
+**Leitura.** Cada arquivo é lido uma vez e o modelo dele é dividido entre todas as instâncias
+(também entre pais diferentes). Um filho pode ter instâncias (os caminhos são sempre relativos ao
+arquivo que os escreve); um filho que inclui um ancestral é recusado (ciclo). O leitor abre os
+filhos por uma função (`ler_boneco(texto, caminho, abrir, erro)`): o disco nas ferramentas, a
+memória na web (`mm_arquivo` antes de `mm_carregar_de`), o `FileAccess` no Godot. As páginas do
+desenho são as do pai e depois as de cada filho (`paginas_desenho`), com o caminho relativo ao pai.
+
+**Timeline:** `animacoes.<a>.instancias.<nome>`: chaves em degrau com `tempo` e qualquer de
+`animacao`, `inicio`, `velocidade`, `repetir` (o que falta vem da chave anterior; na primeira, da
+instância). Da chave `k` em diante o tempo do filho é `inicio + velocidade × (t − tempo_k)`, com
+`t` o tempo da animação do pai; antes da primeira chave vale a instância, com o relógio. A chave
+manda só na animação que entra ou toca (não na que sai num mix). Para a troca não dar salto, as
+animações do filho podem começar e acabar na mesma pose (o filho não mistura animações).
+
+**Atualização** (no fim do `atualizar_mundo` do pai, depois das partículas), para cada instância
+com o alfa do slot acima de 0: a base `B = M_osso × T(x, y) × R(rotacao) × S(escala_x, escala_y)`;
+o tempo do filho (acima), no laço (`fmod`, positivo) ou limitado a `[0, duração]`; o filho volta
+ao setup e aplica a animação nesse tempo e calcula o mundo, com os ossos raiz multiplicados por
+`B`. O relógio do filho anda com o do pai vezes a `velocidade` (física, partículas, borrar e rastro
+do filho contam nele). Escondida (alfa 0), a instância não é calculada; um filho sem memória (sem
+física, partículas, borrar, rastro nem instâncias) no mesmo instante, com a mesma animação e a
+mesma base, não é refeito.
+
+**Desenho.** O filho entra no mesmo desenho do pai, depois da parte do slot: os lotes dele usam as
+páginas dele na tabela do pai; a cor do slot multiplica todos os vértices que ele desenhou (cada
+nível pela do slot dele, então aninhar multiplica); os efeitos de shader do slot (linha, brilho,
+dissolver, tingir) valem para cada peça do filho que não tem efeitos próprios; a luz é a do pai
+(o grupo de luz do pai ilumina as páginas com relevo do filho; sem grupo no pai, o filho usa as
+luzes dele). Com o recorte na CPU, o recorte do pai não corta o filho.
+
+Conferência: `npx tsx tools/nucleo-instancias.ts` refaz, por instante, a animação e o tempo de
+cada instância de `tests/nucleo/instancias/instancias.boneco` (quatro instâncias do robô CC0:
+livre no relógio, trocando de animação por chaves, uma que some e um arquivo intermediário com
+mais duas, aninhado) e o mundo de cada osso do filho (o filho sozinho no `nucleo-pose`, vezes a
+base), e compara com o que o núcleo calculou. No `nucleo-pose`, a saída ganha `relogio` e
+`instancias` (por instância visível: `animacao`, `tempo` e a pose do filho, recursiva). O
+desenho foi olhado no editor (modo núcleo) e no Godot 4.7.2 com `exemplos/vinheta` (nove letras e
+uma marionete por instâncias): o mesmo nos dois.
+
 ## Estado
 
 `mamulengo/estado.h`: trilhas, fila, mix e eventos (o que o jogo usa para tocar, emendar e

@@ -1,5 +1,7 @@
 # Mamulengo
 
+![A abertura do Mamulengo: uma marionete vem do fundo e quica nos fios, as letras do nome vêm para a tela uma a uma, um raio desce pelos fios e a câmera mergulha na cabeça da marionete](exemplos/vinheta/vinheta.gif)
+
 **[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
 
 ![Um robô, um zumbi e um monstro, rigados e animados pelo Claude Code no Mamulengo](docs/media/elenco.webp)
@@ -98,6 +100,11 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   corpo.
 - **Giro em 2,5D:** `deform.turn` gira uma malha como um cilindro, e a cabeça olha
   para o lado com as orelhas rígidas.
+- **Instâncias, um `.boneco` dentro de outro:** o que se repete fica num arquivo
+  só, e a cena só posiciona as cópias e diz a cada uma o que tocar e quando, numa
+  timeline de poucas chaves. O filho é lido uma vez e dividido, a instância
+  escondida nem é calculada, e os filhos desenham no mesmo desenho do pai, com a
+  cor e os efeitos do slot e as luzes do pai. Aninham.
 
 ![O robô olhando em 2,5D, voando com jatos, brilho e um anel de estrelas, dissolvendo os braços e soltando um raio entre as mãos](exemplos/vitrine/vitrine.gif)
 
@@ -105,6 +112,11 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
 laço de 8,6 s. Exportado pelo editor, com moldura e legendas.*
 
 ![O zumbi CC0 numa noite: um vagalume dá a volta nele, pela frente e por trás, a cabeça gira em 2,5D atrás dele, a luz troca de lado e vira contraluz, e ele pousa no nariz](exemplos/vagalume/vagalume.gif)
+
+*[exemplos/vinheta](exemplos/vinheta), a abertura do topo desta página: uma
+cena feita de instâncias, nove de uma letra e uma da marionete do ícone, com
+quatro chaves na timeline de cada letra. Uns 7 µs de pose e 8 µs de desenho
+por quadro.*
 
 *[exemplos/vagalume](exemplos/vagalume): 2,5D, luz e profundidade juntos. O
 vagalume dá a volta no zumbi pela frente e por trás; a luz dele segue a

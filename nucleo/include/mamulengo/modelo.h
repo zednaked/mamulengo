@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -319,6 +320,28 @@ struct TimelineLuz {
   Timeline tl;
 };
 
+// ---- instancias (docs/NUCLEO.md "Instancias"): um .boneco dentro de outro, preso a um slot
+// (lugar na ordem de desenho, cor e efeitos) e a um osso (posicao). O modelo do filho e lido uma
+// vez e dividido entre todas as instancias dele
+struct DadosInstancia {
+  std::string nome;
+  int slot = -1, osso = -1;
+  double x = 0, y = 0, rotacao = 0, escala_x = 1, escala_y = 1;  // no osso
+  int filho = -1;        // indice em Modelo::filhos
+  int animacao = -1;     // do filho; -1: a pose de setup dele
+  int skin = 0;          // do filho
+  double inicio = 0, velocidade = 1;  // tempo do filho = inicio + velocidade * relogio
+  bool laco = true;      // "repetir": sem repetir, o filho para no fim
+};
+// timeline de uma instancia: chaves em degrau que trocam animacao, inicio, velocidade e repetir; da
+// chave em diante o tempo do filho e inicio + velocidade * (tempo - tempo da chave)
+struct TimelineInstancia {
+  int instancia;
+  std::vector<double> tempos;
+  std::vector<int> animacoes;  // do filho; -1: setup
+  std::vector<double> inicios, velocidades;
+  std::vector<uint8_t> lacos;
+};
 struct TimelineRajada {
   int emissor;
   std::vector<double> tempos;
@@ -395,6 +418,7 @@ struct Animacao {
   std::vector<TimelineOrdem> ordem;  // 0 ou 1
   std::vector<TimelineRestricao> restricoes;
   std::vector<ChaveEvento> eventos;  // em ordem de tempo
+  std::vector<TimelineInstancia> instancias;
 };
 
 // mix do .boneco: o tempo de emenda de uma animacao para outra (`pares`), ou o padrao
@@ -428,6 +452,18 @@ struct Modelo {
   std::vector<std::vector<int>> emissores_do_slot;  // por slot, os emissores que desenham nele
   std::vector<std::vector<int>> orbitas_atras;      // por slot, as orbitas cujas de tras desenham nele
   std::vector<Animacao> animacoes;
+  // instancias: os modelos filhos (um por arquivo, divididos), as instancias e, por slot, as que
+  // desenham nele
+  std::vector<std::shared_ptr<const Modelo>> filhos;
+  std::vector<DadosInstancia> instancias;
+  std::vector<std::vector<int>> instancias_do_slot;
+  // as paginas do desenho: as deste modelo e, depois, as de cada filho (com o caminho relativo a
+  // este arquivo); o lote de um filho usa a pagina dele mais filho_pagina_base[filho]
+  std::vector<Pagina> paginas_desenho;
+  std::vector<int> filho_pagina_base;
+  // sem fisica, particulas, borrar, rastro nem instancias: a pose so depende da animacao e do
+  // tempo (uma instancia dele parada no mesmo instante nao precisa ser recalculada)
+  bool sem_memoria = true;
   std::vector<std::string> nomes_partes;  // id -> nome
   std::vector<DadosEvento> eventos;
   double mix_padrao = 0;
@@ -438,14 +474,24 @@ struct Modelo {
   int animacao(std::string_view nome) const;
   int id_parte(std::string_view nome) const;
   int evento(std::string_view nome) const;
+  int instancia(std::string_view nome) const;
   // mix de `de` para `para` (indices de animacao; -1 e a vazia): o par, ou o padrao
   double mix(int de, int para) const;
   // parte (indice em `partes`) do slot com o nome dado, procurando na skin e na default
   int parte_de(int skin, int slot, int id_nome) const;
 };
 
-// Le um .boneco ja carregado em memoria. Em erro devolve nullptr e preenche `erro`.
+// Le um .boneco ja carregado em memoria. Em erro devolve nullptr e preenche `erro`. Sem
+// `abrir`, um .boneco com instancias da erro.
 std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string* erro);
+// Com instancias: `abrir(caminho, texto)` le o arquivo de um filho (caminho relativo ao
+// diretorio de `caminho`, ja normalizado, com '/') e devolve false se nao ha. Cada arquivo e
+// lido uma vez; um filho que inclui um ancestral da erro.
+using AbrirArquivo = std::function<bool(const std::string& caminho, std::string& texto)>;
+std::shared_ptr<const Modelo> ler_boneco(std::string_view texto, std::string_view caminho, const AbrirArquivo& abrir, std::string* erro);
+// "a/b/../c.boneco" -> "a/c.boneco"; o diretorio de um caminho ("a/b.boneco" -> "a/")
+std::string normalizar_caminho(std::string_view c);
+std::string diretorio(std::string_view c);
 
 // Le uma animacao (o objeto dela em `animacoes` do .boneco) e troca a de mesmo nome do modelo,
 // ou acrescenta no fim. Em erro devolve false, preenche `erro` e nao muda o modelo. Quem usa o

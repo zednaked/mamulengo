@@ -1,0 +1,24 @@
+{
+ "boneco": 0,
+ "nome": "meio",
+ "esqueleto": {"versao_spine": "4.3.23"},
+ "ossos": [
+  {"nome": "root"},
+  {"nome": "base", "pai": "root", "x": -60},
+  {"nome": "base2", "pai": "root", "x": 60, "rotacao": 15}
+ ],
+ "slots": [
+  {"nome": "a", "osso": "base"},
+  {"nome": "b", "osso": "base2"}
+ ],
+ "skins": [{"nome": "default", "partes": {}}],
+ "instancias": [
+  {"nome": "r1", "slot": "a", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle"},
+  {"nome": "r2", "slot": "b", "boneco": "../../boneco/robo/robo.boneco", "animacao": "ganhou", "inicio": 0.5, "escala_x": 0.8, "escala_y": 0.8}
+ ],
+ "animacoes": {
+  "vai": {
+   "ossos": {"base": {"girar": [{"tempo": 0, "valor": 0}, {"tempo": 1.5, "valor": -30}]}}
+  }
+ }
+}

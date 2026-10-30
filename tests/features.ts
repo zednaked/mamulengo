@@ -467,6 +467,45 @@ runtimeOk("constraints");
     );
     await run("animation.delete", { name: "t.luzes" });
   }
+
+  // instancias: instance.set cria e muda, key.set (chave em degrau com animacao, inicio,
+  // velocidade, repetir), renomear o slot e o osso acompanha, instance.rename leva as timelines,
+  // instance.delete tambem; a ida e volta pelo .boneco guarda tudo e o spine-core segue lendo
+  {
+    const osso = doc.json.bones[1].name;
+    const slot = doc.json.slots[0].name;
+    await run("instance.set", { name: "t.inst", slot, boneco: "filho.boneco", animation: "anda", x: 12, scaleX: 0.5 });
+    await run("instance.set", { name: "t.inst", bone: osso, loop: false, start: 0.25 });
+    await run("animation.create", { name: "t.inst" });
+    await run("key.set", { anim: "t.inst", target: { instance: "t.inst" }, timeline: "instance", time: 0.5, animation: "pula", start: 0, speed: 2 });
+    const ki = structuredClone(doc.json.animations["t.inst"].instances["t.inst"][0]);
+    const inst = structuredClone(doc.json.instances[0]);
+    const { exportarSpine, importarSpine } = await import("../src/boneco/spine.ts");
+    const b = importarSpine(structuredClone(doc.json), atlasText, "t");
+    const volta = exportarSpine(b).json;
+    const idaVolta = JSON.stringify(volta.instances) === JSON.stringify(doc.json.instances) && b.instancias[0].repetir === false && b.animacoes["t.inst"].instancias["t.inst"][0].velocidade === 2;
+    await run("slot.rename", { slot, to: "t.slot" });
+    await run("bone.rename", { bone: osso, to: "t.osso" });
+    const seguiu = doc.json.instances[0].slot === "t.slot" && doc.json.instances[0].bone === "t.osso";
+    await run("bone.rename", { bone: "t.osso", to: osso });
+    await run("slot.rename", { slot: "t.slot", to: slot });
+    await run("instance.rename", { name: "t.inst", to: "t.outra" });
+    const renomeou = !!doc.json.animations["t.inst"].instances["t.outra"];
+    let erroSpine = "";
+    try {
+      const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))).readSkeletonData(structuredClone(doc.json));
+    } catch (err: any) {
+      erroSpine = String(err?.message ?? err);
+    }
+    await run("instance.delete", { name: "t.outra" });
+    const limpo = !doc.json.instances && !doc.json.animations["t.inst"].instances;
+    check(
+      inst.bone === osso && inst.loop === false && inst.start === 0.25 && inst.scaleX === 0.5 && ki.animation === "pula" && ki.speed === 2 && ki.start === 0 && idaVolta && seguiu && renomeou && limpo && !erroSpine,
+      `instancias: instance.set, key.set (instance), ida e volta, slot e osso renomeados, instance.rename, instance.delete ${JSON.stringify({ inst, ki })}${erroSpine ? ` (spine-core: ${erroSpine})` : ""}`,
+    );
+    await run("animation.delete", { name: "t.inst" });
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

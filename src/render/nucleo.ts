@@ -99,14 +99,38 @@ export class NucleoCena {
     this.anims = new Map(this.info.animacoes.map((a, i) => [a.nome, i]));
   }
 
+  // instancias (docs/NUCLEO.md "Instancias"): o texto de um arquivo que elas pedem, pelo caminho
+  // normalizado (o leitor pede os filhos ja assim)
+  registrarArquivo(caminho: string, texto: string) {
+    const N = this.N;
+    const c = N.stringToNewUTF8(caminho);
+    const t = N.stringToNewUTF8(texto);
+    N._mm_arquivo(c, t);
+    N._free(c);
+    N._free(t);
+  }
+
+  // as paginas do desenho (as dos filhos das instancias inclusive) ainda sem textura
+  paginasSemTextura(): string[] {
+    const faltam = new Set<string>();
+    for (const p of this.info?.paginas ?? []) {
+      if (!this.texturas.has(p.arquivo)) faltam.add(p.arquivo);
+      if (p.relevo && !this.texturas.has(p.relevo)) faltam.add(p.relevo);
+    }
+    return [...faltam];
+  }
+
   // Le o documento (JSON do Spine e atlas texto) como .boneco; troca o modelo e as instancias.
-  carregar(json: any, atlas: string, nome: string) {
+  // `caminho`: o do arquivo, para as instancias acharem os filhos (registrarArquivo)
+  carregar(json: any, atlas: string, nome: string, caminho = "") {
     const N = this.N;
     const t0 = performance.now();
     const b = importarSpine(json, atlas, nome);
     const p = N.stringToNewUTF8(JSON.stringify(b));
-    const m = N._mm_carregar(p);
+    const c = N.stringToNewUTF8(caminho);
+    const m = N._mm_carregar_de(p, c);
     N._free(p);
+    N._free(c);
     if (m < 0) throw new Error(N.UTF8ToString(N._mm_erro()));
     if (this.modelo >= 0) N._mm_liberar_modelo(this.modelo);
     this.modelo = m;
@@ -595,3 +619,18 @@ export class NucleoPose implements PoseView {
     return [x0, y0, x1 - x0, y1 - y0];
   }
 }
+
+// caminhos como o leitor do nucleo (normalizar_caminho, diretorio): "a/b/../c" -> "a/c"
+export function normalizarCaminho(c: string): string {
+  const abs = c.startsWith("/");
+  const out: string[] = [];
+  for (const p of c.split("/")) {
+    if (p === "..") {
+      if (out.length && out[out.length - 1] !== "..") out.pop();
+      else if (!abs) out.push("..");
+    } else if (p && p !== ".") out.push(p);
+  }
+  return (abs ? "/" : "") + out.join("/") + (c.endsWith("/") && out.length ? "/" : "");
+}
+export const diretorio = (c: string) => c.slice(0, c.lastIndexOf("/") + 1);
+
