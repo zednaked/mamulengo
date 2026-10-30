@@ -336,10 +336,19 @@ for (const t of T) {
   particulas.faiscas_atras.taxa.push({ tempo: t, valor: lado === "atras" ? 22 : 0, curva: "degrau" });
 }
 
-b.animacoes = { vagalume: { ossos, slots, luzes, particulas }, idle: b.animacoes.idle, anda: b.animacoes.anda };
+// a ordem de desenho: na tentativa de pegar, os bracos e as maos passam na frente da cabeca (ela
+// vai para logo depois do corpo), e voltam para tras quando o vagalume pousa
+const ordem_desenho = [
+  { tempo: 0 },
+  { tempo: 3.55, deslocamentos: [{ slot: "cabeca", deslocamento: -4 }] },
+  { tempo: 5.15 },
+];
+
+b.animacoes = { vagalume: { ossos, slots, luzes, particulas, ordem_desenho }, idle: b.animacoes.idle, anda: b.animacoes.anda };
 
 // ---- 2,5D com os comandos do editor: a cabeca (as tres caras) e o corpo viram malha e giram atras
-// da luz; o corpo gira menos, a cabeca puxa
+// da luz; o corpo gira menos, a cabeca puxa. Na cabeca o cilindro tem raio 40 (o rosto; a malha
+// vai de -54 a 54): as orelhas ficam fora e andam rigidas com a borda, sem esticar
 const ex = exportarSpine(b);
 const atlas = parseAtlas(ex.atlas);
 const imagens: AssetProvider = {
@@ -363,7 +372,7 @@ for (const att of CARAS) chamadas.push({ cmd: "mesh.create", args: { slot: "cabe
 chamadas.push({ cmd: "mesh.create", args: { slot: "corpo", name: "body", detail: 1.4 } });
 for (const t of amostras().filter((_, k) => k % 2 === 0)) {
   const o = olhar(t);
-  for (const att of CARAS) chamadas.push({ cmd: "deform.turn", args: { anim: "vagalume", slot: "cabeca", attachment: att, time: t, angle: r3(o.giro), perspective: 0.2, ...(o.tilt ? { tilt: r3(o.tilt) } : {}) } });
+  for (const att of CARAS) chamadas.push({ cmd: "deform.turn", args: { anim: "vagalume", slot: "cabeca", attachment: att, time: t, angle: r3(o.giro), perspective: 0.2, radius: 40, ...(o.tilt ? { tilt: r3(o.tilt) } : {}) } });
   chamadas.push({ cmd: "deform.turn", args: { anim: "vagalume", slot: "corpo", attachment: "body", time: t, angle: r3(0.4 * o.giro), perspective: 0.15 } });
 }
 await executeAsync(doc, chamadas, "gerador", "2,5D", {}, imagens);
