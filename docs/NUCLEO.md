@@ -249,7 +249,7 @@ O palco: `npm run dev` e `/palco.html` (os `.boneco` das raízes do editor). O w
 
 ## Efeitos
 
-O primeiro recurso que o Spine não tem. Cada slot pode ter cinco efeitos, todos desligados
+O primeiro recurso que o Spine não tem. Cada slot pode ter seis efeitos, todos desligados
 por padrão, com valores de setup (`efeitos` no slot) e animáveis (`efeitos` na animação, por
 slot). A exportação para o Spine tira os efeitos e avisa.
 
@@ -260,16 +260,18 @@ slot). A exportação para o Spine tira os efeitos e avisa.
 | `dissolver` | `valor` (0 a 1), `cor` da borda (`ff8000ff`), `borda` (0,05), `grao` (8: o tamanho dos pedaços, em pixels da textura) | `valor > 0` |
 | `tingir` | `cor` (`ffffffff`), `forca` (0 a 1) | `forca > 0` e alfa da cor > 0 |
 | `borrar` (smear) | `forca` (0, em segundos de movimento), `limite` (60, em pixels do mundo), `esmaecer` (0,5, de 0 a 1) | `forca > 0` e `limite > 0` |
+| `rastro` (ghosting) | `copias` (0; até 16, a parte inteira), `intervalo` (0,05 s), `alfa` (0,5, de 0 a 1) | `copias >= 1`, `intervalo > 0` e `alfa > 0` |
 
 **Timelines.** `animacoes.<a>.efeitos.<slot>.<efeito>`: chaves com `tempo`, os campos do
 efeito e `curva` (como no `rgba`: `"degrau"` ou 4 números por canal). Os canais, na ordem da
 curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda grao`;
-tingir `r g b a forca`; borrar `forca limite esmaecer`. Campo que falta na chave vale o da chave anterior (na primeira, o do
+tingir `r g b a forca`; borrar `forca limite esmaecer`; rastro `copias intervalo alfa`. Campo que falta na chave vale o da chave anterior (na primeira, o do
 setup): uma chave pode mudar só a `forca`. A mistura com o que já está
 na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `borda` entre 0 e
-1; `largura`, `raio`, as `forca` e `limite` a partir de 0; `grao` a partir de 1; `esmaecer` entre 0 e 1.
-São 26 canais: os 23 primeiros (linha, brilho, dissolver, tingir) são os de shader, que o
-desenhista recebe por lote; os 3 do borrar só mexem nos vértices e não mudam o lote.
+1; `largura`, `raio`, as `forca`, `limite`, `copias` e `intervalo` a partir de 0; `grao` a partir de 1;
+`esmaecer` e `alfa` entre 0 e 1. São 29 canais: os 23 primeiros (linha, brilho, dissolver, tingir)
+são os de shader, que o desenhista recebe por lote; os 6 do borrar e do rastro só mexem na
+geometria e não mudam o lote.
 
 **No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
 efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
@@ -342,11 +344,37 @@ Com `forca` 0,05 a traseira fica onde estava 50 ms antes, o rastro de uns três 
 fps. Como o anterior vem do quadro de verdade, o borrar segue o que o jogo faz (mix, fila,
 física, o jogo movendo ossos), não só a animação.
 
-Conferência: `npx tsx tools/nucleo-borrar.ts` refaz a conta pela especificação, com os
+Conferência do borrar: `npx tsx tools/nucleo-borrar.ts` refaz a conta pela especificação, com os
 vértices do `nucleo-pose` no instante e no passo anterior dele, em
 `tests/nucleo/borrar/borrar.boneco` (o robô CC0 com um balanço rápido, malha e regiões, um
 borrar animado e um que liga no meio), e compara com os vértices esticados e o alfa que o
 núcleo desenha.
+
+### Rastro
+
+Cópias da peça nos quadros anteriores, desenhadas por trás dela e mais fracas quanto mais
+antigas: o rastro de um golpe, de um pulo, de uma peça que gira. Usa a mesma imagem, o mesmo
+lote e o mesmo recorte da peça; cada cópia é só mais geometria.
+
+**Memória.** A cada `atualizar_mundo`, um slot com rastro ligado guarda os vértices em mundo
+(com deformar) e o relógio. Relógio novo acrescenta um quadro; o mesmo relógio troca o último;
+relógio que volta, `setup` ou rastro desligado apagam tudo. Depois de guardar, fica só o que as
+cópias podem pedir: o quadro mais novo com relógio até `agora - copias * intervalo` e os
+seguintes (com os canais daquele quadro: diminuir as cópias descarta, e voltar a aumentar não
+traz de volta).
+
+**As cópias**, no desenho, com `c` a parte inteira de `copias` (até 16) e `agora` o relógio do
+último quadro guardado: nada se há menos de dois quadros. Para `k` de `c` até 1 (da mais antiga
+para a mais nova), a cópia `k` usa o quadro guardado mais novo com relógio até
+`agora - k * intervalo` (com folga de `1e-9`); sem quadro, ou com outra quantidade de vértices
+(troca de imagem), ela não sai. O alfa da cópia é o da peça vezes `alfa * (c - k + 1) / c`. Elas
+vão antes da peça, sem os efeitos de shader e sem o borrar (que são da peça).
+
+Conferência do rastro: `npx tsx tools/nucleo-rastro.ts` refaz a memória passo a passo e as
+cópias pela especificação, com os vértices e os canais do `nucleo-pose` em cada passo, em
+`tests/nucleo/rastro/rastro.boneco` (o robô CC0 com o mesmo balanço do borrar, rastro numa malha
+e em regiões, um que liga no meio e um que diminui as cópias e volta a aumentar), e compara com
+as cópias que o núcleo desenha.
 
 ## Partículas
 

@@ -55,6 +55,7 @@ void Esqueleto::setup() {
     s.borrar_atual.clear();
     s.borrar_ant.clear();
     s.borrar_t = s.borrar_t_ant = -1;
+    s.rastro.clear();
   }
   for (size_t i = 0; i < m.emissores.size(); ++i) {
     emis_[i] = EstadoEmissor{};
@@ -229,7 +230,7 @@ float Efeitos::margem() const {
 
 void Efeitos::limitar() {
   for (int i = 0; i < CANAIS_EFEITOS; ++i) {
-    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO || i == BORRAR_FORCA || i == BORRAR_LIMITE;
+    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO || i == BORRAR_FORCA || i == BORRAR_LIMITE || i == RASTRO_COPIAS || i == RASTRO_INTERVALO;
     v[i] = std::max(v[i], i == DISSOLVER_GRAO ? 1.0f : 0.0f);
     if (!sem_teto) v[i] = std::min(v[i], 1.0f);
   }
@@ -656,6 +657,43 @@ void Esqueleto::atualizar_mundo() {
     }
     vertices(int(i), s.borrar_atual);
     s.borrar_t = relogio_;
+  }
+  // rastro: um quadro por relogio (o mesmo relogio de novo so troca o ultimo); relogio que volta
+  // apaga; fica so o que as copias ainda podem pedir (o mais novo antes de agora - copias x
+  // intervalo e os seguintes)
+  for (size_t i = 0; i < slots_.size(); ++i) {
+    EstadoSlot& s = slots_[i];
+    if (!s.efeitos.rastro()) {
+      s.rastro.clear();
+      continue;
+    }
+    auto& q = s.rastro;
+    if (!q.empty() && relogio_ < q.back().first) q.clear();
+    if (q.empty() || relogio_ > q.back().first) q.emplace_back(relogio_, std::vector<double>());
+    vertices(int(i), q.back().second);
+    const double corte = relogio_ - s.efeitos.copias() * double(s.efeitos.v[RASTRO_INTERVALO]);
+    size_t primeiro = 0;
+    while (primeiro + 1 < q.size() && q[primeiro + 1].first <= corte) ++primeiro;
+    if (primeiro) q.erase(q.begin(), q.begin() + std::ptrdiff_t(primeiro));
+  }
+}
+
+void Esqueleto::copias_rastro(int slot, size_t n, std::vector<CopiaRastro>& out) const {
+  out.clear();
+  const EstadoSlot& s = slots_[size_t(slot)];
+  if (!s.efeitos.rastro() || s.rastro.size() < 2) return;
+  const int c = s.efeitos.copias();
+  const double agora = s.rastro.back().first, intervalo = s.efeitos.v[RASTRO_INTERVALO], alfa = s.efeitos.v[RASTRO_ALFA];
+  for (int k = c; k >= 1; --k) {
+    // o quadro mais novo com relogio ate agora - k x intervalo
+    const double alvo = agora - k * intervalo;
+    const std::vector<double>* xy = nullptr;
+    for (const auto& [t, v] : s.rastro) {
+      if (t > alvo + 1e-9) break;
+      xy = &v;
+    }
+    if (!xy || xy->size() != n) continue;
+    out.push_back({xy, float(alfa * (c - k + 1) / c)});
   }
 }
 

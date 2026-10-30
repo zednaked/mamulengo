@@ -182,6 +182,9 @@ export const EFFECTS: Record<string, [string, number[]][]> = {
   // so mexe nos vertices (docs/NUCLEO.md "Borrar"): strength em segundos de movimento, limit em
   // pixels do mundo, fade de 0 a 1
   smear: [["strength", [0]], ["limit", [60]], ["fade", [0.5]]],
+  // so geometria (docs/NUCLEO.md "Rastro"): copies (0 desliga, ate 16), interval em segundos,
+  // alpha da copia mais nova (0 a 1)
+  trail: [["copies", [0]], ["interval", [0.05]], ["alpha", [0.5]]],
 };
 export const EFFECT_NAMES = Object.keys(EFFECTS);
 export const isEffect = (timeline: string) => timeline in EFFECTS;

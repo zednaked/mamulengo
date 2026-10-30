@@ -73,8 +73,8 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       escreve_num(out, c[j]);
     }
     out += ']';
-    // os efeitos (os 26 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
-    if (st.efeitos.algum() || st.efeitos.borrar()) {
+    // os efeitos (os 29 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
+    if (st.efeitos.algum() || st.efeitos.borrar() || st.efeitos.rastro()) {
       out += ",\"efeitos\":[";
       for (int j = 0; j < CANAIS_EFEITOS; ++j) {
         if (j) out += ',';
@@ -121,6 +121,29 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
     bor += ']';
   }
   if (!bor.empty()) out += ",\"borrados\":{" + bor + '}';
+  // rastro (docs/NUCLEO.md "Rastro"): de quem tem copias, da mais antiga para a mais nova, cada
+  // uma [alfa, x, y, ...]
+  std::string ras;
+  std::vector<CopiaRastro> cps;
+  for (size_t k = 0; k < e.ordem().size(); ++k) {
+    const int s = e.ordem()[k];
+    if (!e.slots()[size_t(s)].efeitos.rastro()) continue;
+    const size_t n = e.vertices(s, v);
+    e.copias_rastro(s, n, cps);
+    if (!n || cps.empty()) continue;
+    if (!ras.empty()) ras += ',';
+    escreve_texto(ras, m.slots[size_t(s)].nome);
+    ras += ":[";
+    for (size_t c = 0; c < cps.size(); ++c) {
+      if (c) ras += ',';
+      ras += '[';
+      escreve_num(ras, cps[c].alfa);
+      for (double x : *cps[c].xy) ras += ',', escreve_num(ras, x);
+      ras += ']';
+    }
+    ras += ']';
+  }
+  if (!ras.empty()) out += ",\"rastros\":{" + ras + '}';
   // particulas vivas por emissor: [x, y, rot, idade, vida] (docs/NUCLEO.md "Particulas")
   if (!m.emissores.empty()) {
     out += ",\"particulas\":{";

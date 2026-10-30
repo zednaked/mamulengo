@@ -108,9 +108,20 @@ for (const s of ["braco_e", "braco_d"]) slot(s).efeitos = { dissolver: { valor: 
 // ou devagar (o 2,5D sutil) quase nada
 const BORRAR = { forca: 0.05, limite: 45, esmaecer: 0.55 };
 for (const s of ["braco_e", "braco_d"]) slot(s).efeitos.borrar = BORRAR;
-for (const s of ["mao_e", "mao_d"]) slot(s).efeitos = { ...(slot(s).efeitos ?? {}), borrar: BORRAR };
+for (const s of ["mao_e", "mao_d"]) slot(s).efeitos = { ...(slot(s).efeitos ?? {}), borrar: BORRAR, rastro: { copias: 0, intervalo: 0.035, alfa: 0.45 } };
 
+// rastro nas maos so nas comemoracoes (parada, a copia ficaria por baixo da peca a toa): liga em
+// degrau no comeco de cada uma e desliga no fim
+const RASTRO = [
+  { tempo: 0, copias: 0, curva: "degrau" },
+  { tempo: 2.3, copias: 4, curva: "degrau" },
+  { tempo: 3.7, copias: 0, curva: "degrau" },
+  { tempo: 6.2, copias: 4, curva: "degrau" },
+  { tempo: 7.6, copias: 0, curva: "degrau" },
+];
 const efeitos = {
+  mao_e: { rastro: RASTRO },
+  mao_d: { rastro: RASTRO },
   corpo: {
     tingir: [
       { tempo: 0, forca: 0 },

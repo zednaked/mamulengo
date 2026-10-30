@@ -424,6 +424,18 @@ runtimeOk("constraints");
     await run("animation.delete", { name: "t.borrar" });
     await run("slot.effect", { slot: s0, effect: "smear", off: true });
   }
+  // rastro (trail): copias, intervalo e alfa no setup e numa chave
+  {
+    const s0 = doc.json.slots[0].name;
+    await run("slot.effect", { slot: s0, effect: "trail", copies: 4, interval: 0.04 });
+    await run("animation.create", { name: "t.rastro" });
+    await run("key.set", { anim: "t.rastro", target: { slot: s0 }, timeline: "trail", time: 0.3, copies: 6, alpha: 0.8 });
+    const tr = doc.json.slots[0].effects.trail;
+    const k = doc.json.animations["t.rastro"].effects[s0].trail[0];
+    check(tr.copies === 4 && tr.interval === 0.04 && k.copies === 6 && k.alpha === 0.8 && k.interval === 0.04, `rastro: slot.effect e key.set (${JSON.stringify(tr)} ${JSON.stringify(k)})`);
+    await run("animation.delete", { name: "t.rastro" });
+    await run("slot.effect", { slot: s0, effect: "trail", off: true });
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

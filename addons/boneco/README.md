@@ -79,9 +79,10 @@ Mamulengo tools: `npx tsx tools/boneco.ts binario hero.boneco hero.boneco`.
 
 The Godot web export sizes its canvas by the screen's pixel ratio, so on a phone a
 game made at 700 px is drawn 1080 px wide or more. On a mid-range Android phone a
-700 x 1370 game dropped 130 to 180 frames in 30 s that way, the same with
-`BonecoSprite` or the official Spine plugin (the GPU is the bottleneck, not the
-animation), and about 10 when drawn at its base size. Cap the canvas at the base size in the web preset's Head Include
+700 x 1370 game once dropped 130 to 180 frames in 30 s that way, the same with
+`BonecoSprite` or the official Spine plugin (the GPU was the bottleneck, not the
+animation), and about 10 when drawn at its base size; after a browser update the
+difference shrank to a few frames. It never costs anything visible. Cap the canvas at the base size in the web preset's Head Include
 (Export > Web > HTML), with your project's base size:
 
 ```html

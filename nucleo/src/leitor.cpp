@@ -97,8 +97,9 @@ const std::vector<CampoEfeito> CAMPOS_EFEITO[NUM_EFEITOS] = {
     {{"valor", false}, {"cor", true}, {"borda", false}, {"grao", false}},
     {{"cor", true}, {"forca", false}},
     {{"forca", false}, {"limite", false}, {"esmaecer", false}},
+    {{"copias", false}, {"intervalo", false}, {"alfa", false}},
 };
-const char* NOMES_EFEITO[NUM_EFEITOS] = {"linha", "brilho", "dissolver", "tingir", "borrar"};
+const char* NOMES_EFEITO[NUM_EFEITOS] = {"linha", "brilho", "dissolver", "tingir", "borrar", "rastro"};
 
 int tipo_efeito(std::string_view nome) {
   for (int i = 0; i < NUM_EFEITOS; ++i)

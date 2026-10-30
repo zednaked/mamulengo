@@ -532,6 +532,11 @@
      "forca": 0.05,
      "limite": 45,
      "esmaecer": 0.55
+    },
+    "rastro": {
+     "copias": 0,
+     "intervalo": 0.035,
+     "alfa": 0.45
     }
    }
   },
@@ -562,6 +567,11 @@
      "forca": 0.05,
      "limite": 45,
      "esmaecer": 0.55
+    },
+    "rastro": {
+     "copias": 0,
+     "intervalo": 0.035,
+     "alfa": 0.45
     }
    }
   },
@@ -14342,6 +14352,64 @@
     }
    },
    "efeitos": {
+    "mao_e": {
+     "rastro": [
+      {
+       "tempo": 0,
+       "copias": 0,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 2.3,
+       "copias": 4,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 3.7,
+       "copias": 0,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 6.2,
+       "copias": 4,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 7.6,
+       "copias": 0,
+       "curva": "degrau"
+      }
+     ]
+    },
+    "mao_d": {
+     "rastro": [
+      {
+       "tempo": 0,
+       "copias": 0,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 2.3,
+       "copias": 4,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 3.7,
+       "copias": 0,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 6.2,
+       "copias": 4,
+       "curva": "degrau"
+      },
+      {
+       "tempo": 7.6,
+       "copias": 0,
+       "curva": "degrau"
+      }
+     ]
+    },
     "corpo": {
      "tingir": [
       {

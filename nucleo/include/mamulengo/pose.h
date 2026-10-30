@@ -41,6 +41,15 @@ struct EstadoSlot {
   // que o mundo foi calculado (so de slot com borrar ligado; relogio -1: ainda nao ha)
   std::vector<double> borrar_atual, borrar_ant;
   double borrar_t = -1, borrar_t_ant = -1;
+  // rastro (docs/NUCLEO.md "Rastro"): os vertices em mundo dos quadros recentes, do mais antigo
+  // ao atual, com o relogio de cada um (so de slot com rastro ligado)
+  std::vector<std::pair<double, std::vector<double>>> rastro;
+};
+
+// uma copia do rastro: os vertices (x, y) e o quanto do alfa da peca ela tem
+struct CopiaRastro {
+  const std::vector<double>* xy = nullptr;
+  float alfa = 0;
 };
 
 // Como uma timeline mistura o valor dela com o que ja esta na pose, com peso `alfa`:
@@ -157,6 +166,9 @@ class Esqueleto {
   // slot agora, x e y) pela velocidade desde o relogio anterior; `esmaece`, se nao nulo, recebe
   // por vertice quanto o alfa cai (0 a 1). Devolve false se nao borrou nada
   bool borrar(int slot, double* xy, size_t n, float* esmaece) const;
+  // rastro (docs/NUCLEO.md "Rastro"): as copias do slot, da mais antiga para a mais nova (a
+  // ordem de desenho, por tras da peca), so as que tem `n` numeros (a mesma parte)
+  void copias_rastro(int slot, size_t n, std::vector<CopiaRastro>& out) const;
 
  private:
   std::shared_ptr<const Modelo> m_;

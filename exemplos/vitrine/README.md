@@ -8,12 +8,12 @@ have, in one looping animation (`vitrine`, 8.6 s):
 | time | body | features |
 |---|---|---|
 | 0.0 to 2.0 s | idle | **2.5D**: the head looks left and right (the mesh turned like a cylinder by `deform.turn`), and every part keeps a subtle turn for depth through the whole loop; **tint**: the body flashes red |
-| 2.3 to 3.6 s | celebration | **jets** under the feet (a fake-light halo, a white core, flame tongues swapped every frame, masked to come out only below the soles, with a flash and smoke on ignition), **glow** around the body, sparks from the hands, star bursts from the head and a ring of stars in **orbit** that passes behind and in front of the body; the arms and hands **smear** as they swing |
+| 2.3 to 3.6 s | celebration | **jets** under the feet (a fake-light halo, a white core, flame tongues swapped every frame, masked to come out only below the soles, with a flash and smoke on ignition), **glow** around the body, sparks from the hands, star bursts from the head and a ring of stars in **orbit** that passes behind and in front of the body; the arms and hands **smear** as they swing and the hands leave a **trail** |
 | 3.9 to 5.9 s | idle | **dissolve**: both arms break apart with an orange edge and come back |
 | 6.2 to 7.5 s | celebration | everything together, with the body tinted gold, an **outline** on the head and a **lightning** arc between the hands |
 | 7.8 to 8.6 s | idle | everything fades out and the loop starts again |
 
-Effects are per slot (outline, glow, dissolve, tint, smear); particles are emitters attached to bones
+Effects are per slot (outline, glow, dissolve, tint, smear, trail); particles are emitters attached to bones
 (sprites with color ramps, additive blend and sway for fire, or procedural lightning between two
 bones). All of them are keyed on the timeline like any other property. The format and the math are in
 [docs/NUCLEO.md](../../docs/NUCLEO.md) ("Efeitos" and "Partículas"). Exporting to Spine drops

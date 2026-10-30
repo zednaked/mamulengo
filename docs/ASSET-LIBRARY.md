@@ -54,7 +54,7 @@ animation toolkit, through its own C++ core written from scratch.
   animation_ended, animation_event (name, int, float, string) and
   before_world_transforms_change to move bones from the game
 - what Spine does not have, keyed on the timeline: per-part effects (outline, glow,
-  dissolve, tint, smear), particles attached to bones (sprites, lightning, orbit)
+  dissolve, tint, smear, trail), particles attached to bones (sprites, lightning, orbit)
   and 2.5D turns
 - one mesh per batch kept between frames: only vertices are rewritten, and pieces
   that do not move send nothing to the GPU

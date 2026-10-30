@@ -21,7 +21,6 @@ parte, partículas e giro em 2,5D.
 20 personagens posados em 0,043 ms por quadro (nativo), cerca de 5x mais rápido que o runtime que ele substitui
 102 de 102 projetos Spine 4.3 de produção vão e voltam pelo .boneco sem mudar nada
 um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
-num Android intermediário, um jogo web desenhado no tamanho base: 10 quadros perdidos em 30 s em vez de 130 a 180
 objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
 ```
 
@@ -86,6 +85,8 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   veio, e esmaece na ponta, como os quadros de smear dos desenhos animados, e volta
   sozinha quando desacelera. Segue o que o jogo faz de verdade (mix, fila, física),
   só move vértices e quase não custa na GPU.
+- **Rastro:** cópias da parte nos quadros anteriores, por trás dela e cada vez mais
+  fracas, para golpes, pulos e giros; a mesma imagem e o mesmo lote, só mais geometria.
 - **Partículas presas a ossos:** emissores de imagens com taxa e rajadas, rampa
   de cores, soma de luz e tremor (fogo, faíscas, fumaça); **raio** procedural
   entre dois ossos; um anel em **órbita** que passa por trás e pela frente do
@@ -260,12 +261,16 @@ thread principal fica esperando a GPU. A exportação web do Godot dimensiona o 
 pela densidade de pixels da tela (2,81 ali), então o jogo de 700 px é desenhado com
 1080 px de largura, mais que o dobro de pixels, sem arte para mostrar.
 
-| canvas | quadros acima de 25 ms em 30 s | p95 | thread principal |
+| canvas (29/10, densidade emulada) | quadros acima de 25 ms em 30 s | p95 | thread principal |
 |---|---|---|---|
 | densidade da tela, 1080 x 2112 | 183 / 125 / 127 | 32,6 ms | 87 a 93% |
 | **tamanho base, 720 x 1408** | **10 / 9 / 13** | **16,4 ms** | **64 a 65%** |
 
-No tamanho base a captura fica igual à da densidade da tela. A correção é um script
+No dia seguinte, depois de uma atualização do Chrome do celular, o mesmo jogo rodou liso
+mesmo na densidade da tela (15 quadros acima de 25 ms em 30 s), e a correção, já dentro do
+export de verdade, deu de 10 a 15 e uns 3 pontos a menos de thread principal. O ganho depende
+do aparelho e do navegador: o tamanho base nunca custa nada visível (a captura fica igual) e
+tira a GPU do caminho quando ela é o gargalo. A correção é um script
 no **Head Include** do preset web (Exportar > Web > HTML), sem mudar o motor nem o
 template; ponha nos dois números o tamanho base do seu projeto:
 

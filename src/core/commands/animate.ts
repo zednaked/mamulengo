@@ -92,6 +92,9 @@ const KeyValue = z
     grain: z.number().min(1).optional().describe("dissolve: tamanho dos pedacos, em pixels da textura (padrao 8)"),
     limit: z.number().min(0).optional().describe("smear: esticada maxima, em pixels do mundo (padrao 60)"),
     fade: z.number().min(0).max(1).optional().describe("smear: quanto a ponta esticada fica transparente (0 a 1, padrao 0.5)"),
+    copies: z.number().min(0).max(16).optional().describe("trail: quantas copias (0 desliga)"),
+    interval: z.number().min(0).optional().describe("trail: segundos entre uma copia e a seguinte (padrao 0.05)"),
+    alpha: z.number().min(0).max(1).optional().describe("trail: alfa da copia mais nova (0 a 1, padrao 0.5)"),
   })
   .partial();
 
@@ -103,7 +106,7 @@ defineCommand({
   params: z.object({
     anim: AnimName,
     target: Target,
-    timeline: z.string().describe("rotate, translate, scale, shear, attachment, rgba, alpha, deform, ...; efeitos do slot (so .boneco): outline {color, width}, glow {color, strength, radius}, dissolve {value 0-1, color, edge}, tint {color, strength 0-1}"),
+    timeline: z.string().describe("rotate, translate, scale, shear, attachment, rgba, alpha, deform, ...; efeitos do slot (so .boneco): outline {color, width}, glow {color, strength, radius}, dissolve {value 0-1, color, edge, grain}, tint {color, strength 0-1}, smear {strength, limit, fade}, trail {copies, interval, alpha}"),
     time: z.number().min(0).describe("segundos"),
     curve: CurveArg.optional(),
     space: z.enum(["parent", "world"]).default("parent").describe("translate: x/y no espaco do pai (padrao) ou na tela (world)"),

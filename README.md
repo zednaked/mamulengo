@@ -20,7 +20,6 @@ and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 20 characters posed in 0.043 ms a frame (native), about 5x faster than the runtime it replaces
 102 of 102 production Spine 4.3 projects round-trip through .boneco unchanged
 a slot game on staging runs on the core: 1 wasm instead of 3
-on a mid-range Android phone, a web game drawn at its base size: 10 dropped frames in 30 s instead of 130 to 180
 GPU objects created per frame in that game: 160 before, 0.3 now
 ```
 
@@ -86,6 +85,8 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   at the tail, like the smear frames of cartoons, and settles by itself when it
   slows down. It follows what the game really does (mixes, queues, physics), only
   moves vertices and costs next to nothing on the GPU.
+- **Trail:** fading copies of a part from the frames before, behind it, for punches,
+  jumps and spins; the same image and batch, just more geometry.
 - **Particles attached to bones:** sprite emitters with rate and bursts, color
   ramps, additive blend and sway (fire, sparks, smoke); procedural **lightning**
   between two bones; a ring in **orbit** that passes behind and in front of the
@@ -260,12 +261,16 @@ from the animation. The core and the official Spine plugin drop the same frames,
 canvas by the screen's pixel ratio (2.81 there), so the 700 px game is drawn 1080 px
 wide, more than twice the pixels, with no art to show for it.
 
-| canvas | frames over 25 ms in 30 s | p95 | main thread |
+| canvas (Oct 29, density emulated) | frames over 25 ms in 30 s | p95 | main thread |
 |---|---|---|---|
 | screen density, 1080 x 2112 | 183 / 125 / 127 | 32.6 ms | 87 to 93% |
 | **base size, 720 x 1408** | **10 / 9 / 13** | **16.4 ms** | **64 to 65%** |
 
-At the base size the capture looks the same as at the screen's density. The fix is a
+The next day, after the phone's Chrome updated, the same game ran smoothly even at the
+screen's density (15 frames over 25 ms in 30 s), and the fix, now inside the real export,
+gave 10 to 15 and about 3 points less of the main thread. So the gain depends on the device
+and the browser: the base size never costs anything you can see (the capture looks the same)
+and it takes the GPU out of the way when it is the bottleneck. The fix is a
 script in the web preset's **Head Include** (Export > Web > HTML), no engine or
 template change; set the two numbers to your project's base size:
 

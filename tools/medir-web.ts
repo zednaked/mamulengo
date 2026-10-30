@@ -101,6 +101,8 @@ const SONDA = `(() => {
 
 const { targetId } = await send("Target.createTarget", { url: "about:blank" });
 const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
+// no celular a aba que nao esta na frente fica congelada: traz a da medida para a frente
+await send("Target.activateTarget", { targetId });
 await send("Page.enable", {}, sessionId);
 await send("Runtime.enable", {}, sessionId);
 await send("Page.addScriptToEvaluateOnNewDocument", { source: SONDA }, sessionId);

@@ -26,8 +26,25 @@ nitidez: a arte é do tamanho base.
 | **a do tamanho base (1,875)** | **720 x 1408** | **10 / 9 / 13** | **16,4 ms** | **64 a 65%** |
 | 1 | 384 x 751 | 7 | 16,4 ms | 60% |
 
-Rodadas alternadas, densidade emulada pelo DevTools (`--dpr` do medidor, abaixo). No tamanho base a
-captura fica igual à da densidade da tela, texto e bordas incluídos.
+Rodadas alternadas em 29/10, densidade emulada pelo DevTools (`--dpr` do medidor, abaixo). No
+tamanho base a captura fica igual à da densidade da tela, texto e bordas incluídos.
+
+## No dia seguinte (30/10)
+
+O Chrome do celular se atualizou (156.0.8078.47 para 156.0.8078.79) e a medida mudou. Com o
+trecho abaixo já dentro do export (não emulado), em rodadas alternadas, pelo `medir-web.ts` e
+pelo medidor da primeira série:
+
+| canvas | quadros acima de 25 ms em 30 s | p95 | thread principal |
+|---|---|---|---|
+| a da tela, 1080 x 2112 | 20 / 19 / 15 / 15 / 15 | 16,4 ms | 74% |
+| o tamanho base, 700 x 1370 (trecho) | 17 / 18 / 17 / 10 / 15 | 16,4 ms | 67 a 71% |
+
+Sem a correção o jogo já não perdia quadro como no dia anterior; com ela, uns 3 pontos a menos
+de thread principal. Não dá para dizer com certeza que foi o navegador (pode ter sido o estado
+do aparelho), mas a conclusão vale para os dois casos: o ganho depende do aparelho e do
+navegador, e o tamanho base nunca custa nada visível. Vale como seguro para aparelhos em que
+a GPU é o gargalo.
 
 ## A correção
 

@@ -74,6 +74,15 @@
         { k: "fade", label: "esmaecer", max: 1, step: 0.05 },
       ],
     },
+    trail: {
+      nome: "rastro",
+      dica: "copias dos quadros anteriores por tras da imagem, mais fracas quanto mais antigas",
+      campos: [
+        { k: "copies", label: "copias", max: 16, step: 1 },
+        { k: "interval", label: "intervalo (s)", max: 0.2, step: 0.005 },
+        { k: "alpha", label: "alfa", max: 1, step: 0.05 },
+      ],
+    },
   };
   const ehBoneco = $derived(!!app.asset?.tres?.endsWith(".boneco"));
   const efeitos = $derived.by(() => {
@@ -94,7 +103,7 @@
     } else app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, [campo]: valor } }, `${EFEITOS[n].nome} ${slot.name}`, `ef-${n}-${slot.name}`);
   }
   // ligar um efeito: no setup com um valor que ja aparece (o padrao deixa desligado)
-  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 } };
+  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 }, trail: { copies: 4 } };
   function ligar(n: string) {
     if (!slot || !n) return;
     app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`);

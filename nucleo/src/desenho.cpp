@@ -223,6 +223,8 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   const Modelo& m = e.modelo();
   std::vector<double> mundo;
   std::vector<float> esmaece;  // borrar: quanto o alfa de cada vertice cai
+  std::vector<CopiaRastro> copias;  // rastro
+  std::vector<double> copia;
   std::vector<std::vector<P2>> recorte;  // pedacos convexos do recorte aberto (modo cpu)
   std::vector<double> caixas;            // por pedaco: x0, y0, x1, y1
   std::vector<uint8_t> dentro_v;         // por vertice da peca: dentro do pedaco
@@ -460,135 +462,148 @@ void desenhar(const Esqueleto& e, Desenho& d) {
       }
       const size_t n = e.vertices(si, mundo);
       if (n && p.uvs.size() == n) {
-        const uint32_t base = uint32_t(d.vertices.size() / 8);
-        d.vertices.resize(d.vertices.size() + n * 4);
-        float* w = d.vertices.data() + size_t(base) * 8;
-        for (size_t i = 0; i < n; i += 2, w += 8) {
-          w[0] = float(mundo[i]);
-          w[1] = float(mundo[i + 1]);
-          w[2] = p.uvs[i];
-          w[3] = p.uvs[i + 1];
-          w[4] = r;
-          w[5] = g;
-          w[6] = b;
-          w[7] = a;
-        }
-        // borrar (docs/NUCLEO.md "Borrar"): a traseira esticada pela velocidade e mais transparente
-        if (s.efeitos.borrar()) {
-          esmaece.assign(n / 2, 0.0f);
-          if (e.borrar(si, mundo.data(), n, esmaece.data())) {
-            float* q = d.vertices.data() + size_t(base) * 8;
-            for (size_t i = 0; i < n / 2; ++i, q += 8) {
-              q[0] = float(mundo[i * 2]);
-              q[1] = float(mundo[i * 2 + 1]);
-              q[7] *= 1 - esmaece[i];
-            }
+        // uma camada: a peca (principal: com borrar e efeitos) ou uma copia do rastro
+        auto geometria = [&](double* xy, float alfa, bool principal) {
+          const uint32_t base = uint32_t(d.vertices.size() / 8);
+          d.vertices.resize(d.vertices.size() + n * 4);
+          float* w = d.vertices.data() + size_t(base) * 8;
+          for (size_t i = 0; i < n; i += 2, w += 8) {
+            w[0] = float(xy[i]);
+            w[1] = float(xy[i + 1]);
+            w[2] = p.uvs[i];
+            w[3] = p.uvs[i + 1];
+            w[4] = r;
+            w[5] = g;
+            w[6] = b;
+            w[7] = alfa;
           }
-        }
-        int efeito = -1;
-        if (s.efeitos.algum()) {
-          // a caixa da imagem na pagina (antes de crescer) e, na regiao com linha ou brilho,
-          // os cantos para fora pela margem (docs/NUCLEO.md "Efeitos")
-          EfeitosLote el;
-          el.valores = s.efeitos;
-          el.caixa[0] = el.caixa[2] = p.uvs[0];
-          el.caixa[1] = el.caixa[3] = p.uvs[1];
-          for (size_t i = 2; i < n; i += 2) {
-            el.caixa[0] = std::min(el.caixa[0], p.uvs[i]), el.caixa[2] = std::max(el.caixa[2], p.uvs[i]);
-            el.caixa[1] = std::min(el.caixa[1], p.uvs[i + 1]), el.caixa[3] = std::max(el.caixa[3], p.uvs[i + 1]);
-          }
-          const float margem = s.efeitos.margem();
-          const Pagina& pg = m.paginas[size_t(p.pagina)];
-          if (p.tipo == TipoParte::Regiao && margem > 0 && pg.largura > 0 && pg.altura > 0) {
-            // cantos: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita; ex vai do
-            // primeiro ao ultimo, ey do primeiro ao segundo (posicao e uv juntos)
-            float* q = d.vertices.data() + size_t(base) * 8;
-            float ex[4], ey[4];
-            for (int c = 0; c < 4; ++c) ex[c] = q[24 + c] - q[c], ey[c] = q[8 + c] - q[c];
-            const double lx = std::hypot(ex[2] * pg.largura, ex[3] * pg.altura);
-            const double ly = std::hypot(ey[2] * pg.largura, ey[3] * pg.altura);
-            const float fx = lx > 0 ? float(margem / lx) : 0, fy = ly > 0 ? float(margem / ly) : 0;
-            static const float sx[4] = {-1, -1, 1, 1}, sy[4] = {-1, 1, 1, -1};
-            for (int k = 0; k < 4; ++k)
-              for (int c = 0; c < 4; ++c) q[k * 8 + c] += sx[k] * ex[c] * fx + sy[k] * ey[c] * fy;
-          }
-          el.pagina[0] = float(std::max(pg.largura, 1));
-          el.pagina[1] = float(std::max(pg.altura, 1));
-          if ((p.tipo == TipoParte::Malha || p.tipo == TipoParte::MalhaLigada) && margem > 0 && p.contorno >= 3 && pg.largura > 0 && pg.altura > 0 &&
-              size_t(p.contorno) * 2 <= n)
-            crescer_malha(d.vertices.data() + size_t(base) * 8, p.contorno, margem, pg.largura, pg.altura);
-          efeito = int(d.efeitos.size());
-          d.efeitos.push_back(el);
-        }
-        Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend, efeito);
-        const size_t li = size_t(&l - d.lotes.data());
-        // recorte na CPU: primeiro a peca inteira pela caixa dela (fora de todos os pedacos:
-        // nada; dentro de um pedaco convexo: os triangulos vao direto), so o resto por triangulo
-        int recorte_peca = recorte_fim != -2 && d.recorte_cpu ? 1 : 0;  // 1: cortar por triangulo
-        if (recorte_peca) {
-          const float* v = d.vertices.data() + size_t(base) * 8;
-          double x0 = v[0], x1 = v[0], y0 = v[1], y1 = v[1];
-          for (size_t i = 1; i < n / 2; ++i) {
-            x0 = std::min(x0, double(v[i * 8])), x1 = std::max(x1, double(v[i * 8]));
-            y0 = std::min(y0, double(v[i * 8 + 1])), y1 = std::max(y1, double(v[i * 8 + 1]));
-          }
-          bool toca = false;
-          for (size_t ip = 0; ip < recorte.size(); ++ip) {
-            const double* cx = &caixas[ip * 4];
-            if (x1 < cx[0] || x0 > cx[2] || y1 < cx[1] || y0 > cx[3]) continue;
-            toca = true;
-            const auto& pc = recorte[ip];
-            const P2 cantos[4] = {{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}};
-            bool dentro = true;
-            for (size_t ed = 0, ne = pc.size(); ed < ne && dentro; ++ed)
-              for (const P2& q : cantos)
-                if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
-                  dentro = false;
-                  break;
-                }
-            if (dentro) {
-              recorte_peca = 0;
-              break;
-            }
-          }
-          if (!toca) recorte_peca = 2;  // 2: fora, nao desenha
-        }
-        if (recorte_peca == 1) {
-          static const uint16_t quad[6] = {0, 1, 2, 2, 3, 0};
-          const uint16_t* tri = p.tipo == TipoParte::Regiao ? quad : p.triangulos.data();
-          const size_t ntri = p.tipo == TipoParte::Regiao ? 6 : p.triangulos.size();
-          if (recorte.size() == 1) {
-            // um pedaco so (o caso comum, recorte convexo): cada vertice testado uma vez; o
-            // triangulo com os tres dentro vai direto, o resto e cortado
-            const auto& pc = recorte[0];
-            dentro_v.assign(n / 2, 1);
-            const float* v = d.vertices.data() + size_t(base) * 8;
-            for (size_t i = 0; i < n / 2; ++i) {
-              const P2 q{v[i * 8], v[i * 8 + 1]};
-              for (size_t ed = 0, ne = pc.size(); ed < ne; ++ed)
-                if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
-                  dentro_v[i] = 0;
-                  break;
-                }
-            }
-            for (size_t t = 0; t + 2 < ntri; t += 3) {
-              if (dentro_v[tri[t]] && dentro_v[tri[t + 1]] && dentro_v[tri[t + 2]]) {
-                d.indices.push_back(base + tri[t]);
-                d.indices.push_back(base + tri[t + 1]);
-                d.indices.push_back(base + tri[t + 2]);
-              } else {
-                tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+          // borrar (docs/NUCLEO.md "Borrar"): a traseira esticada pela velocidade e mais transparente
+          if (principal && s.efeitos.borrar()) {
+            esmaece.assign(n / 2, 0.0f);
+            if (e.borrar(si, xy, n, esmaece.data())) {
+              float* q = d.vertices.data() + size_t(base) * 8;
+              for (size_t i = 0; i < n / 2; ++i, q += 8) {
+                q[0] = float(xy[i * 2]);
+                q[1] = float(xy[i * 2 + 1]);
+                q[7] *= 1 - esmaece[i];
               }
             }
-          } else {
-            for (size_t t = 0; t + 2 < ntri; t += 3) tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
           }
-        } else if (recorte_peca == 0 && p.tipo == TipoParte::Regiao) {
-          d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
-        } else if (recorte_peca == 0) {
-          for (uint16_t t : p.triangulos) d.indices.push_back(base + t);
+          int efeito = -1;
+          if (principal && s.efeitos.algum()) {
+            // a caixa da imagem na pagina (antes de crescer) e, na regiao com linha ou brilho,
+            // os cantos para fora pela margem (docs/NUCLEO.md "Efeitos")
+            EfeitosLote el;
+            el.valores = s.efeitos;
+            el.caixa[0] = el.caixa[2] = p.uvs[0];
+            el.caixa[1] = el.caixa[3] = p.uvs[1];
+            for (size_t i = 2; i < n; i += 2) {
+              el.caixa[0] = std::min(el.caixa[0], p.uvs[i]), el.caixa[2] = std::max(el.caixa[2], p.uvs[i]);
+              el.caixa[1] = std::min(el.caixa[1], p.uvs[i + 1]), el.caixa[3] = std::max(el.caixa[3], p.uvs[i + 1]);
+            }
+            const float margem = s.efeitos.margem();
+            const Pagina& pg = m.paginas[size_t(p.pagina)];
+            if (p.tipo == TipoParte::Regiao && margem > 0 && pg.largura > 0 && pg.altura > 0) {
+              // cantos: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita; ex vai do
+              // primeiro ao ultimo, ey do primeiro ao segundo (posicao e uv juntos)
+              float* q = d.vertices.data() + size_t(base) * 8;
+              float ex[4], ey[4];
+              for (int c = 0; c < 4; ++c) ex[c] = q[24 + c] - q[c], ey[c] = q[8 + c] - q[c];
+              const double lx = std::hypot(ex[2] * pg.largura, ex[3] * pg.altura);
+              const double ly = std::hypot(ey[2] * pg.largura, ey[3] * pg.altura);
+              const float fx = lx > 0 ? float(margem / lx) : 0, fy = ly > 0 ? float(margem / ly) : 0;
+              static const float sx[4] = {-1, -1, 1, 1}, sy[4] = {-1, 1, 1, -1};
+              for (int k = 0; k < 4; ++k)
+                for (int c = 0; c < 4; ++c) q[k * 8 + c] += sx[k] * ex[c] * fx + sy[k] * ey[c] * fy;
+            }
+            el.pagina[0] = float(std::max(pg.largura, 1));
+            el.pagina[1] = float(std::max(pg.altura, 1));
+            if ((p.tipo == TipoParte::Malha || p.tipo == TipoParte::MalhaLigada) && margem > 0 && p.contorno >= 3 && pg.largura > 0 && pg.altura > 0 &&
+                size_t(p.contorno) * 2 <= n)
+              crescer_malha(d.vertices.data() + size_t(base) * 8, p.contorno, margem, pg.largura, pg.altura);
+            efeito = int(d.efeitos.size());
+            d.efeitos.push_back(el);
+          }
+          Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend, efeito);
+          const size_t li = size_t(&l - d.lotes.data());
+          // recorte na CPU: primeiro a peca inteira pela caixa dela (fora de todos os pedacos:
+          // nada; dentro de um pedaco convexo: os triangulos vao direto), so o resto por triangulo
+          int recorte_peca = recorte_fim != -2 && d.recorte_cpu ? 1 : 0;  // 1: cortar por triangulo
+          if (recorte_peca) {
+            const float* v = d.vertices.data() + size_t(base) * 8;
+            double x0 = v[0], x1 = v[0], y0 = v[1], y1 = v[1];
+            for (size_t i = 1; i < n / 2; ++i) {
+              x0 = std::min(x0, double(v[i * 8])), x1 = std::max(x1, double(v[i * 8]));
+              y0 = std::min(y0, double(v[i * 8 + 1])), y1 = std::max(y1, double(v[i * 8 + 1]));
+            }
+            bool toca = false;
+            for (size_t ip = 0; ip < recorte.size(); ++ip) {
+              const double* cx = &caixas[ip * 4];
+              if (x1 < cx[0] || x0 > cx[2] || y1 < cx[1] || y0 > cx[3]) continue;
+              toca = true;
+              const auto& pc = recorte[ip];
+              const P2 cantos[4] = {{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}};
+              bool dentro = true;
+              for (size_t ed = 0, ne = pc.size(); ed < ne && dentro; ++ed)
+                for (const P2& q : cantos)
+                  if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
+                    dentro = false;
+                    break;
+                  }
+              if (dentro) {
+                recorte_peca = 0;
+                break;
+              }
+            }
+            if (!toca) recorte_peca = 2;  // 2: fora, nao desenha
+          }
+          if (recorte_peca == 1) {
+            static const uint16_t quad[6] = {0, 1, 2, 2, 3, 0};
+            const uint16_t* tri = p.tipo == TipoParte::Regiao ? quad : p.triangulos.data();
+            const size_t ntri = p.tipo == TipoParte::Regiao ? 6 : p.triangulos.size();
+            if (recorte.size() == 1) {
+              // um pedaco so (o caso comum, recorte convexo): cada vertice testado uma vez; o
+              // triangulo com os tres dentro vai direto, o resto e cortado
+              const auto& pc = recorte[0];
+              dentro_v.assign(n / 2, 1);
+              const float* v = d.vertices.data() + size_t(base) * 8;
+              for (size_t i = 0; i < n / 2; ++i) {
+                const P2 q{v[i * 8], v[i * 8 + 1]};
+                for (size_t ed = 0, ne = pc.size(); ed < ne; ++ed)
+                  if (cruz(pc[ed], pc[(ed + 1) % ne], q) < 0) {
+                    dentro_v[i] = 0;
+                    break;
+                  }
+              }
+              for (size_t t = 0; t + 2 < ntri; t += 3) {
+                if (dentro_v[tri[t]] && dentro_v[tri[t + 1]] && dentro_v[tri[t + 2]]) {
+                  d.indices.push_back(base + tri[t]);
+                  d.indices.push_back(base + tri[t + 1]);
+                  d.indices.push_back(base + tri[t + 2]);
+                } else {
+                  tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+                }
+              }
+            } else {
+              for (size_t t = 0; t + 2 < ntri; t += 3) tri_cortado(base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+            }
+          } else if (recorte_peca == 0 && p.tipo == TipoParte::Regiao) {
+            d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+          } else if (recorte_peca == 0) {
+            for (uint16_t t : p.triangulos) d.indices.push_back(base + t);
+          }
+          d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+        };
+        // rastro (docs/NUCLEO.md "Rastro"): as copias de quadros anteriores, da mais antiga para a
+        // mais nova, por tras da peca, no mesmo lote e pelo mesmo recorte
+        if (s.efeitos.rastro()) {
+          e.copias_rastro(si, n, copias);
+          for (const CopiaRastro& cp : copias) {
+            copia.assign(cp.xy->begin(), cp.xy->end());
+            geometria(copia.data(), a * cp.alfa, false);
+          }
         }
-        d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+        geometria(mundo.data(), a, true);
       }
     }
     particulas(si);

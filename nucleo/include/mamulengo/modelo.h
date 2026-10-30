@@ -4,6 +4,7 @@
 // Unidades do .boneco: pixels, y para cima, graus anti-horarios, segundos.
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -72,12 +73,12 @@ struct Cor {
 
 // ---- efeitos (docs/NUCLEO.md "Efeitos"): os valores de todos num vetor so, por efeito um
 // trecho de canais na ordem das timelines. Os de shader vem primeiro (os CANAIS_SHADER que o
-// desenhista recebe por lote); o borrar mexe so nos vertices e fica no fim
-enum class TipoEfeito : uint8_t { Linha, Brilho, Dissolver, Tingir, Borrar };
-constexpr int NUM_EFEITOS = 5;
-constexpr int EFEITO_INICIO[NUM_EFEITOS] = {0, 5, 11, 18, 23};
-constexpr int EFEITO_CANAIS[NUM_EFEITOS] = {5, 6, 7, 5, 3};
-constexpr int CANAIS_EFEITOS = 26;
+// desenhista recebe por lote); o borrar e o rastro mexem so na geometria e ficam no fim
+enum class TipoEfeito : uint8_t { Linha, Brilho, Dissolver, Tingir, Borrar, Rastro };
+constexpr int NUM_EFEITOS = 6;
+constexpr int EFEITO_INICIO[NUM_EFEITOS] = {0, 5, 11, 18, 23, 26};
+constexpr int EFEITO_CANAIS[NUM_EFEITOS] = {5, 6, 7, 5, 3, 3};
+constexpr int CANAIS_EFEITOS = 29;
 constexpr int CANAIS_SHADER = 23;
 // indices no vetor
 enum : int {
@@ -86,9 +87,10 @@ enum : int {
   DISSOLVER_VALOR = 11, DISSOLVER_R = 12, DISSOLVER_A = 15, DISSOLVER_BORDA = 16, DISSOLVER_GRAO = 17,
   TINGIR_R = 18, TINGIR_A = 21, TINGIR_FORCA = 22,
   BORRAR_FORCA = 23, BORRAR_LIMITE = 24, BORRAR_ESMAECER = 25,
+  RASTRO_COPIAS = 26, RASTRO_INTERVALO = 27, RASTRO_ALFA = 28,
 };
 struct Efeitos {
-  float v[CANAIS_EFEITOS] = {1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 8, 0, 1, 0.5f, 0, 1, 0.05f, 8, 1, 1, 1, 1, 0, 0, 60, 0.5f};
+  float v[CANAIS_EFEITOS] = {1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 8, 0, 1, 0.5f, 0, 1, 0.05f, 8, 1, 1, 1, 1, 0, 0, 60, 0.5f, 0, 0.05f, 0.5f};
   bool linha() const { return v[LINHA_LARGURA] > 0 && v[LINHA_A] > 0; }
   bool brilho() const { return v[BRILHO_FORCA] > 0 && v[BRILHO_A] > 0; }
   bool dissolver() const { return v[DISSOLVER_VALOR] > 0; }
@@ -97,6 +99,9 @@ struct Efeitos {
   bool algum() const { return linha() || brilho() || dissolver() || tingir(); }
   // o borrar (docs/NUCLEO.md "Borrar"): estica a traseira da imagem pela velocidade
   bool borrar() const { return v[BORRAR_FORCA] > 0 && v[BORRAR_LIMITE] > 0; }
+  // o rastro (docs/NUCLEO.md "Rastro"): copias de quadros anteriores, por tras da imagem
+  bool rastro() const { return v[RASTRO_COPIAS] >= 1 && v[RASTRO_INTERVALO] > 0 && v[RASTRO_ALFA] > 0; }
+  int copias() const { return std::min(int(v[RASTRO_COPIAS]), 16); }
   // quanto a regiao cresce para fora, em pixels da textura
   float margem() const;
   // limita cada canal a faixa dele (cores, valor, borda e esmaecer de 0 a 1; largura, raio,
