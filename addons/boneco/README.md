@@ -68,6 +68,14 @@ sprite.animation_completed.connect(func(entry): print("loop or end of ", entry.g
   applied and before physics and world transforms, to move bones or slots from
   the game
 
+## Lights
+
+A `.boneco` can carry point lights tied to bones and an ambient light (keyed on the
+timeline), and a normal map per atlas page that the Mamulengo tools build from the
+art itself (`npx tsx tools/relevo.ts hero.boneco --gravar`). `BonecoSprite` lights
+the parts with them in its own shader, the same math as the editor: no Light2D nodes
+needed, and the normal map follows parts that turn, flip or bend.
+
 ## Binary .boneco
 
 A `.boneco` can also be stored in binary: the same data, about 5 times smaller on disk and

@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Editor } from "../document.ts";
 import type { SpineJson } from "../format.ts";
 import type { Path } from "../ops.ts";
-import { channels, constraints, denormalize, isEffect, keyValues, normalize, requireBone, requireSlot, CURVE_PRESETS, EFFECT_NAMES, type Bezier } from "../model.ts";
+import { channels, constraints, denormalize, hasFields, isEffect, keyValues, normalize, requireBone, requireSlot, CURVE_PRESETS, EFFECT_NAMES, type Bezier } from "../model.ts";
 
 export const Target = z
   .union([
@@ -14,8 +14,10 @@ export const Target = z
     z.object({ constraint: z.string() }),
     z.object({ deform: z.object({ slot: z.string(), attachment: z.string(), skin: z.string().default("default") }) }),
     z.object({ particles: z.string() }),
+    z.object({ light: z.string() }),
+    z.object({ ambient: z.literal(true) }),
   ])
-  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}} ou {"particles":"faiscas"} (rate, burst)');
+  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}}, {"particles":"faiscas"} (rate, burst), {"light":"chave"} (timeline light: color, strength, radius, height) ou {"ambient":true} (timeline ambient: color, strength)');
 export type Target = z.infer<typeof Target>;
 
 export const TIMELINE_NAMES = {
@@ -54,6 +56,16 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
     requireSlot(doc, d.slot);
     if (timeline !== "deform" && timeline !== "sequence") throw new Error("timeline de attachment: deform ou sequence");
     return { path: [...base, "attachments", d.skin, d.slot, d.attachment, timeline], kind: timeline };
+  }
+  // luzes (so do Mamulengo; docs/NUCLEO.md "Luzes"): fora do que o spine-core le
+  if ("light" in target) {
+    if (!(doc as any).lights?.some((l: any) => l.name === target.light)) throw new Error(`luz nao existe: "${target.light}"`);
+    if (timeline !== "light") throw new Error(`timeline de luz: light (color, strength, radius, height)`);
+    return { path: [...base, "lights", target.light], kind: "light" };
+  }
+  if ("ambient" in target) {
+    if (timeline !== "ambient") throw new Error(`timeline da luz ambiente: ambient (color, strength)`);
+    return { path: [...base, "ambient"], kind: "ambient" };
   }
   if ("particles" in target) {
     if (!(doc as any).particles?.some((p: any) => p.name === target.particles)) throw new Error(`emissor de particulas nao existe: "${target.particles}"`);
@@ -167,8 +179,8 @@ export function keyFields(kind: string, a: Record<string, any>): Record<string, 
     if (a.color !== undefined) out.color = a.color;
     return out;
   }
-  if (isEffect(kind)) {
-    // efeitos: a chave guarda todos os campos (o que falta herdaria da anterior)
+  if (hasFields(kind)) {
+    // efeitos e luzes: a chave guarda todos os campos (o que falta herdaria da anterior)
     if (a.color !== undefined) out.color = a.color;
     for (const c of channels(kind)) if (a[c.key] !== undefined) out[c.key] = round(a[c.key]);
     return out;

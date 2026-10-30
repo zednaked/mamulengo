@@ -231,16 +231,47 @@ void desenhar(const Esqueleto& e, Desenho& d) {
   std::vector<P2> poli, tmp;
   int recorte_fim = -2;  // slot que acaba o recorte aberto (-1: o fim do desenho; -2: nenhum)
   // `efeito` >= 0: o lote de um slot com efeitos, sempre novo (os valores sao do slot)
-  auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1) -> Lote& {
+  // luzes (docs/NUCLEO.md "Luzes"): um grupo para este personagem se alguma pagina tem relevo e
+  // a luz muda alguma coisa (alguma luz acesa, ou a ambiente diferente de branco inteiro)
+  int grupo = -1;
+  {
+    bool relevo = false;
+    for (const Pagina& pg : m.paginas) relevo = relevo || !pg.relevo.empty();
+    const float* am = e.ambiente();
+    GrupoLuz g;
+    for (int c = 0; c < 3; ++c) g.ambiente[c] = am[c] * am[LUZ_A] * am[AMBIENTE_FORCA];
+    for (size_t i = 0; i < m.luzes.size() && g.quantas < MAX_LUZES; ++i) {
+      const auto& v = e.luzes()[i];
+      if (!(v[LUZ_FORCA] > 0 && v[LUZ_RAIO] > 0 && v[LUZ_A] > 0)) continue;
+      const Matriz& w = e.mundo()[size_t(m.luzes[i].osso)];
+      const double lx = m.luzes[i].x, ly = m.luzes[i].y;
+      float* o = g.luzes[g.quantas++];
+      o[0] = float(w.a * lx + w.b * ly + w.x);
+      o[1] = float(w.c * lx + w.d * ly + w.y);
+      o[2] = v[LUZ_ALTURA];
+      for (int c = 0; c < 3; ++c) o[3 + c] = v[c] * v[LUZ_A] * v[LUZ_FORCA];
+      o[6] = v[LUZ_RAIO];
+    }
+    if (relevo && (g.quantas > 0 || g.ambiente[0] != 1 || g.ambiente[1] != 1 || g.ambiente[2] != 1)) {
+      grupo = int(d.grupos_luz.size());
+      d.grupos_luz.push_back(g);
+    }
+  }
+  // o slot e iluminado: ha grupo, a pagina tem relevo e o blend nao e de luz (aditivo, tela)
+  auto iluminado = [&](int pagina, Blend blend) {
+    return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela ? grupo : -1;
+  };
+  auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1, int luz = -1) -> Lote& {
     if (c == Comando::Triangulos && efeito < 0 && !d.lotes.empty()) {
       Lote& u = d.lotes.back();
-      if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0) return u;
+      if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0 && u.luz == luz) return u;
     }
     Lote l;
     l.comando = c;
     l.pagina = pagina;
     l.blend = blend;
     l.efeito = efeito;
+    l.luz = luz;
     l.inicio = uint32_t(d.indices.size());
     d.lotes.push_back(l);
     return d.lotes.back();
@@ -524,7 +555,7 @@ void desenhar(const Esqueleto& e, Desenho& d) {
             efeito = int(d.efeitos.size());
             d.efeitos.push_back(el);
           }
-          Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend, efeito);
+          Lote& l = lote(Comando::Triangulos, p.pagina, ds.blend, efeito, iluminado(p.pagina, ds.blend));
           const size_t li = size_t(&l - d.lotes.data());
           // recorte na CPU: primeiro a peca inteira pela caixa dela (fora de todos os pedacos:
           // nada; dentro de um pedaco convexo: os triangulos vao direto), so o resto por triangulo

@@ -14,7 +14,7 @@ export { Desenhista, carregarNucleo, ortho, type PaginaGL };
 
 type Info = {
   nome: string;
-  paginas: { arquivo: string; largura: number; altura: number; pma: boolean }[];
+  paginas: { arquivo: string; largura: number; altura: number; pma: boolean; relevo?: string }[];
   fisica: boolean;
   ossos: { nome: string; pai: number }[];
   slots: { nome: string; osso: number; blend: number }[];
@@ -89,7 +89,8 @@ export class NucleoCena {
 
   private ligaPaginas() {
     // pagina sem textura (ainda nao carregada) fica de fora do desenho
-    this.paginas = (this.info?.paginas ?? []).map((p) => ({ tex: this.texturas.get(p.arquivo) as WebGLTexture, pma: p.pma }));
+    // o relevo (docs/NUCLEO.md "Luzes") e uma textura como as outras, pelo nome do arquivo
+    this.paginas = (this.info?.paginas ?? []).map((p) => ({ tex: this.texturas.get(p.arquivo) as WebGLTexture, pma: p.pma, relevo: p.relevo ? (this.texturas.get(p.relevo) ?? null) : null }));
   }
 
   private lerInfo() {

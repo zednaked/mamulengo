@@ -49,7 +49,9 @@ enum Passo { NORMAL_PMA, ADITIVO, MULTIPLICA, MULTIPLICA_MOTOR, TELA_MUL, TELA_A
 struct Materiais {
   RID material[PASSOS][2];
   RID shader[PASSOS][2];
-  RID shader_efeitos[PASSOS];  // os materiais com efeitos sao de cada sprite (valores do slot)
+  // os shaders proprios (os materiais sao de cada item: valores do slot, luzes do quadro): por
+  // passo, com efeitos e/ou com luz (indice efeitos + 2 x luz, de 1 a 3)
+  RID shader_proprio[PASSOS][4];
 };
 Materiais &cache() {
   static Materiais m;
@@ -129,12 +131,48 @@ const char *EFEITOS =
     "    if (n < ef[11] + ef[16]) c.rgb = mix(c.rgb, vec3(ef[12], ef[13], ef[14]), ef[15]);\n"
     "  }\n";
 
-RID shader_efeitos(Passo passo) {
-  RID &sh = cache().shader_efeitos[passo];
+// luzes (docs/NUCLEO.md "Luzes"; a mesma conta de src/render/desenhista.ts): a normal do relevo
+// girada para o mundo pelas derivadas de tela, ambiente mais cada luz com cor x max(N.L, 0) x
+// atenuacao^2. mundo_v e o ponto no espaco do esqueleto (y para cima)
+const char *LUZ =
+    "uniform sampler2D relevo : filter_linear;\nuniform vec3 ambiente = vec3(1.0);\nuniform int nluz = 0;\n"
+    "uniform vec4 luzP[8];\nuniform vec3 luzC[8];\nvarying vec2 mundo_v;\n"
+    "vec3 luz(vec2 uv, vec2 mundo) {\n"
+    "  vec3 n = texture(relevo, uv).rgb * 2.0 - 1.0;\n"
+    "  vec2 dpx = dFdx(mundo); vec2 dpy = dFdy(mundo); vec2 dux = dFdx(uv); vec2 duy = dFdy(uv);\n"
+    "  float det = dux.x * duy.y - duy.x * dux.y;\n"
+    "  vec3 N = vec3(0.0, 0.0, 1.0);\n"
+    "  if (abs(det) > 1e-14) {\n"
+    "    vec2 ju = (dpx * duy.y - dpy * dux.y) / det; vec2 jv = (dpy * dux.x - dpx * duy.x) / det;\n"
+    "    N = normalize(vec3(n.x * normalize(ju) - n.y * normalize(jv), n.z));\n"
+    "  }\n"
+    "  vec3 soma = ambiente;\n"
+    "  for (int i = 0; i < 8; i++) {\n"
+    "    if (i >= nluz) break;\n"
+    "    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z);\n"
+    "    float at = clamp(1.0 - length(L.xy) / luzP[i].w, 0.0, 1.0);\n"
+    "    soma += luzC[i] * max(dot(N, normalize(L)), 0.0) * at * at;\n"
+    "  }\n"
+    "  return soma;\n}\n";
+
+// o shader proprio de um item: com os efeitos do slot, com luz, ou os dois
+RID shader_proprio(Passo passo, bool efeitos, bool luz) {
+  RID &sh = cache().shader_proprio[passo][int(efeitos) + 2 * int(luz)];
   if (sh.is_valid()) return sh;
+  String codigo = String("shader_type canvas_item;\nrender_mode ") + MODO[passo] + ";\n" + (luz ? LUZ : "");
+  const String vertice = luz ? "void vertex() { cor_v = COLOR; mundo_v = vec2(VERTEX.x, -VERTEX.y); }\n" : "void vertex() { cor_v = COLOR; }\n";
+  if (efeitos) {
+    String e = String(EFEITOS).replace("void vertex() { cor_v = COLOR; }\n", vertice);
+    if (luz) e = e.replace("ef[19], ef[20]), ft);\n", "ef[19], ef[20]), ft);\n  C.rgb *= luz(UV, mundo_v);\n");
+    codigo += e + "  COLOR = " + SAIDA[passo] + ";\n}\n";
+  } else {
+    codigo += String("uniform bool pma = false;\nvarying vec4 cor_v;\n") + vertice +
+              "void fragment() {\n  vec4 t = texture(TEXTURE, UV);\n  if (pma && t.a > 0.0) t.rgb /= t.a;\n  vec4 c = t * cor_v;\n" +
+              (luz ? "  c.rgb *= luz(UV, mundo_v);\n" : "") + "  COLOR = " + SAIDA[passo] + ";\n}\n";
+  }
   RenderingServer *rs = RenderingServer::get_singleton();
   sh = rs->shader_create();
-  rs->shader_set_code(sh, String("shader_type canvas_item;\nrender_mode ") + MODO[passo] + ";\n" + EFEITOS + "  COLOR = " + SAIDA[passo] + ";\n}\n");
+  rs->shader_set_code(sh, codigo);
   return sh;
 }
 
@@ -170,10 +208,11 @@ void boneco_liberar_materiais() {
       cache().material[p][k] = RID();
       cache().shader[p][k] = RID();
     }
-  for (int p = 0; p < PASSOS; p++) {
-    if (cache().shader_efeitos[p].is_valid()) rs->free_rid(cache().shader_efeitos[p]);
-    cache().shader_efeitos[p] = RID();
-  }
+  for (int p = 0; p < PASSOS; p++)
+    for (int k = 0; k < 4; k++) {
+      if (cache().shader_proprio[p][k].is_valid()) rs->free_rid(cache().shader_proprio[p][k]);
+      cache().shader_proprio[p][k] = RID();
+    }
 }
 
 // ---- BonecoData
@@ -223,6 +262,13 @@ Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
     Ref<Texture2D> tex = BONECO_CARREGA(p);
     if (tex.is_null()) BONECO_ERRO("boneco: nao carreguei a pagina " + p);
     d->paginas.push_back(tex);
+    // o relevo da pagina (docs/NUCLEO.md "Luzes"): sem ele a pagina fica sem luz
+    Ref<Texture2D> rel;
+    if (!pg.relevo.empty()) {
+      rel = BONECO_CARREGA(pasta.path_join(String::utf8(pg.relevo.c_str())));
+      if (rel.is_null()) BONECO_ERRO("boneco: nao carreguei o relevo " + String::utf8(pg.relevo.c_str()));
+    }
+    d->relevos.push_back(rel);
   }
   vivos()[padrao(p_caminho)] = d.ptr();
   return d;
@@ -732,22 +778,43 @@ void BonecoSprite::_desenhar() {
     rs->canvas_item_clear(it);
     if (k >= int(lista.size())) continue;
     const mamulengo::Lote &lt = desenho.lotes[size_t(lista[size_t(k)].lote)];
-    if (lt.efeito >= 0) {
-      // slot com efeitos: o material proprio do item, com os valores do slot neste quadro
+    // luz: o relevo da pagina carregado e um grupo de luz no lote
+    const Ref<Texture2D> rel = lt.luz >= 0 && lt.pagina >= 0 && lt.pagina < data->relevos.size() ? data->relevos[lt.pagina] : Ref<Texture2D>();
+    const bool luz = rel.is_valid();
+    if (lt.efeito >= 0 || luz) {
+      // slot com efeitos ou iluminado: o material proprio do item, com os valores deste quadro
       const Item &li = lista[size_t(k)];
-      const mamulengo::EfeitosLote &el = desenho.efeitos[size_t(lt.efeito)];
+      const bool efeitos = lt.efeito >= 0;
       if (!material_efeito[k].is_valid()) material_efeito.write[k] = rs->material_create();
       const RID me = material_efeito[k];
-      if (passo_efeito[k] != int(li.passo)) {
-        rs->material_set_shader(me, shader_efeitos(li.passo));
-        passo_efeito.write[k] = int(li.passo);
+      const int chave = int(li.passo) * 4 + int(efeitos) + 2 * int(luz);
+      if (passo_efeito[k] != chave) {
+        rs->material_set_shader(me, shader_proprio(li.passo, efeitos, luz));
+        passo_efeito.write[k] = chave;
       }
-      PackedFloat32Array ef;
-      ef.resize(mamulengo::CANAIS_SHADER);
-      memcpy(ef.ptrw(), el.valores.v, sizeof(float) * mamulengo::CANAIS_SHADER);
-      rs->material_set_param(me, "ef", ef);
-      rs->material_set_param(me, "caixa", Vector4(el.caixa[0], el.caixa[1], el.caixa[2], el.caixa[3]));
-      rs->material_set_param(me, "pagina", Vector2(el.pagina[0], el.pagina[1]));
+      if (efeitos) {
+        const mamulengo::EfeitosLote &el = desenho.efeitos[size_t(lt.efeito)];
+        PackedFloat32Array ef;
+        ef.resize(mamulengo::CANAIS_SHADER);
+        memcpy(ef.ptrw(), el.valores.v, sizeof(float) * mamulengo::CANAIS_SHADER);
+        rs->material_set_param(me, "ef", ef);
+        rs->material_set_param(me, "caixa", Vector4(el.caixa[0], el.caixa[1], el.caixa[2], el.caixa[3]));
+        rs->material_set_param(me, "pagina", Vector2(el.pagina[0], el.pagina[1]));
+      }
+      if (luz) {
+        const mamulengo::GrupoLuz &g = desenho.grupos_luz[size_t(lt.luz)];
+        Array p4, c3;
+        for (int q = 0; q < mamulengo::MAX_LUZES; q++) {
+          const float *l = g.luzes[q];
+          p4.push_back(Vector4(l[0], l[1], l[2], l[6]));
+          c3.push_back(Vector3(l[3], l[4], l[5]));
+        }
+        rs->material_set_param(me, "relevo", rel->get_rid());
+        rs->material_set_param(me, "ambiente", Vector3(g.ambiente[0], g.ambiente[1], g.ambiente[2]));
+        rs->material_set_param(me, "nluz", g.quantas);
+        rs->material_set_param(me, "luzP", p4);
+        rs->material_set_param(me, "luzC", c3);
+      }
       rs->material_set_param(me, "pma", li.pma);
       lista[size_t(k)].material = me;
     }

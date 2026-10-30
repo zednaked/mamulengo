@@ -436,6 +436,37 @@ runtimeOk("constraints");
     await run("animation.delete", { name: "t.rastro" });
     await run("slot.effect", { slot: s0, effect: "trail", off: true });
   }
+  // luzes: light.set cria e muda, key.set anima (chave completa), ambient.set, renomear o osso
+  // acompanha, light.delete leva as timelines; o spine-core segue lendo
+  {
+    const osso = doc.json.bones[1].name;
+    await run("light.set", { name: "t.luz", bone: osso, x: 10, color: "ff8800", strength: 1.5, radius: 200, height: 40 });
+    await run("ambient.set", { color: "8899bb", strength: 0.7 });
+    await run("animation.create", { name: "t.luzes" });
+    await run("key.set", { anim: "t.luzes", target: { light: "t.luz" }, timeline: "light", time: 0.2, strength: 3 });
+    await run("key.set", { anim: "t.luzes", target: { ambient: true }, timeline: "ambient", time: 0.4, strength: 0.3 });
+    const l = doc.json.lights[0];
+    const kl = doc.json.animations["t.luzes"].lights["t.luz"][0];
+    const ka = doc.json.animations["t.luzes"].ambient[0];
+    await run("bone.rename", { bone: osso, to: "t.osso" });
+    const seguiu = doc.json.lights[0].bone === "t.osso";
+    await run("bone.rename", { bone: "t.osso", to: osso });
+    let erroSpine = "";
+    try {
+      const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))).readSkeletonData(structuredClone(doc.json));
+    } catch (err: any) {
+      erroSpine = String(err?.message ?? err);
+    }
+    await run("light.delete", { name: "t.luz" });
+    await run("ambient.set", { off: true });
+    const limpo = !doc.json.lights && !doc.json.ambient && !doc.json.animations["t.luzes"].lights;
+    check(
+      l.bone === osso && l.strength === 1.5 && kl.strength === 3 && kl.color === "ff8800ff" && kl.height === 40 && ka.strength === 0.3 && ka.color === "8899bbff" && seguiu && limpo && !erroSpine,
+      `luzes: light.set, key.set (chave completa), ambient.set, osso renomeado, light.delete ${JSON.stringify({ kl, ka })}${erroSpine ? ` (spine-core: ${erroSpine})` : ""}`,
+    );
+    await run("animation.delete", { name: "t.luzes" });
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

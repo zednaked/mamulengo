@@ -78,6 +78,7 @@ std::vector<std::unique_ptr<Instancia>> instancias;
 Desenho desenho;
 std::vector<int32_t> lotes;
 std::vector<float> efeitos;
+std::vector<float> grupos;
 // leituras da pose (o JavaScript le os numeros direto da memoria)
 std::vector<double> saida, saida_ossos, saida_setup, saida_slots;
 std::string erro, info;
@@ -170,7 +171,12 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
     const Pagina& p = m.paginas[i];
     info += i ? ",{\"arquivo\":" : "{\"arquivo\":";
     texto_json(info, p.arquivo);
-    info += ",\"largura\":" + std::to_string(p.largura) + ",\"altura\":" + std::to_string(p.altura) + ",\"pma\":" + (p.pma ? "true" : "false") + "}";
+    info += ",\"largura\":" + std::to_string(p.largura) + ",\"altura\":" + std::to_string(p.altura) + ",\"pma\":" + (p.pma ? "true" : "false");
+    if (!p.relevo.empty()) {
+      info += ",\"relevo\":";
+      texto_json(info, p.relevo);
+    }
+    info += "}";
   }
   bool fisica = false;
   for (const DadosRestricao& r : m.restricoes) fisica = fisica || r.tipo == TipoRestricao::Fisica;
@@ -329,12 +335,25 @@ EMSCRIPTEN_KEEPALIVE const float* mm_vertices() { return desenho.vertices.data()
 EMSCRIPTEN_KEEPALIVE int mm_num_vertices() { return int(desenho.vertices.size() / 8); }
 EMSCRIPTEN_KEEPALIVE const uint32_t* mm_indices() { return desenho.indices.data(); }
 EMSCRIPTEN_KEEPALIVE int mm_num_indices() { return int(desenho.indices.size()); }
-// lotes em 6 inteiros: comando, pagina, blend, inicio, quantos, efeito (-1 sem efeitos)
+// lotes em 7 inteiros: comando, pagina, blend, inicio, quantos, efeito (-1 sem efeitos), grupo de
+// luz (-1 sem luz)
 EMSCRIPTEN_KEEPALIVE const int32_t* mm_lotes() {
   lotes.clear();
-  for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos), int32_t(l.efeito)});
+  for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos), int32_t(l.efeito), int32_t(l.luz)});
   return lotes.data();
 }
+// grupos de luz (docs/NUCLEO.md "Luzes") em 60 floats: a ambiente (r, g, b), quantas luzes, e 8
+// luzes de 7 (x, y, altura, r, g, b, raio)
+EMSCRIPTEN_KEEPALIVE const float* mm_grupos_luz() {
+  grupos.clear();
+  for (const GrupoLuz& g : desenho.grupos_luz) {
+    grupos.insert(grupos.end(), g.ambiente, g.ambiente + 3);
+    grupos.push_back(float(g.quantas));
+    for (int i = 0; i < MAX_LUZES; ++i) grupos.insert(grupos.end(), g.luzes[i], g.luzes[i] + 7);
+  }
+  return grupos.data();
+}
+EMSCRIPTEN_KEEPALIVE int mm_num_grupos_luz() { return int(desenho.grupos_luz.size()); }
 // efeitos dos lotes em 29 floats: os 23 canais de shader (docs/NUCLEO.md "Efeitos"), a caixa da imagem
 // na pagina (u0, v0, u1, v1) e o tamanho da pagina
 EMSCRIPTEN_KEEPALIVE const float* mm_efeitos() {

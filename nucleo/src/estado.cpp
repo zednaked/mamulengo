@@ -19,11 +19,11 @@ enum Modo : uint8_t {
                  // cheio (ou some enquanto uma ainda mais nova, que nao anima, entra: modo_mix)
 };
 
-enum class TipoTl : uint8_t { Parte, Cor, Efeito, Taxa, Rajada, Osso, Restricao, Deformar, Ordem, Evento };
+enum class TipoTl : uint8_t { Parte, Cor, Efeito, Taxa, Luz, Rajada, Osso, Restricao, Deformar, Ordem, Evento };
 
 // propriedades (para saber quem anima o que): categoria e indices
 enum Prop : uint8_t {
-  P_GIRAR = 1, P_X, P_Y, P_EX, P_EY, P_CX, P_CY, P_PARTE, P_RGB, P_ALFA, P_DEFORM, P_ORDEM, P_EVENTO, P_RESTRICAO, P_EFEITO, P_TAXA, P_RAJADA,
+  P_GIRAR = 1, P_X, P_Y, P_EX, P_EY, P_CX, P_CY, P_PARTE, P_RGB, P_ALFA, P_DEFORM, P_ORDEM, P_EVENTO, P_RESTRICAO, P_EFEITO, P_TAXA, P_RAJADA, P_LUZ,
 };
 
 inline uint64_t id(Prop p, int a, int b = 0) {
@@ -82,6 +82,7 @@ Estado::Estado(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo)) {
       else poe(TipoTl::Cor, i, id(c.prop == PropCor::Rgb ? P_RGB : P_ALFA, c.slot));
     }
     for (size_t i = 0; i < an.taxas.size(); ++i) poe(TipoTl::Taxa, i, id(P_TAXA, an.taxas[i].emissor));
+    for (size_t i = 0; i < an.luzes.size(); ++i) poe(TipoTl::Luz, i, id(P_LUZ, an.luzes[i].luz + 1));
     for (size_t i = 0; i < an.rajadas.size(); ++i) poe(TipoTl::Rajada, i, id(P_RAJADA, an.rajadas[i].emissor));
     for (size_t i = 0; i < an.efeitos.size(); ++i) poe(TipoTl::Efeito, i, id(P_EFEITO, an.efeitos[i].slot, int(an.efeitos[i].tipo)));
     for (size_t i = 0; i < an.ossos.size(); ++i) {
@@ -570,6 +571,7 @@ void Estado::aplicar_timeline(Esqueleto& e, const Entrada& en, const Tl& tl, dou
     case TipoTl::Cor: e.aplicar_cor(an.cores[i], t, alfa, mist); break;
     case TipoTl::Efeito: e.aplicar_efeito(an.efeitos[i], t, alfa, mist); break;
     case TipoTl::Taxa: e.aplicar_taxa(an.taxas[i], t, alfa, mist); break;
+    case TipoTl::Luz: e.aplicar_luz(an.luzes[i], t, alfa, mist); break;
     case TipoTl::Rajada:
       // so da animacao que entra ou toca (nao da que sai num mix), como um evento
       if (coletar && !sai) e.aplicar_rajada(an.rajadas[i], ultimo, t);

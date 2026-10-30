@@ -144,6 +144,35 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
     ras += ']';
   }
   if (!ras.empty()) out += ",\"rastros\":{" + ras + '}';
+  // luzes (docs/NUCLEO.md "Luzes"): o grupo que o desenho monta (ambiente e os pontos em mundo:
+  // x, y, altura, r, g, b, raio) e quantos lotes sairam iluminados
+  if (!m.luzes.empty() || m.ambiente[0] != 1 || m.ambiente[1] != 1 || m.ambiente[2] != 1 || m.ambiente[3] != 1 || m.ambiente[4] != 1) {
+    Desenho d;
+    desenhar(e, d);
+    out += ",\"luzes\":";
+    if (d.grupos_luz.empty()) out += "null";
+    else {
+      const GrupoLuz& g = d.grupos_luz[0];
+      out += "{\"ambiente\":[";
+      for (int c = 0; c < 3; ++c) {
+        if (c) out += ',';
+        escreve_num(out, g.ambiente[c]);
+      }
+      out += "],\"pontos\":[";
+      for (int i = 0; i < g.quantas; ++i) {
+        if (i) out += ',';
+        out += '[';
+        for (int c = 0; c < 7; ++c) {
+          if (c) out += ',';
+          escreve_num(out, g.luzes[i][c]);
+        }
+        out += ']';
+      }
+      int lotes = 0;
+      for (const Lote& l : d.lotes) lotes += l.luz >= 0;
+      out += "],\"lotes\":" + std::to_string(lotes) + '}';
+    }
+  }
   // particulas vivas por emissor: [x, y, rot, idade, vida] (docs/NUCLEO.md "Particulas")
   if (!m.emissores.empty()) {
     out += ",\"particulas\":{";

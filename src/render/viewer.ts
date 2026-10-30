@@ -31,6 +31,7 @@ import type { ChangeEvent, Document, Path } from "../core/document.ts";
 import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/sim.ts";
 import { patchSkeletonData } from "../core/patch.ts";
 import { usarMedidas } from "../core/instantes.ts";
+import { parseAtlas } from "../core/atlas-text.ts";
 import { NucleoCena } from "./nucleo.ts";
 import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
 
@@ -273,6 +274,16 @@ export class Viewer {
           const img = crus.get(page.name);
           // o filtro da pagina do atlas (o mesmo que o spine-webgl usa)
           if (img) this.nucleo.poeTextura(page.name, img, { min: page.minFilter ?? gl.LINEAR, mag: page.magFilter ?? gl.LINEAR });
+        }
+        // o relevo das paginas (docs/NUCLEO.md "Luzes"): a linha relevo:<arquivo> do atlas; sem o
+        // arquivo, a pagina fica sem luz
+        for (const p of parseAtlas(doc.atlas.text).pages) {
+          const rel = p.extra.find((x) => x.startsWith("relevo:"))?.slice(7);
+          if (!rel) continue;
+          try {
+            const r = await fetch(urlFor(rel));
+            if (r.ok) this.nucleo.poeTextura(rel, await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" }));
+          } catch {}
         }
       } catch (e: any) {
         this.nucleoError = String(e?.message ?? e);

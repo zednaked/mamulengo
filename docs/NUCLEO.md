@@ -376,6 +376,57 @@ cópias pela especificação, com os vértices e os canais do `nucleo-pose` em c
 e em regiões, um que liga no meio e um que diminui as cópias e volta a aumentar), e compara com
 as cópias que o núcleo desenha.
 
+## Luzes
+
+O terceiro recurso além do Spine: luz dinâmica 2D sem o artista pintar nada. Cada página do
+atlas pode ter um **relevo** (um mapa de normais ao lado dela, `paginas[i].relevo`), que
+`tools/relevo.ts` calcula da própria imagem; as **luzes** (`luzes` no topo) são pontos presos a
+ossos, e a **ambiente** (`ambiente`) é a luz que chega em tudo. A exportação para o Spine tira
+luzes, ambiente e relevo, com aviso.
+
+| campo | padrão | o quê |
+|---|---|---|
+| `nome`, `osso` | (obrigatório), a raiz | `x`, `y` (0) é o ponto no osso |
+| `cor` | `ffffffff` | a cor da luz (o alfa multiplica a força) |
+| `forca` | 1 | quanto ela soma (a partir de 0) |
+| `raio` | 300 | em pixels do mundo: a luz some nessa distância no plano (a partir de 0) |
+| `altura` | 80 | acima do plano; baixa ilumina rasante, negativa vira contraluz |
+
+A ambiente tem `cor` (`ffffffff`) e `forca` (1); o padrão não muda nada. Animáveis:
+`animacoes.<a>.luzes.<nome>` (canais `r g b a forca raio altura`) e `animacoes.<a>.ambiente`
+(`r g b a forca`), com chaves como as dos efeitos (o campo que falta vale o da chave anterior; a
+mistura é a da cor). Limites: cor de 0 a 1, força e raio a partir de 0.
+
+**O relevo** (`tools/relevo.ts`). Para cada imagem das partes das skins (fora dos slots aditivo e
+tela, que são luz), no retângulo dela: a altura sobe da borda pela distância euclidiana até o
+transparente (alfa < 128), num perfil de almofada `sqrt(1 - (1 - t)^2)` com `t = min(d / borda, 1)`,
+vezes `profundidade`, mais `detalhe * luminancia * 0,25`, tudo vezes `borda` pixels; suaviza 3 x 3 e
+a normal é `normalize(-dh/dx, dh/dy, 1)` (o y da imagem desce, o do relevo sobe), em RGB
+`n * 0,5 + 0,5`. Fora das imagens e nas giradas, plano. Padrões: borda 12, profundidade 1,
+detalhe 0,2 (numa página 2x ou 3x, a borda vezes isso).
+
+**No desenho.** Um personagem monta um grupo de luz se alguma página tem relevo e a luz muda
+alguma coisa (alguma luz acesa ou a ambiente diferente de branco inteiro): a ambiente
+`cor * alfa * forca` e as luzes acesas (força, raio e alfa maiores que 0), na ordem do arquivo,
+até 8, cada uma com a posição em mundo (o ponto pela matriz do osso), a altura, `cor * alfa *
+forca` e o raio. Um lote de página com relevo e blend que não é aditivo nem tela aponta para o
+grupo (lotes com e sem luz não se juntam). Por fragmento, com `n` o relevo, `p` o ponto em mundo
+e `uv` a textura:
+
+1. a normal vai para o mundo pelas derivadas de tela: `J` leva `(du, dv)` a `(dx, dy)` (de
+   `dFdx` e `dFdy` de `p` e `uv`), e `N = normalize(n.x * Ju - n.y * Jv, n.z)` com `Ju`, `Jv` as
+   colunas de `J` normalizadas (o y do relevo sobe e o v da textura desce). Vale para peça
+   girada, espelhada ou deformada por malha, sem dado por vértice; com `J` degenerado, `N = (0, 0, 1)`;
+2. `L = (luz.xy - p, altura)`, atenuação `a = clamp(1 - |L.xy| / raio, 0, 1)`;
+3. a cor da imagem (depois do tingir, antes da linha e do halo) vezes
+   `ambiente + soma(cor * max(N . normalize(L), 0) * a^2)`.
+
+Conferência: `npx tsx tools/nucleo-luzes.ts` calcula os canais das luzes e da ambiente pelas
+timelines, põe cada luz em mundo pela matriz do osso (a do `nucleo-pose`) e compara com o grupo
+que o desenho do núcleo monta, em `tests/nucleo/luzes/luzes.boneco` (o robô CC0 com relevo,
+quatro luzes, uma apagada, uma contraluz e a ambiente animada). O desenho foi olhado no editor
+e no Godot 4.7.2 (Compatibility), com o mesmo resultado.
+
 ## Partículas
 
 O segundo recurso além do Spine: emissores de imagens pequenas (brilhos, moedas, faíscas) que

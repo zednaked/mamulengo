@@ -14,5 +14,6 @@ import "./study.ts";
 import "./estilo.ts";
 import "./psd.ts";
 import "./particles.ts";
+import "./lights.ts";
 
 export * from "./registry.ts";

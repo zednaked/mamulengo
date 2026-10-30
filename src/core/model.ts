@@ -152,7 +152,7 @@ export function channels(timeline: string): { key: string; def: number }[] {
       return [{ key: "value", def: NaN }];
     default:
       // efeitos: os campos numericos (a cor vai em keyFields, como no rgba)
-      if (isEffect(timeline)) return EFFECTS[timeline].filter(([f]) => f !== "color").map(([key, def]) => ({ key, def: def[0] }));
+      if (hasFields(timeline)) return FIELDS[timeline].filter(([f]) => f !== "color").map(([key, def]) => ({ key, def: def[0] }));
       return [];
   }
 }
@@ -189,10 +189,21 @@ export const EFFECTS: Record<string, [string, number[]][]> = {
 export const EFFECT_NAMES = Object.keys(EFFECTS);
 export const isEffect = (timeline: string) => timeline in EFFECTS;
 
+// ---- luzes (so do Mamulengo; docs/NUCLEO.md "Luzes"): `lights` e `ambient` no topo (setup) e
+// `animations.<a>.lights.<nome>` e `animations.<a>.ambient` (chaves). As chaves funcionam como as
+// dos efeitos (campos, cor em 4 canais, chave completa)
+export const LIGHT_FIELDS: Record<string, [string, number[]][]> = {
+  light: [["color", [1, 1, 1, 1]], ["strength", [1]], ["radius", [300]], ["height", [80]]],
+  ambient: [["color", [1, 1, 1, 1]], ["strength", [1]]],
+};
+// todas as timelines de campos (efeitos, luz, ambiente)
+const FIELDS: Record<string, [string, number[]][]> = { ...EFFECTS, ...LIGHT_FIELDS };
+export const hasFields = (timeline: string) => timeline in FIELDS;
+
 // valores de um efeito (canal a canal) a partir de um objeto com os campos; o que falta vem de `base`
 export function effectValues(effect: string, o: any, base?: number[]): number[] {
   const out: number[] = [];
-  for (const [f, def] of EFFECTS[effect]) {
+  for (const [f, def] of FIELDS[effect]) {
     const at = out.length;
     if (o?.[f] === undefined) out.push(...(base ? base.slice(at, at + def.length) : def));
     else if (f === "color") out.push(...parseColor(o[f]));
@@ -205,7 +216,7 @@ export function effectValues(effect: string, o: any, base?: number[]): number[] 
 export function effectFields(effect: string, v: number[]): Record<string, any> {
   const out: Record<string, any> = {};
   let c = 0;
-  for (const [f, def] of EFFECTS[effect]) {
+  for (const [f, def] of FIELDS[effect]) {
     out[f] = f === "color" ? formatColor(v.slice(c, c + 4)) : v[c];
     c += def.length;
   }
@@ -215,8 +226,21 @@ export function effectFields(effect: string, v: number[]): Record<string, any> {
 // valores de um efeito no tempo t (chaves lineares ou degrau, como no nucleo; as curvas
 // bezier sao aproximadas pela reta, que basta para preencher uma chave nova)
 export function effectAt(doc: any, anim: string | null, slot: string, effect: string, t: number): number[] {
-  const setup = effectValues(effect, doc.slots?.find((s: any) => s.name === slot)?.effects?.[effect]);
-  const keys: any[] = (anim && doc.animations?.[anim]?.effects?.[slot]?.[effect]) || [];
+  return fieldsAt(doc, anim, { slot }, effect, t);
+}
+
+// o mesmo para qualquer timeline de campos: efeito do slot, luz ({light}) ou ambiente
+export function fieldsAt(doc: any, anim: string | null, target: any, kind: string, t: number): number[] {
+  const a = anim ? doc.animations?.[anim] : null;
+  const [o, ks] =
+    kind === "light"
+      ? [doc.lights?.find((l: any) => l.name === target.light), a?.lights?.[target.light]]
+      : kind === "ambient"
+        ? [doc.ambient, a?.ambient]
+        : [doc.slots?.find((s: any) => s.name === target.slot)?.effects?.[kind], a?.effects?.[target.slot]?.[kind]];
+  const effect = kind;
+  const setup = effectValues(effect, o);
+  const keys: any[] = ks || [];
   if (!keys.length || t < (keys[0].time ?? 0)) return setup;
   let prev = setup;
   const vals = keys.map((k) => (prev = effectValues(effect, k, prev)));
@@ -231,7 +255,7 @@ export function effectAt(doc: any, anim: string | null, slot: string, effect: st
 
 // Valores numericos de uma chave, canal a canal (cores viram 0..1).
 export function keyValues(timeline: string, key: any): number[] {
-  if (isEffect(timeline)) return effectValues(timeline, key);
+  if (hasFields(timeline)) return effectValues(timeline, key);
   if (timeline === "rgba" || timeline === "rgb") return parseColor(key.color).slice(0, timeline === "rgb" ? 3 : 4);
   if (timeline === "rgba2" || timeline === "rgb2") {
     const light = parseColor(key.light);

@@ -57,6 +57,7 @@ void Esqueleto::setup() {
     s.borrar_t = s.borrar_t_ant = -1;
     s.rastro.clear();
   }
+  luzes_setup();
   for (size_t i = 0; i < m.emissores.size(); ++i) {
     emis_[i] = EstadoEmissor{};
     emis_[i].taxa = m.emissores[i].taxa;
@@ -261,6 +262,39 @@ void Esqueleto::aplicar_efeito(const TimelineEfeito& te, double t, double alfa, 
     }
   }
   e.limitar();
+}
+
+void Esqueleto::luzes_setup() {
+  const Modelo& m = *m_;
+  luzes_.resize(m.luzes.size());
+  for (size_t i = 0; i < m.luzes.size(); ++i) std::copy(m.luzes[i].v, m.luzes[i].v + CANAIS_LUZ, luzes_[i].begin());
+  std::copy(m.ambiente, m.ambiente + CANAIS_AMBIENTE, ambiente_);
+}
+
+void Esqueleto::aplicar_luz(const TimelineLuz& tl, double t, double alfa, Mistura mist) {
+  const Modelo& m = *m_;
+  float* v = tl.luz >= 0 ? luzes_[size_t(tl.luz)].data() : ambiente_;
+  const float* s = tl.luz >= 0 ? m.luzes[size_t(tl.luz)].v : m.ambiente;
+  const int nc = tl.tl.canais;
+  const int k = tl.tl.chave(t);
+  if (k < 0) {
+    if (mist == Mistura::Setup) {
+      for (int i = 0; i < nc; ++i) v[i] = s[i];
+    } else if (mist == Mistura::Primeira) {
+      for (int i = 0; i < nc; ++i) v[i] = float(v[i] + (s[i] - v[i]) * alfa);
+    }
+    return;
+  }
+  for (int i = 0; i < nc; ++i) {
+    const double x = tl.tl.valor(k, i, t);
+    if (alfa == 1) {
+      v[i] = float(x);
+    } else {
+      if (mist == Mistura::Setup) v[i] = s[i];
+      v[i] = float(v[i] + (x - v[i]) * alfa);
+    }
+  }
+  limitar_luz(v, nc);
 }
 
 void Esqueleto::aplicar_taxa(const TimelineTaxa& tt, double t, double alfa, Mistura mist) {
@@ -516,6 +550,7 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
     slots_[i].efeitos = m.slots[i].efeitos;
     mudar_parte(int(i), parte_setup(int(i)));
   }
+  luzes_setup();
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
     const DadosRestricao& d = m.restricoes[r];
     EstadoRestricao& e = rest_[r];
@@ -557,6 +592,7 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   ultima_anim_ = ai;
   ultimo_tempo_ = t;
   for (const TimelineTaxa& tt : an.taxas) aplicar_taxa(tt, t, 1, Mistura::Setup);
+  for (const TimelineLuz& tl : an.luzes) aplicar_luz(tl, t, 1, Mistura::Setup);
 
   // a mesma ordem do Estado: partes (o deformar so vale para a parte que o slot mostra), cores,
   // ossos, restricoes, deformar, ordem de desenho

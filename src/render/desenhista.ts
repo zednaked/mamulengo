@@ -27,7 +27,8 @@ export function carregarNucleo(url = new URL(NO_REPO, import.meta.url).href): Pr
 
 // ---- desenhista: WebGL2 com stencil para o recorte
 
-export type PaginaGL = { tex: WebGLTexture; pma: boolean };
+// relevo: o mapa de normais da pagina (docs/NUCLEO.md "Luzes"), se ela tem
+export type PaginaGL = { tex: WebGLTexture; pma: boolean; relevo?: WebGLTexture | null };
 
 // blend na ordem do enum Blend do nucleo: normal, aditivo, multiplica, multiplica do motor, tela
 // (a cor sai pre-multiplicada do shader)
@@ -44,18 +45,46 @@ const ATRIBUTOS = [["pos", 2, 0], ["uv", 2, 8], ["cor", 4, 16]] as const;
 const VERTICE = `#version 300 es
 in vec2 pos; in vec2 uv; in vec4 cor;
 uniform mat4 proj; // mundo (y para cima) -> recorte
-out vec2 vuv; out vec4 vcor;
-void main() { vuv = uv; vcor = cor; gl_Position = proj * vec4(pos, 0.0, 1.0); }`;
+out vec2 vuv; out vec4 vcor; out vec2 vmundo;
+void main() { vuv = uv; vcor = cor; vmundo = pos; gl_Position = proj * vec4(pos, 0.0, 1.0); }`;
+
+const LUZ = `// luzes (docs/NUCLEO.md "Luzes"): a normal do relevo girada para o mundo pelas derivadas de tela
+// (para onde andam +u e +v da textura), ambiente mais a soma de cada luz: cor x max(N.L, 0) x
+// atenuacao (1 - distancia no plano / raio)^2; L vai do pixel a luz, com a altura dela em z
+uniform bool iluminado; uniform sampler2D relevo; uniform vec3 ambiente; uniform int nluz;
+uniform vec4 luzP[8]; uniform vec3 luzC[8];
+vec3 luz(vec2 uv, vec2 mundo) {
+  vec3 n = texture(relevo, uv).rgb * 2.0 - 1.0;
+  vec2 dpx = dFdx(mundo), dpy = dFdy(mundo), dux = dFdx(uv), duy = dFdy(uv);
+  float det = dux.x * duy.y - duy.x * dux.y;
+  vec3 N = vec3(0.0, 0.0, 1.0);
+  if (abs(det) > 1e-14) {
+    vec2 ju = (dpx * duy.y - dpy * dux.y) / det, jv = (dpy * dux.x - dpx * duy.x) / det;
+    // o y do relevo sobe e o v da textura desce
+    N = normalize(vec3(n.x * normalize(ju) - n.y * normalize(jv), n.z));
+  }
+  vec3 soma = ambiente;
+  for (int i = 0; i < 8; i++) {
+    if (i >= nluz) break;
+    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z);
+    float at = clamp(1.0 - length(L.xy) / luzP[i].w, 0.0, 1.0);
+    soma += luzC[i] * max(dot(N, normalize(L)), 0.0) * at * at;
+  }
+  return soma;
+}
+`;
 
 const FRAGMENTO = `#version 300 es
-precision mediump float;
-in vec2 vuv; in vec4 vcor;
+precision highp float;
+in vec2 vuv; in vec4 vcor; in vec2 vmundo;
 uniform sampler2D tex; uniform bool pma; uniform bool motor;
 out vec4 saida;
+${LUZ}
 void main() {
   vec4 t = texture(tex, vuv);
   if (pma && t.a > 0.0) t.rgb /= t.a;
   vec3 c = t.rgb * vcor.rgb;
+  if (iluminado) c *= luz(vuv, vmundo);
   float a = t.a * vcor.a;
   // multiplica do motor: so a cor, sem o alfa (o retangulo escuro do Godot)
   saida = motor ? vec4(c, 1.0) : vec4(c * a, a);
@@ -65,7 +94,7 @@ void main() {
 // 5-10, dissolver 11-17, tingir 18-22); a textura so vale dentro da caixa da imagem
 const FRAGMENTO_EFEITOS = `#version 300 es
 precision highp float; precision highp int;
-in vec2 vuv; in vec4 vcor;
+in vec2 vuv; in vec4 vcor; in vec2 vmundo;
 uniform sampler2D tex; uniform bool pma; uniform bool motor;
 uniform float ef[23]; uniform vec4 caixa; uniform vec2 pagina;
 out vec4 saida;
@@ -86,6 +115,7 @@ float ruido(vec2 p) {
   uint i = uint(int(c.x)), j = uint(int(c.y));
   return mix(mix(hash(i, j), hash(i + 1u, j), f.x), mix(hash(i, j + 1u), hash(i + 1u, j + 1u), f.x), f.y);
 }
+${LUZ}
 vec4 sobre(vec4 cima, vec4 baixo) {
   float a = cima.a + baixo.a * (1.0 - cima.a);
   return a > 0.0 ? vec4((cima.rgb * cima.a + baixo.rgb * baixo.a * (1.0 - cima.a)) / a, a) : vec4(0.0);
@@ -96,6 +126,7 @@ void main() {
   vec4 C = vec4(t.rgb * vcor.rgb, t.a * vcor.a);
   float ft = ef[22] * ef[21];
   if (ft > 0.0) C.rgb = mix(C.rgb, vec3(ef[18], ef[19], ef[20]), ft);
+  if (iluminado) C.rgb *= luz(vuv, vmundo);
   vec4 U = vec4(0.0);
   // miolo opaco: a linha e o halo ficam por baixo e nao aparecem (F = C); nem amostra
   bool opaco = C.a >= 1.0;
@@ -142,6 +173,8 @@ export class Desenhista {
   private uProj: WebGLUniformLocation | null;
   private uPma: WebGLUniformLocation | null;
   private uMotor: WebGLUniformLocation | null;
+  // as uniformes da luz nos dois programas
+  private uLuz = new Map<WebGLProgram, Record<string, WebGLUniformLocation | null>>();
   private vbo: WebGLBuffer;
   private ibo: WebGLBuffer;
   private vao: WebGLVertexArrayObject;
@@ -172,6 +205,14 @@ export class Desenhista {
     this.uMotor = gl.getUniformLocation(this.prog, "motor");
     this.progEf = programa(FRAGMENTO_EFEITOS);
     for (const u of ["proj", "pma", "motor", "ef", "caixa", "pagina"]) this.uEf[u] = gl.getUniformLocation(this.progEf, u);
+    for (const p of [this.prog, this.progEf]) {
+      const u: Record<string, WebGLUniformLocation | null> = {};
+      for (const n of ["iluminado", "relevo", "ambiente", "nluz", "luzP", "luzC", "tex"]) u[n] = gl.getUniformLocation(p, n);
+      this.uLuz.set(p, u);
+      gl.useProgram(p);
+      gl.uniform1i(u.tex, 0);
+      gl.uniform1i(u.relevo, 1);
+    }
     this.vbo = gl.createBuffer()!;
     this.ibo = gl.createBuffer()!;
     this.vao = gl.createVertexArray()!;
@@ -215,7 +256,12 @@ export class Desenhista {
     const v = N.HEAPF32.subarray(N._mm_vertices() / 4, N._mm_vertices() / 4 + nv * 8);
     const ind = N.HEAPU32.subarray(N._mm_indices() / 4, N._mm_indices() / 4 + ni);
     const pl = N._mm_lotes() / 4;
-    const lotes = N.HEAP32.subarray(pl, pl + nl * 6);
+    const lotes = N.HEAP32.subarray(pl, pl + nl * 7);
+    const ng = N._mm_num_grupos_luz(),
+      pg = N._mm_grupos_luz() / 4;
+    const grupos = ng ? N.HEAPF32.subarray(pg, pg + ng * 60) : null;
+    const luzP = new Float32Array(32),
+      luzC = new Float32Array(24);
     const ne = N._mm_num_efeitos(),
       pe = N._mm_efeitos() / 4;
     const efeitos = ne ? N.HEAPF32.subarray(pe, pe + ne * 29) : null;
@@ -236,12 +282,13 @@ export class Desenhista {
     gl.disable(gl.STENCIL_TEST);
     let chamadas = 0;
     for (let i = 0; i < nl; i++) {
-      const cmd = lotes[i * 6],
-        pag = lotes[i * 6 + 1],
-        blend = lotes[i * 6 + 2],
-        inicio = lotes[i * 6 + 3],
-        quantos = lotes[i * 6 + 4],
-        ef = lotes[i * 6 + 5];
+      const cmd = lotes[i * 7],
+        pag = lotes[i * 7 + 1],
+        blend = lotes[i * 7 + 2],
+        inicio = lotes[i * 7 + 3],
+        quantos = lotes[i * 7 + 4],
+        ef = lotes[i * 7 + 5],
+        grupo = lotes[i * 7 + 6];
       if (cmd === 1) {
         // recorte: marca o poligono no stencil (leque com inversao serve para poligono concavo)
         gl.enable(gl.STENCIL_TEST);
@@ -278,6 +325,26 @@ export class Desenhista {
       } else {
         gl.uniform1i(this.uPma, p.pma ? 1 : 0);
         gl.uniform1i(this.uMotor, blend === 3 ? 1 : 0);
+      }
+      // luz: o relevo da pagina na unidade 1 e o grupo do personagem (sem relevo carregado, sem luz)
+      const ul = this.uLuz.get(quer)!;
+      const acesa = grupo >= 0 && grupos && p.relevo;
+      gl.uniform1i(ul.iluminado, acesa ? 1 : 0);
+      if (acesa) {
+        const o = grupo * 60,
+          n = Math.min(8, grupos![o + 3]);
+        for (let k = 0; k < n; k++) {
+          const q = o + 4 + k * 7;
+          luzP.set([grupos![q], grupos![q + 1], grupos![q + 2], grupos![q + 6]], k * 4);
+          luzC.set([grupos![q + 3], grupos![q + 4], grupos![q + 5]], k * 3);
+        }
+        gl.uniform3f(ul.ambiente, grupos![o], grupos![o + 1], grupos![o + 2]);
+        gl.uniform1i(ul.nluz, n);
+        gl.uniform4fv(ul.luzP, luzP);
+        gl.uniform3fv(ul.luzC, luzC);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, p.relevo!);
+        gl.activeTexture(gl.TEXTURE0);
       }
       const [s, d] = this.BLENDS[blend] ?? this.BLENDS[0];
       gl.blendFuncSeparate(s, d, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);

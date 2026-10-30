@@ -8,16 +8,17 @@
 //   invertido e essa gravidade puxa para o outro lado; ver src/core/pose.ts godotGravity);
 // - blend multiply vira "multiplica" (com transparencia, o que o artista ve no editor) ou
 //   "multiplica_motor" (o do Godot, que ignora a transparencia), conforme o jogo.
-// Os efeitos e as particulas (que o Spine nao tem) vao e voltam como `effects` (no slot e na
-// animacao) e `particles` (no topo e na animacao), onde o spine-core nao le; so a exportacao
-// para o Spine de verdade (`soSpine`) os tira.
+// Os efeitos, as particulas e as luzes (que o Spine nao tem) vao e voltam como `effects` (no slot
+// e na animacao), `particles`, `lights` e `ambient` (no topo e na animacao), onde o spine-core nao
+// le, e o relevo da pagina como a linha `relevo:<arquivo>` do atlas; so a exportacao para o Spine
+// de verdade (`soSpine`) os tira.
 import { CAMPOS, CAMPOS_VOLTA, VALORES, VALORES_VOLTA } from "./dicionario.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
 
 export const VERSAO = 0;
 
 // caminhos (so as chaves do esquema, sem indices) cujas chaves sao nomes do artista
-const MAPA_DE_NOMES = /^(events|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
+const MAPA_DE_NOMES = /^(events|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
 
 function traduz(n: any, campos: Record<string, string>, valores: Record<string, Record<string, string>>, eNome: (p: string) => boolean, p: string[] = []): any {
   if (Array.isArray(n)) return n.map((x) => traduz(x, campos, valores, eNome, p));
@@ -126,7 +127,8 @@ function atlasParaBoneco(texto: string) {
     ...(p.pma ? { pma: true } : {}),
     ...(p.filter !== "Linear,Linear" ? { filtro: p.filter } : {}),
     ...(p.scale !== undefined ? { escala: p.scale } : {}),
-    ...(p.extra.length ? { extras: p.extra } : {}),
+    ...(p.extra.some((x) => x.startsWith("relevo:")) ? { relevo: p.extra.find((x) => x.startsWith("relevo:"))!.slice(7) } : {}),
+    ...(p.extra.filter((x) => !x.startsWith("relevo:")).length ? { extras: p.extra.filter((x) => !x.startsWith("relevo:")) } : {}),
   }));
   const imagens = regions.map((r) => ({
     nome: r.name,
@@ -148,6 +150,7 @@ export function atlasTexto(b: Boneco): string {
     linhas.push(p.arquivo, `size:${p.tamanho[0]},${p.tamanho[1]}`, `filter:${p.filtro ?? "Linear,Linear"}`);
     if (p.pma) linhas.push("pma:true");
     if (p.escala !== undefined) linhas.push(`scale:${p.escala}`);
+    if (p.relevo) linhas.push(`relevo:${p.relevo}`);
     linhas.push(...(p.extras ?? []));
     for (const im of (b.imagens ?? []).filter((x: any) => x.pagina === i)) {
       linhas.push(im.nome, `bounds:${im.ret.join(",")}`);
@@ -228,6 +231,15 @@ export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
       avisos.push(`particulas (${resto.particulas.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);
       delete resto.particulas;
     }
+    if (resto.luzes?.length || resto.ambiente) {
+      avisos.push(`luzes${resto.luzes?.length ? ` (${resto.luzes.map((l: any) => l.nome).join(", ")})` : ""} e ambiente nao existem no Spine e ficaram de fora`);
+      delete resto.luzes;
+      delete resto.ambiente;
+    }
+    for (const a of Object.values<any>(resto.animacoes ?? {})) {
+      delete a.luzes;
+      delete a.ambiente;
+    }
   }
   for (const s of resto.slots ?? []) {
     if (s.blend === "multiplica") {
@@ -245,5 +257,9 @@ export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
   );
   const j = traduz(resto, CAMPOS_VOLTA, VALORES_VOLTA, (p) => MAPA_DE_NOMES.test(voltaCaminho(p)));
   trocaGravidade(j);
-  return { json: j, atlas: atlasTexto(b), avisos };
+  // o relevo das paginas (docs/NUCLEO.md "Luzes") vai como linha do atlas, que o Spine de verdade nao conhece
+  const relevo = (paginas ?? []).filter((p: any) => p.relevo);
+  if (opts.soSpine && relevo.length) avisos.push(`o relevo das paginas (${relevo.map((p: any) => p.arquivo).join(", ")}) nao existe no Spine e ficou de fora`);
+  const semRelevo = opts.soSpine && relevo.length ? { ...b, paginas: (paginas ?? []).map(({ relevo: _r, ...p }: any) => p) } : b;
+  return { json: j, atlas: atlasTexto(semRelevo), avisos };
 }

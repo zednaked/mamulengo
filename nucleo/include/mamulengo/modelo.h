@@ -295,6 +295,30 @@ struct TimelineTaxa {
   Timeline tl;  // 1 canal
 };
 
+// ---- luzes (docs/NUCLEO.md "Luzes"): pontos de luz presos a ossos e a luz ambiente, que
+// iluminam as pecas pelas paginas com relevo
+constexpr int CANAIS_LUZ = 7;       // r g b a, forca, raio, altura
+constexpr int CANAIS_AMBIENTE = 5;  // r g b a, forca
+constexpr int MAX_LUZES = 8;        // por personagem, no desenho
+enum : int { LUZ_R = 0, LUZ_A = 3, LUZ_FORCA = 4, LUZ_RAIO = 5, LUZ_ALTURA = 6, AMBIENTE_FORCA = 4 };
+struct DadosLuz {
+  std::string nome;
+  int osso = 0;
+  double x = 0, y = 0;  // ponto no osso
+  float v[CANAIS_LUZ] = {1, 1, 1, 1, 1, 300, 80};
+};
+// cor de 0 a 1, forca e raio a partir de 0; a altura pode ser qualquer (abaixo do plano: luz
+// rasante por tras). Serve para luz (7 canais) e ambiente (5)
+inline void limitar_luz(float* v, int n) {
+  for (int i = 0; i < 4; ++i) v[i] = std::min(std::max(v[i], 0.0f), 1.0f);
+  for (int i = 4; i < n && i < 6; ++i) v[i] = std::max(v[i], 0.0f);
+}
+// timeline de uma luz (luz >= 0) ou da ambiente (luz = -1)
+struct TimelineLuz {
+  int luz;
+  Timeline tl;
+};
+
 struct TimelineRajada {
   int emissor;
   std::vector<double> tempos;
@@ -364,6 +388,7 @@ struct Animacao {
   std::vector<TimelineCor> cores;
   std::vector<TimelineEfeito> efeitos;
   std::vector<TimelineTaxa> taxas;
+  std::vector<TimelineLuz> luzes;
   std::vector<TimelineRajada> rajadas;
   std::vector<TimelineParte> partes;
   std::vector<TimelineDeformar> deformar;
@@ -385,6 +410,7 @@ struct Pagina {
   std::string arquivo;
   int largura = 0, altura = 0;
   bool pma = false;  // cores ja multiplicadas pelo alfa
+  std::string relevo;  // o mapa de normais ao lado (docs/NUCLEO.md "Luzes"); vazio: sem relevo
 };
 
 struct Modelo {
@@ -397,6 +423,8 @@ struct Modelo {
   std::vector<Skin> skins;  // a 0 e a "default" (criada vazia se o arquivo nao tem)
   std::vector<DadosRestricao> restricoes;
   std::vector<DadosEmissor> emissores;
+  std::vector<DadosLuz> luzes;
+  float ambiente[CANAIS_AMBIENTE] = {1, 1, 1, 1, 1};
   std::vector<std::vector<int>> emissores_do_slot;  // por slot, os emissores que desenham nele
   std::vector<std::vector<int>> orbitas_atras;      // por slot, as orbitas cujas de tras desenham nele
   std::vector<Animacao> animacoes;

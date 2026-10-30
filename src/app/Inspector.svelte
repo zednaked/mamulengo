@@ -4,7 +4,7 @@
   import { applyLocal } from "./interact.ts";
   import { startMeshEdit } from "./meshedit.ts";
   import MeshPanel from "./MeshPanel.svelte";
-  import { EFFECT_NAMES, effectAt, effectFields } from "../core/model.ts";
+  import { EFFECT_NAMES, effectAt, effectFields, fieldsAt } from "../core/model.ts";
 
   const FIELDS = [
     { k: "x", label: "x", step: 1 },
@@ -153,6 +153,47 @@
       });
   });
   const animando = $derived(app.mode === "animate" && !!app.play.animation);
+
+  // ---- luzes (so .boneco; docs/NUCLEO.md "Luzes"): as presas a este osso e a ambiente
+  const CAMPOS_LUZ = [
+    { k: "strength", label: "forca", min: 0, max: 4, step: 0.05, dica: "quanto a luz soma (1: a cor dela inteira)" },
+    { k: "radius", label: "raio", min: 0, max: 1500, step: 10, dica: "a luz some nessa distancia, em pixels do mundo" },
+    { k: "height", label: "altura", min: -300, max: 500, step: 5, dica: "acima do plano; baixa ilumina rasante, negativa vira contraluz" },
+  ];
+  const luzesDoOsso = $derived.by(() => {
+    app.version;
+    app.play.time;
+    if (!bone || !app.doc || !ehBoneco) return [];
+    const anim = app.mode === "animate" ? app.play.animation : null;
+    return ((app.doc.json as any).lights ?? []).filter((l: any) => l.bone === bone.name).map((l: any) => ({ n: l.name as string, v: effectFields("light", fieldsAt(app.doc!.json, anim, { light: l.name }, "light", app.play.time)) }));
+  });
+  const ambiente = $derived.by(() => {
+    app.version;
+    app.play.time;
+    const j = app.doc?.json as any;
+    if (!j || !ehBoneco || !(j.lights?.length || j.ambient)) return null;
+    return effectFields("ambient", fieldsAt(j, app.mode === "animate" ? app.play.animation : null, { ambient: true }, "ambient", app.play.time));
+  });
+  // sem relevo nas paginas, as luzes nao tem o que iluminar
+  const semRelevo = $derived(!!app.doc && !/^relevo:/m.test(app.doc.atlas.text));
+  function setLuz(n: string, campo: string, valor: any) {
+    if (animando) {
+      const time = +app.play.time.toFixed(4);
+      app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { light: n }, timeline: "light", time, [campo]: valor } }, `luz ${n} @${time}`, `luz-${n}-${campo}-${time}`);
+    } else app.run({ cmd: "light.set", args: { name: n, [campo]: valor } }, `luz ${n}`, `luz-${n}-${campo}`);
+  }
+  function setAmbiente(campo: string, valor: any) {
+    if (animando) {
+      const time = +app.play.time.toFixed(4);
+      app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { ambient: true }, timeline: "ambient", time, [campo]: valor } }, `ambiente @${time}`, `amb-${campo}-${time}`);
+    } else app.run({ cmd: "ambient.set", args: { [campo]: valor } }, "luz ambiente", `amb-${campo}`);
+  }
+  function novaLuz() {
+    if (!bone) return;
+    let nome = "luz";
+    for (let n = 2; ((app.doc?.json as any).lights ?? []).some((l: any) => l.name === nome); n++) nome = `luz_${n}`;
+    app.run({ cmd: "light.set", args: { name: nome, bone: bone.name, color: "ffeecc", strength: 1.2, radius: 400, height: 100 } }, `luz em ${bone.name}`);
+  }
   function setP(nome: string, campo: string, valor: number, atual: any) {
     if (animando && campo === "rate") {
       const time = +app.play.time.toFixed(4);
@@ -324,6 +365,44 @@
             <button class="x" title="remover" onclick={() => app.run({ cmd: "constraint.delete", args: { name: c.name } })}>✕</button>
           </div>
         {/each}
+      </div>
+    {/if}
+    {#if ehBoneco}
+      <div class="efeitos">
+        <div class="dim small">
+          Luzes (do Mamulengo): presas a este osso, iluminam as paginas com relevo. {animando ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
+          {#if semRelevo}<br />Sem relevo nas paginas: <code>npx tsx tools/relevo.ts x.boneco --gravar</code>{/if}
+        </div>
+        {#each luzesDoOsso as l (l.n)}
+          <div class="ef">
+            <div class="efnome" title="luz presa em {bone.name}">
+              <span>💡 {l.n}</span>
+              <input type="color" value={"#" + l.v.color.slice(0, 6)} title="cor" oninput={(e) => setLuz(l.n, "color", (e.target as HTMLInputElement).value.slice(1) + l.v.color.slice(6, 8))} />
+              {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "light.delete", args: { name: l.n } }, `apaga ${l.n}`)} title="apagar a luz">✕</button>{/if}
+            </div>
+            {#each CAMPOS_LUZ as c}
+              <label class="efcampo" title={c.dica}>
+                <span>{c.label}</span>
+                <input type="range" min={c.min} max={c.max} step={c.step} value={l.v[c.k]} oninput={(e) => setLuz(l.n, c.k, +(e.target as HTMLInputElement).value)} />
+                <span class="num">{(+l.v[c.k]).toFixed(c.step < 1 ? 2 : 0)}</span>
+              </label>
+            {/each}
+          </div>
+        {/each}
+        {#if ambiente}
+          <div class="ef">
+            <div class="efnome" title="a luz que chega em tudo que tem relevo, somada as luzes">
+              <span>ambiente</span>
+              <input type="color" value={"#" + ambiente.color.slice(0, 6)} title="cor" oninput={(e) => setAmbiente("color", (e.target as HTMLInputElement).value.slice(1) + ambiente!.color.slice(6, 8))} />
+            </div>
+            <label class="efcampo" title="1: as cores como sao; abaixo, o que nenhuma luz alcanca escurece">
+              <span>forca</span>
+              <input type="range" min="0" max="2" step="0.05" value={ambiente.strength} oninput={(e) => setAmbiente("strength", +(e.target as HTMLInputElement).value)} />
+              <span class="num">{(+ambiente.strength).toFixed(2)}</span>
+            </label>
+          </div>
+        {/if}
+        {#if !animando}<button onclick={novaLuz} title="uma luz presa a este osso (anda com ele)">+ luz</button>{/if}
       </div>
     {/if}
   {:else}

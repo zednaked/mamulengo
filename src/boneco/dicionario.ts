@@ -147,6 +147,9 @@ export const CAMPOS: Record<string, string> = {
   // particulas (so do Mamulengo; docs/NUCLEO.md "Particulas"); a escala do emissor fica
   // "escala" nos dois lados (scale ja e a timeline "escalar")
   particles: "particulas",
+  // luzes (so do Mamulengo; docs/NUCLEO.md "Luzes"); altura, raio, forca, cor e osso ja estao acima
+  lights: "luzes",
+  ambient: "ambiente",
   image: "imagem",
   rate: "taxa",
   life: "vida",

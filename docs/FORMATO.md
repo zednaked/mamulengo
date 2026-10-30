@@ -42,7 +42,7 @@ sentidos (nada se perde numa ida e volta).
   "boneco": 0,
   "nome": "monstro",
   "paginas": [ { "arquivo": "monstro.webp", "tamanho": [187, 494],
-                 "jogo": { "compressao": "perda", "qualidade": 0.7 } } ],   // pma, filtro, escala se houver
+                 "jogo": { "compressao": "perda", "qualidade": 0.7 } } ],   // pma, filtro, escala, relevo se houver
   "imagens": [ { "nome": "antena", "pagina": 0, "ret": [147, 403, 38, 58] } ], // girada, corte, indice se houver
   "esqueleto": { "versao_spine": "4.3.23", "x": -95, "y": -4, "largura": 190, "altura": 250 },
   "ossos": [ { "nome": "root" }, { "nome": "base", "pai": "root" },
@@ -54,6 +54,8 @@ sentidos (nada se perde numa ida e volta).
   "restricoes": [ { "tipo": "fisica", "nome": "antena_fisica", "osso": "antena", "girar": 1,
                     "inercia": 0.8, "forca": 60, "amortecimento": 0.6 } ],
   "eventos": { "passo": { "inteiro": 1 } },
+  "luzes": [ { "nome": "chave", "osso": "root", "x": 300, "y": 460, "cor": "fff0dcff", "forca": 0.6, "raio": 1100, "altura": 260 } ],
+  "ambiente": { "cor": "c9d3eeff", "forca": 0.8 },   // luzes e relevo da pagina: docs/NUCLEO.md "Luzes"
   "animacoes": { "idle": { "ossos": { "topo": { "girar": [
       { "valor": -5, "curva": [0.125, -5, 0.375, 0] }, { "tempo": 0.5, ... } ] } },
       "slots": { "olho": { "parte": [ { "tempo": 1.2, "nome": "olho_fechado" } ] } } } },

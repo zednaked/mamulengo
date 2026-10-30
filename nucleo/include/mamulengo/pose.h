@@ -13,6 +13,7 @@
 // o que nenhuma timeline toca fica como estava (inclusive o que o jogo mudou).
 #pragma once
 
+#include <array>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -112,6 +113,8 @@ class Esqueleto {
   void aplicar_cor(const TimelineCor& tl, double t, double alfa, Mistura mist);
   void aplicar_efeito(const TimelineEfeito& tl, double t, double alfa, Mistura mist);
   void aplicar_taxa(const TimelineTaxa& tl, double t, double alfa, Mistura mist);
+  // luz (tl.luz >= 0) ou ambiente (tl.luz = -1), como aplicar_cor para os canais dela
+  void aplicar_luz(const TimelineLuz& tl, double t, double alfa, Mistura mist);
   // rajadas com tempo em (de, ate]; com ate < de (a animacao deu a volta), as depois de `de` e
   // as ate `ate`
   void aplicar_rajada(const TimelineRajada& tl, double de, double ate);
@@ -155,6 +158,11 @@ class Esqueleto {
   const std::vector<int>& ordem() const { return ordem_; }
   std::vector<EstadoRestricao>& restricoes() { return rest_; }
   std::vector<EstadoEmissor>& emissores() { return emis_; }
+  // luzes (docs/NUCLEO.md "Luzes"): os canais animados de cada luz e da ambiente
+  std::vector<std::array<float, CANAIS_LUZ>>& luzes() { return luzes_; }
+  const std::vector<std::array<float, CANAIS_LUZ>>& luzes() const { return luzes_; }
+  float* ambiente() { return ambiente_; }
+  const float* ambiente() const { return ambiente_; }
   const std::vector<EstadoEmissor>& emissores() const { return emis_; }
 
   // vertices em mundo da parte do slot (regiao: 4 cantos; malha: 2 numeros por vertice);
@@ -177,6 +185,9 @@ class Esqueleto {
   std::vector<int> ordem_;
   std::vector<EstadoRestricao> rest_;
   std::vector<EstadoEmissor> emis_;
+  std::vector<std::array<float, CANAIS_LUZ>> luzes_;
+  float ambiente_[CANAIS_AMBIENTE] = {1, 1, 1, 1, 1};
+  void luzes_setup();
   // aplicar() sem Estado: a animacao e o tempo da ultima vez (para as rajadas)
   int ultima_anim_ = -1;
   double ultimo_tempo_ = 0;

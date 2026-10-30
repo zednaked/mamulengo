@@ -87,6 +87,12 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   moves vertices and costs next to nothing on the GPU.
 - **Trail:** fading copies of a part from the frames before, behind it, for punches,
   jumps and spins; the same image and batch, just more geometry.
+- **Dynamic 2D light, with nothing for the artist to paint:** `tools/relevo.ts`
+  builds a normal map for each atlas page from the art itself (pillowed edges plus
+  a little of the shading), and point lights tied to bones light every part, turned,
+  mirrored or deformed by a mesh. Light color, strength, radius and height are keyed
+  on the timeline, so a jet's fire can light the legs from below and a lightning bolt
+  can flash the face.
 - **Particles attached to bones:** sprite emitters with rate and bursts, color
   ramps, additive blend and sway (fire, sparks, smoke); procedural **lightning**
   between two bones; a ring in **orbit** that passes behind and in front of the

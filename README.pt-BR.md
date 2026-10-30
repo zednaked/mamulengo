@@ -87,6 +87,11 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   só move vértices e quase não custa na GPU.
 - **Rastro:** cópias da parte nos quadros anteriores, por trás dela e cada vez mais
   fracas, para golpes, pulos e giros; a mesma imagem e o mesmo lote, só mais geometria.
+- **Luz dinâmica 2D, sem o artista pintar nada:** `tools/relevo.ts` calcula um mapa de
+  normais de cada página do atlas a partir da própria arte (bordas em almofada e um
+  pouco do sombreado), e luzes presas a ossos iluminam cada parte, girada, espelhada
+  ou deformada por malha. Cor, força, raio e altura da luz têm chave na timeline: o
+  fogo do jato ilumina as pernas por baixo e o raio acende o rosto.
 - **Partículas presas a ossos:** emissores de imagens com taxa e rajadas, rampa
   de cores, soma de luz e tremor (fogo, faíscas, fumaça); **raio** procedural
   entre dois ossos; um anel em **órbita** que passa por trás e pela frente do

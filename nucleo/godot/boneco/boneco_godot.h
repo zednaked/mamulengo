@@ -43,6 +43,7 @@ class BonecoData : public Resource {
  public:
   std::shared_ptr<const mamulengo::Modelo> modelo;
   Vector<Ref<Texture2D>> paginas;
+  Vector<Ref<Texture2D>> relevos;  // por pagina, o relevo (nulo: sem relevo)
   Rect2 caixa;  // esqueleto x, y, largura, altura (unidades do arquivo, y para cima)
   String caminho, erro;
 
@@ -215,7 +216,7 @@ class BonecoSprite : public Node2D {
   Vector<RID> material_item;
   // material proprio de cada item que ja desenhou um slot com efeitos (os valores sao do slot)
   Vector<RID> material_efeito;
-  Vector<int> passo_efeito;  // o passo de blend do shader posto em cada um (-1: nenhum)
+  Vector<int> passo_efeito;  // o shader posto em cada um: passo x 4 + efeitos + 2 x luz (-1: nenhum)
   Vector<Vector<int>> indices_item;
   Vector<int> vertices_item;
   // o que foi enviado por ultimo a cada malha: so reenvia o que mudou (peca parada nao custa)

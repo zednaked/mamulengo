@@ -107,10 +107,14 @@ int tipo_efeito(std::string_view nome) {
   return -1;
 }
 
-// os canais do efeito `t` lidos de `j` para `v` (o que falta fica como esta em `v`)
-void ler_campos_efeito(int t, const Json& j, float* v) {
+// luzes (docs/NUCLEO.md "Luzes"): os campos na ordem dos canais
+const std::vector<CampoEfeito> CAMPOS_LUZ = {{"cor", true}, {"forca", false}, {"raio", false}, {"altura", false}};
+const std::vector<CampoEfeito> CAMPOS_AMBIENTE = {{"cor", true}, {"forca", false}};
+
+// os canais dos `campos` lidos de `j` para `v` (o que falta fica como esta em `v`)
+void ler_campos(const std::vector<CampoEfeito>& campos, const Json& j, float* v) {
   int c = 0;
-  for (const CampoEfeito& ce : CAMPOS_EFEITO[t]) {
+  for (const CampoEfeito& ce : campos) {
     if (ce.cor) {
       if (const Json* x = j.acha(ce.nome); x && x->texto()) {
         const Cor k = cor_hex(x->str());
@@ -124,21 +128,27 @@ void ler_campos_efeito(int t, const Json& j, float* v) {
   }
 }
 
-// timeline de um efeito; o campo que falta na chave vale o da chave anterior (na primeira, o
-// do setup)
-Timeline ler_timeline_efeito(const Json& chaves, int t, const Efeitos& setup) {
+void ler_campos_efeito(int t, const Json& j, float* v) { ler_campos(CAMPOS_EFEITO[t], j, v); }
+
+// timeline de campos (efeito, luz, ambiente); o campo que falta na chave vale o da chave
+// anterior (na primeira, o do setup)
+Timeline ler_timeline_campos(const Json& chaves, const std::vector<CampoEfeito>& campos, const float* setup, int canais) {
   Timeline tl;
-  tl.canais = EFEITO_CANAIS[t];
-  float v[7];
-  std::copy(setup.v + EFEITO_INICIO[t], setup.v + EFEITO_INICIO[t] + tl.canais, v);
+  tl.canais = canais;
+  float v[8];
+  std::copy(setup, setup + canais, v);
   for (const Json& k : chaves.itens()) {
     tl.tempos.push_back(f32(k.num("tempo", 0)));
-    ler_campos_efeito(t, k, v);
+    ler_campos(campos, k, v);
     for (int c = 0; c < tl.canais; ++c) tl.valores.push_back(v[c]);
     ler_curva(tl, k);
   }
   tl.preparar();
   return tl;
+}
+
+Timeline ler_timeline_efeito(const Json& chaves, int t, const Efeitos& setup) {
+  return ler_timeline_campos(chaves, CAMPOS_EFEITO[t], setup.v + EFEITO_INICIO[t], EFEITO_CANAIS[t]);
 }
 
 Blend ler_blend(const std::string& s) {
@@ -211,6 +221,7 @@ class Leitor {
       p.largura = int(pg["tamanho"][0].num(0));
       p.altura = int(pg["tamanho"][1].num(0));
       p.pma = pg.sim("pma", false);
+      p.relevo = pg.str("relevo", "");
       m.paginas.push_back(std::move(p));
     }
     for (const Json& im : r["imagens"].itens()) {
@@ -236,6 +247,7 @@ class Leitor {
     ler_skins(r["skins"]);
     ler_restricoes(r["restricoes"]);
     ler_particulas(r["particulas"]);
+    ler_luzes(r["luzes"], r["ambiente"]);
     for (const auto& [nome, d] : r["eventos"].campos()) {
       DadosEvento e;
       e.nome = nome;
@@ -266,6 +278,30 @@ class Leitor {
   int emissor(const std::string& nome) const {
     for (size_t i = 0; i < m.emissores.size(); ++i)
       if (m.emissores[i].nome == nome) return int(i);
+    return -1;
+  }
+
+  // luzes (docs/NUCLEO.md "Luzes"): presas a um osso (root se nao diz), e a ambiente
+  void ler_luzes(const Json& lista, const Json& ambiente) {
+    for (const Json& j : lista.itens()) {
+      DadosLuz d;
+      d.nome = j.str("nome", "");
+      if (luz(d.nome) >= 0) falha("luzes: luz repetida " + d.nome);
+      d.osso = j.acha("osso") ? osso(j["osso"], "luzes") : 0;
+      d.x = j.num("x", 0);
+      d.y = j.num("y", 0);
+      ler_campos(CAMPOS_LUZ, j, d.v);
+      limitar_luz(d.v, CANAIS_LUZ);
+      m.luzes.push_back(std::move(d));
+    }
+    if (ambiente.objeto()) {
+      ler_campos(CAMPOS_AMBIENTE, ambiente, m.ambiente);
+      limitar_luz(m.ambiente, CANAIS_AMBIENTE);
+    }
+  }
+  int luz(const std::string& nome) const {
+    for (size_t i = 0; i < m.luzes.size(); ++i)
+      if (m.luzes[i].nome == nome) return int(i);
     return -1;
   }
 
@@ -806,6 +842,24 @@ class Leitor {
         conta(te.tl.fim());
         an.efeitos.push_back(std::move(te));
       }
+    }
+
+    // luzes: nome -> [chaves]; ambiente: [chaves]
+    for (const auto& [nome_luz, chaves] : a["luzes"].campos()) {
+      const int il = luz(nome_luz);
+      if (il < 0) falha("animacao " + nome + ": luz desconhecida " + nome_luz);
+      TimelineLuz tl;
+      tl.luz = il;
+      tl.tl = ler_timeline_campos(chaves, CAMPOS_LUZ, m.luzes[size_t(il)].v, CANAIS_LUZ);
+      conta(tl.tl.fim());
+      an.luzes.push_back(std::move(tl));
+    }
+    if (a["ambiente"].lista()) {
+      TimelineLuz tl;
+      tl.luz = -1;
+      tl.tl = ler_timeline_campos(a["ambiente"], CAMPOS_AMBIENTE, m.ambiente, CANAIS_AMBIENTE);
+      conta(tl.tl.fim());
+      an.luzes.push_back(std::move(tl));
     }
 
     // particulas: emissor -> { taxa: [...], rajada: [...] }

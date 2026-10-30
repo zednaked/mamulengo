@@ -23,7 +23,7 @@ import { parseAtlas } from "../../src/core/atlas-text.ts";
 import { Document } from "../../src/core/document.ts";
 import { executeAsync, type AssetProvider } from "../../src/core/commands/index.ts";
 import { extractRegion } from "../../server/atlas.ts";
-import { NL, chavesJato } from "./jato.ts";
+import { NL, QUADRO, chavesJato, envelope, tremor } from "./jato.ts";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const ROBO = join(AQUI, "..", "..", "tests", "boneco", "robo");
@@ -411,7 +411,41 @@ Object.assign(efeitos, chJato.efeitos);
 Object.assign(particulas, chJato.particulas);
 const slotsAnim: any = { ...chJato.slots };
 
-b.animacoes = { vitrine: { ossos, slots: slotsAnim, efeitos, particulas }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
+// ---- luzes (docs/NUCLEO.md "Luzes"): o relevo da pagina do robo (tools/relevo.ts
+// exemplos/vitrine/vitrine.boneco --borda 36; a borda e de pagina 3x) e as luzes. Discretas o
+// tempo todo (uma chave quente de cima, uma contraluz azul rasante pela esquerda, a ambiente um
+// pouco fria e baixa) e as que contam o que acontece: o fogo do jato ilumina as pernas e o corpo
+// por baixo, tremendo com a chama, e o raio acende as maos de azul
+b.paginas[0].relevo = "robo-hd_relevo.png";
+b.ambiente = { cor: "c9d3eeff", forca: 0.82 };
+b.luzes = [
+  { nome: "chave", x: 300, y: 460, cor: "fff0dcff", forca: 0.55, raio: 1100, altura: 260 },
+  { nome: "contraluz", x: -300, y: 170, cor: "66b3ffff", forca: 1.1, raio: 700, altura: -20 },
+  { nome: "jato_e", osso: "jato_e", x: 30, cor: "ff9a40ff", forca: 0, raio: 300, altura: 25 },
+  { nome: "jato_d", osso: "jato_d", x: 30, cor: "ff9a40ff", forca: 0, raio: 300, altura: 25 },
+  { nome: "raio_e", osso: "mao_e", cor: "8fd8ffff", forca: 0, raio: 260, altura: 50 },
+  { nome: "raio_d", osso: "mao_d", cor: "8fd8ffff", forca: 0, raio: 260, altura: 50 },
+];
+// o fogo: a forca segue o envelope do jato e treme a cada dois quadros da chama
+const fogo = (canal: number) => {
+  const ks: any[] = [{ tempo: 0, forca: 0 }];
+  for (const jan of JANELAS) {
+    ks.push({ tempo: r3(jan[0]), forca: 0 });
+    for (let k = 1, t = jan[0] + 2 * QUADRO; t < jan[1]; k++, t += 2 * QUADRO) ks.push({ tempo: r3(t), forca: r3(1.7 * envelope(t, jan) * (0.7 + 0.6 * tremor(k, canal))) });
+    ks.push({ tempo: r3(jan[1]), forca: 0 });
+  }
+  return ks;
+};
+// o raio: pisca enquanto o arco esta ligado (6,4 a 7,45 s)
+const relampago = (canal: number) => {
+  const ks: any[] = [{ tempo: 0, forca: 0 }, { tempo: 6.35, forca: 0 }];
+  for (let k = 1, t = 6.4; t < 7.45; k++, t += 0.05) ks.push({ tempo: r3(t), forca: r3(tremor(k, canal) < 0.3 ? 0.4 : 1.6 + tremor(k, canal + 1)) });
+  ks.push({ tempo: 7.6, forca: 0 });
+  return ks;
+};
+const luzes = { jato_e: fogo(11), jato_d: fogo(12), raio_e: relampago(13), raio_d: relampago(15) };
+
+b.animacoes = { vitrine: { ossos, slots: slotsAnim, efeitos, particulas, luzes }, idle: b.animacoes.idle, ganhou: b.animacoes.ganhou };
 
 // ---- 2,5D: com os comandos do editor (os mesmos da tela e da ponte), sobre o documento no
 // formato do editor. A cabeca vira malha pelo contorno da imagem e olha para os lados

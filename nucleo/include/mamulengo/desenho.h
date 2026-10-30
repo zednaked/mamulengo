@@ -19,6 +19,15 @@ struct Lote {
   Blend blend = Blend::Normal;
   uint32_t inicio = 0, quantos = 0;  // em `indices` (ComecaRecorte: o leque do poligono)
   int efeito = -1;  // indice em Desenho::efeitos (o lote de um slot com efeitos), -1 sem efeitos
+  int luz = -1;     // indice em Desenho::grupos_luz (lote iluminado: a pagina tem relevo), -1 sem luz
+};
+
+// as luzes de um personagem no desenho (docs/NUCLEO.md "Luzes"): a ambiente e ate MAX_LUZES
+// pontos em mundo; por ponto x, y, altura, r, g, b (ja vezes alfa e forca) e raio
+struct GrupoLuz {
+  float ambiente[3] = {1, 1, 1};
+  int quantas = 0;
+  float luzes[MAX_LUZES][7] = {};
 };
 
 // os efeitos de um lote (docs/NUCLEO.md "Efeitos"): os valores e a caixa da imagem na pagina
@@ -37,11 +46,13 @@ struct Desenho {
   std::vector<uint32_t> indices;
   std::vector<Lote> lotes;
   std::vector<EfeitosLote> efeitos;
+  std::vector<GrupoLuz> grupos_luz;
   void limpar() {
     vertices.clear();
     indices.clear();
     lotes.clear();
     efeitos.clear();
+    grupos_luz.clear();
   }
 };
 

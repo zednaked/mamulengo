@@ -1,7 +1,7 @@
 // Comandos de animacao: criar/remover animacoes, chaves e curvas.
 import { z } from "zod";
 import { defineCommand } from "./registry.ts";
-import { animations, channels, effectAt, effectFields, isEffect, requireAnimation } from "../model.ts";
+import { animations, channels, effectFields, fieldsAt, hasFields, requireAnimation } from "../model.ts";
 import { boneWorld, invert, skeletonAt } from "../pose.ts";
 import { CurveArg, Target, editKeys, findKey, getKeys, keyFields, presetShape, removeEmpty, round, timeOf, timelinePath, writeShape } from "./timeline.ts";
 
@@ -95,6 +95,7 @@ const KeyValue = z
     copies: z.number().min(0).max(16).optional().describe("trail: quantas copias (0 desliga)"),
     interval: z.number().min(0).optional().describe("trail: segundos entre uma copia e a seguinte (padrao 0.05)"),
     alpha: z.number().min(0).max(1).optional().describe("trail: alfa da copia mais nova (0 a 1, padrao 0.5)"),
+    height: z.number().optional().describe("light: altura da luz sobre o plano (negativa: rasante por tras)"),
   })
   .partial();
 
@@ -112,7 +113,7 @@ defineCommand({
     space: z.enum(["parent", "world"]).default("parent").describe("translate: x/y no espaco do pai (padrao) ou na tela (world)"),
     ...KeyValue.shape,
   }),
-  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : "particles" in p.target ? p.target.particles : p.target.deform.attachment} @${p.time}`,
+  label: (p) => `chave ${p.timeline} ${"bone" in p.target ? p.target.bone : "slot" in p.target ? p.target.slot : "constraint" in p.target ? p.target.constraint : "particles" in p.target ? p.target.particles : "light" in p.target ? `luz ${p.target.light}` : "ambient" in p.target ? "ambiente" : p.target.deform.attachment} @${p.time}`,
   run({ e }, p) {
     requireAnimation(e.json, p.anim);
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);
@@ -137,8 +138,8 @@ defineCommand({
           apply: () => {
             const k = keys[i];
             const fields = keyFields(kind, p);
-            // efeitos: a chave fica completa (sem tirar o que e igual ao padrao)
-            if (isEffect(kind)) {
+            // efeitos e luzes: a chave fica completa (sem tirar o que e igual ao padrao)
+            if (hasFields(kind)) {
               for (const [f, v] of Object.entries(fields)) if (JSON.stringify(k[f]) !== JSON.stringify(v)) e.set([...path, i, f], v);
               return;
             }
@@ -164,8 +165,8 @@ defineCommand({
           if (!keys.length) e.set(path, []);
           const k: any = {};
           if (t !== 0) k.time = t;
-          // efeito: os campos que nao vieram sao os do efeito naquele instante
-          if (isEffect(kind)) Object.assign(k, effectFields(kind, effectAt(e.json, p.anim, (p.target as any).slot, kind, t)));
+          // efeito ou luz: os campos que nao vieram sao os daquele instante
+          if (hasFields(kind)) Object.assign(k, effectFields(kind, fieldsAt(e.json, p.anim, p.target, kind, t)));
           Object.assign(k, keyFields(kind, p));
           e.insert(path, at, k);
         },

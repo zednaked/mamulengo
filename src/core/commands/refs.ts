@@ -46,6 +46,7 @@ defineCommand({
     });
     for (const [an] of anims(e)) renameKey(e, ["animations", an, "bones"], p.bone, p.to);
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.bone === p.bone && e.set(["particles", k, "bone"], p.to));
+    ((e.json as any).lights ?? []).forEach((l: any, k: number) => l.bone === p.bone && e.set(["lights", k, "bone"], p.to));
     return { renamed: p.to };
   },
 });
@@ -102,6 +103,8 @@ defineCommand({
     for (const s of slots(e.json).filter((x) => dead.has(x.bone))) ctx.run("slot.delete", { slot: s.name });
     // emissores de particulas que nascem deles
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("particles.delete", { name: em.name });
+    // luzes presas neles
+    for (const l of ((e.json as any).lights ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("light.delete", { name: l.name });
     // constraints que dependem deles
     for (const { c } of allC(e).filter(({ c }) => dead.has(c.target) || dead.has(c.source) || dead.has(c.bone) || c.bones?.some((b: string) => dead.has(b))))
       ctx.run("constraint.delete", { name: c.name });
