@@ -4,10 +4,12 @@ O que está aberto, em ordem de prioridade.
 
 ## Agora
 
-1. **O núcleo como modo padrão do editor:** um `.boneco` já abre desenhado, posado e medido pelo núcleo em wasm; falta o mesmo para os projetos do Spine.
-2. **`.boneco` binário,** para pacotes menores.
-3. **O addon na Godot Asset Library,** e o build de macOS conferido num Mac.
-4. **Teste com uma pessoa:** levar para o editor o que a pessoa achou.
+1. **Desempenho no celular:** medir de novo com o canvas no tamanho base (docs/CELULAR.md) e o `.boneco` binário, e ver o que sobra para o núcleo.
+2. **O addon na Godot Asset Library,** e o build de macOS conferido num Mac.
+3. **Teste com uma pessoa:** levar para o editor o que a pessoa achou.
+
+Feito há pouco: o núcleo como modo padrão do editor (o spine-core só nos modos de comparação), o
+`.boneco` binário (docs/FORMATO.md "Binário") e o borrar (docs/NUCLEO.md "Borrar").
 
 ## Qualidade das animações (medidas que faltam)
 

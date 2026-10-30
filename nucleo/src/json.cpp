@@ -2,6 +2,8 @@
 // localidade do processo, que no Godot ou no navegador pode ter virgula decimal).
 #include "mamulengo/json.h"
 
+#include "mamulengo/binario.h"
+
 #include <cstdlib>
 #include <cstring>
 
@@ -243,6 +245,11 @@ class LeitorJson {
 };
 
 Json Json::ler(std::string_view texto, std::string* erro) {
+  if (eh_binario(texto)) {
+    Json out;
+    ler_binario(texto, out, erro);
+    return out;
+  }
   LeitorJson l(texto);
   Json out;
   if (!l.valor(out, 0) || !l.fim()) {

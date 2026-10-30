@@ -12,6 +12,7 @@ endif()
 # a biblioteca: so contas, sem arquivo nem console (vira wasm e modulo do Godot)
 add_library(mamulengo_nucleo STATIC
   src/json.cpp
+  src/binario.cpp
   src/leitor.cpp
   src/curva.cpp
   src/pose.cpp
@@ -29,6 +30,8 @@ add_executable(nucleo-pose ferramentas/nucleo-pose.cpp)
 target_link_libraries(nucleo-pose PRIVATE mamulengo_nucleo)
 add_executable(nucleo-estado ferramentas/nucleo-estado.cpp)
 target_link_libraries(nucleo-estado PRIVATE mamulengo_nucleo)
+add_executable(nucleo-binario ferramentas/nucleo-binario.cpp)
+target_link_libraries(nucleo-binario PRIVATE mamulengo_nucleo)
 
 # o nucleo no navegador (so com emscripten): build-web/nucleo.mjs + nucleo.wasm
 #   emcmake cmake -S nucleo -B nucleo/build-web -G Ninja && cmake --build nucleo/build-web

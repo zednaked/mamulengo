@@ -9,7 +9,7 @@ together.** Rig a character from a layered PSD, animate it on a timeline, or ask
 Claude to do it over MCP and watch every bone it moves, live, in the same editor.
 Characters are saved as `.boneco`, one readable file that carries its atlas,
 transitions and a written brief. A C++ core, written from scratch, plays them in
-Godot (engine module or GDExtension) and in the browser (316 KB of WebAssembly, 127 KB gzipped).
+Godot (engine module or GDExtension) and in the browser (328 KB of WebAssembly, 128 KB gzipped).
 It opens and writes Spine 4.3 projects, so nothing already made gets left behind,
 and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 
@@ -171,7 +171,9 @@ One JSON file per character: skeleton, atlas regions, animations, the transition
 times the game uses, page compression for the game and the brief. Field names
 are in Portuguese and every one of them maps both ways to Spine 4.3, so a
 `.boneco` exports back to the exact JSON and atlas it came from (102 of 102
-production projects, at a median 1.05x the size). Where the two runtimes the
+production projects, at a median 1.05x the size). For shipping, the same file can be
+stored in binary: about 5 times smaller and 1.6 times faster to load, with the pose byte
+for byte the same. Where the two runtimes the
 games used disagreed (multiply ignoring alpha, physics gravity flipping sign),
 the format says which one it means. Spec: [docs/FORMATO.md](docs/FORMATO.md).
 

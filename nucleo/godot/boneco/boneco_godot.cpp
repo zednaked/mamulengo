@@ -195,8 +195,9 @@ Ref<BonecoData> BonecoData::carregar(const String &p_caminho) {
     d->erro = "nao existe: " + p_caminho;
     return d;
   }
-  const String texto = FileAccess::get_file_as_string(p_caminho);
-  const std::string t = padrao(texto);
+  // texto ou binario (o nucleo reconhece o binario pelo comeco): os bytes como estao
+  const PackedByteArray bytes = FileAccess::get_file_as_bytes(p_caminho);
+  const std::string t(reinterpret_cast<const char *>(bytes.ptr()), size_t(bytes.size()));
   std::string erro;
   d->modelo = mamulengo::ler_boneco(t, &erro);
   if (!d->modelo) {

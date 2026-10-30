@@ -10,7 +10,7 @@ numa timeline, ou peça ao Claude pelo MCP e veja cada osso que ele mexe, ao viv
 no mesmo editor. O personagem é gravado em `.boneco`, um arquivo só e legível,
 com o atlas, as transições e uma ficha escrita. Um núcleo em C++, escrito do
 zero, toca esses arquivos no Godot (módulo do motor ou GDExtension) e no
-navegador (316 KB de WebAssembly, 127 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
+navegador (328 KB de WebAssembly, 128 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
 do que já foi feito fica para trás, e soma o que o Spine não tem: efeitos por
 parte, partículas e giro em 2,5D.
 
@@ -173,7 +173,9 @@ em português e cada um tem ida e volta com o Spine 4.3, então um `.boneco`
 exporta de volta exatamente o JSON e o atlas de onde veio (102 de 102 projetos de
 produção, com mediana de 1,05x o tamanho). Onde os dois runtimes que os jogos
 usavam discordavam (multiply ignorando o alfa, gravidade da física com sinal
-trocado), o formato diz qual vale. Especificação: [docs/FORMATO.md](docs/FORMATO.md).
+trocado), o formato diz qual vale. Para entregar ao jogo, o mesmo arquivo pode ir
+em binário: cerca de 5 vezes menor e 1,6 vez mais rápido de carregar, com a pose
+igual byte a byte. Especificação: [docs/FORMATO.md](docs/FORMATO.md).
 
 ```sh
 npx tsx tools/boneco.ts importar <x-data.tres|x.json> <x.boneco>

@@ -21,8 +21,9 @@ que existe depois de passar nos testes de aceitação (seção final).
 - `<nome>.boneco`: JSON, UTF-8. Tudo que o personagem é: esqueleto, imagens (atlas
   incluído), animações, mix, ficha.
 - `<nome>.png|webp` (e `_2`, `_3`...): as páginas de textura.
-- Depois do v0: `<nome>.bonecob`, a mesma coisa em binário (carregar rápido no jogo); o
-  editor salva os dois.
+- O mesmo `<nome>.boneco` pode estar em binário (abaixo, "Binário"): a forma de entrega ao
+  jogo, menor e mais rápida de carregar. O núcleo, o Godot e o editor reconhecem pelo começo
+  do arquivo; o nome não muda, então o jogo não muda nada para usar.
 
 Um arquivo só no lugar de quatro (`.json`, `.atlas`, `-data.tres` e a ficha ao lado): o par
 json/atlas que não se acha pelo nome, o mix que mora num recurso do Godot e a compressão da
@@ -135,6 +136,40 @@ Gera `.json` 4.3 e `.atlas` que o editor e os runtimes do Spine abrem. O que é 
 
 Regra: importar e exportar sem editar devolve um JSON que o Spine lê igual ao original
 (conferido pelo oráculo: ossos e pixels iguais).
+
+## Binário
+
+A mesma árvore do texto, em bytes (`nucleo/src/binario.cpp`). Começa com `BNCB` e a versão (1);
+depois, a tabela de textos (quantos, e cada um com o tamanho e os bytes em UTF-8: cada chave e
+cada nome aparece uma vez só) e o valor raiz. Um valor é um byte de tipo e o que ele pede:
+
+| tipo | o quê |
+|---|---|
+| 0, 1, 2 | nulo, falso, verdadeiro |
+| 3 | inteiro: zigzag varint |
+| 4 | decimal: zigzag varint `m` e um byte `e` (0 a 22): o número é `m / 10^e` |
+| 5 | double cru: 8 bytes, little endian |
+| 6 | texto: o índice na tabela (varint) |
+| 7 | lista: quantos (varint) e os valores |
+| 8 | objeto: quantos (varint) e os pares: índice da chave (varint) e o valor (a ordem das chaves é a do texto) |
+| 9 | lista de números: quantos, um byte `e`, um byte `passo` e os zigzag varint; com passo 0 cada um é `m`, com passo `p` (1 ou 2) os `p` primeiros são `m` e os outros a diferença para o `m` de `p` antes (pares x, y andam de 2 em 2); o número é `m / 10^e` |
+
+**O mesmo número que o texto.** Com `|m| < 2^53` e `10^e` exato em double (`e <= 22`),
+`m / 10^e` é uma divisão só, arredondada certo: dá o mesmo double que o texto decimal lido
+pelo leitor de JSON. O codificador procura o menor `e` em que `m / 10^e` volta exatamente ao
+número e manda como double cru o que não volta (ou o `-0`). A conferência
+(`npx tsx tools/boneco-binario.ts`) codifica cada `.boneco` dos testes e dos exemplos e exige a
+saída do `nucleo-pose` igual byte a byte com o texto e com o binário, em todas as animações.
+
+**Converter:** `npx tsx tools/boneco.ts binario <x.boneco> <saida.boneco>` (e `texto` para
+voltar), ou direto `nucleo/build/nucleo-binario`, que confere a árvore número a número. O editor
+abre os dois e grava um binário de volta em binário.
+
+**Medido** (nos 24 personagens de dois jogos de produção, com malhas com pesos, física e 76
+animações num deles): 2.245 KB de texto viram 413 KB (5,4 vezes menos); com gzip, 154 contra
+123 KB; com brotli, 106 contra 98,5 KB; a carga até o modelo, 10,5 contra 6,4 ms. Nos 17 dos
+testes e exemplos, 1.741 KB viram 394 KB e a carga cai de 6,5 para 3,5 ms (com brotli o
+binário sai 7% maior que o texto ali: arquivos pequenos, em que o texto repete muito).
 
 ## Núcleo (runtime)
 

@@ -68,6 +68,13 @@ sprite.animation_completed.connect(func(entry): print("loop or end of ", entry.g
   applied and before physics and world transforms, to move bones or slots from
   the game
 
+## Binary .boneco
+
+A `.boneco` can also be stored in binary: the same data, about 5 times smaller on disk and
+faster to load, with exactly the same numbers (the pose comes out byte for byte the same).
+`BonecoData` reads both, by the first bytes, so the path does not change. Convert with the
+Mamulengo tools: `npx tsx tools/boneco.ts binario hero.boneco hero.boneco`.
+
 ## Web export on phones
 
 The Godot web export sizes its canvas by the screen's pixel ratio, so on a phone a

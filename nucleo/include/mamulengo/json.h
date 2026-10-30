@@ -44,11 +44,13 @@ class Json {
   std::string str(std::string_view chave, const std::string& padrao) const;
   bool sim(std::string_view chave, bool padrao) const;
 
-  // le o texto todo; em erro devolve nulo e preenche `erro`
+  // le o texto todo (ou o .boneco binario, reconhecido pelo comeco: mamulengo/binario.h); em
+  // erro devolve nulo e preenche `erro`
   static Json ler(std::string_view texto, std::string* erro);
 
  private:
   friend class LeitorJson;
+  friend class LeitorBinario;
   Tipo tipo_ = Tipo::Nulo;
   bool log_ = false;
   double num_ = 0;

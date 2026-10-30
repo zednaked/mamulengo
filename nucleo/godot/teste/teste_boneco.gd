@@ -2,7 +2,7 @@ extends SceneTree
 # Teste do BonecoSprite (GDExtension) no Godot oficial, headless, com o pessoa (CC0):
 # entradas vivas (de tras para frente, mix e atraso, relogio, escala), sinais na hora, o no
 # escondido (so o relogio anda), o caminho do .boneco na cena, a previa so no editor e o
-# relogio em float32. Montado e rodado por tools/boneco-godot-teste.ts.
+# relogio em float32 e o .boneco binario. Montado e rodado por tools/boneco-godot-teste.ts.
 #   godot --headless --path <projeto> -s res://teste_boneco.gd
 
 var falhas := 0
@@ -155,6 +155,24 @@ func _rodar() -> void:
 	var w := _osso(a, "cotovelo_d")
 	var x: PackedFloat64Array = bw["cotovelo_d"]
 	_confere(bw.size() > 5 and absf(x[0] - w[0]) < 1e-9 and absf(x[1] - w[1]) < 1e-9 and absf(x[2] - w[2]) < 1e-9, "get_bones_world")
+
+	# o .boneco binario (docs/FORMATO.md "Binario"): o mesmo personagem, tocado igual, da os
+	# mesmos ossos no mundo
+	var tx := _novo()
+	var bn := _novo("res://pessoa/pessoa-binario.boneco")
+	_confere(bn.data != null and bn.data.get_error() == "", "o .boneco binario carrega")
+	for s in [tx, bn]:
+		s.set_animation("idle", true, 0)
+		s.add_animation("acenar", 0.3, false, 0)
+		for k in 90:
+			s.update_skeleton(1.0 / 60.0)
+	var wt: Dictionary = tx.get_bones_world()
+	var wb: Dictionary = bn.get_bones_world()
+	var dbin := 0.0
+	for nome in wt:
+		for i in 6:
+			dbin = maxf(dbin, absf(wt[nome][i] - wb[nome][i]))
+	_confere(wt.size() == wb.size() and dbin == 0.0, "binario e texto: os mesmos ossos depois de 1,5 s com fila e mix (dif %s)" % str(dbin))
 
 	print("\n%d ok, FAILURES: %d" % [oks, falhas])
 	quit(1 if falhas else 0)

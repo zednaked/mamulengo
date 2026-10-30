@@ -1,6 +1,8 @@
 // .boneco na linha de comando (docs/FORMATO.md):
 //   npx tsx tools/boneco.ts importar <x-data.tres | x.json> <saida.boneco> [--multiply certo|motor]
 //   npx tsx tools/boneco.ts exportar <x.boneco> <pasta> [--nome n]
+//   npx tsx tools/boneco.ts binario <x.boneco> <saida.boneco>   (para entregar ao jogo)
+//   npx tsx tools/boneco.ts texto <x.boneco> <saida.boneco>     (de volta ao texto, para editar)
 // importar le o JSON 4.3 do Spine e o atlas (pelo -data.tres, ou o .atlas ao lado), e leva
 // junto o mix (-data.tres), a ficha (.ficha.md) e a compressao das paginas (.import do
 // Godot). As paginas sao copiadas para a pasta do .boneco. exportar faz o caminho de volta:
@@ -12,6 +14,7 @@ import { exportarSpine, importarSpine, type Boneco } from "../src/boneco/spine.t
 import { findProjectRoot, parseMixes, parseSkeletonDataTres } from "../server/godot.ts";
 import { tresText } from "../server/assets.ts";
 import { serializeSpineJson } from "../src/core/format.ts";
+import { gravarBonecoArquivo, lerBonecoArquivo } from "../server/boneco-binario.ts";
 
 const args = process.argv.slice(2);
 const opt = (n: string) => {
@@ -71,7 +74,7 @@ if (acao === "importar") {
   console.log(`${out}: ${b.ossos?.length ?? 0} ossos, ${b.slots?.length ?? 0} slots, ${Object.keys(b.animacoes ?? {}).length} animacoes, ${b.paginas.length} paginas${mix ? ", mix" : ""}${b.ficha ? ", ficha" : ""}`);
 } else if (acao === "exportar") {
   if (!de || !para) throw new Error("exportar <x.boneco> <pasta>");
-  const b: Boneco = JSON.parse(readFileSync(resolve(de), "utf8"));
+  const b: Boneco = lerBonecoArquivo(resolve(de));
   const nome = nomeOpt ?? b.nome ?? basename(de, ".boneco");
   const dir = resolve(para);
   mkdirSync(dir, { recursive: true });
@@ -99,7 +102,14 @@ if (acao === "importar") {
   }
   console.log(`${skel}${root ? " + -data.tres" : ""}`);
   for (const a of e.avisos) console.log(`  AVISO ${a}`);
+} else if (acao === "binario" || acao === "texto") {
+  // docs/FORMATO.md "Binario": o binario e a forma de entrega (menor, carrega mais rapido); o
+  // editor abre os dois. A mesma arvore, conferida numero a numero pelo nucleo-binario
+  if (!de || !para) throw new Error(`${acao} <x.boneco> <saida.boneco>`);
+  const antes = readFileSync(resolve(de)).length;
+  gravarBonecoArquivo(resolve(para), lerBonecoArquivo(resolve(de)), acao === "binario");
+  console.log(`${resolve(para)}: ${acao}, ${antes} -> ${readFileSync(resolve(para)).length} bytes`);
 } else {
-  console.error("uso: boneco.ts importar <x-data.tres | x.json> <saida.boneco> | exportar <x.boneco> <pasta>");
+  console.error("uso: boneco.ts importar <x-data.tres | x.json> <saida.boneco> | exportar <x.boneco> <pasta> | binario|texto <x.boneco> <saida.boneco>");
   process.exit(2);
 }

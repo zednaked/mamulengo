@@ -24,6 +24,9 @@ writeFileSync(join(pasta, "project.godot"), 'config_version=5\n\n[application]\n
 copyFileSync(so, join(pasta, "bin", "libboneco.so"));
 writeFileSync(join(pasta, "boneco.gdextension"), '[configuration]\nentry_symbol = "boneco_library_init"\ncompatibility_minimum = "4.5"\n\n[libraries]\nlinux.x86_64 = "res://bin/libboneco.so"\n');
 for (const f of ["pessoa.boneco", "pessoa.webp"]) copyFileSync(join(RAIZ, "tests", "boneco", "pessoa", f), join(pasta, "pessoa", f));
+// o mesmo personagem em binario (nucleo-binario, do build nativo)
+const bin = spawnSync(join(RAIZ, "nucleo", "build", "nucleo-binario"), [join(pasta, "pessoa", "pessoa.boneco"), join(pasta, "pessoa", "pessoa-binario.boneco")], { encoding: "utf8" });
+if (bin.status !== 0) throw new Error(`nucleo-binario: ${bin.stderr || bin.error} (compile o nucleo: cmake --build nucleo/build)`);
 copyFileSync(join(RAIZ, "nucleo", "godot", "teste", "teste_boneco.gd"), join(pasta, "teste_boneco.gd"));
 
 // a primeira abertura importa a pagina e registra a extensao

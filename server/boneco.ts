@@ -2,11 +2,13 @@
 // x.boneco aparece como tres arquivos virtuais ao lado dele (x.boneco.spine-json,
 // x.boneco.atlas e x.boneco.ficha.md), convertidos na hora (src/boneco/spine.ts). Gravar um
 // deles regrava o .boneco inteiro, guardando o que so ele tem (mix, compressao das paginas,
-// multiply do motor). As paginas sao arquivos de verdade ao lado.
-import { existsSync, readFileSync, renameSync, writeFileSync, copyFileSync } from "node:fs";
+// multiply do motor). As paginas sao arquivos de verdade ao lado. O .boneco binario (docs/FORMATO.md
+// "Binario") e lido e regravado em binario (server/boneco-binario.ts).
+import { existsSync, renameSync, copyFileSync } from "node:fs";
 import { atlasTexto, exportarSpine, importarSpine, type Boneco } from "../src/boneco/spine.ts";
 import { serializeSpineJson } from "../src/core/format.ts";
 import type { SpineAsset } from "./godot.ts";
+import { arquivoBinario, gravarBonecoArquivo, lerBonecoArquivo } from "./boneco-binario.ts";
 
 const VIRTUAIS = /\.boneco\.(spine-json|atlas|ficha\.md)$/;
 
@@ -18,7 +20,7 @@ export function bonecoVirtual(p: string): { arquivo: string; parte: "spine-json"
   return existsSync(arquivo) ? { arquivo, parte: m[1] as any } : null;
 }
 
-const ler = (arquivo: string): Boneco => JSON.parse(readFileSync(arquivo, "utf8"));
+const ler = (arquivo: string): Boneco => lerBonecoArquivo(arquivo);
 
 export function lerVirtual(p: string): string | null {
   const v = bonecoVirtual(p);
@@ -46,7 +48,7 @@ function regravar(arquivo: string, antigo: Boneco, json: any, atlas: string, fic
   // copia de seguranca e gravacao atomica, como os outros arquivos do editor
   copyFileSync(arquivo, arquivo + ".bak");
   const tmp = arquivo + ".mamulengo-tmp";
-  writeFileSync(tmp, JSON.stringify(novo, null, 1) + "\n");
+  gravarBonecoArquivo(tmp, novo, arquivoBinario(arquivo));
   renameSync(tmp, arquivo);
 }
 
