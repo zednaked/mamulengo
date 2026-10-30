@@ -20,6 +20,7 @@ and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 20 characters posed in 0.043 ms a frame (native), about 5x faster than the runtime it replaces
 102 of 102 production Spine 4.3 projects round-trip through .boneco unchanged
 a slot game on staging runs on the core: 1 wasm instead of 3
+on a mid-range Android phone, a web game drawn at its base size: 10 dropped frames in 30 s instead of 130 to 180
 GPU objects created per frame in that game: 160 before, 0.3 now
 ```
 
@@ -27,7 +28,7 @@ GPU objects created per frame in that game: 160 before, 0.3 now
 [beyond Spine](#beyond-spine) · [Claude Code](#working-with-claude-code) ·
 [the agent bench](#the-agent-bench) · [the .boneco format](#the-boneco-format) ·
 [the core](#the-core) · [use in your Godot game](#use-in-your-godot-game) ·
-[in a Godot game](#in-a-godot-game) · [run it](#run-it) ·
+[in a Godot game](#in-a-godot-game) · [on phones](#on-phones) · [run it](#run-it) ·
 [status](#status)
 
 ![Claude Code rigging and animating a robot from loose parts, on its own, over MCP](docs/media/robo-processo.webp)
@@ -244,12 +245,47 @@ nucleo/godot/montar-addon.sh out  # the addon zip, from nucleo/godot/bin
 scons platform=web target=template_release threads=no custom_modules=<repo>/nucleo/godot  # web template, from Godot's source
 ```
 
+## On phones
+
+Measured on a mid-range Android phone (Galaxy A52s, Chrome, a 1080 x 2177 screen at
+60 Hz) with a Godot 4 web game made at 700 x 1370: the frames it drops do not come
+from the animation. The core and the official Spine plugin drop the same frames, and
+35% of the main thread is spent waiting for the GPU. The Godot web export sizes its
+canvas by the screen's pixel ratio (2.81 there), so the 700 px game is drawn 1080 px
+wide, more than twice the pixels, with no art to show for it.
+
+| canvas | frames over 25 ms in 30 s | p95 | main thread |
+|---|---|---|---|
+| screen density, 1080 x 2112 | 183 / 125 / 127 | 32.6 ms | 87 to 93% |
+| **base size, 720 x 1408** | **10 / 9 / 13** | **16.4 ms** | **64 to 65%** |
+
+At the base size the capture looks the same as at the screen's density. The fix is a
+script in the web preset's **Head Include** (Export > Web > HTML), no engine or
+template change; set the two numbers to your project's base size:
+
+```html
+<script>
+// draw the canvas at most at the game's base size: on a dense screen the rest is only GPU cost
+(() => {
+  const WIDTH = 700, HEIGHT = 1370; // window/size/viewport_width and viewport_height
+  const native = window.devicePixelRatio || 1;
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    get: () => Math.min(native, Math.max(1, WIDTH / innerWidth, HEIGHT / innerHeight)),
+  });
+})();
+</script>
+```
+
+How it was measured, and `tools/medir-web.ts` to measure your own game on a phone
+over `adb`: [docs/CELULAR.md](docs/CELULAR.md) (in Portuguese).
+
 ## Run it
 
 In the "nucleo" drawing mode the editor does not use `spine-core`: drawing, posing,
 interaction, measurements, the character sheet and the commands all come from the core in wasm.
-A `.boneco` opens in "nucleo"; a Spine project opens in "godot", which, like "spine" and the
-test oracle, uses
+Every character opens in "nucleo", `.boneco` or Spine project. The "godot" and "spine" modes,
+kept to compare against the old game runtime and the Spine editor, and the test oracle use
 `spine-core` and `spine-webgl` (installed from npm), which require a
 [Spine license](https://esotericsoftware.com/spine-purchase). The core in `nucleo/` and the
 `.boneco` format do not depend on them.

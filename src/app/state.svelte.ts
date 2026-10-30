@@ -73,7 +73,8 @@ function runtimeDoEndereco(): Runtime | null {
 }
 
 // modo de desenho de um personagem: o do endereco, o escolhido antes no projeto dele (guardado
-// no navegador) ou o do formato: .boneco no nucleo, -data.tres (spine-godot) no godot
+// no navegador) ou o nucleo, para qualquer formato (os modos godot e spine, que usam o
+// spine-core, ficam para comparar com o jogo antigo e com o editor do Spine)
 export function runtimeDe(asset: AssetInfo): Runtime {
   const q = runtimeDoEndereco();
   if (q) return q;
@@ -81,7 +82,7 @@ export function runtimeDe(asset: AssetInfo): Runtime {
     const s = localStorage.getItem(`mamulengo.runtime.${asset.project}`);
     if (ehRuntime(s)) return s;
   } catch {}
-  return asset.tres.endsWith(".boneco") ? "nucleo" : "godot";
+  return "nucleo";
 }
 
 class AppState {
@@ -147,7 +148,7 @@ class AppState {
   }
   // modo de desenho do viewport (godot, spine ou nucleo): segue o personagem aberto (runtimeDe);
   // escolher no seletor vale para o projeto dele
-  runtime = $state<Runtime>(runtimeDoEndereco() ?? "godot");
+  runtime = $state<Runtime>(runtimeDoEndereco() ?? "nucleo");
   async setRuntime(r: Runtime) {
     this.runtime = r;
     try {

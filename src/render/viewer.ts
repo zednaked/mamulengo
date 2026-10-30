@@ -83,7 +83,7 @@ export class Viewer {
   // "nucleo": o nucleo proprio (wasm) e o nosso desenho, com a semantica do jogo (o template
   // web e o modulo Godot): multiply e screen certos, pma desfeito, fisica no sentido do jogo.
   // Troque com setRuntime (recarrega as texturas).
-  runtime: Runtime = "godot";
+  runtime: Runtime = "nucleo";
   nucleo: NucleoCena | null = null;
   // o nucleo recusou o documento (o desenho volta ao spine-webgl enquanto isso)
   nucleoError: string | null = null;

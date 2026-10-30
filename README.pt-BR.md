@@ -21,13 +21,14 @@ parte, partículas e giro em 2,5D.
 20 personagens posados em 0,043 ms por quadro (nativo), cerca de 5x mais rápido que o runtime que ele substitui
 102 de 102 projetos Spine 4.3 de produção vão e voltam pelo .boneco sem mudar nada
 um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
+num Android intermediário, um jogo web desenhado no tamanho base: 10 quadros perdidos em 30 s em vez de 130 a 180
 objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
 ```
 
 **Nesta página:** [o que faz](#o-que-faz) · [além do Spine](#além-do-spine) · [Claude Code](#com-o-claude-code) ·
 [a bancada de agentes](#a-bancada-de-agentes) · [o formato .boneco](#o-formato-boneco) ·
 [o núcleo](#o-núcleo) · [use no seu jogo Godot](#use-no-seu-jogo-godot) ·
-[num jogo Godot](#num-jogo-godot) · [rodar](#rodar) ·
+[num jogo Godot](#num-jogo-godot) · [no celular](#no-celular) · [rodar](#rodar) ·
 [estado](#estado)
 
 ![O Claude Code montando e animando um robô a partir de peças soltas, sozinho, pelo MCP](docs/media/robo-processo.webp)
@@ -244,11 +245,47 @@ nucleo/godot/montar-addon.sh out  # o zip do addon, a partir de nucleo/godot/bin
 scons platform=web target=template_release threads=no custom_modules=<repo>/nucleo/godot  # template web, no código do Godot
 ```
 
+## No celular
+
+Medido num Android intermediário (Galaxy A52s, Chrome, tela 1080 x 2177 a 60 Hz) com
+um jogo web do Godot 4 feito em 700 x 1370: os quadros que ele perde não vêm da
+animação. O núcleo e o plugin oficial do Spine perdem os mesmos quadros, e 35% da
+thread principal fica esperando a GPU. A exportação web do Godot dimensiona o canvas
+pela densidade de pixels da tela (2,81 ali), então o jogo de 700 px é desenhado com
+1080 px de largura, mais que o dobro de pixels, sem arte para mostrar.
+
+| canvas | quadros acima de 25 ms em 30 s | p95 | thread principal |
+|---|---|---|---|
+| densidade da tela, 1080 x 2112 | 183 / 125 / 127 | 32,6 ms | 87 a 93% |
+| **tamanho base, 720 x 1408** | **10 / 9 / 13** | **16,4 ms** | **64 a 65%** |
+
+No tamanho base a captura fica igual à da densidade da tela. A correção é um script
+no **Head Include** do preset web (Exportar > Web > HTML), sem mudar o motor nem o
+template; ponha nos dois números o tamanho base do seu projeto:
+
+```html
+<script>
+// desenha o canvas no maximo no tamanho base do jogo: numa tela densa, o resto e so custo de GPU
+(() => {
+  const LARGURA = 700, ALTURA = 1370; // window/size/viewport_width e viewport_height
+  const nativo = window.devicePixelRatio || 1;
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    get: () => Math.min(nativo, Math.max(1, LARGURA / innerWidth, ALTURA / innerHeight)),
+  });
+})();
+</script>
+```
+
+Como foi medido, e o `tools/medir-web.ts` para medir o seu jogo num celular pelo
+`adb`: [docs/CELULAR.md](docs/CELULAR.md).
+
 ## Rodar
 
 No modo de desenho "núcleo" o editor não usa o `spine-core`: o desenho, a pose, a interação, as
-medidas, a ficha e os comandos vêm do núcleo em wasm. Um `.boneco` abre no "núcleo"; um projeto do
-Spine abre no "godot", que, como o "spine" e o oráculo dos testes, usa o `spine-core` e o `spine-webgl` (instalados pelo npm),
+medidas, a ficha e os comandos vêm do núcleo em wasm. Todo personagem abre no "núcleo", `.boneco` ou
+projeto do Spine. Os modos "godot" e "spine", que ficam para comparar com o runtime antigo
+dos jogos e com o editor do Spine, e o oráculo dos testes usam o `spine-core` e o `spine-webgl` (instalados pelo npm),
 que exigem uma [licença do Spine](https://esotericsoftware.com/spine-purchase). O núcleo em
 `nucleo/` e o formato `.boneco` não dependem deles.
 

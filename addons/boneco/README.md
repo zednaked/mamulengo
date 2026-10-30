@@ -68,6 +68,32 @@ sprite.animation_completed.connect(func(entry): print("loop or end of ", entry.g
   applied and before physics and world transforms, to move bones or slots from
   the game
 
+## Web export on phones
+
+The Godot web export sizes its canvas by the screen's pixel ratio, so on a phone a
+game made at 700 px is drawn 1080 px wide or more. On a mid-range Android phone a
+700 x 1370 game dropped 130 to 180 frames in 30 s that way, the same with
+`BonecoSprite` or the official Spine plugin (the GPU is the bottleneck, not the
+animation), and about 10 when drawn at its base size. Cap the canvas at the base size in the web preset's Head Include
+(Export > Web > HTML), with your project's base size:
+
+```html
+<script>
+// draw the canvas at most at the game's base size: on a dense screen the rest is only GPU cost
+(() => {
+  const WIDTH = 700, HEIGHT = 1370; // window/size/viewport_width and viewport_height
+  const native = window.devicePixelRatio || 1;
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    get: () => Math.min(native, Math.max(1, WIDTH / innerWidth, HEIGHT / innerHeight)),
+  });
+})();
+</script>
+```
+
+Measurements and a tool to measure on a phone over `adb`: `docs/CELULAR.md` in the
+Mamulengo repository.
+
 ## Make characters
 
 `.boneco` files come from the Mamulengo editor, which also imports Spine 4.3
