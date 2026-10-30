@@ -385,9 +385,11 @@ for (const lado of ["e", "d"]) {
   novos.push({ nome: `mascara_${lado}`, osso: `perna_${lado}`, parte: "mascara" });
   b.skins[0].partes[`mascara_${lado}`] = { mascara: { tipo: "recorte", fim: `jato_nucleo_${lado}`, num_vertices: 4, vertices: [44, -21, 260, -230, 260, 230, 44, 21] } };
   novos.push(
-    { nome: `jato_halo_${lado}`, osso: `jato_${lado}`, parte: "jato_halo", blend: "aditivo" },
+    // apagados no setup (transparentes): so a animacao com o jato acende; as outras (idle, ganhou)
+    // ficam sem jato
+    { nome: `jato_halo_${lado}`, osso: `jato_${lado}`, parte: "jato_halo", blend: "aditivo", cor: "ffffff00" },
     { nome: `jato_lingua_${lado}`, osso: `jato_${lado}`, blend: "aditivo" },
-    { nome: `jato_nucleo_${lado}`, osso: `jato_${lado}`, parte: "jato_nucleo", blend: "aditivo" },
+    { nome: `jato_nucleo_${lado}`, osso: `jato_${lado}`, parte: "jato_nucleo", blend: "aditivo", cor: "ffffff00" },
   );
   b.skins[0].partes[`jato_lingua_${lado}`] = Object.fromEntries(Array.from({ length: NL }, (_, f) => [`lingua_${f}`, { x: 52, largura: 92, altura: 38 }]));
   b.skins[0].partes[`jato_halo_${lado}`] = { jato_halo: { x: 46, largura: 150, altura: 84 } };

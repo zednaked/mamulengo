@@ -471,7 +471,8 @@
    "nome": "jato_halo_e",
    "osso": "jato_e",
    "parte": "jato_halo",
-   "blend": "aditivo"
+   "blend": "aditivo",
+   "cor": "ffffff00"
   },
   {
    "nome": "jato_lingua_e",
@@ -482,7 +483,8 @@
    "nome": "jato_nucleo_e",
    "osso": "jato_e",
    "parte": "jato_nucleo",
-   "blend": "aditivo"
+   "blend": "aditivo",
+   "cor": "ffffff00"
   },
   {
    "nome": "mascara_d",
@@ -493,7 +495,8 @@
    "nome": "jato_halo_d",
    "osso": "jato_d",
    "parte": "jato_halo",
-   "blend": "aditivo"
+   "blend": "aditivo",
+   "cor": "ffffff00"
   },
   {
    "nome": "jato_lingua_d",
@@ -504,7 +507,8 @@
    "nome": "jato_nucleo_d",
    "osso": "jato_d",
    "parte": "jato_nucleo",
-   "blend": "aditivo"
+   "blend": "aditivo",
+   "cor": "ffffff00"
   },
   {
    "nome": "braco_e",

@@ -186,7 +186,8 @@ const robo = JSON.parse(readFileSync(join(AQUI, "..", "vitrine", "vitrine.boneco
 const P = (n: string) => `robo.${n}`;
 osso("heroi", "root", 300, 190, { escala_x: 0.62, escala_y: 0.62 });
 const base = b.paginas.length;
-for (const pg of robo.paginas) b.paginas.push({ ...pg, arquivo: `../vitrine/${pg.arquivo}` });
+// as paginas do robo (e o relevo delas) ficam na pasta da vitrine
+for (const pg of robo.paginas) b.paginas.push({ ...pg, arquivo: `../vitrine/${pg.arquivo}`, ...(pg.relevo ? { relevo: `../vitrine/${pg.relevo}` } : {}) });
 for (const im of robo.imagens) b.imagens.push({ ...im, nome: P(im.nome), pagina: im.pagina + base });
 for (const o of robo.ossos) b.ossos.push({ ...o, nome: P(o.nome), pai: o.pai ? P(o.pai) : "heroi" });
 for (const s of robo.slots) b.slots.push({ ...s, nome: P(s.nome), osso: P(s.osso) });
