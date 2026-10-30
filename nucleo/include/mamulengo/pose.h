@@ -37,6 +37,10 @@ struct EstadoSlot {
   Efeitos efeitos;
   std::vector<double> deform;  // deslocamentos dos vertices (ou das entradas de peso); vazio: sem deformar
   int marca = 0;  // uso do Estado: se a parte foi posta por uma timeline neste aplicar
+  // borrar (docs/NUCLEO.md "Borrar"): os vertices em mundo no relogio atual e no anterior em
+  // que o mundo foi calculado (so de slot com borrar ligado; relogio -1: ainda nao ha)
+  std::vector<double> borrar_atual, borrar_ant;
+  double borrar_t = -1, borrar_t_ant = -1;
 };
 
 // Como uma timeline mistura o valor dela com o que ja esta na pose, com peso `alfa`:
@@ -149,6 +153,10 @@ class Esqueleto {
   size_t vertices(int slot, std::vector<double>& out) const;
   // vertices em mundo de uma parte com geometria, como o slot a mostraria (com deformar)
   void vertices_geometria(int slot, const Parte& p, double* out) const;
+  // borrar (docs/NUCLEO.md "Borrar"): estica para tras os `n` numeros de `xy` (os vertices do
+  // slot agora, x e y) pela velocidade desde o relogio anterior; `esmaece`, se nao nulo, recebe
+  // por vertice quanto o alfa cai (0 a 1). Devolve false se nao borrou nada
+  bool borrar(int slot, double* xy, size_t n, float* esmaece) const;
 
  private:
   std::shared_ptr<const Modelo> m_;

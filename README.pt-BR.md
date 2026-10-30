@@ -82,6 +82,10 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
 
 - **Efeitos por parte:** contorno, brilho, dissolver (com tamanho do grão e borda
   em brasa) e tingir. A malha cresce pelo contorno para o halo ter onde aparecer.
+- **Borrar (smear):** a parte que anda rápido estica para trás, na direção de onde
+  veio, e esmaece na ponta, como os quadros de smear dos desenhos animados, e volta
+  sozinha quando desacelera. Segue o que o jogo faz de verdade (mix, fila, física),
+  só move vértices e quase não custa na GPU.
 - **Partículas presas a ossos:** emissores de imagens com taxa e rajadas, rampa
   de cores, soma de luz e tremor (fogo, faíscas, fumaça); **raio** procedural
   entre dois ossos; um anel em **órbita** que passa por trás e pela frente do

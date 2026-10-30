@@ -104,6 +104,11 @@ const slot = (n: string) => b.slots.find((s: any) => s.nome === n);
 slot("cabeca").efeitos = { linha: { cor: "ffd23cff", largura: 0 } };
 slot("corpo").efeitos = { brilho: { cor: "4cc9ffff", forca: 0, raio: 16 * HD }, tingir: { cor: "ff3355ff", forca: 0 } };
 for (const s of ["braco_e", "braco_d"]) slot(s).efeitos = { dissolver: { valor: 0, cor: "ff8a3cff", borda: 0.08, grao: 8 * HD } };
+// borrar (smear): bracos e maos esticam para tras quando balancam rapido na comemoracao; parados
+// ou devagar (o 2,5D sutil) quase nada
+const BORRAR = { forca: 0.05, limite: 45, esmaecer: 0.55 };
+for (const s of ["braco_e", "braco_d"]) slot(s).efeitos.borrar = BORRAR;
+for (const s of ["mao_e", "mao_d"]) slot(s).efeitos = { ...(slot(s).efeitos ?? {}), borrar: BORRAR };
 
 const efeitos = {
   corpo: {

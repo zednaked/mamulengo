@@ -52,6 +52,9 @@ void Esqueleto::setup() {
     s.efeitos = m.slots[i].efeitos;
     s.parte = m.parte_de(skin_, int(i), m.slots[i].parte_setup);
     s.deform.clear();
+    s.borrar_atual.clear();
+    s.borrar_ant.clear();
+    s.borrar_t = s.borrar_t_ant = -1;
   }
   for (size_t i = 0; i < m.emissores.size(); ++i) {
     emis_[i] = EstadoEmissor{};
@@ -226,7 +229,7 @@ float Efeitos::margem() const {
 
 void Efeitos::limitar() {
   for (int i = 0; i < CANAIS_EFEITOS; ++i) {
-    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO;
+    const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO || i == BORRAR_FORCA || i == BORRAR_LIMITE;
     v[i] = std::max(v[i], i == DISSOLVER_GRAO ? 1.0f : 0.0f);
     if (!sem_teto) v[i] = std::min(v[i], 1.0f);
   }
@@ -634,6 +637,62 @@ void Esqueleto::atualizar_mundo() {
   }
   local.swap(antes_);
   atualizar_particulas();
+  // borrar: os vertices deste relogio; o do relogio anterior vira o `ant` quando o relogio anda
+  // (varios atualizar_mundo no mesmo relogio so trocam o atual). Relogio que volta: sem anterior
+  for (size_t i = 0; i < slots_.size(); ++i) {
+    EstadoSlot& s = slots_[i];
+    if (!s.efeitos.borrar()) {
+      if (s.borrar_t >= 0) s.borrar_atual.clear(), s.borrar_ant.clear(), s.borrar_t = s.borrar_t_ant = -1;
+      continue;
+    }
+    if (s.borrar_t != relogio_) {
+      if (s.borrar_t >= 0 && relogio_ > s.borrar_t) {
+        s.borrar_ant.swap(s.borrar_atual);
+        s.borrar_t_ant = s.borrar_t;
+      } else {
+        s.borrar_ant.clear();
+        s.borrar_t_ant = -1;
+      }
+    }
+    vertices(int(i), s.borrar_atual);
+    s.borrar_t = relogio_;
+  }
+}
+
+bool Esqueleto::borrar(int slot, double* xy, size_t n, float* esmaece) const {
+  const EstadoSlot& s = slots_[size_t(slot)];
+  const Efeitos& ef = s.efeitos;
+  if (!ef.borrar() || s.borrar_t_ant < 0 || s.borrar_ant.size() != n || n < 2) return false;
+  const double dt = s.borrar_t - s.borrar_t_ant;
+  if (!(dt > 0) || dt > 0.25) return false;  // parado ou um salto (pausa, troca de cena)
+  const double forca = ef.v[BORRAR_FORCA], limite = ef.v[BORRAR_LIMITE], esm = ef.v[BORRAR_ESMAECER];
+  const size_t nv = n / 2;
+  // deslocamento de cada vertice: a velocidade vezes a forca, no maximo `limite`
+  std::vector<double> d(n);
+  double mx = 0, my = 0, cx = 0, cy = 0;
+  for (size_t i = 0; i < nv; ++i) {
+    double dx = (xy[i * 2] - s.borrar_ant[i * 2]) / dt * forca, dy = (xy[i * 2 + 1] - s.borrar_ant[i * 2 + 1]) / dt * forca;
+    const double l = std::hypot(dx, dy);
+    if (l > limite) dx *= limite / l, dy *= limite / l;
+    d[i * 2] = dx, d[i * 2 + 1] = dy;
+    mx += dx, my += dy, cx += xy[i * 2], cy += xy[i * 2 + 1];
+  }
+  // o sentido do movimento (a media) e quanto cada vertice esta na traseira: 0 do centro para a
+  // frente, 1 no vertice mais atras
+  const double ml = std::hypot(mx, my);
+  if (ml < 1e-9) return false;
+  const double ux = mx / ml, uy = my / ml;
+  cx /= double(nv), cy /= double(nv);
+  double atras = 0;
+  for (size_t i = 0; i < nv; ++i) atras = std::max(atras, -((xy[i * 2] - cx) * ux + (xy[i * 2 + 1] - cy) * uy));
+  if (!(atras > 0)) return false;
+  for (size_t i = 0; i < nv; ++i) {
+    const double w = std::clamp(-((xy[i * 2] - cx) * ux + (xy[i * 2 + 1] - cy) * uy) / atras, 0.0, 1.0);
+    xy[i * 2] -= w * d[i * 2];
+    xy[i * 2 + 1] -= w * d[i * 2 + 1];
+    if (esmaece) esmaece[i] = float(esm * w * std::min(1.0, std::hypot(d[i * 2], d[i * 2 + 1]) / limite));
+  }
+  return true;
 }
 
 Local Esqueleto::local_de_mundo(int i) const {

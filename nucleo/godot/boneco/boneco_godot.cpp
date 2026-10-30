@@ -736,8 +736,8 @@ void BonecoSprite::_desenhar() {
         passo_efeito.write[k] = int(li.passo);
       }
       PackedFloat32Array ef;
-      ef.resize(mamulengo::CANAIS_EFEITOS);
-      memcpy(ef.ptrw(), el.valores.v, sizeof(float) * mamulengo::CANAIS_EFEITOS);
+      ef.resize(mamulengo::CANAIS_SHADER);
+      memcpy(ef.ptrw(), el.valores.v, sizeof(float) * mamulengo::CANAIS_SHADER);
       rs->material_set_param(me, "ef", ef);
       rs->material_set_param(me, "caixa", Vector4(el.caixa[0], el.caixa[1], el.caixa[2], el.caixa[3]));
       rs->material_set_param(me, "pagina", Vector2(el.pagina[0], el.pagina[1]));

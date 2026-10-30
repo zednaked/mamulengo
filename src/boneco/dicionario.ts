@@ -139,6 +139,8 @@ export const CAMPOS: Record<string, string> = {
   radius: "raio",
   edge: "borda",
   grain: "grao",
+  smear: "borrar",
+  fade: "esmaecer",
   // particulas (so do Mamulengo; docs/NUCLEO.md "Particulas"); a escala do emissor fica
   // "escala" nos dois lados (scale ja e a timeline "escalar")
   particles: "particulas",

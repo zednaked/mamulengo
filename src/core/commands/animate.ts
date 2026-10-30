@@ -90,6 +90,8 @@ const KeyValue = z
     radius: z.number().min(0).optional().describe("glow: raio em pixels da textura"),
     edge: z.number().min(0).max(1).optional().describe("dissolve: largura da borda colorida (0 a 1)"),
     grain: z.number().min(1).optional().describe("dissolve: tamanho dos pedacos, em pixels da textura (padrao 8)"),
+    limit: z.number().min(0).optional().describe("smear: esticada maxima, em pixels do mundo (padrao 60)"),
+    fade: z.number().min(0).max(1).optional().describe("smear: quanto a ponta esticada fica transparente (0 a 1, padrao 0.5)"),
   })
   .partial();
 

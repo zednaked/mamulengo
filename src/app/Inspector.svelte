@@ -65,6 +65,15 @@
     glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "forca", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
     dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }, { k: "grain", label: "pedacos", max: 64, step: 1 }] },
     tint: { nome: "tingir", dica: "pinta a imagem com uma cor", campos: [{ k: "strength", label: "forca", max: 1, step: 0.01 }] },
+    smear: {
+      nome: "borrar",
+      dica: "estica a traseira da imagem quando ela anda rapido (smear de desenho animado)",
+      campos: [
+        { k: "strength", label: "forca (s)", max: 0.2, step: 0.005 },
+        { k: "limit", label: "limite", max: 200, step: 1 },
+        { k: "fade", label: "esmaecer", max: 1, step: 0.05 },
+      ],
+    },
   };
   const ehBoneco = $derived(!!app.asset?.tres?.endsWith(".boneco"));
   const efeitos = $derived.by(() => {
@@ -85,7 +94,7 @@
     } else app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, [campo]: valor } }, `${EFEITOS[n].nome} ${slot.name}`, `ef-${n}-${slot.name}`);
   }
   // ligar um efeito: no setup com um valor que ja aparece (o padrao deixa desligado)
-  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" } };
+  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 } };
   function ligar(n: string) {
     if (!slot || !n) return;
     app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`);
@@ -392,7 +401,7 @@
           <div class="ef">
             <div class="efnome" title={EFEITOS[ef.n].dica}>
               <span>{EFEITOS[ef.n].nome}</span>
-              <input type="color" value={"#" + ef.v.color.slice(0, 6)} title="cor" oninput={(e) => setEfeito(ef.n, "color", (e.target as HTMLInputElement).value.slice(1) + ef.v.color.slice(6, 8))} />
+              {#if ef.v.color}<input type="color" value={"#" + ef.v.color.slice(0, 6)} title="cor" oninput={(e) => setEfeito(ef.n, "color", (e.target as HTMLInputElement).value.slice(1) + ef.v.color.slice(6, 8))} />{/if}
               {#if app.mode !== "animate" || !app.play.animation}<button class="tira" onclick={() => tirar(ef.n)} title="tirar o efeito do setup">✕</button>{/if}
             </div>
             {#each EFEITOS[ef.n].campos as c}

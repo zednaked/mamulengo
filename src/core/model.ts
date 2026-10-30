@@ -179,6 +179,9 @@ export const EFFECTS: Record<string, [string, number[]][]> = {
   glow: [["color", [1, 1, 1, 1]], ["strength", [0]], ["radius", [8]]],
   dissolve: [["value", [0]], ["color", [1, 0.5, 0, 1]], ["edge", [0.05]], ["grain", [8]]],
   tint: [["color", [1, 1, 1, 1]], ["strength", [0]]],
+  // so mexe nos vertices (docs/NUCLEO.md "Borrar"): strength em segundos de movimento, limit em
+  // pixels do mundo, fade de 0 a 1
+  smear: [["strength", [0]], ["limit", [60]], ["fade", [0.5]]],
 };
 export const EFFECT_NAMES = Object.keys(EFFECTS);
 export const isEffect = (timeline: string) => timeline in EFFECTS;

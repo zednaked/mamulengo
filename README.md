@@ -82,6 +82,10 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
 
 - **Effects per part:** outline, glow, dissolve (with a grain size and a burning
   edge) and tint. The mesh grows along its contour so the halo has room.
+- **Smear:** a part moving fast stretches back toward where it came from and fades
+  at the tail, like the smear frames of cartoons, and settles by itself when it
+  slows down. It follows what the game really does (mixes, queues, physics), only
+  moves vertices and costs next to nothing on the GPU.
 - **Particles attached to bones:** sprite emitters with rate and bursts, color
   ramps, additive blend and sway (fire, sparks, smoke); procedural **lightning**
   between two bones; a ring in **orbit** that passes behind and in front of the

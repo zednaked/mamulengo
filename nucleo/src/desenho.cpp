@@ -222,6 +222,7 @@ void posicoes_orbita(const Esqueleto& e, int ie, std::vector<double>& out) {
 void desenhar(const Esqueleto& e, Desenho& d) {
   const Modelo& m = e.modelo();
   std::vector<double> mundo;
+  std::vector<float> esmaece;  // borrar: quanto o alfa de cada vertice cai
   std::vector<std::vector<P2>> recorte;  // pedacos convexos do recorte aberto (modo cpu)
   std::vector<double> caixas;            // por pedaco: x0, y0, x1, y1
   std::vector<uint8_t> dentro_v;         // por vertice da peca: dentro do pedaco
@@ -471,6 +472,18 @@ void desenhar(const Esqueleto& e, Desenho& d) {
           w[5] = g;
           w[6] = b;
           w[7] = a;
+        }
+        // borrar (docs/NUCLEO.md "Borrar"): a traseira esticada pela velocidade e mais transparente
+        if (s.efeitos.borrar()) {
+          esmaece.assign(n / 2, 0.0f);
+          if (e.borrar(si, mundo.data(), n, esmaece.data())) {
+            float* q = d.vertices.data() + size_t(base) * 8;
+            for (size_t i = 0; i < n / 2; ++i, q += 8) {
+              q[0] = float(mundo[i * 2]);
+              q[1] = float(mundo[i * 2 + 1]);
+              q[7] *= 1 - esmaece[i];
+            }
+          }
         }
         int efeito = -1;
         if (s.efeitos.algum()) {

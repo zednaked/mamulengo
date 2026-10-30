@@ -515,13 +515,25 @@
      "cor": "ff8a3cff",
      "borda": 0.08,
      "grao": 24
+    },
+    "borrar": {
+     "forca": 0.05,
+     "limite": 45,
+     "esmaecer": 0.55
     }
    }
   },
   {
    "nome": "mao_e",
    "osso": "mao_e",
-   "parte": "hand"
+   "parte": "hand",
+   "efeitos": {
+    "borrar": {
+     "forca": 0.05,
+     "limite": 45,
+     "esmaecer": 0.55
+    }
+   }
   },
   {
    "nome": "braco_d",
@@ -533,13 +545,25 @@
      "cor": "ff8a3cff",
      "borda": 0.08,
      "grao": 24
+    },
+    "borrar": {
+     "forca": 0.05,
+     "limite": 45,
+     "esmaecer": 0.55
     }
    }
   },
   {
    "nome": "mao_d",
    "osso": "mao_d",
-   "parte": "hand"
+   "parte": "hand",
+   "efeitos": {
+    "borrar": {
+     "forca": 0.05,
+     "limite": 45,
+     "esmaecer": 0.55
+    }
+   }
   },
   {
    "nome": "corpo",

@@ -249,7 +249,7 @@ O palco: `npm run dev` e `/palco.html` (os `.boneco` das raízes do editor). O w
 
 ## Efeitos
 
-O primeiro recurso que o Spine não tem. Cada slot pode ter quatro efeitos, todos desligados
+O primeiro recurso que o Spine não tem. Cada slot pode ter cinco efeitos, todos desligados
 por padrão, com valores de setup (`efeitos` no slot) e animáveis (`efeitos` na animação, por
 slot). A exportação para o Spine tira os efeitos e avisa.
 
@@ -259,14 +259,17 @@ slot). A exportação para o Spine tira os efeitos e avisa.
 | `brilho` (halo) | `cor` (`ffffffff`), `forca` (0), `raio` (8, em pixels da textura) | `forca > 0` e alfa da cor > 0 |
 | `dissolver` | `valor` (0 a 1), `cor` da borda (`ff8000ff`), `borda` (0,05), `grao` (8: o tamanho dos pedaços, em pixels da textura) | `valor > 0` |
 | `tingir` | `cor` (`ffffffff`), `forca` (0 a 1) | `forca > 0` e alfa da cor > 0 |
+| `borrar` (smear) | `forca` (0, em segundos de movimento), `limite` (60, em pixels do mundo), `esmaecer` (0,5, de 0 a 1) | `forca > 0` e `limite > 0` |
 
 **Timelines.** `animacoes.<a>.efeitos.<slot>.<efeito>`: chaves com `tempo`, os campos do
 efeito e `curva` (como no `rgba`: `"degrau"` ou 4 números por canal). Os canais, na ordem da
 curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda grao`;
-tingir `r g b a forca`. Campo que falta na chave vale o da chave anterior (na primeira, o do
+tingir `r g b a forca`; borrar `forca limite esmaecer`. Campo que falta na chave vale o da chave anterior (na primeira, o do
 setup): uma chave pode mudar só a `forca`. A mistura com o que já está
 na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `borda` entre 0 e
-1; `largura`, `raio` e `forca` a partir de 0; `grao` a partir de 1.
+1; `largura`, `raio`, as `forca` e `limite` a partir de 0; `grao` a partir de 1; `esmaecer` entre 0 e 1.
+São 26 canais: os 23 primeiros (linha, brilho, dissolver, tingir) são os de shader, que o
+desenhista recebe por lote; os 3 do borrar só mexem nos vértices e não mudam o lote.
 
 **No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
 efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
@@ -302,6 +305,40 @@ Conferência: `npx tsx tools/nucleo-efeitos.ts` calcula os canais das timelines 
 `tests/nucleo/efeitos/efeitos.boneco` (o robô CC0 com os quatro efeitos) por conta própria e
 compara com o núcleo. O desenho foi olhado no editor (modo núcleo) e no Godot 4.7.2
 (Compatibility): os mesmos quatro efeitos, iguais nos dois.
+
+### Borrar
+
+O smear dos desenhos animados: quando a imagem anda rápido, a traseira dela estica para trás,
+na direção de onde veio, e fica mais transparente; parada, volta ao normal sozinha. Não usa
+shader nem desenha mais nada: só move os vértices da peça (região ou malha) e baixa o alfa
+deles, então custa quase nada na GPU.
+
+**Memória.** A cada `atualizar_mundo`, um slot com borrar ligado guarda os vértices em mundo
+(com deformar) e o relógio do esqueleto. Quando o relógio andou desde a última vez, os
+guardados viram os anteriores (`A`, no relógio `t0`); vários `atualizar_mundo` no mesmo relógio
+só trocam os atuais. Relógio que volta, `setup` ou borrar desligado apagam a memória: só há
+anterior se o borrar já estava ligado no quadro anterior.
+
+**A conta**, no desenho, com `P` os vértices agora (relógio `t1`), `n` vértices:
+
+1. Nada se não há anterior, se o número de vértices mudou (troca de imagem), ou se
+   `dt = t1 - t0` não está em (0; 0,25] s (parado ou um salto).
+2. Por vértice, `D = (P - A) / dt * forca`; se `|D| > limite`, `D` encolhe para `limite`.
+3. `M` é a soma dos `D` (o sentido do movimento); nada se `|M| < 1e-9`. `u = M / |M|`, `c` o
+   centro (média dos `P`), `s = -(P - c) · u` o quanto o vértice está para trás e `S` o maior
+   `s`; nada se `S <= 0`.
+4. `w = clamp(s / S, 0, 1)`: 0 do centro para a frente, 1 no vértice mais atrás.
+   `P' = P - w D` e o alfa do vértice vezes `1 - esmaecer * w * min(1, |D| / limite)`.
+
+Com `forca` 0,05 a traseira fica onde estava 50 ms antes, o rastro de uns três quadros a 60
+fps. Como o anterior vem do quadro de verdade, o borrar segue o que o jogo faz (mix, fila,
+física, o jogo movendo ossos), não só a animação.
+
+Conferência: `npx tsx tools/nucleo-borrar.ts` refaz a conta pela especificação, com os
+vértices do `nucleo-pose` no instante e no passo anterior dele, em
+`tests/nucleo/borrar/borrar.boneco` (o robô CC0 com um balanço rápido, malha e regiões, um
+borrar animado e um que liga no meio), e compara com os vértices esticados e o alfa que o
+núcleo desenha.
 
 ## Partículas
 

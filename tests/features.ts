@@ -410,6 +410,20 @@ runtimeOk("constraints");
     check(renomeou && !doc.json.animations["t.efeito"].effects[s0].dissolve && doc.json.slots[0].effects === undefined, "efeitos: renomear o slot leva as timelines; key.delete e off limpam");
     await run("animation.delete", { name: "t.efeito" });
   }
+  // borrar (smear): sem cor, setup com padroes, chave com limit e fade, campo de outro efeito recusado
+  {
+    const s0 = doc.json.slots[0].name;
+    await run("slot.effect", { slot: s0, effect: "smear", strength: 0.05 });
+    await run("animation.create", { name: "t.borrar" });
+    await run("key.set", { anim: "t.borrar", target: { slot: s0 }, timeline: "smear", time: 0.2, strength: 0.08, limit: 30, fade: 0.8 });
+    let recusou = false;
+    await run("slot.effect", { slot: s0, effect: "smear", color: "ff0000" }).catch(() => (recusou = true));
+    const sm = doc.json.slots[0].effects.smear;
+    const k = doc.json.animations["t.borrar"].effects[s0].smear[0];
+    check(sm.strength === 0.05 && sm.limit === undefined && k.strength === 0.08 && k.limit === 30 && k.fade === 0.8 && recusou, `borrar: slot.effect e key.set (${JSON.stringify(sm)} ${JSON.stringify(k)})`);
+    await run("animation.delete", { name: "t.borrar" });
+    await run("slot.effect", { slot: s0, effect: "smear", off: true });
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

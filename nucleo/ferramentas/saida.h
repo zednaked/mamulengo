@@ -73,8 +73,8 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       escreve_num(out, c[j]);
     }
     out += ']';
-    // os efeitos (os 22 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
-    if (st.efeitos.algum()) {
+    // os efeitos (os 26 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
+    if (st.efeitos.algum() || st.efeitos.borrar()) {
       out += ",\"efeitos\":[";
       for (int j = 0; j < CANAIS_EFEITOS; ++j) {
         if (j) out += ',';
@@ -100,6 +100,27 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
     out += ']';
   }
   out += '}';
+  // borrar (docs/NUCLEO.md "Borrar"): de quem borrou, os vertices esticados e depois, por
+  // vertice, quanto o alfa cai
+  std::string bor;
+  std::vector<float> esm;
+  for (size_t k = 0; k < e.ordem().size(); ++k) {
+    const int s = e.ordem()[k];
+    if (!e.slots()[size_t(s)].efeitos.borrar()) continue;
+    const size_t n = e.vertices(s, v);
+    esm.assign(n / 2, 0.0f);
+    if (!n || !e.borrar(s, v.data(), n, esm.data())) continue;
+    if (!bor.empty()) bor += ',';
+    escreve_texto(bor, m.slots[size_t(s)].nome);
+    bor += ":[";
+    for (size_t j = 0; j < n; ++j) {
+      if (j) bor += ',';
+      escreve_num(bor, v[j]);
+    }
+    for (float x : esm) bor += ',', escreve_num(bor, x);
+    bor += ']';
+  }
+  if (!bor.empty()) out += ",\"borrados\":{" + bor + '}';
   // particulas vivas por emissor: [x, y, rot, idade, vida] (docs/NUCLEO.md "Particulas")
   if (!m.emissores.empty()) {
     out += ",\"particulas\":{";
