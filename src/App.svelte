@@ -43,7 +43,7 @@
   const layout = $derived(compacto ? layoutCompacto : layoutNormal);
   const padrao = () => (compacto ? LAYOUT_C0 : LAYOUT0);
   // paineis laterais recolhidos (botoes no topo; Ctrl+[ e Ctrl+])
-  let recolhe = $state({ left: false, right: false });
+  let recolhe = $state({ left: false, right: false, foot: false });
   try {
     Object.assign(layoutNormal, JSON.parse(localStorage.getItem("mamulengo.layout") ?? "{}"));
     Object.assign(layoutCompacto, JSON.parse(localStorage.getItem("mamulengo.layoutCompacto") ?? "{}"));
@@ -57,7 +57,7 @@
     } catch {}
     savePrefs({ layout: { ...layoutNormal }, layoutCompacto: { ...layoutCompacto }, recolhe: { ...recolhe } });
   }
-  function alterna(lado: "left" | "right") {
+  function alterna(lado: "left" | "right" | "foot") {
     recolhe[lado] = !recolhe[lado];
     guardaLayout();
   }
@@ -237,9 +237,9 @@
     } else if (mod && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (!app.spectator) save();
-    } else if (mod && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+    } else if (mod && (e.code === "BracketLeft" || e.code === "BracketRight" || e.code === "Backslash")) {
       e.preventDefault();
-      alterna(e.code === "BracketLeft" ? "left" : "right");
+      alterna(e.code === "BracketLeft" ? "left" : e.code === "BracketRight" ? "right" : "foot");
     } else if (!mod && e.key === "f") app.viewer?.frameAll();
     else if (!mod && (e.key === "PageUp" || e.key === "PageDown") && app.selection.slot) {
       // ordem de desenho da camada escolhida: passo inteligente; com Shift, topo ou fundo
@@ -279,8 +279,9 @@
   class:compacto
   class:sem-esq={recolhe.left}
   class:sem-dir={recolhe.right}
+  class:sem-pe={recolhe.foot}
   style:grid-template-columns="{recolhe.left ? 0 : layout.left}px minmax(0, 1fr) {recolhe.right ? 0 : layout.right}px"
-  style:grid-template-rows="auto minmax(0, 1fr) {layout.foot}px"
+  style:grid-template-rows="auto minmax(0, 1fr) {recolhe.foot ? 0 : layout.foot}px"
 >
   <header>
     <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
@@ -342,6 +343,7 @@
     {#if !app.spectator}
       <button class="save" class:dirty disabled={!app.doc || saving} onclick={save} title="Salvar no projeto (Ctrl+S)">{saving ? "salvando…" : dirty ? "● Salvar" : "Salvo"}</button>
     {/if}
+    <button class="painel" class:on={!recolhe.foot} onclick={() => alterna("foot")} title="Mostrar ou esconder o painel de baixo: a timeline (Ctrl+\\). Espaco continua tocando e pausando">⬓</button>
     <button class="painel" class:on={!recolhe.right} onclick={() => alterna("right")} title="Mostrar ou esconder o painel da direita: inspetor, ficha, notas (Ctrl+])">◨</button>
   </header>
 
@@ -419,7 +421,8 @@
   }
   /* paineis recolhidos: a coluna vai a 0 e o painel sai do fluxo */
   .sem-esq aside.left,
-  .sem-dir aside.right {
+  .sem-dir aside.right,
+  .sem-pe footer {
     display: none;
   }
   .agent {

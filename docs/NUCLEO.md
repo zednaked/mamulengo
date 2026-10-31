@@ -249,7 +249,7 @@ O palco: `npm run dev` e `/palco.html` (os `.boneco` das raízes do editor). O w
 
 ## Efeitos
 
-O primeiro recurso que o Spine não tem. Cada slot pode ter seis efeitos, todos desligados
+O primeiro recurso que o Spine não tem. Cada slot pode ter sete efeitos, todos desligados
 por padrão, com valores de setup (`efeitos` no slot) e animáveis (`efeitos` na animação, por
 slot). A exportação para o Spine tira os efeitos e avisa.
 
@@ -261,17 +261,19 @@ slot). A exportação para o Spine tira os efeitos e avisa.
 | `tingir` | `cor` (`ffffffff`), `forca` (0 a 1) | `forca > 0` e alfa da cor > 0 |
 | `borrar` (smear) | `forca` (0, em segundos de movimento), `limite` (60, em pixels do mundo), `esmaecer` (0,5, de 0 a 1) | `forca > 0` e `limite > 0` |
 | `rastro` (ghosting) | `copias` (0; até 16, a parte inteira), `intervalo` (0,05 s), `alfa` (0,5, de 0 a 1) | `copias >= 1`, `intervalo > 0` e `alfa > 0` |
+| `ajuste` (camada de ajuste) | `matiz` (0, em graus), `saturacao` (1), `luminosidade` (0), `contraste` (1), `desfoque` (0, em pixels do mundo) | algum campo fora do padrão |
 
 **Timelines.** `animacoes.<a>.efeitos.<slot>.<efeito>`: chaves com `tempo`, os campos do
 efeito e `curva` (como no `rgba`: `"degrau"` ou 4 números por canal). Os canais, na ordem da
 curva: linha `r g b a largura`; brilho `r g b a forca raio`; dissolver `valor r g b a borda grao`;
-tingir `r g b a forca`; borrar `forca limite esmaecer`; rastro `copias intervalo alfa`. Campo que falta na chave vale o da chave anterior (na primeira, o do
+tingir `r g b a forca`; borrar `forca limite esmaecer`; rastro `copias intervalo alfa`; ajuste `matiz saturacao luminosidade contraste desfoque`. Campo que falta na chave vale o da chave anterior (na primeira, o do
 setup): uma chave pode mudar só a `forca`. A mistura com o que já está
 na pose é a da cor (Estado, "Mistura"). Cores ficam entre 0 e 1; `valor` e `borda` entre 0 e
 1; `largura`, `raio`, as `forca`, `limite`, `copias` e `intervalo` a partir de 0; `grao` a partir de 1;
-`esmaecer` e `alfa` entre 0 e 1. São 29 canais: os 23 primeiros (linha, brilho, dissolver, tingir)
+`esmaecer` e `alfa` entre 0 e 1; `saturacao` e `contraste` entre 0 e 4, `luminosidade` entre -1
+e 1, `desfoque` a partir de 0. São 34 canais: os 23 primeiros (linha, brilho, dissolver, tingir)
 são os de shader, que o desenhista recebe por lote; os 6 do borrar e do rastro só mexem na
-geometria e não mudam o lote.
+geometria e não mudam o lote; os 5 do ajuste viram um comando próprio (Ajuste, abaixo).
 
 **No desenho.** Um slot com algum efeito ligado sai num lote só dele, com os valores dos
 efeitos e a caixa da imagem na página (uv mínima e máxima). Uma região com linha ou brilho
@@ -376,6 +378,33 @@ cópias pela especificação, com os vértices e os canais do `nucleo-pose` em c
 e em regiões, um que liga no meio e um que diminui as cópias e volta a aumentar), e compara com
 as cópias que o núcleo desenha.
 
+### Ajuste
+
+A camada de ajuste dos editores de imagem: o slot não desenha a imagem dele, muda o que já foi
+desenhado antes (por baixo dele na ordem de desenho). Com imagem, ela é só a máscara (o alfa da
+textura vezes o alfa do vértice); sem imagem, vale a tela inteira. Animada, faz um foco que
+entra, um flash frio de raio, uma cena que perde a cor.
+
+**No desenho.** Um slot com ajuste ligado e alfa maior que 0 sai como um lote `Comando::Ajuste`
+no lugar da imagem: `efeito` aponta para `Desenho::ajustes` (os 5 valores), os triângulos são os
+da imagem (página e uv como num lote comum) e, sem imagem, `quantos` é 0. Os outros efeitos do
+slot não se aplicam. Instâncias desenham os ajustes delas no meio da cena do pai, na ordem.
+
+**No desenhista**, por pixel, com `tela` a cópia do que já está desenhado e `p` o pixel:
+
+1. `r = desfoque * px`, com `px` os pixels de tela por pixel do mundo. Se `r > 0,5`, `c` é a
+   média gaussiana de `tela` em 7 x 7 amostras a `(i, j) / 3 * r` (i, j de -3 a 3), peso
+   `exp(-2 |(i, j) / 3|²)`; senão `c = tela(p)`.
+2. matiz: `c` gira `matiz` graus em volta do eixo do cinza (`(1, 1, 1) / √3`, fórmula de Rodrigues).
+3. saturação: `c = mix(Y, c, saturacao)`, `Y = 0,2126 r + 0,7152 g + 0,0722 b`.
+4. luminosidade e contraste: `c = clamp((c + luminosidade - 0,5) * contraste + 0,5, 0, 1)`.
+5. `m` a máscara (1 sem imagem); sai `(c m, m)` pré-multiplicado, por cima do que estava.
+
+Na web, `copyTexImage2D` da vista para uma textura antes de cada lote de ajuste; no Godot, o item
+do lote copia o backbuffer da viewport (`canvas_item_set_copy_to_backbuffer`) e o shader lê
+`hint_screen_texture`. Cada ajuste custa uma cópia da tela, e o desfoque 49 leituras por pixel:
+para a cena toda, um ou dois bastam.
+
 ## Luzes
 
 O terceiro recurso além do Spine: luz dinâmica 2D sem o artista pintar nada. Cada página do
@@ -410,7 +439,10 @@ mundo, a união dos pontos opacos delas (cada célula do mundo lê a textura no 
 furos) e, para cada texel de cada parte, a distância no mundo até a borda dessa união, em texels
 (dividida pelo tamanho do texel ali). Onde as peças se juntam (punho e mão, pescoço e corpo) a
 superfície continua, sem vinco; as trocas de imagem de um slot usam o lugar que teriam nele, e a
-média vale para a mesma imagem em dois lugares (o braço dos dois lados). Texels que nenhum
+média vale para a mesma imagem em dois lugares (o braço dos dois lados). Com `--camadas` (0 a 1,
+padrão 0,5), cada peça mistura essa altura com a da distância até a borda da união dela com as
+peças que estão na frente dela na ordem de desenho: a que está por cima (a cabeça sobre o corpo)
+ganha contorno, e não fica "grudada" na de trás quando as duas se mexem; 0 é só a silhueta de tudo. Texels que nenhum
 triângulo cobre pegam a média dos vizinhos. Imagem fora de slot, girada ou cortada no atlas (e o
 `--modo peca`) usa a borda dela mesma: a distância euclidiana até o transparente (alfa < 128).
 Nos dois casos, o perfil de almofada é `sqrt(1 - (1 - t)^2)` com `t = min(d / borda, 1)`,

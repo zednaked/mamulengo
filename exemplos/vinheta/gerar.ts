@@ -77,6 +77,10 @@ class Atlas {
     this.porPagina[pagina].push(im);
     return im;
   }
+  // uma imagem de pixels prontos (RGBA)
+  cru(pagina: number, nome: string, w: number, h: number, data: Buffer) {
+    this.porPagina[pagina].push({ nome, data, w, h, ox: 0, oy: 0 });
+  }
   // prateleiras, 4 px entre as imagens
   async montar() {
     for (let p = 0; p < this.arquivos.length; p++) {
@@ -101,6 +105,20 @@ class Atlas {
 const pilula = (cor: string, comp: number, larg: number) => `<rect width="${comp * HD}" height="${larg * HD}" rx="${(larg * HD) / 2}" fill="#${cor}"/>`;
 const radial = (paradas: [number, number][]) =>
   `<defs><radialGradient id="g">${paradas.map(([o, a]) => `<stop offset="${o}" stop-color="#fff" stop-opacity="${a}"/>`).join("")}</radialGradient></defs>`;
+
+// formas de particula (brancas: a cor vem do emissor), em 64 px
+const FORMAS: Record<string, string> = {
+  confete: `<rect x="14" y="22" width="36" height="20" rx="3" fill="#fff"/>`,
+  serpentina: `<path d="M6 40 C16 14 26 14 32 32 S48 50 58 24" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>`,
+  estrela5: `<polygon points="${Array.from({ length: 10 }, (_, k) => {
+    const r = k % 2 ? 12 : 28,
+      a = -Math.PI / 2 + (k * Math.PI) / 5;
+    return `${(32 + r * Math.cos(a)).toFixed(1)},${(33 + r * Math.sin(a)).toFixed(1)}`;
+  }).join(" ")}" fill="#fff"/>`,
+  nota: `<ellipse cx="22" cy="46" rx="11" ry="8" transform="rotate(-20 22 46)" fill="#fff"/><rect x="29" y="10" width="5" height="36" fill="#fff"/><path d="M33 10 C44 14 50 20 46 32 C46 24 40 20 33 20 Z" fill="#fff"/>`,
+  losango: `<polygon points="32,6 50,32 32,58 14,32" fill="#fff"/>`,
+  bolinha: `<circle cx="32" cy="32" r="14" fill="#fff"/>`,
+};
 
 // timelines: ossos[osso][prop] e o resto por nome
 class Anim {
@@ -253,15 +271,18 @@ await atlasMar.svg(0, "vara_lado", (6 * U + VARA) * HD, VARA * HD, pilula(ROSA, 
 await atlasMar.svg(0, "vara_meio", (8 * U + VARA) * HD, VARA * HD, pilula(ROSA, 8 * U + VARA, VARA));
 const L_FIO = Math.hypot(PONTA.e.x - OMBRO_X, PONTA.e.y - OMBRO_Y);
 await atlasMar.svg(0, "fio", (L_FIO + FIO) * HD, FIO * HD, pilula(ROSA, L_FIO + FIO, FIO));
-await atlasMar.svg(1, "confete", 24, 14, `<rect x="1" y="1" width="22" height="12" rx="2" fill="#fff"/>`);
+for (const nome of ["confete", "estrela5", "bolinha", "serpentina"]) await atlasMar.svg(1, nome, 64, 64, FORMAS[nome]);
 await atlasMar.svg(1, "raio", 16, 32, `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.42" stop-color="#fff" stop-opacity="0.9"/><stop offset="0.5" stop-color="#fff"/><stop offset="0.58" stop-color="#fff" stop-opacity="0.9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="16" height="32" fill="url(#g)"/>`);
 await atlasMar.svg(1, "estrela", 64, 64, `${radial([[0, 1], [1, 0]])}<circle cx="32" cy="32" r="14" fill="url(#g)"/><path d="M32 2 C34 26 38 30 62 32 C38 34 34 38 32 62 C30 38 26 34 2 32 C26 30 30 26 32 2Z" fill="#fff"/>`);
 await atlasMar.montar();
 {
   // o movimento: o controle (deslocamento e giro) e o boneco pendurado (deslocamento, giro,
   // amasso do corpo e giro da cabeca); os fios saem das pontas das varetas ate os ombros
-  type Pose = { cx: number; cy: number; ct: number; bx: number; by: number; bt: number; amassa: number; ht: number };
+  // hy: quanto a cabeca desce alem do amasso (o agradecimento)
+  type Pose = { cx: number; cy: number; ct: number; bx: number; by: number; bt: number; amassa: number; ht: number; hy?: number };
   const REPOUSO: Pose = { cx: 0, cy: 0, ct: 0, bx: 0, by: 0, bt: 0, amassa: 0, ht: 0 };
+  // a cabeca desce com o amasso do corpo; a vareta do meio vai ate ela pelo mesmo numero
+  const desceCabeca = (p: Pose) => -60 * p.amassa + (p.hy ?? 0);
   const gira = (x: number, y: number, g: number) => {
     const r = (g * Math.PI) / 180;
     return { x: x * Math.cos(r) - y * Math.sin(r), y: x * Math.sin(r) + y * Math.cos(r) };
@@ -277,7 +298,7 @@ await atlasMar.montar();
       const v = gira(x, y, p.bt);
       return { x: b.x + v.x, y: b.y + v.y };
     };
-    const pescoco = noBoneco(0, U);
+    const pescoco = noBoneco(0, U + desceCabeca(p));
     const topo = gira(0, 9 * U, p.bt + p.ht);
     return {
       fios: {
@@ -297,7 +318,7 @@ await atlasMar.montar();
     an.osso("boneco", "mover", t, { x: r3(p.bx), y: r3(p.by) });
     an.osso("boneco", "girar", t, { valor: r3(p.bt) });
     an.osso("corpo", "escalar", t, { x: r3(1 + 0.6 * p.amassa), y: r3(1 - p.amassa) });
-    an.osso("cabeca", "mover", t, { x: 0, y: r3(-60 * p.amassa) });
+    an.osso("cabeca", "mover", t, { x: 0, y: r3(desceCabeca(p)) });
     an.osso("cabeca", "girar", t, { valor: r3(p.ht) });
     const agora = pontos(p);
     for (const k of ["e", "d", "m"] as const) {
@@ -311,7 +332,14 @@ await atlasMar.montar();
   // a mola do boneco pendurado: segue o controle com atraso (mais solto de lado que em pe), o
   // corpo amassa com a aceleracao e balanca como pendulo; os ultimos `assenta` segundos vao ao
   // repouso, para emendar com qualquer animacao
-  const mole = (an: Anim, dur: number, controle: (t: number) => { cx: number; cy: number; ct: number }, impulso = { t: -1, vx: 0, vy: 0 }, assenta = 0.25) => {
+  const mole = (
+    an: Anim,
+    dur: number,
+    controle: (t: number) => { cx: number; cy: number; ct: number },
+    impulso = { t: -1, vx: 0, vy: 0 },
+    assenta = 0.25,
+    extra?: (t: number) => { amassa?: number; hy?: number },
+  ) => {
     const dt = 1 / 240;
     let [x, y, vx, vy] = [0, 0, 0, 0];
     const wx = 2 * Math.PI * 1.3,
@@ -330,7 +358,7 @@ await atlasMar.montar();
       vy += fy * dt;
       x += vx * dt;
       y += vy * dt;
-      if (i % 8 === 0) {
+      if (i % 4 === 0) {
         const k = entre(t, dur - assenta, dur);
         const p: Pose = {
           cx: c.cx,
@@ -342,6 +370,11 @@ await atlasMar.montar();
           amassa: mistura(clamp(ay / 9000, -0.12, 0.2), 0, k),
           ht: mistura(clamp(-0.25 * vx, -12, 12), 0, k),
         };
+        if (extra) {
+          const x = extra(t);
+          p.amassa += x.amassa ?? 0;
+          p.hy = x.hy ?? 0;
+        }
         amostras.set(r3(t), p);
       }
     }
@@ -357,15 +390,21 @@ await atlasMar.montar();
   mole(chega, 1.6, (t) => ({ cx: 4 * Math.sin(2 * Math.PI * 3 * t) * (1 - entre(t, 0.4, 0.65)), cy: 0, ct: 0 }), { t: 0.65, vx: 40, vy: -560 }, 0.3);
   const RASTRO = ["corpo", "cabeca", "vara_e", "vara_d", "fio_m"];
   for (const s of RASTRO) chega.efeitos[s] = { rastro: [{ tempo: 0, copias: 6, curva: "degrau" }, { tempo: 0.8, copias: 0, curva: "degrau" }] };
-  for (const c of ["confete_rosa", "confete_amarelo", "confete_branco"]) chega.particulas[c] = { rajada: [{ tempo: 0.72, quantidade: 22 }] };
+  for (const c of ["confete_rosa", "confete_amarelo", "confete_branco", "confete_serpentina"]) chega.particulas[c] = { rajada: [{ tempo: 0.72, quantidade: 16 }] };
   // danca (0,9 s em laco): o controle balanca e inclina; o boneco vai mais longe, com um
   // repique (tudo zero no 0 e no fim: emenda com o repouso)
   const W = (2 * Math.PI) / 0.9;
   for (const t of de(0, 0.9)) {
     const s1 = Math.sin(W * t),
       s2 = Math.sin(2 * W * t);
-    chaves(danca, t, { cx: 22 * s1, cy: 5 * s2, ct: -8 * s1, bx: 34 * s1 + 6 * s2, by: 8 * s2, bt: -11 * s1 - 3 * s2, amassa: 0.06 * s2, ht: 8 * s1 });
+    // a cabeca acena duas vezes por laco, no tempo da musica (um balanco de pista)
+    chaves(danca, t, { cx: 22 * s1, cy: 5 * s2, ct: -8 * s1, bx: 34 * s1 + 6 * s2, by: 8 * s2, bt: -11 * s1 - 3 * s2, amassa: 0.06 * s2, ht: 8 * s1 + 9 * Math.sin(2 * W * t) });
   }
+  // reverencia (1 s): o controle desce, o boneco dobra e baixa a cabeca, segura e volta
+  const reverencia = new Anim();
+  // por cima da mola: a cabeca baixa e o corpo amassa no meio do agradecimento (pela pose: a
+  // vareta do meio acompanha a cabeca)
+  mole(reverencia, 1.0, (t) => ({ cx: 0, cy: -34 * sino(t, 0.05, 0.85), ct: 0 }), undefined, 0.2, (t) => ({ amassa: 0.15 * sino(t, 0.1, 0.85), hy: -18 * sino(t, 0.1, 0.85) }));
   // pula (0,8 s): o controle desce (preparo), da um tranco para cima e volta; o boneco vai atras
   mole(pula, 0.8, (t) => ({ cx: 0, cy: -14 * sino(t, 0, 0.14) + 90 * sino(t, 0.14, 0.5), ct: 0 }), undefined, 0.2);
   // eletrico (0,5 s em laco): tremedeira; raio pelos tres fios, estrelas em volta da cabeca
@@ -382,12 +421,12 @@ await atlasMar.montar();
     return { nome: `fio_${k}`, pai: "root", x: r3(a.x), y: r3(a.y), rotacao: r3(ang(a, b)), comprimento: r3(comp(a, b)) };
   };
   const raio = (k: string, ate: string) => ({ nome: `raio_${k}`, tipo: "raio", slot: "raio", osso: `ponta_${k}`, ate, imagem: "raio", blend: "aditivo", taxa: 0, largura: 12, segmentos: 9, desvio: 0.18, ramos: 2, troca: 0.05, cor: ["bfeaffff"], semente: k.charCodeAt(0) });
-  const confete = (nome: string, cor: string, semente: number) => ({
+  const confete = (nome: string, cor: string, semente: number, imagem = "confete", esc = 0.32) => ({
     nome,
     slot: "confete",
     osso: "cabeca",
     y: 5 * U,
-    imagem: "confete",
+    imagem,
     taxa: 0,
     vida: [1.2, 1.9],
     velocidade: [200, 430],
@@ -395,7 +434,7 @@ await atlasMar.montar();
     abertura: 150,
     gravidade: 520,
     arrasto: 1.4,
-    escala: [0.75, 0.55],
+    escala: [esc, esc * 0.75],
     giro: [-620, 620],
     cor: [cor + "ff", cor + "ff", cor + "00"],
     semente,
@@ -452,9 +491,10 @@ await atlasMar.montar();
       },
     ],
     particulas: [
-      confete("confete_rosa", ROSA, 1),
-      confete("confete_amarelo", AMARELO, 2),
-      confete("confete_branco", "ffffff", 3),
+      confete("confete_rosa", ROSA, 1, "confete", 0.34),
+      confete("confete_amarelo", AMARELO, 2, "estrela5", 0.36),
+      confete("confete_branco", "ffffff", 3, "bolinha", 0.24),
+      confete("confete_serpentina", "7fd8ff", 4, "serpentina", 0.4),
       raio("e", "ombro_e"),
       raio("d", "ombro_d"),
       raio("m", "topo"),
@@ -480,7 +520,91 @@ await atlasMar.montar();
         semente: 5,
       },
     ],
-    animacoes: { danca: danca.json(), chega: chega.json(), pula: pula.json(), eletrico: eletrico.json() },
+    animacoes: { danca: danca.json(), chega: chega.json(), pula: pula.json(), eletrico: eletrico.json(), reverencia: reverencia.json() },
+  });
+}
+
+// =====================================================================================
+// lampada.boneco e plateia.boneco: pecas pequenas, instanciadas muitas vezes pela cena
+// =====================================================================================
+{
+  // a lampada do letreiro: o bulbo e o brilho em volta; pisca (0,8 s em laco: acende de estalo e
+  // apaga devagar); a cena defasa uma da outra e a luz corre em volta do nome
+  const at = new Atlas([{ arquivo: "lampada.png", largura: 128 }]);
+  await at.svg(0, "bulbo", 24, 24, `${radial([[0, 1], [0.55, 1], [0.7, 0.9], [1, 0]])}<circle cx="12" cy="12" r="11" fill="url(#g)"/>`);
+  await at.svg(0, "brilho", 64, 64, `${radial([[0, 0.8], [0.3, 0.35], [1, 0]])}<circle cx="32" cy="32" r="32" fill="url(#g)"/>`);
+  await at.montar();
+  const pisca = new Anim();
+  pisca.slots.bulbo = { rgba: [{ tempo: 0, cor: "fff4d0ff" }, { tempo: 0.12, cor: "ffd166ff" }, { tempo: 0.5, cor: "a8663aff" }, { tempo: 0.8, cor: "fff4d0ff" }] };
+  pisca.slots.brilho = { rgba: [{ tempo: 0, cor: "ffd166cc" }, { tempo: 0.2, cor: "ffd16680" }, { tempo: 0.5, cor: "ffd16600" }, { tempo: 0.8, cor: "ffd166cc" }] };
+  escreve("lampada.boneco", {
+    boneco: 0,
+    nome: "lampada",
+    paginas: at.paginas,
+    imagens: at.imagens,
+    esqueleto: { versao_spine: "4.3.23", pasta_imagens: "./images/", audio: "", x: -16, y: -16, largura: 32, altura: 32 },
+    ossos: [{ nome: "root" }],
+    slots: [
+      { nome: "brilho", osso: "root", parte: "brilho", blend: "aditivo", cor: "ffd166cc" },
+      { nome: "bulbo", osso: "root", parte: "bulbo", blend: "aditivo", cor: "fff4d0ff" },
+    ],
+    skins: [{ nome: "default", partes: { brilho: { brilho: { largura: 34, altura: 34 } }, bulbo: { bulbo: { largura: 9, altura: 9 } } } }],
+    animacoes: { pisca: pisca.json() },
+  });
+}
+{
+  // uma pessoa da plateia em silhueta: cabeca e ombros; balanca (1,2 s em laco) e vibra (0,5 s em
+  // laco: pula com os bracos para cima, no aplauso)
+  const at = new Atlas([{ arquivo: "plateia.png", largura: 256 }]);
+  await at.svg(0, "corpo_p", 120 * HD, 70 * HD, `<path d="M${6 * HD} ${70 * HD} C${8 * HD} ${30 * HD} ${30 * HD} ${16 * HD} ${60 * HD} ${16 * HD} C${90 * HD} ${16 * HD} ${112 * HD} ${30 * HD} ${114 * HD} ${70 * HD} Z" fill="#100d15"/>`);
+  await at.svg(0, "cabeca_p", 52 * HD, 58 * HD, `<ellipse cx="${26 * HD}" cy="${29 * HD}" rx="${25 * HD}" ry="${28 * HD}" fill="#100d15"/>`);
+  await at.svg(0, "braco_p", 18 * HD, 70 * HD, `<rect x="${2 * HD}" width="${14 * HD}" height="${70 * HD}" rx="${7 * HD}" fill="#100d15"/>`);
+  await at.montar();
+  const balanca = new Anim(),
+    vibra = new Anim();
+  for (const t of de(0, 1.2)) {
+    const s1 = Math.sin((2 * Math.PI * t) / 1.2);
+    balanca.osso("corpo", "girar", t, { valor: r3(2.5 * s1) });
+    balanca.osso("cabeca", "girar", t, { valor: r3(5 * s1) });
+    balanca.osso("corpo", "mover", t, { x: 0, y: r3(2 * Math.abs(s1)) });
+  }
+  for (const t of de(0, 0.5)) {
+    const pulo = Math.abs(Math.sin((2 * Math.PI * t) / 0.5));
+    vibra.osso("corpo", "mover", t, { x: 0, y: r3(14 * pulo) });
+    vibra.osso("cabeca", "girar", t, { valor: r3(6 * Math.sin((2 * Math.PI * t) / 0.5)) });
+    for (const [l, sg] of [["e", 1], ["d", -1]] as const) vibra.osso(`braco_${l}`, "girar", t, { valor: r3(sg * (-150 + 18 * pulo)) });
+  }
+  escreve("plateia.boneco", {
+    boneco: 0,
+    nome: "plateia",
+    paginas: at.paginas,
+    imagens: at.imagens,
+    esqueleto: { versao_spine: "4.3.23", pasta_imagens: "./images/", audio: "", x: -60, y: 0, largura: 120, altura: 130 },
+    ossos: [
+      { nome: "root" },
+      { nome: "corpo", pai: "root" },
+      { nome: "cabeca", pai: "corpo", y: 60 },
+      { nome: "braco_e", pai: "corpo", x: -40, y: 40, rotacao: -90 },
+      { nome: "braco_d", pai: "corpo", x: 40, y: 40, rotacao: -90 },
+    ],
+    slots: [
+      { nome: "braco_e", osso: "braco_e", parte: "braco_p" },
+      { nome: "braco_d", osso: "braco_d", parte: "braco_p" },
+      { nome: "corpo", osso: "corpo", parte: "corpo_p" },
+      { nome: "cabeca", osso: "cabeca", parte: "cabeca_p" },
+    ],
+    skins: [
+      {
+        nome: "default",
+        partes: {
+          corpo: { corpo_p: { largura: 120, altura: 70, y: 35 } },
+          cabeca: { cabeca_p: { largura: 52, altura: 58, y: 22 } },
+          braco_e: { braco_p: { largura: 18, altura: 70, x: 30, rotacao: 90 } },
+          braco_d: { braco_p: { largura: 18, altura: 70, x: 30, rotacao: 90 } },
+        },
+      },
+    ],
+    animacoes: { balanca: balanca.json(), vibra: vibra.json() },
   });
 }
 
@@ -491,6 +615,9 @@ const atlasCena = new Atlas([
   { arquivo: "vinheta.png", largura: 2048 },
   { arquivo: "efeitos.png", largura: 256 },
   { arquivo: "fundo.png", largura: 256 },
+  { arquivo: "cortina.png", largura: 2048, relevo: "cortina_relevo.png" },
+  { arquivo: "chita.png", largura: 1024, relevo: "chita_relevo.png" },
+  { arquivo: "grao.png", largura: 1024 },
 ]);
 await atlasCena.svg(0, "barra", 120 * HD, 6 * HD, `<rect width="${120 * HD}" height="${6 * HD}" rx="${3 * HD}" fill="#${ROSA}"/>`);
 const sub = await atlasCena.svg(
@@ -502,6 +629,7 @@ const sub = await atlasCena.svg(
   true,
 );
 await atlasCena.svg(1, "ponto", 64, 64, `${radial([[0, 1], [0.25, 0.85], [1, 0]])}<circle cx="32" cy="32" r="32" fill="url(#g)"/>`);
+for (const [nome, corpo] of Object.entries(FORMAS)) await atlasCena.svg(1, nome, 64, 64, corpo);
 await atlasCena.svg(1, "halo", 128, 128, `${radial([[0, 0.9], [0.35, 0.35], [1, 0]])}<circle cx="64" cy="64" r="64" fill="url(#g)"/>`);
 await atlasCena.svg(
   2,
@@ -510,16 +638,165 @@ await atlasCena.svg(
   144,
   `<defs><radialGradient id="f" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#2c2438"/><stop offset="0.6" stop-color="#1d1a24"/><stop offset="1" stop-color="#121016"/></radialGradient></defs><rect width="256" height="144" fill="url(#f)"/>`,
 );
+// o teatro: a cortina de veludo (dobras, sombra em cima e embaixo, franja dourada), a bambinela
+// de cima (festoes com galao) e o cone do refletor
+const CW = 520,
+  CH = 560;
+await atlasCena.svg(
+  3,
+  "cortina",
+  CW * HD,
+  CH * HD,
+  `<defs><linearGradient id="d" x2="${(52 * HD) / (CW * HD)}" spreadMethod="repeat"><stop offset="0" stop-color="#4a0718"/><stop offset="0.3" stop-color="#9c0f34"/><stop offset="0.5" stop-color="#d42452"/><stop offset="0.72" stop-color="#9c0f34"/><stop offset="1" stop-color="#4a0718"/></linearGradient>` +
+    `<linearGradient id="v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.55"/><stop offset="0.25" stop-color="#000" stop-opacity="0"/><stop offset="0.8" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient></defs>` +
+    `<rect width="${CW * HD}" height="${CH * HD}" fill="url(#d)"/><rect width="${CW * HD}" height="${CH * HD}" fill="url(#v)"/>` +
+    `<rect y="${(CH - 16) * HD}" width="${CW * HD}" height="${10 * HD}" fill="#e8b54a"/>` +
+    Array.from({ length: Math.floor(CW / 13) }, (_, k) => `<rect x="${(k * 13 + 4) * HD}" y="${(CH - 8) * HD}" width="${5 * HD}" height="${8 * HD}" rx="${2 * HD}" fill="#c9922e"/>`).join(""),
+);
+await atlasCena.svg(
+  3,
+  "bambinela",
+  1000 * HD,
+  80 * HD,
+  `<path d="M0 0 H${1000 * HD} V${46 * HD} ${Array.from({ length: 10 }, (_, k) => `Q${(1000 - k * 100 - 50) * HD} ${80 * HD} ${(1000 - k * 100 - 100) * HD} ${46 * HD}`).join(" ")} Z" fill="#8e0d30"/>` +
+    `<path d="M0 ${44 * HD} ${Array.from({ length: 10 }, (_, k) => `Q${(k * 100 + 50) * HD} ${78 * HD} ${(k * 100 + 100) * HD} ${44 * HD}`).join(" ")}" fill="none" stroke="#e8b54a" stroke-width="${4 * HD}"/>` +
+    `<rect y="${6 * HD}" width="${1000 * HD}" height="${4 * HD}" fill="#e8b54a"/>`,
+);
+await atlasCena.svg(
+  1,
+  "foco",
+  256,
+  256,
+  `<defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="9"/></filter></defs><polygon points="104,0 152,0 246,256 10,256" fill="url(#c)" filter="url(#b)"/>`,
+);
+await atlasCena.svg(
+  1,
+  "feixe",
+  128,
+  256,
+  `<defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="5"/></filter></defs><polygon points="58,0 70,0 116,256 12,256" fill="url(#c)" filter="url(#b)"/>`,
+);
+// o pano de fundo de chita: flores grandes (cinco petalas, miolo, folhas) num azul fundo; a luz
+// revela (o relevo sai do brilho das flores). Em 1x: o pano e grande e fica no fundo
+const chita = (() => {
+  const h = (i: number, s: number) => {
+    const x = Math.sin(i * 127.1 + s * 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const cores = ["#c8233a", "#f0b429", "#2d6bd6", "#e8337f", "#f07d1a"];
+  let out = `<rect width="1000" height="600" fill="#1c1a3c"/>`;
+  let k = 0;
+  for (let gy = -1; gy < 6; gy++)
+    for (let gx = -1; gx < 9; gx++, k++) {
+      const cx = gx * 125 + (gy % 2 ? 62 : 0) + (h(k, 1) - 0.5) * 30,
+        cy = gy * 110 + (h(k, 2) - 0.5) * 30;
+      const r = 26 + h(k, 3) * 18,
+        cor = cores[Math.floor(h(k, 4) * cores.length)],
+        g = h(k, 5) * 72;
+      for (let f = 0; f < 2; f++) {
+        const a = g + 40 + f * 150;
+        out += `<ellipse cx="${cx + Math.cos((a * Math.PI) / 180) * r * 1.25}" cy="${cy + Math.sin((a * Math.PI) / 180) * r * 1.25}" rx="${r * 0.62}" ry="${r * 0.28}" transform="rotate(${a} ${cx + Math.cos((a * Math.PI) / 180) * r * 1.25} ${cy + Math.sin((a * Math.PI) / 180) * r * 1.25})" fill="#2f8a4e"/>`;
+      }
+      for (let p = 0; p < 5; p++) {
+        const a = g + p * 72;
+        const px = cx + Math.cos((a * Math.PI) / 180) * r * 0.55,
+          py = cy + Math.sin((a * Math.PI) / 180) * r * 0.55;
+        out += `<ellipse cx="${px}" cy="${py}" rx="${r * 0.52}" ry="${r * 0.38}" transform="rotate(${a} ${px} ${py})" fill="${cor}"/>`;
+      }
+      out += `<circle cx="${cx}" cy="${cy}" r="${r * 0.28}" fill="#fff1b8"/><circle cx="${cx}" cy="${cy}" r="${r * 0.14}" fill="#7a3a12"/>`;
+      // bolinhas brancas entre as flores
+      out += `<circle cx="${cx + 62}" cy="${cy + 55}" r="3" fill="#e9e4ff"/>`;
+    }
+  // na penumbra: um veu escuro por cima e as bordas mais escuras (a luz e que revela as flores)
+  out += `<rect width="1000" height="600" fill="#0c0a1a" opacity="0.72"/>`;
+  out += `<defs><radialGradient id="vg" cx="0.5" cy="0.42" r="0.7"><stop offset="0.35" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.7"/></radialGradient></defs><rect width="1000" height="600" fill="url(#vg)"/>`;
+  return out;
+})();
+await atlasCena.svg(4, "chita", 1000, 600, chita);
+// a pos (feita na cena): branco liso (as camadas de cor), a vinheta de lente, o grao de filme e
+// a mancha de luz que vaza
+await atlasCena.svg(1, "liso", 8, 8, `<rect width="8" height="8" fill="#fff"/>`);
+await atlasCena.svg(1, "vinheta_lente", 256, 144, `<defs><radialGradient id="v" cx="0.5" cy="0.5" r="0.62"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="1"/></radialGradient></defs><rect width="256" height="144" fill="url(#v)"/>`);
+{
+  // o grao: um ponto por pixel, brilho sorteado (somado em "tela", fraco: textura sem lavar)
+  const N = 1024;
+  const px = Buffer.alloc(N * N * 4);
+  let x = 0x9e3779b9;
+  for (let i = 0; i < N * N; i++) {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    const v = (x >>> 0) / 4294967296;
+    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = 255;
+    px[i * 4 + 3] = v > 0.55 ? Math.round(255 * (v - 0.55) / 0.45) : 0;
+  }
+  atlasCena.cru(5, "grao", N, N, px);
+}
+await atlasCena.svg(1, "vazamento", 256, 256, `${radial([[0, 0.85], [0.4, 0.35], [1, 0]])}<ellipse cx="128" cy="128" rx="128" ry="96" fill="url(#g)"/>`);
+// a ribalta: as lampadas da beira do palco
+await atlasCena.svg(
+  1,
+  "ribalta",
+  256,
+  16,
+  `${radial([[0, 1], [0.4, 0.6], [1, 0]])}${Array.from({ length: 8 }, (_, k) => `<circle cx="${16 + k * 32}" cy="8" r="8" fill="url(#g)"/>`).join("")}`,
+);
 await atlasCena.montar();
+// o letreiro: lampadas num retangulo arredondado em volta do nome, a cada ~36 px
+const LETREIRO = (() => {
+  const [x0, x1, y0, y1, r] = [-410, 410, -150, 38, 30];
+  const pts: [number, number][] = [];
+  const passo = 36;
+  const reta = (ax: number, ay: number, bx: number, by: number) => {
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / passo));
+    for (let k = 0; k < n; k++) pts.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n]);
+  };
+  const canto = (cx: number, cy: number, a0: number) => {
+    for (let k = 0; k < 2; k++) {
+      const a = ((a0 + 45 * k) * Math.PI) / 180;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  };
+  reta(x0 + r, y1, x1 - r, y1);
+  canto(x1 - r, y1 - r, 90 - 90);
+  reta(x1, y1 - r, x1, y0 + r);
+  canto(x1 - r, y0 + r, 0 - 90);
+  reta(x1 - r, y0, x0 + r, y0);
+  canto(x0 + r, y0 + r, -90 - 90);
+  reta(x0, y0 + r, x0, y1 - r);
+  canto(x0 + r, y1 - r, 180 - 90);
+  return pts.map(([x, y]) => [r3(x), r3(y)]);
+})();
+// a plateia: x, escala, tom
+const PLATEIA: [number, number, string][] = [
+  [-430, 1.0, "ffffffff"],
+  [-330, 1.12, "e0e0ffff"],
+  [-220, 0.95, "ffffffff"],
+  [-120, 1.08, "e8e0f0ff"],
+  [-10, 1.15, "ffffffff"],
+  [100, 1.0, "e0e0ffff"],
+  [210, 1.1, "ffffffff"],
+  [320, 0.96, "e8e0f0ff"],
+  [430, 1.06, "ffffffff"],
+];
+// a chuva do aplauso: nome, forma, cor e escala
+const CHUVA: [string, string, string, number][] = [
+  ["serpentina", "serpentina", "ff2e88", 0.55],
+  ["estrela", "estrela5", "ffd166", 0.42],
+  ["nota", "nota", "ffffff", 0.45],
+  ["losango", "losango", "7fd8ff", 0.32],
+  ["bolinha", "bolinha", "ffd166", 0.3],
+  ["confete", "confete", "ff2e88", 0.4],
+];
 {
   const an = new Anim();
-  const SUB_Y = -222,
-    BARRA_Y = -172;
+  const SUB_Y = -205,
+    BARRA_Y = -167;
   const CABECA = { x: 0, y: py(15) }; // o centro da cabeca da marionete em repouso
   // a marionete: vem do fundo (de 5% a 100%, girando, a cabeca saindo do meio da tela) e, na
   // saida, a camera mergulha na cabeca (14x, a cabeca indo para o meio) e escurece
   const ENTRA = [0.05, 0.7],
-    MERGULHA = [7.15, 7.85];
+    MERGULHA = [99, 99]; // sem mergulho: no fim a cortina fecha
   const fundo = (t: number) => {
     if (t < MERGULHA[0]) {
       const f = clamp((t - ENTRA[0]) / (ENTRA[1] - ENTRA[0]), 0, 1);
@@ -534,7 +811,7 @@ await atlasCena.montar();
     const alvo = { x: CABECA.x, y: mistura(CABECA.y, 20, f) };
     return { s, x: alvo.x - s * CABECA.x, y: alvo.y - s * CABECA.y, g: 0 };
   };
-  for (const t of [...de(0, ENTRA[1] + 0.05), ...de(MERGULHA[0] - 0.05, DUR)]) {
+  for (const t of [...de(0, ENTRA[1] + 0.05), DUR]) {
     const p = fundo(t);
     an.osso("cena_boneco", "escalar", t, { x: r3(p.s), y: r3(p.s) });
     an.osso("cena_boneco", "mover", t, { x: r3(p.x), y: r3(p.y) });
@@ -544,9 +821,9 @@ await atlasCena.montar();
   an.slots.marionete = {
     rgba: [
       { tempo: 0, cor: "ffffff00", curva: "degrau" },
-      { tempo: ENTRA[0], cor: "ffffffff" },
-      { tempo: 7.78, cor: "ffffffff" },
-      { tempo: 7.95, cor: "ffffff00" },
+      // em degrau: sem isso a cor ia de visivel ate apagada ao longo da vinheta inteira
+      { tempo: ENTRA[0], cor: "ffffffff", curva: "degrau" },
+      { tempo: 7.85, cor: "ffffff00", curva: "degrau" },
     ],
   };
   // o que a marionete toca: as trocas caem no fim de um laco da anterior (repouso: sem salto)
@@ -556,6 +833,47 @@ await atlasCena.montar();
     { tempo: 3.45, animacao: "pula", inicio: 0, repetir: false },
     { tempo: 4.25, animacao: "eletrico", inicio: 0, repetir: true },
     { tempo: 5.25, animacao: "danca", inicio: 0, repetir: true },
+    // o agradecimento, e de volta a danca enquanto a cortina fecha
+    { tempo: 6.15, animacao: "reverencia", inicio: 0, repetir: false },
+    { tempo: 7.15, animacao: "danca", inicio: 0, repetir: true },
+  ];
+  // a cortina: fechada no 0, abre ate 0,75 (o veludo junta nas laterais, com um balanco) e fecha
+  // de 7,15 a 7,8; fechada, o laco emenda
+  const ABERTA = 0.12;
+  const abre = (t: number) => {
+    if (t < 0.75) {
+      const f = clamp(t / 0.75, 0, 1);
+      return mistura(1, ABERTA, 1 - (1 - f) ** 3) - 0.04 * Math.sin(Math.PI * clamp((t - 0.55) / 0.4, 0, 1));
+    }
+    if (t < 7.15) return ABERTA - 0.04 * Math.sin(Math.PI * clamp((t - 0.55) / 0.4, 0, 1));
+    return mistura(ABERTA, 1, suave((t - 7.15) / 0.65));
+  };
+  for (const t of [...de(0, 1.0), ...de(7.1, 7.85), DUR]) {
+    const a = abre(t);
+    for (const k of ["cortina_e", "cortina_d"]) {
+      an.osso(k, "escalar", t, { x: r3(a), y: 1 });
+      an.osso(k, "girar", t, { valor: r3((k === "cortina_e" ? 1 : -1) * 2.5 * Math.sin(Math.PI * clamp(t / 1.0, 0, 1)) * (t < 7 ? 1 : 0)) });
+    }
+  }
+  // o refletor acende quando a cortina abre (dois piscos) e apaga quando ela fecha
+  an.slots.foco = {
+    rgba: [
+      { tempo: 0, cor: "ffe7c400", curva: "degrau" },
+      { tempo: 0.3, cor: "ffe7c466", curva: "degrau" },
+      { tempo: 0.36, cor: "ffe7c410", curva: "degrau" },
+      { tempo: 0.42, cor: "ffe7c470" },
+      { tempo: 0.7, cor: "ffe7c45a" },
+      { tempo: 7.2, cor: "ffe7c45a" },
+      { tempo: 7.75, cor: "ffe7c400" },
+    ],
+  };
+  an.luzes.foco = [
+    { tempo: 0, forca: 0, curva: "degrau" },
+    { tempo: 0.3, forca: 0.7, curva: "degrau" },
+    { tempo: 0.36, forca: 0.1, curva: "degrau" },
+    { tempo: 0.42, forca: 0.8 },
+    { tempo: 7.2, forca: 0.8 },
+    { tempo: 7.75, forca: 0 },
   ];
   // as letras: chega (defasada), onda, brilha e sai (do meio para as pontas); o slot apagado
   // antes de chegar e depois de sair (a instancia nao e calculada)
@@ -608,6 +926,94 @@ await atlasCena.montar();
   // a poeira: pontinhos que vem do fundo em direcao a quem assiste (nascem no meio e crescem
   // andando para fora, acelerando)
   an.particulas.poeira = { rajada: [{ tempo: 0, quantidade: 14 }] };
+  // a nevoa ja comeca no palco; a poeira dourada so com o refletor aceso
+  an.particulas.nevoa = { rajada: [{ tempo: 0, quantidade: 9 }] };
+  an.particulas.poeira_foco = { taxa: [{ tempo: 0, valor: 0, curva: "degrau" }, { tempo: 0.42, valor: 9 }, { tempo: 7.2, valor: 9 }, { tempo: 7.5, valor: 0 }] };
+  // a ribalta acende junto com a cortina e apaga quando ela fecha
+  an.slots.ribalta = { rgba: [{ tempo: 0, cor: "ffd08a00" }, { tempo: 0.35, cor: "ffd08a00" }, { tempo: 0.7, cor: "ffd08aff" }, { tempo: 7.3, cor: "ffd08aff" }, { tempo: 7.8, cor: "ffd08a00" }] };
+  an.luzes.ribalta = [{ tempo: 0, forca: 0 }, { tempo: 0.35, forca: 0 }, { tempo: 0.7, forca: 0.6 }, { tempo: 7.3, forca: 0.6 }, { tempo: 7.8, forca: 0 }];
+  // luzes de pista: dois feixes (rosa e ciano) varrendo o palco nas dancas, com a luz deles
+  const DANCAS: [number, number][] = [
+    [1.75, 3.4],
+    [5.3, 6.15],
+  ];
+  const naDanca = (t: number) => Math.max(...DANCAS.map(([a, z]) => entre(t, a, a + 0.2) * (1 - entre(t, z - 0.2, z))));
+  for (const t of de(1.6, 6.3)) {
+    const k = naDanca(t);
+    an.osso("feixe_e", "girar", t, { valor: r3(-22 * Math.sin(2 * Math.PI * 0.55 * t)) });
+    an.osso("feixe_d", "girar", t, { valor: r3(22 * Math.sin(2 * Math.PI * 0.55 * t + 1.3)) });
+    (an.slots.feixe_e ??= { rgba: [] }).rgba.push({ tempo: t, cor: alfa("ff2e88", 0.42 * k) });
+    (an.slots.feixe_d ??= { rgba: [] }).rgba.push({ tempo: t, cor: alfa("38d8ff", 0.42 * k) });
+    (an.luzes.disco_e ??= []).push({ tempo: t, forca: r3(1.1 * k) });
+    (an.luzes.disco_d ??= []).push({ tempo: t, forca: r3(1.1 * k) });
+  }
+  for (const s of ["feixe_e", "feixe_d"]) an.slots[s].rgba.unshift({ tempo: 0, cor: (s === "feixe_e" ? "ff2e88" : "38d8ff") + "00" });
+  for (const l of ["disco_e", "disco_d"]) an.luzes[l].unshift({ tempo: 0, forca: 0 });
+  // o letreiro acende quando o nome termina de chegar (lampada a lampada) e apaga na saida
+  LETREIRO.forEach((_, k) => {
+    const acende = r3(2.3 + k * 0.012);
+    an.instancias[`lampada_${k}`] = [{ tempo: 0, animacao: "pisca", inicio: r3(-k * 0.04), repetir: true }];
+    an.slots[`lampada_${k}`] = { rgba: [{ tempo: 0, cor: "ffffff00", curva: "degrau" }, { tempo: acende, cor: "ffffffff", curva: "degrau" }, { tempo: r3(6.95 + k * 0.004), cor: "ffffff00", curva: "degrau" }] };
+  });
+  // a plateia balanca, cada um no seu tempo; vibra no agradecimento (com mistura) e volta
+  PLATEIA.forEach((_, k) => {
+    an.instancias[`plateia_${k}`] = [
+      { tempo: 0, animacao: "balanca", inicio: r3(k * 0.37), repetir: true },
+      { tempo: r3(6.2 + 0.03 * k), animacao: "vibra", inicio: 0, repetir: true, mix: 0.18 },
+      { tempo: r3(7.15 + 0.02 * k), animacao: "balanca", inicio: 0, repetir: true, mix: 0.3 },
+    ];
+  });
+
+  // ---- a pos
+  // o grao troca de lugar a cada quadro de filme (24 por segundo), em degrau
+  {
+    const h = (i: number) => {
+      const x = Math.sin(i * 78.233 + 1.7) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    an.ossos.grao = { mover: de(0, DUR, 1 / 24).map((t, i) => ({ tempo: t, x: r3((h(i) - 0.5) * 280), y: r3((h(i + 500) - 0.5) * 300), curva: "degrau" })) };
+  }
+  // vazamentos de luz: uma mancha quente atravessa quando a cortina abre e outra, rosa, no aplauso
+  for (const t of [...de(0.2, 1.4), ...de(6.0, 7.2)]) {
+    const abre = t < 3;
+    const f = abre ? (t - 0.2) / 1.2 : (t - 6.0) / 1.2;
+    an.osso("vazamento", "mover", t, { x: r3(abre ? mistura(-700, 300, f) : mistura(700, -300, f)), y: r3(abre ? 120 - 160 * f : -60 + 140 * f) });
+    an.osso("vazamento", "girar", t, { valor: r3(abre ? -25 : 20) });
+    (an.slots.vazamento ??= { rgba: [] }).rgba.push({ tempo: t, cor: alfa(abre ? "ff8a4a" : "ff4f9a", 0.32 * Math.sin(Math.PI * clamp(f, 0, 1))) });
+  }
+  an.slots.vazamento.rgba.unshift({ tempo: 0, cor: "ff8a4a00" });
+  // o ajuste: o palco desfocado entra em foco com a cortina abrindo; no raio a cena esfria e ganha
+  // contraste (piscando com os estalos); no aplauso, cor viva
+  an.efeitos.ajuste_foco = { ajuste: [{ tempo: 0, desfoque: 9 }, { tempo: 0.3, desfoque: 9 }, { tempo: 1.0, desfoque: 0 }] };
+  an.efeitos.ajuste_cena = {
+    ajuste: [
+      { tempo: 0, matiz: 0, saturacao: 1, contraste: 1, luminosidade: 0 },
+      { tempo: 4.2, matiz: 0, saturacao: 1, contraste: 1, luminosidade: 0 },
+      ...estalos.map((t, i) => ({ tempo: r3(t), matiz: -14, saturacao: 0.7, contraste: i % 2 ? 1.15 : 1.35, luminosidade: i % 2 ? 0 : 0.06, curva: "degrau" })),
+      { tempo: 5.25, matiz: -14, saturacao: 0.7, contraste: 1.15, luminosidade: 0 },
+      { tempo: 5.5, matiz: 0, saturacao: 1, contraste: 1, luminosidade: 0 },
+      { tempo: 6.1, saturacao: 1 },
+      { tempo: 6.35, saturacao: 1.35, contraste: 1.08 },
+      { tempo: 6.95, saturacao: 1.35, contraste: 1.08 },
+      { tempo: 7.3, saturacao: 1, contraste: 1 },
+    ],
+  };
+  // clarao: no pouso da marionete e piscando com o raio
+  an.slots.clarao = {
+    rgba: [
+      { tempo: 0, cor: "fff0e000" },
+      { tempo: 0.7, cor: "fff0e000" },
+      { tempo: 0.74, cor: "fff0e033" },
+      { tempo: 0.95, cor: "fff0e000" },
+      { tempo: 4.25, cor: "dff2ff00", curva: "degrau" },
+      ...estalos.map((t, i) => ({ tempo: r3(t), cor: i % 2 ? "dff2ff00" : "dff2ff1c", curva: "degrau" })),
+      { tempo: 5.25, cor: "dff2ff00" },
+    ],
+  };
+
+  // o aplauso: confete, serpentina, estrelas e notas caindo do alto no agradecimento
+  for (const [k, [c]] of CHUVA.entries())
+    an.particulas[`chuva_${c}`] = { taxa: [{ tempo: 0, valor: 0, curva: "degrau" }, { tempo: 6.1, valor: 16 }, { tempo: 6.35, valor: 16 }, { tempo: 7.0, valor: 0, curva: "degrau" }], rajada: [{ tempo: 6.15, quantidade: 6 + 2 * k }] };
 
   const BASE_LETRA = BASE;
   escreve("vinheta.boneco", {
@@ -624,32 +1030,126 @@ await atlasCena.montar();
       { nome: "barra", pai: "root", y: BARRA_Y },
       { nome: "subtitulo", pai: "root", y: SUB_Y },
       { nome: "luz_varre", pai: "root", x: -620, y: -60 },
+      { nome: "feixe_e", pai: "root", x: -360, y: 290, rotacao: -70, comprimento: 420 },
+      { nome: "feixe_d", pai: "root", x: 360, y: 290, rotacao: -110, comprimento: 420 },
+      ...LETREIRO.map(([x, y], k) => ({ nome: `lampada_${k}`, pai: "root", x, y })),
+      // so o topo das cabecas aparece embaixo (o pulo do aplauso mostra mais)
+      ...PLATEIA.map(([x, esc], k) => ({ nome: `plateia_${k}`, pai: "root", x, y: r3(-236 - 110 * esc * 0.8), escala_x: r3(esc * 0.8), escala_y: r3(esc * 0.8) })),
+      { nome: "cortina_e", pai: "root", x: -490, y: -270 },
+      { nome: "cortina_d", pai: "root", x: 490, y: -270, escala_x: -1 },
+      { nome: "bambinela", pai: "root", y: 232 },
+      { nome: "grao", pai: "root" },
+      { nome: "vazamento", pai: "root" },
     ],
     slots: [
       { nome: "fundo", osso: "root", parte: "fundo" },
+      // o pano de chita, na camada do fundo (a luz do refletor chega atenuada; a de pista pinta)
+      { nome: "pano", osso: "root", parte: "chita", profundidade: -180 },
+      { nome: "nevoa", osso: "root", blend: "aditivo" },
       { nome: "poeira", osso: "root", blend: "aditivo" },
+      { nome: "foco", osso: "root", parte: "foco", blend: "aditivo", cor: "ffe7c400" },
+      { nome: "poeira_foco", osso: "root", blend: "aditivo" },
       { nome: "halo", osso: "cena_boneco", parte: "halo", blend: "aditivo", cor: ROSA + "00" },
+      { nome: "feixe_e", osso: "feixe_e", parte: "feixe", blend: "aditivo", cor: "ff2e8800" },
+      { nome: "feixe_d", osso: "feixe_d", parte: "feixe", blend: "aditivo", cor: "38d8ff00" },
       { nome: "marionete", osso: "cena_boneco" },
       ...LETRAS.map((_, k) => ({ nome: `letra_${k}`, osso: `letra_${k}` })),
       { nome: "barra", osso: "barra", parte: "barra" },
+      ...LETREIRO.map((_, k) => ({ nome: `lampada_${k}`, osso: `lampada_${k}`, cor: "ffffff00" })),
+      { nome: "chuva", osso: "root" },
       { nome: "subtitulo", osso: "subtitulo", parte: "subtitulo", efeitos: { dissolver: { valor: 0, cor: ROSA + "ff", borda: 0.12, grao: 6 } } },
+      // camada de ajuste do palco (docs/NUCLEO.md "Ajuste"): o foco puxado na abertura; a plateia
+      // e a cortina, na frente dela, ficam nitidas (profundidade de campo)
+      { nome: "ajuste_foco", osso: "root" },
+      // a ribalta, atras da plateia
+      { nome: "ribalta", osso: "root", parte: "ribalta", blend: "aditivo", cor: "ffd08a00" },
+      // a plateia na frente do palco, em silhueta
+      ...PLATEIA.map(([, , cor], k) => ({ nome: `plateia_${k}`, osso: `plateia_${k}`, cor, profundidade: 120 })),
+      // o teatro na frente de tudo, numa camada adiante (a luz do refletor pega de frente)
+      { nome: "cortina_e", osso: "cortina_e", parte: "cortina", profundidade: 40 },
+      { nome: "cortina_d", osso: "cortina_d", parte: "cortina", profundidade: 40 },
+      { nome: "bambinela", osso: "bambinela", parte: "bambinela", profundidade: 40 },
+      // a pos, por cima de tudo: cor (multiplica quente, tela levanta os pretos para o violeta),
+      // vazamentos de luz, clarao, grao e a vinheta da lente
+      // camada de ajuste da cena inteira: frio e contraste no raio, cor viva no aplauso
+      { nome: "ajuste_cena", osso: "root" },
+      { nome: "pos_cor", osso: "root", parte: "liso", blend: "multiplica", cor: "fff0f4ff" },
+      { nome: "pos_pretos", osso: "root", parte: "liso", blend: "tela", cor: "0a0612ff" },
+      { nome: "vazamento", osso: "vazamento", parte: "vazamento", blend: "aditivo", cor: "ff8a4a00" },
+      { nome: "clarao", osso: "root", parte: "liso", blend: "aditivo", cor: "fff0e000" },
+      { nome: "grao", osso: "grao", parte: "grao", blend: "tela", cor: "ffffff14" },
+      { nome: "vinheta_lente", osso: "root", parte: "vinheta_lente", cor: "000000b0" },
     ],
     skins: [
       {
         nome: "default",
         partes: {
           fundo: { fundo: { largura: 1000, altura: 580, y: 7 } },
+          pano: { chita: { largura: 1000, altura: 600, y: 10 } },
+          ribalta: { ribalta: { largura: 1000, altura: 30, y: -258 } },
           halo: { halo: { largura: 380, altura: 380, x: CABECA.x, y: CABECA.y - 20 } },
           barra: { barra: { largura: 120, altura: 6 } },
           subtitulo: { subtitulo: { largura: r3(sub.w / HD), altura: r3(sub.h / HD) } },
+          foco: { foco: { largura: 460, altura: 470, y: 30 } },
+          feixe_e: { feixe: { largura: 260, altura: 520, x: 250, rotacao: 90 } },
+          feixe_d: { feixe: { largura: 260, altura: 520, x: 250, rotacao: 90 } },
+          cortina_e: { cortina: { largura: CW, altura: CH, x: CW / 2, y: CH / 2 } },
+          cortina_d: { cortina: { largura: CW, altura: CH, x: CW / 2, y: CH / 2 } },
+          bambinela: { bambinela: { largura: 1000, altura: 80 } },
+          pos_cor: { liso: { largura: 1040, altura: 620, y: 7 } },
+          pos_pretos: { liso: { largura: 1040, altura: 620, y: 7 } },
+          clarao: { liso: { largura: 1040, altura: 620, y: 7 } },
+          vazamento: { vazamento: { largura: 900, altura: 700 } },
+          grao: { grao: { largura: 1300, altura: 1300, y: 7 } },
+          vinheta_lente: { vinheta_lente: { largura: 1000, altura: 562, y: 7 } },
         },
       },
     ],
     instancias: [
       { nome: "marionete", slot: "marionete", boneco: "marionete.boneco", animacao: "danca" },
+      ...LETREIRO.map((_, k) => ({ nome: `lampada_${k}`, slot: `lampada_${k}`, boneco: "lampada.boneco", animacao: "pisca" })),
+      ...PLATEIA.map((_, k) => ({ nome: `plateia_${k}`, slot: `plateia_${k}`, boneco: "plateia.boneco", animacao: "balanca" })),
       ...LETRAS.map((l, k) => ({ nome: `letra_${k}`, slot: `letra_${k}`, boneco: "letra.boneco", skin: l.c, animacao: "chega", repetir: false })),
     ],
     particulas: [
+      // a nevoa de palco: manchas grandes e fracas andando devagar (os feixes ganham corpo)
+      {
+        nome: "nevoa",
+        slot: "nevoa",
+        osso: "root",
+        x: -520,
+        y: -20,
+        imagem: "halo",
+        blend: "aditivo",
+        taxa: 1.6,
+        vida: [6, 8],
+        velocidade: [18, 34],
+        angulo: 0,
+        abertura: 30,
+        escala: [3.5, 5],
+        cor: ["d8c8ff00", "d8c8ff16", "d8c8ff10", "d8c8ff00"],
+        semente: 41,
+      },
+      // poeira dourada no cone do refletor
+      {
+        nome: "poeira_foco",
+        slot: "poeira_foco",
+        osso: "root",
+        y: 230,
+        imagem: "ponto",
+        blend: "aditivo",
+        taxa: 9,
+        vida: [3, 4.5],
+        velocidade: [12, 40],
+        angulo: -90,
+        abertura: 34,
+        gravidade: 4,
+        arrasto: 0.4,
+        escala: [0.07, 0.04],
+        onda: [6, 0.6],
+        cor: ["ffe2a000", "ffe2a0b0", "ffe2a000"],
+        semente: 42,
+      },
       {
         nome: "poeira",
         slot: "poeira",
@@ -667,13 +1167,41 @@ await atlasCena.montar();
         cor: ["c9b8ff00", "c9b8ff40", "ff2e8838", "ff2e8800"],
         semente: 3,
       },
+      ...CHUVA.map(([c, forma, cor, esc], k) => ({
+        nome: `chuva_${c}`,
+        slot: "chuva",
+        osso: "root",
+        y: 300,
+        x: (k - 2.5) * 110,
+        imagem: forma,
+        taxa: 0,
+        vida: [2.2, 3],
+        velocidade: [40, 160],
+        angulo: -90,
+        abertura: 120,
+        gravidade: forma === "serpentina" ? 70 : 120,
+        arrasto: forma === "serpentina" ? 1.2 : 0.6,
+        escala: [esc, esc * 0.8],
+        giro: forma === "nota" ? [-90, 90] : [-540, 540],
+        onda: [14, 1.3],
+        cor: [cor + "ff", cor + "ff", cor + "00"],
+        semente: 30 + k,
+      })),
     ],
     luzes: [
       { nome: "chave", osso: "root", x: -320, y: 320, cor: "fff6faff", forca: 0.32, raio: 2200, altura: 420 },
       { nome: "varre", osso: "luz_varre", cor: "ffd2e8ff", forca: 0, raio: 300, altura: 40 },
       { nome: "faisca", osso: "cena_boneco", y: 200, cor: "a8e2ffff", forca: 0, raio: 520, altura: 90 },
+      // as luzes de pista, nas pontas dos feixes
+      { nome: "disco_e", osso: "feixe_e", x: 420, cor: "ff4fa0ff", forca: 0, raio: 380, altura: 90 },
+      { nome: "disco_d", osso: "feixe_d", x: 420, cor: "4fd8ffff", forca: 0, raio: 380, altura: 90 },
+      // o refletor, de cima e da frente; e uma contraluz fria atras do palco, numa camada funda
+      { nome: "foco", osso: "root", y: 300, cor: "fff0d8ff", forca: 0, raio: 950, altura: 220, profundidade: 120 },
+      { nome: "contra", osso: "root", y: 120, cor: "8fb8ffff", forca: 1.1, raio: 520, altura: 30, profundidade: -140 },
+      // a ribalta: de baixo para cima, na beira do palco
+      { nome: "ribalta", osso: "root", y: -300, cor: "ffc98aff", forca: 0, raio: 700, altura: 40, profundidade: 80 },
     ],
-    ambiente: { cor: "e8e2ffff", forca: 0.68 },
+    ambiente: { cor: "e8e2ffff", forca: 0.6 },
     animacoes: { vinheta: an.json() },
   });
 }
@@ -683,6 +1211,9 @@ await atlasCena.montar();
 for (const [arquivo, extra] of [
   ["marionete.boneco", ["--borda", "10", "--paginas", "0"]],
   ["letra.boneco", ["--borda", "10", "--paginas", "0", "--modo", "peca"]],
+  ["vinheta.boneco", ["--borda", "14", "--paginas", "3", "--modo", "peca"]],
+  // o pano: so o relevo do brilho das flores (sem borda)
+  ["vinheta.boneco", ["--borda", "6", "--paginas", "4", "--modo", "peca", "--profundidade", "0", "--detalhe", "2.5"]],
 ] as const) {
   const r = spawnSync("npx", ["tsx", join(AQUI, "..", "..", "tools", "relevo.ts"), join(AQUI, arquivo), ...extra], { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`relevo de ${arquivo}: ${r.stderr}`);

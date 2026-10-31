@@ -166,6 +166,51 @@ void main() {
   saida = motor ? vec4(F.rgb, 1.0) : vec4(F.rgb * F.a, F.a);
 }`;
 
+// a camada de ajuste (docs/NUCLEO.md "Ajuste"): o que ja esta na tela (copiado para `tela`), com
+// desfoque gaussiano, matiz (giro em volta do eixo do cinza), saturacao, luminosidade e
+// contraste, desenhado por cima pela mascara (o alfa da imagem do slot; cheia: a tela inteira)
+const VERTICE_AJUSTE = `#version 300 es
+in vec2 pos; in vec2 uv; in vec4 cor;
+uniform mat4 proj; uniform bool cheia;
+out vec2 vuv; out vec4 vcor;
+void main() {
+  if (cheia) {
+    vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+    gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+    vuv = vec2(0.0); vcor = vec4(1.0);
+  } else { vuv = uv; vcor = cor; gl_Position = proj * vec4(pos, 0.0, 1.0); }
+}`;
+const FRAGMENTO_AJUSTE = `#version 300 es
+precision highp float;
+in vec2 vuv; in vec4 vcor;
+uniform sampler2D tela; uniform sampler2D tex; uniform bool cheia;
+uniform vec4 vista; uniform float aj[5]; uniform float pxMundo;
+out vec4 saida;
+vec3 gira(vec3 c, float graus) {
+  float a = radians(graus), s = sin(a), k = cos(a);
+  vec3 e = vec3(0.57735027);
+  return c * k + cross(e, c) * s + e * dot(e, c) * (1.0 - k);
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - vista.xy) / vista.zw;
+  float r = aj[4] * pxMundo;
+  vec3 c;
+  if (r > 0.5) {
+    vec3 s = vec3(0.0); float w = 0.0;
+    for (int i = -3; i <= 3; i++) for (int j = -3; j <= 3; j++) {
+      vec2 o = vec2(float(i), float(j)) / 3.0;
+      float g = exp(-dot(o, o) * 2.0);
+      s += texture(tela, p + o * r / vista.zw).rgb * g; w += g;
+    }
+    c = s / w;
+  } else c = texture(tela, p).rgb;
+  c = gira(c, aj[0]);
+  c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, aj[1]);
+  c = clamp((c + aj[2] - 0.5) * aj[3] + 0.5, 0.0, 1.0);
+  float m = cheia ? 1.0 : texture(tex, vuv).a * vcor.a;
+  saida = vec4(c * m, m);
+}`;
+
 export class Desenhista {
   readonly gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
@@ -180,6 +225,9 @@ export class Desenhista {
   private ibo: WebGLBuffer;
   private vao: WebGLVertexArrayObject;
   private BLENDS: [number, number][];
+  private progAj: WebGLProgram;
+  private uAj: Record<string, WebGLUniformLocation | null> = {};
+  private tela: WebGLTexture;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -191,9 +239,9 @@ export class Desenhista {
       return s;
     };
     // os dois programas (sem e com efeitos) com os atributos nas mesmas posicoes, para um VAO so
-    const programa = (frag: string) => {
+    const programa = (frag: string, vert = VERTICE) => {
       const p = gl.createProgram()!;
-      gl.attachShader(p, sombra(gl.VERTEX_SHADER, VERTICE));
+      gl.attachShader(p, sombra(gl.VERTEX_SHADER, vert));
       gl.attachShader(p, sombra(gl.FRAGMENT_SHADER, frag));
       ATRIBUTOS.forEach(([nome], i) => gl.bindAttribLocation(p, i, nome));
       gl.linkProgram(p);
@@ -214,6 +262,14 @@ export class Desenhista {
       gl.uniform1i(u.tex, 0);
       gl.uniform1i(u.relevo, 1);
     }
+    this.progAj = programa(FRAGMENTO_AJUSTE, VERTICE_AJUSTE);
+    for (const u of ["proj", "cheia", "tela", "tex", "vista", "aj", "pxMundo"]) this.uAj[u] = gl.getUniformLocation(this.progAj, u);
+    gl.useProgram(this.progAj);
+    gl.uniform1i(this.uAj.tex, 0);
+    gl.uniform1i(this.uAj.tela, 2);
+    this.tela = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.tela);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
     this.vbo = gl.createBuffer()!;
     this.ibo = gl.createBuffer()!;
     this.vao = gl.createVertexArray()!;
@@ -285,6 +341,8 @@ export class Desenhista {
     gl.blendEquation(gl.FUNC_ADD);
     gl.disable(gl.STENCIL_TEST);
     let chamadas = 0;
+    const na = N._mm_num_ajustes ? N._mm_num_ajustes() : 0;
+    const ajustes = na ? N.HEAPF32.subarray(N._mm_ajustes() / 4, N._mm_ajustes() / 4 + na * 5) : null;
     for (let i = 0; i < nl; i++) {
       const cmd = lotes[i * 7],
         pag = lotes[i * 7 + 1],
@@ -312,6 +370,33 @@ export class Desenhista {
       }
       if (cmd === 2) {
         gl.disable(gl.STENCIL_TEST);
+        continue;
+      }
+      if (cmd === 3) {
+        // camada de ajuste: copia o que ja esta desenhado e desenha por cima, ajustado
+        if (!ajustes) continue;
+        const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this.tela);
+        gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, vp[0], vp[1], vp[2], vp[3], 0);
+        gl.activeTexture(gl.TEXTURE0);
+        const cheia = !quantos;
+        if (!cheia) {
+          const p = paginas[pag];
+          if (!p?.tex) continue;
+          gl.bindTexture(gl.TEXTURE_2D, p.tex);
+        }
+        if (usando !== this.progAj) gl.useProgram((usando = this.progAj));
+        gl.uniformMatrix4fv(this.uAj.proj, false, proj);
+        gl.uniform1i(this.uAj.cheia, cheia ? 1 : 0);
+        gl.uniform4f(this.uAj.vista, vp[0], vp[1], vp[2], vp[3]);
+        gl.uniform1fv(this.uAj.aj, ajustes.subarray(ef * 5, ef * 5 + 5));
+        // pixels de tela por pixel do mundo (o desfoque e em pixels do mundo)
+        gl.uniform1f(this.uAj.pxMundo, Math.hypot(proj[0], proj[1]) * vp[2] * 0.5);
+        gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        if (cheia) gl.drawArrays(gl.TRIANGLES, 0, 3);
+        else gl.drawElements(gl.TRIANGLES, quantos, gl.UNSIGNED_INT, inicio * 4);
+        chamadas++;
         continue;
       }
       const p = paginas[pag];

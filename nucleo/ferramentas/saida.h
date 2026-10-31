@@ -89,8 +89,8 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       escreve_num(out, c[j]);
     }
     out += ']';
-    // os efeitos (os 29 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
-    if (st.efeitos.algum() || st.efeitos.borrar() || st.efeitos.rastro()) {
+    // os efeitos (os 34 canais, docs/NUCLEO.md "Efeitos"), so de quem tem algum ligado
+    if (st.efeitos.algum() || st.efeitos.borrar() || st.efeitos.rastro() || st.efeitos.ajuste()) {
       out += ",\"efeitos\":[";
       for (int j = 0; j < CANAIS_EFEITOS; ++j) {
         if (j) out += ',';

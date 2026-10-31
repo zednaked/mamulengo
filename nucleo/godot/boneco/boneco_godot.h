@@ -216,7 +216,9 @@ class BonecoSprite : public Node2D {
   Vector<RID> material_item;
   // material proprio de cada item que ja desenhou um slot com efeitos (os valores sao do slot)
   Vector<RID> material_efeito;
-  Vector<int> passo_efeito;  // o shader posto em cada um: passo x 4 + efeitos + 2 x luz (-1: nenhum)
+  // o shader posto em cada um: passo x 4 + efeitos + 2 x luz (PASSOS x 4: ajuste; -1: nenhum)
+  Vector<int> passo_efeito;
+  Vector<bool> copia_item;  // o item copia o backbuffer antes (camada de ajuste)
   Vector<Vector<int>> indices_item;
   Vector<int> vertices_item;
   // o que foi enviado por ultimo a cada malha: so reenvia o que mudou (peca parada nao custa)

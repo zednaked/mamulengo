@@ -20,7 +20,7 @@
   const snap = (t: number) => Math.max(0, Math.round(t * FPS) / FPS);
   const tkey = (t: number) => Math.round(t * 1e4);
   const NOCURVE = new Set(["attachment", "events", "drawOrder", "sequence", "inherit", "reset", "burst"]);
-  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0", outline: "#ffd23c", glow: "#4cc9ff", dissolve: "#ff8a3c", tint: "#ff5577", rate: "#ffd23c", burst: "#ffd23c" };
+  const COLORS: Record<string, string> = { rotate: "#7ee787", translate: "#6cc6ff", scale: "#ffd166", shear: "#c39bff", attachment: "#ff9f6c", rgba: "#ff6bb5", alpha: "#ff6bb5", deform: "#5ee0d0", outline: "#ffd23c", glow: "#4cc9ff", dissolve: "#ff8a3c", tint: "#ff5577", adjust: "#b8f05a", rate: "#ffd23c", burst: "#ffd23c" };
 
   let creating = $state(false);
   let renaming = $state<string | null>(null);
@@ -507,7 +507,7 @@
 
   // --- exportar
 
-  let exporting = $state<{ open: boolean; format: "gif" | "webm"; fps: number; dir: string; busy: boolean; progress: string; result: string; titulo: string; subtitulo: string; rodape: string; credito: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "", titulo: "", subtitulo: "", rodape: "", credito: "" });
+  let exporting = $state<{ open: boolean; format: "gif" | "webm" | "webp"; fps: number; dir: string; busy: boolean; progress: string; result: string; titulo: string; subtitulo: string; rodape: string; credito: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "", titulo: "", subtitulo: "", rodape: "", credito: "" });
   async function runExport() {
     const x = exporting;
     x.busy = true;
@@ -651,6 +651,7 @@
         <div class="fmt">
           <button class:on={exporting.format === "gif"} onclick={() => (exporting.format = "gif")}>GIF</button>
           <button class:on={exporting.format === "webm"} onclick={() => (exporting.format = "webm")}>WebM</button>
+          <button class:on={exporting.format === "webp"} onclick={() => (exporting.format = "webp")} title="WebP animado: bem menor que o GIF em cena com gradiente, luz e grao">WebP</button>
         </div>
         <label>fps <select bind:value={exporting.fps}><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label>
         <input placeholder="pasta (vazio: ~/.cache/mamulengo/exports)" bind:value={exporting.dir} />

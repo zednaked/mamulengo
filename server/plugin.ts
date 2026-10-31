@@ -243,7 +243,7 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
           // ou em ~/.cache/mamulengo/exports, e devolve o caminho
           if (url.pathname === "/api/export" && req.method === "POST") {
             const format = url.searchParams.get("format");
-            if (format !== "gif" && format !== "webm") return send(400, { error: `formato invalido: ${format} (gif ou webm)` });
+            if (format !== "gif" && format !== "webm" && format !== "webp") return send(400, { error: `formato invalido: ${format} (gif, webm ou webp)` });
             const dirParam = url.searchParams.get("dir");
             const dir = dirParam ? resolve(dirParam.replace(/^~(?=\/|$)/, homedir())) : EXPORTS;
             if (dirParam) guard(dir);

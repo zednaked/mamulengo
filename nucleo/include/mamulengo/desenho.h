@@ -11,7 +11,10 @@
 
 namespace mamulengo {
 
-enum class Comando : uint8_t { Triangulos, ComecaRecorte, AcabaRecorte };
+// Ajuste: a camada de ajuste (docs/NUCLEO.md "Ajuste"): o desenhista copia o que ja esta na tela
+// e desenha por cima, pela mascara (os triangulos com a imagem do slot; quantos 0: a tela
+// inteira), o que estava la com os ajustes de Desenho::ajustes[efeito]
+enum class Comando : uint8_t { Triangulos, ComecaRecorte, AcabaRecorte, Ajuste };
 
 struct Lote {
   Comando comando = Comando::Triangulos;
@@ -39,6 +42,12 @@ struct EfeitosLote {
   float pagina[2] = {1, 1};        // largura e altura da pagina, em pixels
 };
 
+// os valores de uma camada de ajuste: matiz (graus), saturacao, luminosidade, contraste, desfoque
+// (px do mundo)
+struct AjusteLote {
+  float v[5] = {0, 1, 0, 1, 0};
+};
+
 struct Desenho {
   // true: o recorte e feito aqui, na CPU (os triangulos saem ja cortados e nao ha comandos
   // de recorte); false: o desenhista faz no stencil com ComecaRecorte e AcabaRecorte
@@ -49,7 +58,9 @@ struct Desenho {
   std::vector<Lote> lotes;
   std::vector<EfeitosLote> efeitos;
   std::vector<GrupoLuz> grupos_luz;
+  std::vector<AjusteLote> ajustes;  // Comando::Ajuste: Lote::efeito aponta aqui
   void limpar() {
+    ajustes.clear();
     vertices.clear();
     indices.clear();
     lotes.clear();

@@ -398,6 +398,10 @@ EMSCRIPTEN_KEEPALIVE const float* mm_efeitos() {
 }
 EMSCRIPTEN_KEEPALIVE int mm_num_efeitos() { return int(desenho.efeitos.size()); }
 EMSCRIPTEN_KEEPALIVE int mm_num_lotes() { return int(desenho.lotes.size()); }
+// as camadas de ajuste (docs/NUCLEO.md "Ajuste"), 5 floats cada: matiz, saturacao, luminosidade,
+// contraste, desfoque; o lote com comando 3 aponta aqui pelo campo do efeito
+EMSCRIPTEN_KEEPALIVE const float* mm_ajustes() { return desenho.ajustes.empty() ? nullptr : desenho.ajustes[0].v; }
+EMSCRIPTEN_KEEPALIVE int mm_num_ajustes() { return int(desenho.ajustes.size()); }
 
 // ---- leitura da pose (o editor sem o spine-core)
 

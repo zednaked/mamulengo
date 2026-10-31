@@ -6,7 +6,8 @@
 // A borda e a da silhueta do personagem montado (modo silhueta, o padrao): o personagem na pose de
 // montagem (os ossos pelo nucleo-pose), a uniao dos pixels opacos das pecas, e a altura de cada
 // pixel de cada peca pela distancia ate a borda dessa uniao. Onde as pecas se juntam (o punho na
-// mao, o pescoco no corpo) a superficie continua, sem vinco. As trocas de imagem de um slot (as
+// mao, o pescoco no corpo) a superficie continua, sem vinco; com --camadas, cada peca mistura a borda
+// da uniao dela com as da frente (pela ordem de desenho): a que esta por cima ganha contorno. As trocas de imagem de um slot (as
 // caras) usam o lugar que teriam nele; imagem que nao esta em slot nenhum, e as giradas ou
 // cortadas no atlas, ficam pela borda delas mesmas, como no modo peca.
 //
@@ -16,6 +17,9 @@
 //   --borda         largura da borda inclinada, em pixels da pagina (multiplique numa pagina HD)
 //   --profundidade  quanto a borda sobe (1: a borda sobe a largura dela, 45 graus)
 //   --detalhe       quanto o brilho da cor vira relevo (0: so a forma)
+//   --camadas       0 a 1 (0,5): quanto cada peca tem a borda da uniao dela com as que estao na
+//                   frente (a cabeca sobre o corpo ganha contorno; sem isso, so a silhueta de tudo e
+//                   a peca da frente fica "grudada" na de tras quando elas se mexem)
 //   --paginas       so estas paginas (indices; padrao: as das partes das skins, abaixo); a silhueta
 //                   e so das pecas destas paginas (o cenario de outra pagina nao entra)
 //   --modo peca     cada imagem pela borda dela (o relevo de antes: vinco onde as pecas encostam)
@@ -38,6 +42,7 @@ const gravar = args.includes("--gravar") && (args.splice(args.indexOf("--gravar"
 const borda = Number(opt("borda", "12"));
 const profundidade = Number(opt("profundidade", "1"));
 const detalhe = Number(opt("detalhe", "0.2"));
+const camadas = Math.min(Math.max(Number(opt("camadas", "0.5")), 0), 1);
 const soPaginas = opt("paginas", "");
 const modo = opt("modo", "silhueta");
 const nucleo = resolve(opt("nucleo", join(dirname(fileURLToPath(import.meta.url)), "..", "nucleo", "build", "nucleo-pose")));
@@ -214,6 +219,10 @@ const alfa = (pi: number, x: number, y: number) => {
   return x < 0 || y < 0 || x >= p.W || y >= p.H ? 0 : p.data[(y * p.W + x) * 4 + 3];
 };
 let silhueta: { d: Float64Array; x0: number; y0: number; c: number; gw: number; gh: number } | null = null;
+// as camadas: por lugar na ordem de desenho, a distancia ate a borda da uniao desta peca com as que
+// estao na frente dela (a peca da frente tem a borda inteira; a de tras, so a que aparece)
+const ordemDe = new Map<string, number>((b.slots ?? []).map((s: any, i: number) => [s.nome, i]));
+const frente = new Map<number, Float32Array>();
 if (modo === "silhueta") {
   const tris = usos.filter((u) => u.setup).map((u) => ({ u, t: triangulos(u.osso, u.parte, u.im) })).filter((x) => x.t) as { u: Uso; t: Tri[] }[];
   // a grade do mundo: do tamanho de um texel tipico, com margem para a distancia
@@ -235,7 +244,7 @@ if (modo === "silhueta") {
     // cada celula do mundo dentro de cada triangulo le a textura no ponto dela (do mundo para a uv:
     // sem furos, qualquer que seja o tamanho do texel)
     const dentro = new Uint8Array(gw * gh);
-    for (const { u, t } of tris)
+    const pinta = (u: Uso, t: Tri[]) => {
       for (const tri of t) {
         const [a, bb, cc] = tri.w;
         const den = (bb[1] - cc[1]) * (a[0] - cc[0]) + (cc[0] - bb[0]) * (a[1] - cc[1]);
@@ -257,17 +266,25 @@ if (modo === "silhueta") {
             if (alfa(u.im.pagina ?? 0, Math.floor(ux), Math.floor(uy)) >= 128) dentro[gy * gw + gx] = 1;
           }
       }
+    };
+    // da frente para tras: cada nivel soma as pecas dele e guarda a distancia da uniao ate ali
+    const niveis = [...new Set(tris.map(({ u }) => ordemDe.get(u.slot) ?? 0))].sort((a, z) => z - a);
+    for (const nv of niveis) {
+      for (const { u, t } of tris) if ((ordemDe.get(u.slot) ?? 0) === nv) pinta(u, t);
+      if (camadas > 0) frente.set(nv, Float32Array.from(distancia(dentro, gw, gh)));
+    }
     silhueta = { d: distancia(dentro, gw, gh), x0, y0, c, gw, gh };
   }
 }
 // a distancia no ponto, interpolada entre os centros das celulas (sem degraus)
-const distMundo = (wx: number, wy: number) => {
+const distMundo = (wx: number, wy: number, campo?: Float32Array) => {
   const s = silhueta!;
+  const d = campo ?? s.d;
   const fx = (wx - s.x0) / s.c - 0.5,
     fy = (wy - s.y0) / s.c - 0.5;
   const gx = Math.floor(fx),
     gy = Math.floor(fy);
-  const v = (x: number, y: number) => (x < 0 || y < 0 || x >= s.gw || y >= s.gh ? 0 : s.d[y * s.gw + x]);
+  const v = (x: number, y: number) => (x < 0 || y < 0 || x >= s.gw || y >= s.gh ? 0 : d[y * s.gw + x]);
   const ax = fx - gx,
     ay = fy - gy;
   return (v(gx, gy) * (1 - ax) * (1 - ay) + v(gx + 1, gy) * ax * (1 - ay) + v(gx, gy + 1) * (1 - ax) * ay + v(gx + 1, gy + 1) * ax * ay) * s.c;
@@ -300,13 +317,16 @@ for (const pi of paginas) {
     if (silhueta)
       for (const u of usos.filter((x) => x.im === im)) {
         const t = triangulos(u.osso, u.parte, u.im);
+        const campo = frente.get(ordemDe.get(u.slot) ?? 0);
         for (const tri of t ?? [])
           porTexel(tri, (x, y, wx, wy, e) => {
             const lx = x - rx,
               ly = y - ry;
             if (lx < 0 || ly < 0 || lx >= rw || ly >= rh) return;
             const k = (ly + 1) * w + lx + 1;
-            soma[k] += almofada(Math.min(distMundo(wx, wy) / Math.max(borda * e, 1e-6), 1));
+            const b0 = Math.max(borda * e, 1e-6);
+            const junta = almofada(Math.min(distMundo(wx, wy) / b0, 1));
+            soma[k] += campo ? junta + (almofada(Math.min(distMundo(wx, wy, campo) / b0, 1)) - junta) * camadas : junta;
             conta[k]++;
           });
       }

@@ -1,0 +1,130 @@
+{
+ "boneco": 0,
+ "nome": "lampada",
+ "paginas": [
+  {
+   "arquivo": "lampada.png",
+   "tamanho": [
+    128,
+    64
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "brilho",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "bulbo",
+   "pagina": 0,
+   "ret": [
+    68,
+    0,
+    24,
+    24
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./images/",
+  "audio": "",
+  "x": -16,
+  "y": -16,
+  "largura": 32,
+  "altura": 32
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "brilho",
+   "osso": "root",
+   "parte": "brilho",
+   "blend": "aditivo",
+   "cor": "ffd166cc"
+  },
+  {
+   "nome": "bulbo",
+   "osso": "root",
+   "parte": "bulbo",
+   "blend": "aditivo",
+   "cor": "fff4d0ff"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "brilho": {
+     "brilho": {
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "bulbo": {
+     "bulbo": {
+      "largura": 9,
+      "altura": 9
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "pisca": {
+   "slots": {
+    "bulbo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "fff4d0ff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffd166ff"
+      },
+      {
+       "tempo": 0.5,
+       "cor": "a8663aff"
+      },
+      {
+       "tempo": 0.8,
+       "cor": "fff4d0ff"
+      }
+     ]
+    },
+    "brilho": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffd166cc"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffd16680"
+      },
+      {
+       "tempo": 0.5,
+       "cor": "ffd16600"
+      },
+      {
+       "tempo": 0.8,
+       "cor": "ffd166cc"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

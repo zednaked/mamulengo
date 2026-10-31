@@ -52,6 +52,7 @@ struct Materiais {
   // os shaders proprios (os materiais sao de cada item: valores do slot, luzes do quadro): por
   // passo, com efeitos e/ou com luz (indice efeitos + 2 x luz, de 1 a 3)
   RID shader_proprio[PASSOS][4];
+  RID shader_ajuste;
 };
 Materiais &cache() {
   static Materiais m;
@@ -177,6 +178,38 @@ RID shader_proprio(Passo passo, bool efeitos, bool luz) {
   return sh;
 }
 
+// a camada de ajuste (docs/NUCLEO.md "Ajuste"; a mesma conta de src/render/desenhista.ts): o que
+// ja esta na tela (o backbuffer, copiado antes do item), com desfoque gaussiano, matiz, saturacao,
+// luminosidade e contraste, por cima pela mascara (o alfa da imagem; cheia: a tela inteira)
+RID shader_ajuste() {
+  RID &sh = cache().shader_ajuste;
+  if (sh.is_valid()) return sh;
+  const char *codigo =
+      "shader_type canvas_item;\nrender_mode blend_premul_alpha, unshaded;\n"
+      "uniform sampler2D tela : hint_screen_texture, filter_linear;\nuniform bool cheia = false;\nuniform float aj[5];\n"
+      "varying vec4 cor_v;\nvarying float px_mundo;\n"
+      "void vertex() { cor_v = COLOR; px_mundo = length((CANVAS_MATRIX * MODEL_MATRIX)[0].xy); }\n"
+      "vec3 gira(vec3 c, float graus) {\n"
+      "  float a = radians(graus), s = sin(a), k = cos(a);\n  vec3 e = vec3(0.57735027);\n"
+      "  return c * k + cross(e, c) * s + e * dot(e, c) * (1.0 - k);\n}\n"
+      "void fragment() {\n"
+      "  float r = aj[4] * px_mundo;\n  vec3 c;\n"
+      "  if (r > 0.5) {\n    vec3 s = vec3(0.0); float w = 0.0;\n"
+      "    for (int i = -3; i <= 3; i++) for (int j = -3; j <= 3; j++) {\n"
+      "      vec2 o = vec2(float(i), float(j)) / 3.0;\n      float g = exp(-dot(o, o) * 2.0);\n"
+      "      s += texture(tela, SCREEN_UV + o * r * SCREEN_PIXEL_SIZE).rgb * g; w += g;\n    }\n"
+      "    c = s / w;\n  } else c = texture(tela, SCREEN_UV).rgb;\n"
+      "  c = gira(c, aj[0]);\n"
+      "  c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, aj[1]);\n"
+      "  c = clamp((c + aj[2] - 0.5) * aj[3] + 0.5, 0.0, 1.0);\n"
+      "  float m = cheia ? 1.0 : texture(TEXTURE, UV).a * cor_v.a;\n"
+      "  COLOR = vec4(c * m, m);\n}\n";
+  RenderingServer *rs = RenderingServer::get_singleton();
+  sh = rs->shader_create();
+  rs->shader_set_code(sh, codigo);
+  return sh;
+}
+
 RID material_passo(Passo passo, bool pma) {
   RID &m = cache().material[passo][pma ? 1 : 0];
   if (m.is_valid()) return m;
@@ -214,6 +247,8 @@ void boneco_liberar_materiais() {
       if (cache().shader_proprio[p][k].is_valid()) rs->free_rid(cache().shader_proprio[p][k]);
       cache().shader_proprio[p][k] = RID();
     }
+  if (cache().shader_ajuste.is_valid()) rs->free_rid(cache().shader_ajuste);
+  cache().shader_ajuste = RID();
 }
 
 // ---- BonecoData
@@ -382,6 +417,7 @@ void BonecoSprite::_liberar_itens() {
   material_item.clear();
   material_efeito.clear();
   passo_efeito.clear();
+  copia_item.clear();
   indices_item.clear();
   vertices_item.clear();
   enviado_v.clear();
@@ -744,21 +780,26 @@ void BonecoSprite::_desenhar() {
     RID material;
     Passo passo;
     bool pma;
+    bool ajuste;
   };
   std::vector<Item> lista;
   for (int l = 0; l < int(desenho.lotes.size()); ++l) {
     const mamulengo::Lote &lt = desenho.lotes[size_t(l)];
+    if (lt.comando == Comando::Ajuste) {
+      if (lt.efeito >= 0 && lt.efeito < int(desenho.ajustes.size())) lista.push_back({l, RID(), NORMAL_PMA, false, true});
+      continue;
+    }
     if (lt.comando != Comando::Triangulos || lt.quantos == 0) continue;
     const bool pma = lt.pagina >= 0 && lt.pagina < int(data->modelo->paginas_desenho.size()) && data->modelo->paginas_desenho[size_t(lt.pagina)].pma;
     switch (lt.blend) {
-      case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma), ADITIVO, pma}); break;
-      case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma), MULTIPLICA, pma}); break;
-      case Blend::MultiplicaMotor: lista.push_back({l, material_passo(MULTIPLICA_MOTOR, pma), MULTIPLICA_MOTOR, pma}); break;
+      case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma), ADITIVO, pma, false}); break;
+      case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma), MULTIPLICA, pma, false}); break;
+      case Blend::MultiplicaMotor: lista.push_back({l, material_passo(MULTIPLICA_MOTOR, pma), MULTIPLICA_MOTOR, pma, false}); break;
       case Blend::Tela:
-        lista.push_back({l, material_passo(TELA_MUL, pma), TELA_MUL, pma});
-        lista.push_back({l, material_passo(TELA_ADD, pma), TELA_ADD, pma});
+        lista.push_back({l, material_passo(TELA_MUL, pma), TELA_MUL, pma, false});
+        lista.push_back({l, material_passo(TELA_ADD, pma), TELA_ADD, pma, false});
         break;
-      default: lista.push_back({l, pma ? material_passo(NORMAL_PMA, true) : RID(), NORMAL_PMA, pma});
+      default: lista.push_back({l, pma ? material_passo(NORMAL_PMA, true) : RID(), NORMAL_PMA, pma, false});
     }
   }
   const RID pai = get_canvas_item();
@@ -771,6 +812,7 @@ void BonecoSprite::_desenhar() {
     material_item.push_back(RID());
     material_efeito.push_back(RID());
     passo_efeito.push_back(-1);
+    copia_item.push_back(false);
     indices_item.push_back(Vector<int>());
     vertices_item.push_back(0);
     enviado_v.push_back(PackedByteArray());
@@ -787,12 +829,43 @@ void BonecoSprite::_desenhar() {
   for (int k = 0; k < itens.size(); k++) {
     const RID it = itens[k];
     rs->canvas_item_clear(it);
+    const bool ajuste = k < int(lista.size()) && lista[size_t(k)].ajuste;
+    // a camada de ajuste le a tela: o backbuffer e copiado (a viewport inteira) antes do item
+    if (copia_item[k] != ajuste) {
+      rs->canvas_item_set_copy_to_backbuffer(it, ajuste, Rect2());
+      copia_item.write[k] = ajuste;
+    }
     if (k >= int(lista.size())) continue;
     const mamulengo::Lote &lt = desenho.lotes[size_t(lista[size_t(k)].lote)];
+    if (ajuste) {
+      if (!material_efeito[k].is_valid()) material_efeito.write[k] = rs->material_create();
+      const RID me = material_efeito[k];
+      if (passo_efeito[k] != PASSOS * 4) {
+        rs->material_set_shader(me, shader_ajuste());
+        passo_efeito.write[k] = PASSOS * 4;
+      }
+      PackedFloat32Array aj;
+      aj.resize(5);
+      memcpy(aj.ptrw(), desenho.ajustes[size_t(lt.efeito)].v, sizeof(float) * 5);
+      rs->material_set_param(me, "aj", aj);
+      rs->material_set_param(me, "cheia", lt.quantos == 0);
+      lista[size_t(k)].material = me;
+      if (lt.quantos == 0) {
+        // sem imagem: um retangulo que cobre qualquer tela (o recorte da viewport corta)
+        if (material_item[k] != me) {
+          rs->canvas_item_set_material(it, me);
+          material_item.write[k] = me;
+        }
+        const Rect2 tudo(Vector2(-1e6, -1e6), Vector2(2e6, 2e6));
+        rs->canvas_item_set_custom_rect(it, true, tudo);
+        rs->canvas_item_add_rect(it, tudo, Color(1, 1, 1));
+        continue;
+      }
+    }
     // luz: o relevo da pagina carregado e um grupo de luz no lote
     const Ref<Texture2D> rel = lt.luz >= 0 && lt.pagina >= 0 && lt.pagina < data->relevos.size() ? data->relevos[lt.pagina] : Ref<Texture2D>();
-    const bool luz = rel.is_valid();
-    if (lt.efeito >= 0 || luz) {
+    const bool luz = !ajuste && rel.is_valid();
+    if (!ajuste && (lt.efeito >= 0 || luz)) {
       // slot com efeitos ou iluminado: o material proprio do item, com os valores deste quadro
       const Item &li = lista[size_t(k)];
       const bool efeitos = lt.efeito >= 0;

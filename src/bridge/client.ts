@@ -166,7 +166,7 @@ const handlers: Record<string, Handler> = {
 
   // GIF ou WebM da animacao inteira como esta na tela; devolve o caminho gravado
   async export(p: ExportOptions) {
-    if (p.format !== "gif" && p.format !== "webm") throw new Error('format: "gif" ou "webm"');
+    if (p.format !== "gif" && p.format !== "webm" && p.format !== "webp") throw new Error('format: "gif", "webm" ou "webp" (animado)');
     const { onProgress: _, ...opts } = p;
     return exportAnimation(opts);
   },

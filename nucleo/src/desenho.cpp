@@ -493,6 +493,38 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
     prof = float(ctx.profundidade + ds.profundidade);
+    // a camada de ajuste (docs/NUCLEO.md "Ajuste"): no lugar da imagem do slot, um comando que
+    // muda o que ja foi desenhado, pela mascara da imagem (sem imagem, a tela inteira)
+    if (s.efeitos.ajuste()) {
+      if (s.cor.a > 0) {
+        AjusteLote al;
+        std::copy(s.efeitos.v + AJUSTE_MATIZ, s.efeitos.v + AJUSTE_MATIZ + 5, al.v);
+        Lote l;
+        l.comando = Comando::Ajuste;
+        l.efeito = int(d.ajustes.size());
+        l.profundidade = prof;
+        l.inicio = uint32_t(d.indices.size());
+        d.ajustes.push_back(al);
+        const Parte* p = s.parte >= 0 ? &m.partes[size_t(s.parte)] : nullptr;
+        const size_t n = p && p->pagina >= 0 && !p->uvs.empty() ? e.vertices(si, mundo) : 0;
+        if (n && p->uvs.size() == n) {
+          const Cor cs = s.cor, cp = p->cor;
+          const uint32_t base = uint32_t(d.vertices.size() / 8);
+          for (size_t i = 0; i < n; i += 2)
+            d.vertices.insert(d.vertices.end(), {float(mundo[i]), float(mundo[i + 1]), p->uvs[i], p->uvs[i + 1], cs.r * cp.r, cs.g * cp.g, cs.b * cp.b, cs.a * cp.a});
+          if (p->tipo == TipoParte::Regiao) d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+          else
+            for (uint16_t t : p->triangulos) d.indices.push_back(base + t);
+          l.pagina = p->pagina + ctx.pagina_base;
+          l.quantos = uint32_t(d.indices.size()) - l.inicio;
+        }
+        d.lotes.push_back(l);
+      }
+      instancias(si);
+      particulas(si);
+      if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
+      continue;
+    }
     if (s.parte >= 0) {
       const Parte& p = m.partes[size_t(s.parte)];
       if (p.tipo == TipoParte::Recorte) {

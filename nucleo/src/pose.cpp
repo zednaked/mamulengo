@@ -251,7 +251,13 @@ float Efeitos::margem() const {
 }
 
 void Efeitos::limitar() {
-  for (int i = 0; i < CANAIS_EFEITOS; ++i) {
+  // o ajuste tem faixas proprias: matiz livre (graus), saturacao e contraste de 0 a 4,
+  // luminosidade de -1 a 1, desfoque a partir de 0
+  v[AJUSTE_SATURACAO] = std::min(std::max(v[AJUSTE_SATURACAO], 0.0f), 4.0f);
+  v[AJUSTE_CONTRASTE] = std::min(std::max(v[AJUSTE_CONTRASTE], 0.0f), 4.0f);
+  v[AJUSTE_LUMINOSIDADE] = std::min(std::max(v[AJUSTE_LUMINOSIDADE], -1.0f), 1.0f);
+  v[AJUSTE_DESFOQUE] = std::max(v[AJUSTE_DESFOQUE], 0.0f);
+  for (int i = 0; i < EFEITO_INICIO[int(TipoEfeito::Ajuste)]; ++i) {
     const bool sem_teto = i == LINHA_LARGURA || i == BRILHO_FORCA || i == BRILHO_RAIO || i == DISSOLVER_GRAO || i == BORRAR_FORCA || i == BORRAR_LIMITE || i == RASTRO_COPIAS || i == RASTRO_INTERVALO;
     v[i] = std::max(v[i], i == DISSOLVER_GRAO ? 1.0f : 0.0f);
     if (!sem_teto) v[i] = std::min(v[i], 1.0f);

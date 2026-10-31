@@ -1,6 +1,6 @@
 # Mamulengo
 
-![A abertura do Mamulengo: uma marionete vem do fundo e quica nos fios, as letras do nome vêm para a tela uma a uma, um raio desce pelos fios e a câmera mergulha na cabeça da marionete](exemplos/vinheta/vinheta.gif)
+![A abertura do Mamulengo: num palco de teatro a cortina de veludo abre, uma marionete vem do fundo para o refletor e quica nos fios, as letras do nome batem na tela dentro de um letreiro de lâmpadas, feixes de pista varrem um pano de chita, um raio desce pelos fios, a marionete agradece a uma plateia em silhueta e a cortina fecha](exemplos/vinheta/vinheta.webp)
 
 **[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
 
@@ -12,7 +12,7 @@ numa timeline, ou peça ao Claude pelo MCP e veja cada osso que ele mexe, ao viv
 no mesmo editor. O personagem é gravado em `.boneco`, um arquivo só e legível,
 com o atlas, as transições e uma ficha escrita. Um núcleo em C++, escrito do
 zero, toca esses arquivos no Godot (módulo do motor ou GDExtension) e no
-navegador (328 KB de WebAssembly, 128 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
+navegador (412 KB de WebAssembly, 158 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
 do que já foi feito fica para trás, e soma o que o Spine não tem: efeitos por
 parte, partículas e giro em 2,5D.
 
@@ -113,10 +113,11 @@ laço de 8,6 s. Exportado pelo editor, com moldura e legendas.*
 
 ![O zumbi CC0 numa noite: um vagalume dá a volta nele, pela frente e por trás, a cabeça gira em 2,5D atrás dele, a luz troca de lado e vira contraluz, e ele pousa no nariz](exemplos/vagalume/vagalume.gif)
 
-*[exemplos/vinheta](exemplos/vinheta), a abertura do topo desta página: uma
-cena feita de instâncias, nove de uma letra e uma da marionete do ícone, com
-quatro chaves na timeline de cada letra. Uns 7 µs de pose e 8 µs de desenho
-por quadro.*
+*[exemplos/vinheta](exemplos/vinheta), a abertura do topo desta página: um
+espetáculo de bonecos feito de instâncias. Nove de uma letra, cinquenta lâmpadas
+do letreiro, nove pessoas na plateia e a marionete do ícone, cada uma com poucas
+chaves na timeline da cena; a cortina de veludo, o refletor, os feixes de pista e
+a ribalta iluminam um pano de chita por camadas. Uns 32 µs de pose por quadro.*
 
 *[exemplos/vagalume](exemplos/vagalume): 2,5D, luz e profundidade juntos. O
 vagalume dá a volta no zumbi pela frente e por trás; a luz dele segue a

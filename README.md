@@ -1,6 +1,6 @@
 # Mamulengo
 
-![The Mamulengo opening: a string puppet comes out of the distance and bounces on its strings, the letters of the name come at the screen one by one, lightning runs down the strings and the camera dives into the puppet's head](exemplos/vinheta/vinheta.gif)
+![The Mamulengo opening: on a theatre stage the velvet curtain opens, a string puppet comes out of the distance into the spotlight and bounces on its strings, the letters of the name hit the screen inside a marquee of bulbs, disco beams sweep a chita backdrop, lightning runs down the strings, the puppet bows to an audience in silhouette and the curtain closes](exemplos/vinheta/vinheta.webp)
 
 **[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
 
@@ -11,7 +11,7 @@ together.** Rig a character from a layered PSD, animate it on a timeline, or ask
 Claude to do it over MCP and watch every bone it moves, live, in the same editor.
 Characters are saved as `.boneco`, one readable file that carries its atlas,
 transitions and a written brief. A C++ core, written from scratch, plays them in
-Godot (engine module or GDExtension) and in the browser (328 KB of WebAssembly, 128 KB gzipped).
+Godot (engine module or GDExtension) and in the browser (412 KB of WebAssembly, 158 KB gzipped).
 It opens and writes Spine 4.3 projects, so nothing already made gets left behind,
 and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 
@@ -115,9 +115,10 @@ in one 8.6 s loop. Exported from the editor, frame and captions included.*
 ![The CC0 zombie on a night: a firefly circles him, front and behind, his head turns in 2.5D after it, its light changes sides and becomes a rim light, and it lands on his nose](exemplos/vagalume/vagalume.gif)
 
 *[exemplos/vinheta](exemplos/vinheta), the opening at the top of this page: a
-scene made of instances, nine of one letter and one of the puppet from the icon,
-each letter's timeline four keys long. About 7 µs of pose and 8 µs of drawing a
-frame.*
+puppet show made of instances. Nine of one letter, fifty marquee bulbs, nine
+people in the audience and the string puppet from the icon, each a handful of
+keys on the scene's timeline; the velvet curtain, spotlight, disco beams and
+footlights light a chita backdrop by layers. About 32 µs of pose a frame.*
 
 *[exemplos/vagalume](exemplos/vagalume): 2.5D, light and depth together. The
 firefly circles the zombie in front and behind; its light follows the depth (face,

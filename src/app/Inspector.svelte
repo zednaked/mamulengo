@@ -60,7 +60,7 @@
   }
 
   // ---- efeitos (so .boneco; docs/NUCLEO.md "Efeitos"): os ligados no setup ou animados aqui
-  const EFEITOS: Record<string, { nome: string; dica: string; campos: { k: string; label: string; max: number; step: number }[] }> = {
+  const EFEITOS: Record<string, { nome: string; dica: string; campos: { k: string; label: string; min?: number; max: number; step: number }[] }> = {
     outline: { nome: "contorno", dica: "linha em volta da imagem", campos: [{ k: "width", label: "largura", max: 16, step: 0.5 }] },
     glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "forca", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
     dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }, { k: "grain", label: "pedacos", max: 64, step: 1 }] },
@@ -83,6 +83,17 @@
         { k: "alpha", label: "alfa", max: 1, step: 0.05 },
       ],
     },
+    adjust: {
+      nome: "ajuste",
+      dica: "camada de ajuste: muda o que ja esta desenhado por baixo da imagem (sem imagem, a tela toda)",
+      campos: [
+        { k: "hue", label: "matiz", min: -180, max: 180, step: 1 },
+        { k: "saturation", label: "saturacao", max: 4, step: 0.05 },
+        { k: "lightness", label: "luminosidade", min: -1, max: 1, step: 0.02 },
+        { k: "contrast", label: "contraste", max: 4, step: 0.05 },
+        { k: "blur", label: "desfoque", max: 40, step: 0.5 },
+      ],
+    },
   };
   const ehBoneco = $derived(!!app.asset?.tres?.endsWith(".boneco"));
   const efeitos = $derived.by(() => {
@@ -103,7 +114,7 @@
     } else app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, [campo]: valor } }, `${EFEITOS[n].nome} ${slot.name}`, `ef-${n}-${slot.name}`);
   }
   // ligar um efeito: no setup com um valor que ja aparece (o padrao deixa desligado)
-  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 }, trail: { copies: 4 } };
+  const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 }, trail: { copies: 4 }, adjust: { saturation: 0 } };
   function ligar(n: string) {
     if (!slot || !n) return;
     app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`);
@@ -495,7 +506,7 @@
             {#each EFEITOS[ef.n].campos as c}
               <label class="efcampo">
                 <span>{c.label}</span>
-                <input type="range" min="0" max={c.max} step={c.step} value={ef.v[c.k]} oninput={(e) => setEfeito(ef.n, c.k, +(e.target as HTMLInputElement).value)} />
+                <input type="range" min={c.min ?? 0} max={c.max} step={c.step} value={ef.v[c.k]} oninput={(e) => setEfeito(ef.n, c.k, +(e.target as HTMLInputElement).value)} />
                 <span class="num">{(+ef.v[c.k]).toFixed(c.step < 1 ? 2 : 0)}</span>
               </label>
             {/each}

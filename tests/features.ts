@@ -410,6 +410,24 @@ runtimeOk("constraints");
     check(renomeou && !doc.json.animations["t.efeito"].effects[s0].dissolve && doc.json.slots[0].effects === undefined, "efeitos: renomear o slot leva as timelines; key.delete e off limpam");
     await run("animation.delete", { name: "t.efeito" });
   }
+  // camada de ajuste: setup e chave (matiz negativo), vai ao .boneco como "ajuste" em portugues
+  {
+    const s0 = doc.json.slots[0].name;
+    await run("slot.effect", { slot: s0, effect: "adjust", saturation: 0, blur: 3 });
+    await run("animation.create", { name: "t.ajuste" });
+    await run("key.set", { anim: "t.ajuste", target: { slot: s0 }, timeline: "adjust", time: 0.2, hue: -40, contrast: 1.5 });
+    let recusou = false;
+    await run("slot.effect", { slot: s0, effect: "adjust", width: 2 }).catch(() => (recusou = true));
+    const bo = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), atlasText, "t");
+    const aj = bo.slots.find((x: any) => x.nome === s0)?.efeitos?.ajuste;
+    const ch = bo.animacoes?.["t.ajuste"]?.efeitos?.[s0]?.ajuste?.[0];
+    check(
+      aj?.saturacao === 0 && aj?.desfoque === 3 && ch?.matiz === -40 && ch?.contraste === 1.5 && ch?.saturacao === 0 && ch?.desfoque === 3 && recusou,
+      `ajuste: slot.effect e key.set, no .boneco ajuste {matiz, saturacao, contraste, desfoque} (${JSON.stringify(aj)} ${JSON.stringify(ch)})`,
+    );
+    await run("animation.delete", { name: "t.ajuste" });
+    await run("slot.effect", { slot: s0, effect: "adjust", off: true });
+  }
   // borrar (smear): sem cor, setup com padroes, chave com limit e fade, campo de outro efeito recusado
   {
     const s0 = doc.json.slots[0].name;

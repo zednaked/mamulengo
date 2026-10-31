@@ -1,13 +1,16 @@
-// Exporta o que esta na tela (enquadramento do viewport) como GIF ou video WebM,
+// Exporta o que esta na tela (enquadramento do viewport) como GIF, video WebM ou WebP animado,
 // com a animacao inteira, pronta para repetir em loop. O arquivo e gravado pelo
 // servidor (pasta escolhida ou ~/.cache/mamulengo/exports).
 import { app } from "./state.svelte.ts";
 import { GifEncoder, Histogram } from "../render/gif.ts";
 import { encodeWebm } from "../render/webm.ts";
+import { encodeWebpAnim } from "../render/webp.ts";
 import { applySequence, type SequenceParam } from "./sequence.ts";
 
 export interface ExportOptions {
-  format: "gif" | "webm";
+  format: "gif" | "webm" | "webp";
+  // webp: qualidade de 0 a 1 (padrao 0,8)
+  quality?: number;
   animation?: string | null;
   fps?: number;
   // escala sobre o tamanho do viewport em px CSS; maxWidth limita a largura
@@ -215,6 +218,11 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
         if (i % 4 === 3) await sleep(0);
       }
       blob = new Blob([gif.finish() as BlobPart], { type: "image/gif" });
+    } else if (o.format === "webp") {
+      // duracoes inteiras em ms que somam a duracao certa
+      const dur = Array.from({ length: n }, (_, i) => Math.round((1000 * (i + 1)) / fps) - Math.round((1000 * i) / fps));
+      blob = await encodeWebpAnim(n, [w, h], frameAt, dur, o.quality ?? 0.8, o.onProgress);
+      encoder = "webp";
     } else {
       const loops = Math.max(1, Math.min(20, o.loops ?? 1));
       const total = n * loops;

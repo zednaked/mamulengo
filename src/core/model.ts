@@ -185,6 +185,9 @@ export const EFFECTS: Record<string, [string, number[]][]> = {
   // so geometria (docs/NUCLEO.md "Rastro"): copies (0 desliga, ate 16), interval em segundos,
   // alpha da copia mais nova (0 a 1)
   trail: [["copies", [0]], ["interval", [0.05]], ["alpha", [0.5]]],
+  // camada de ajuste (docs/NUCLEO.md "Ajuste"): o slot nao desenha a imagem, muda o que ja esta
+  // na tela por baixo dela (sem imagem, a tela inteira). hue em graus, blur em pixels do mundo
+  adjust: [["hue", [0]], ["saturation", [1]], ["lightness", [0]], ["contrast", [1]], ["blur", [0]]],
 };
 export const EFFECT_NAMES = Object.keys(EFFECTS);
 export const isEffect = (timeline: string) => timeline in EFFECTS;

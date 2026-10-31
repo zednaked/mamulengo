@@ -8,7 +8,9 @@ O que está aberto, em ordem de prioridade.
 2. **O addon na Godot Asset Library,** e o build de macOS conferido num Mac.
 3. **Teste com uma pessoa:** levar para o editor o que a pessoa achou.
 
-Feito há pouco: as instâncias, um `.boneco` dentro de outro, no núcleo, no editor e no Godot
+Feito há pouco: a camada de ajuste (matiz, saturação, luminosidade, contraste e desfoque animados
+pela timeline, sobre o que já foi desenhado; docs/NUCLEO.md "Ajuste"); o export em WebP animado
+pelo editor; a vinheta nova em `exemplos/vinheta` (teatro de mamulengo feito de instâncias); as instâncias, um `.boneco` dentro de outro, no núcleo, no editor e no Godot
 (docs/NUCLEO.md "Instâncias", `exemplos/vinheta`), com extrair ossos para um `.boneco` novo (e
 embutir de volta), entrar na instância no editor e mistura ao trocar a animação do filho; a luz
 por camada (profundidade no slot e na luz); a luz dinâmica 2D com relevo calculado da arte
@@ -24,7 +26,7 @@ timeline que toca milhares de chaves sem engasgar; e a interface compacta para t
 
 ## Além do Spine
 
-- Feito: efeitos por parte (contorno, brilho, dissolver, tingir), borrar, rastro, partículas presas a ossos (com raio e órbita), giro em 2,5D, luz dinâmica 2D (com camadas) e instâncias; ver `exemplos/vitrine`, `exemplos/jogo`, `exemplos/vagalume` e `exemplos/vinheta`.
+- Feito: efeitos por parte (contorno, brilho, dissolver, tingir), borrar, rastro, partículas presas a ossos (com raio e órbita), giro em 2,5D, luz dinâmica 2D (com camadas), instâncias e camada de ajuste; ver `exemplos/vitrine`, `exemplos/jogo`, `exemplos/vagalume` e `exemplos/vinheta`.
 - Depois: cor por evento, materiais, partículas que andam com o osso, colisão com o chão.
 - Bake: assar animações (poses por quadro, deform, física) para tocar barato em mobile e web, ou para spritesheet.
 - Novos tipos de constraint, de timeline e de attachment.

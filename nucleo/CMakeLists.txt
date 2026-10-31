@@ -24,6 +24,11 @@ target_include_directories(mamulengo_nucleo PUBLIC include)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(mamulengo_nucleo PRIVATE -Wall -Wextra -Wno-unused-parameter)
 endif()
+# no navegador as excecoes do C++ vem desligadas por padrao: o leitor (que avisa erro de arquivo
+# por excecao) abortava e o erro chegava ao editor como um numero. As do proprio WebAssembly
+if(EMSCRIPTEN)
+  target_compile_options(mamulengo_nucleo PUBLIC -fwasm-exceptions)
+endif()
 
 # a ferramenta de teste (le o arquivo, escreve o JSON do contrato)
 add_executable(nucleo-pose ferramentas/nucleo-pose.cpp)
@@ -40,6 +45,7 @@ if(EMSCRIPTEN)
   target_link_libraries(nucleo PRIVATE mamulengo_nucleo)
   set_target_properties(nucleo PROPERTIES SUFFIX ".mjs")
   target_link_options(nucleo PRIVATE
+    -fwasm-exceptions
     -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=0
     "-sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAPF64','HEAPU32','HEAP32','HEAPU8','UTF8ToString','stringToNewUTF8']"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']")

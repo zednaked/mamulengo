@@ -144,6 +144,12 @@ export const CAMPOS: Record<string, string> = {
   trail: "rastro",
   copies: "copias",
   interval: "intervalo",
+  adjust: "ajuste",
+  hue: "matiz",
+  saturation: "saturacao",
+  lightness: "luminosidade",
+  contrast: "contraste",
+  blur: "desfoque",
   // particulas (so do Mamulengo; docs/NUCLEO.md "Particulas"); a escala do emissor fica
   // "escala" nos dois lados (scale ja e a timeline "escalar")
   particles: "particulas",
