@@ -2,6 +2,8 @@
 
 ![The Mamulengo opening: on a theatre stage the velvet curtain opens, a string puppet comes out of the distance into the spotlight and bounces on its strings, the letters of the name hit the screen inside a marquee of bulbs, disco beams sweep a chita backdrop, lightning runs down the strings, the puppet bows to an audience in silhouette and the curtain closes](exemplos/vinheta/vinheta.webp)
 
+[Watch in HD: MP4, 1280x720, 60 fps](exemplos/vinheta/vinheta.mp4)
+
 **[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
 
 ![A robot, a zombie and a monster, rigged and animated by Claude Code in Mamulengo](docs/media/elenco.webp)

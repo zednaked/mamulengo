@@ -2,6 +2,8 @@
 
 ![The Mamulengo opening: on a theatre stage the velvet curtain opens, a string puppet comes out of the distance into the spotlight, the name hits the screen inside a marquee, disco beams sweep a chita backdrop, the puppet bows and the curtain closes](vinheta.webp)
 
+[Watch in HD: MP4, 1280x720, 60 fps](vinheta.mp4) (exported by the editor as WebM, then `ffmpeg` to H.264)
+
 An 8-second opening for Mamulengo, built in Mamulengo. A mamulengo is a puppet theatre, so the
 opening is a show: curtain, spotlight, marquee, audience. `vinheta.boneco` is the stage; what
 moves on it lives in small files it places as **instances** and tells what to play and when

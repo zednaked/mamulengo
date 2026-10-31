@@ -2,6 +2,8 @@
 
 ![A abertura do Mamulengo: num palco de teatro a cortina de veludo abre, uma marionete vem do fundo para o refletor e quica nos fios, as letras do nome batem na tela dentro de um letreiro de lâmpadas, feixes de pista varrem um pano de chita, um raio desce pelos fios, a marionete agradece a uma plateia em silhueta e a cortina fecha](exemplos/vinheta/vinheta.webp)
 
+[Ver em HD: MP4, 1280x720, 60 fps](exemplos/vinheta/vinheta.mp4)
+
 **[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
 
 ![Um robô, um zumbi e um monstro, rigados e animados pelo Claude Code no Mamulengo](docs/media/elenco.webp)
