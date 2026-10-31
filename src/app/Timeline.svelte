@@ -11,8 +11,8 @@
 
   type Ref = { target?: any; timeline: string; time: number; name?: string };
   type Cell = { time: number; refs: Ref[]; curve?: "stepped" | "bezier"; next?: number };
-  type Row = { id: string; label: string; color: string; cells: Cell[]; kind: "all" | "part" | "detail"; target?: any; timeline?: string; part?: { bone?: string; slot?: string } };
-  type Tl = { part: string; partLabel: string; partSel?: { bone?: string; slot?: string }; partColor: string; target?: any; timeline: string; label: string; keys: any[]; bone?: string; slot?: string };
+  type Row = { id: string; label: string; color: string; cells: Cell[]; kind: "all" | "part" | "detail"; target?: any; timeline?: string; part?: { bone?: string; slot?: string; instance?: string } };
+  type Tl = { part: string; partLabel: string; partSel?: { bone?: string; slot?: string; instance?: string }; partColor: string; target?: any; timeline: string; label: string; keys: any[]; bone?: string; slot?: string };
 
   const FPS = 30;
   const ROW = 24;
@@ -89,7 +89,7 @@
     for (const [n, tls] of Object.entries<any>(a.particles ?? {}))
       if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: tl, keys });
     // instancias (so do Mamulengo): uma linha por instancia, as chaves que trocam o que o filho toca
-    for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instancia", keys });
+    for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partSel: { instance: n }, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instancia", keys });
     if (a.events?.length) out.push({ part: "ev", partLabel: "eventos", partColor: "#ffffff", timeline: "events", label: "eventos", keys: a.events });
     if (a.drawOrder?.length) out.push({ part: "do", partLabel: "ordem", partColor: "#ff9f6c", timeline: "drawOrder", label: "ordem", keys: a.drawOrder });
     return out;
@@ -707,7 +707,11 @@
       <div class="labels">
         {#each rows as r}
           {#if r.kind === "part" && r.part}
-            <button class="label link" style:color={r.color} title="Ver as timelines de {r.label}" onclick={() => app.select(r.part!)}>{r.label}</button>
+            {#if r.part.instance}
+              <button class="label link" style:color={r.color} title="Entrar na instancia {r.part.instance}: abre o .boneco dela para editar (← no topo volta)" onclick={() => app.entrarInstancia(r.part!.instance!)}>{r.label} ↳</button>
+            {:else}
+              <button class="label link" style:color={r.color} title="Ver as timelines de {r.label}" onclick={() => app.select(r.part!)}>{r.label}</button>
+            {/if}
           {:else}
             <div class="label" style:color={r.color} title={r.label}>{r.label}</div>
           {/if}

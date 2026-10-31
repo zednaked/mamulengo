@@ -117,6 +117,8 @@ struct DadosSlot {
   Cor cor;
   Blend blend = Blend::Normal;
   Efeitos efeitos;
+  // a camada (docs/NUCLEO.md "Luzes"): px para perto de quem assiste (negativa: para o fundo)
+  double profundidade = 0;
 };
 
 enum class TipoParte : uint8_t { Regiao, Malha, MalhaLigada, Recorte, Caminho, Ponto, Caixa };
@@ -298,15 +300,15 @@ struct TimelineTaxa {
 
 // ---- luzes (docs/NUCLEO.md "Luzes"): pontos de luz presos a ossos e a luz ambiente, que
 // iluminam as pecas pelas paginas com relevo
-constexpr int CANAIS_LUZ = 7;       // r g b a, forca, raio, altura
+constexpr int CANAIS_LUZ = 8;       // r g b a, forca, raio, altura, profundidade
 constexpr int CANAIS_AMBIENTE = 5;  // r g b a, forca
 constexpr int MAX_LUZES = 8;        // por personagem, no desenho
-enum : int { LUZ_R = 0, LUZ_A = 3, LUZ_FORCA = 4, LUZ_RAIO = 5, LUZ_ALTURA = 6, AMBIENTE_FORCA = 4 };
+enum : int { LUZ_R = 0, LUZ_A = 3, LUZ_FORCA = 4, LUZ_RAIO = 5, LUZ_ALTURA = 6, LUZ_PROFUNDIDADE = 7, AMBIENTE_FORCA = 4 };
 struct DadosLuz {
   std::string nome;
   int osso = 0;
   double x = 0, y = 0;  // ponto no osso
-  float v[CANAIS_LUZ] = {1, 1, 1, 1, 1, 300, 80};
+  float v[CANAIS_LUZ] = {1, 1, 1, 1, 1, 300, 80, 0};
 };
 // cor de 0 a 1, forca e raio a partir de 0; a altura pode ser qualquer (abaixo do plano: luz
 // rasante por tras). Serve para luz (7 canais) e ambiente (5)
@@ -332,6 +334,7 @@ struct DadosInstancia {
   int skin = 0;          // do filho
   double inicio = 0, velocidade = 1;  // tempo do filho = inicio + velocidade * relogio
   bool laco = true;      // "repetir": sem repetir, o filho para no fim
+  double mix = 0;        // segundos de mistura quando uma chave troca a animacao
 };
 // timeline de uma instancia: chaves em degrau que trocam animacao, inicio, velocidade e repetir; da
 // chave em diante o tempo do filho e inicio + velocidade * (tempo - tempo da chave)
@@ -339,7 +342,7 @@ struct TimelineInstancia {
   int instancia;
   std::vector<double> tempos;
   std::vector<int> animacoes;  // do filho; -1: setup
-  std::vector<double> inicios, velocidades;
+  std::vector<double> inicios, velocidades, mixes;
   std::vector<uint8_t> lacos;
 };
 struct TimelineRajada {

@@ -9,7 +9,8 @@ namespace mamulengo {
 
 EstadoInstancia::EstadoInstancia(const EstadoInstancia& o)
     : e(o.e ? std::make_unique<Esqueleto>(*o.e) : nullptr), animacao(o.animacao), inicio(o.inicio), velocidade(o.velocidade), laco(o.laco),
-      por_timeline(o.por_timeline), tempo_filho(o.tempo_filho), pronto(o.pronto), ultima_anim(o.ultima_anim), ultimo_t(o.ultimo_t) {
+      por_timeline(o.por_timeline), tempo_filho(o.tempo_filho), mix_animacao(o.mix_animacao), mix_tempo(o.mix_tempo), mix_alfa(o.mix_alfa), mix_laco(o.mix_laco),
+      pronto(o.pronto), ultima_anim(o.ultima_anim), ultimo_t(o.ultimo_t), ultimo_alfa(o.ultimo_alfa) {
   std::copy(o.ultima_base, o.ultima_base + 6, ultima_base);
 }
 EstadoInstancia& EstadoInstancia::operator=(const EstadoInstancia& o) {
@@ -607,11 +608,13 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   double t = tempo;
   if (loop && an.duracao > 0) t = std::fmod(t, an.duracao);
   // rajadas desde a ultima vez (na primeira, desde antes do 0)
-  const double de = ai == ultima_anim_ ? ultimo_tempo_ : -1;
-  if (!(ai == ultima_anim_ && t == ultimo_tempo_))
-    for (const TimelineRajada& tr : an.rajadas) aplicar_rajada(tr, de, t);
-  ultima_anim_ = ai;
-  ultimo_tempo_ = t;
+  if (!sem_rajadas_) {
+    const double de = ai == ultima_anim_ ? ultimo_tempo_ : -1;
+    if (!(ai == ultima_anim_ && t == ultimo_tempo_))
+      for (const TimelineRajada& tr : an.rajadas) aplicar_rajada(tr, de, t);
+    ultima_anim_ = ai;
+    ultimo_tempo_ = t;
+  }
   for (const TimelineTaxa& tt : an.taxas) aplicar_taxa(tt, t, 1, Mistura::Setup);
   for (const TimelineLuz& tl : an.luzes) aplicar_luz(tl, t, 1, Mistura::Setup);
 
@@ -628,6 +631,67 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
 }
 
 // ---- instancias (docs/NUCLEO.md "Instancias")
+
+void Esqueleto::aplicar_cruzado(int de, double tempo_de, bool loop_de, int para, double tempo_para, bool loop_para, double alfa) {
+  if (alfa >= 1) return aplicar(para, tempo_para, loop_para);
+  // a pose da que sai (sem rajadas), guardada
+  sem_rajadas_ = true;
+  aplicar(de, tempo_de, loop_de);
+  sem_rajadas_ = false;
+  const std::vector<Local> l_de = local;
+  const std::vector<EstadoSlot> s_de = slots_;
+  const std::vector<int> o_de = ordem_;
+  const auto luz_de = luzes_;
+  float amb_de[CANAIS_AMBIENTE];
+  std::copy(ambiente_, ambiente_ + CANAIS_AMBIENTE, amb_de);
+  std::vector<double> taxa_de(emis_.size());
+  for (size_t i = 0; i < emis_.size(); ++i) taxa_de[i] = emis_[i].taxa;
+  const std::vector<EstadoRestricao> r_de = rest_;
+  // a que entra, e a mistura
+  aplicar(para, tempo_para, loop_para);
+  const double a = std::max(0.0, alfa);
+  auto mix = [a](double x, double y) { return x + (y - x) * a; };
+  for (size_t i = 0; i < local.size(); ++i) {
+    Local& l = local[i];
+    const Local& d = l_de[i];
+    double dr = std::fmod(l.rotacao - d.rotacao, 360.0);
+    if (dr > 180) dr -= 360;
+    if (dr < -180) dr += 360;
+    l.rotacao = d.rotacao + dr * a;
+    l.x = mix(d.x, l.x), l.y = mix(d.y, l.y);
+    l.escala_x = mix(d.escala_x, l.escala_x), l.escala_y = mix(d.escala_y, l.escala_y);
+    l.cisalha_x = mix(d.cisalha_x, l.cisalha_x), l.cisalha_y = mix(d.cisalha_y, l.cisalha_y);
+  }
+  for (size_t i = 0; i < slots_.size(); ++i) {
+    EstadoSlot& s = slots_[i];
+    const EstadoSlot& d = s_de[i];
+    s.cor = Cor{float(mix(d.cor.r, s.cor.r)), float(mix(d.cor.g, s.cor.g)), float(mix(d.cor.b, s.cor.b)), float(mix(d.cor.a, s.cor.a))};
+    for (int c = 0; c < CANAIS_EFEITOS; ++c) s.efeitos.v[c] = float(mix(d.efeitos.v[c], s.efeitos.v[c]));
+    // a imagem e a ordem trocam no meio da mistura; o deformar mistura se for da mesma imagem
+    if (a < 0.5 && d.parte != s.parte) {
+      mudar_parte(int(i), d.parte);
+      s.deform = d.deform;
+    } else if (d.parte == s.parte && d.deform.size() == s.deform.size()) {
+      for (size_t k = 0; k < s.deform.size(); ++k) s.deform[k] = mix(d.deform[k], s.deform[k]);
+    } else if (d.parte == s.parte && s.deform.empty() && !d.deform.empty()) {
+      s.deform = d.deform;
+      for (double& v : s.deform) v *= 1 - a;
+    }
+  }
+  if (a < 0.5) ordem_ = o_de;
+  for (size_t i = 0; i < luzes_.size(); ++i)
+    for (int c = 0; c < CANAIS_LUZ; ++c) luzes_[i][size_t(c)] = float(mix(luz_de[i][size_t(c)], luzes_[i][size_t(c)]));
+  for (int c = 0; c < CANAIS_AMBIENTE; ++c) ambiente_[c] = float(mix(amb_de[c], ambiente_[c]));
+  for (size_t i = 0; i < emis_.size(); ++i) emis_[i].taxa = mix(taxa_de[i], emis_[i].taxa);
+  for (size_t i = 0; i < rest_.size(); ++i) {
+    EstadoRestricao& r = rest_[i];
+    const EstadoRestricao& d = r_de[i];
+    for (auto campo : {&EstadoRestricao::mix, &EstadoRestricao::suavidade, &EstadoRestricao::mix_girar, &EstadoRestricao::mix_x, &EstadoRestricao::mix_y, &EstadoRestricao::mix_escala_x,
+                       &EstadoRestricao::mix_escala_y, &EstadoRestricao::mix_cisalha_y, &EstadoRestricao::posicao, &EstadoRestricao::espacamento, &EstadoRestricao::inercia,
+                       &EstadoRestricao::forca, &EstadoRestricao::amortecimento, &EstadoRestricao::massa_inv, &EstadoRestricao::vento, &EstadoRestricao::gravidade})
+      r.*campo = mix(d.*campo, r.*campo);
+  }
+}
 
 void Esqueleto::instancias_setup() {
   for (size_t i = 0; i < inst_.size(); ++i) {
@@ -661,6 +725,16 @@ void Esqueleto::aplicar_instancia(const TimelineInstancia& ti, double t, Mistura
   in.laco = ti.lacos[c] != 0;
   in.tempo_filho = in.inicio + in.velocidade * (t - ti.tempos[c]);
   in.por_timeline = true;
+  // mistura: a chave tem mix, comecou ha menos que ele e troca a animacao; a anterior continua no
+  // tempo dela
+  in.mix_alfa = 1;
+  const double passou = t - ti.tempos[c];
+  if (c > 0 && ti.mixes[c] > 0 && passou < ti.mixes[c] && ti.animacoes[c - 1] != ti.animacoes[c]) {
+    in.mix_animacao = ti.animacoes[c - 1];
+    in.mix_tempo = ti.inicios[c - 1] + ti.velocidades[c - 1] * (t - ti.tempos[c - 1]);
+    in.mix_laco = ti.lacos[c - 1] != 0;
+    in.mix_alfa = passou / ti.mixes[c];
+  }
 }
 
 void Esqueleto::avancar(double dt) {
@@ -677,6 +751,8 @@ void Esqueleto::atualizar_instancias() {
     EstadoInstancia& in = inst_[i];
     const bool por_tl = in.por_timeline;
     in.por_timeline = false;
+    const double alfa = por_tl ? in.mix_alfa : 1;
+    in.mix_alfa = 1;
     if (slots_[size_t(d.slot)].cor.a <= 0) continue;
     const Matriz& w = mundo_[size_t(d.osso)];
     const double r = d.rotacao * GRAU;
@@ -704,13 +780,28 @@ void Esqueleto::atualizar_instancias() {
       t = 0;
     }
     const double nb[6] = {b.a, b.b, b.c, b.d, b.x, b.y};
-    if (fm.sem_memoria && in.pronto && in.ultima_anim == in.animacao && in.ultimo_t == t && std::equal(nb, nb + 6, in.ultima_base)) continue;
+    if (alfa >= 1 && fm.sem_memoria && in.pronto && in.ultima_anim == in.animacao && in.ultimo_t == t && std::equal(nb, nb + 6, in.ultima_base)) continue;
     f.base = b;
-    f.aplicar(in.animacao, t, false);
+    if (alfa < 1) {
+      // a anterior no tempo dela (no laco dela ou no limite), misturada com a nova
+      double td = in.mix_tempo;
+      if (in.mix_animacao >= 0) {
+        const double dd = fm.animacoes[size_t(in.mix_animacao)].duracao;
+        if (in.mix_laco && dd > 0) td = std::fmod(td, dd), td += td < 0 ? dd : 0;
+        else td = std::min(std::max(td, 0.0), dd);
+      } else {
+        td = 0;
+      }
+      f.aplicar_cruzado(in.mix_animacao, td, false, in.animacao, t, false, alfa);
+      in.pronto = false;  // a mistura nao entra no atalho
+    } else {
+      f.aplicar(in.animacao, t, false);
+    }
     f.atualizar_mundo();
-    in.pronto = true;
+    in.pronto = alfa >= 1;
     in.ultima_anim = in.animacao;
     in.ultimo_t = t;
+    in.ultimo_alfa = alfa;
     std::copy(nb, nb + 6, in.ultima_base);
   }
 }
@@ -897,8 +988,9 @@ Local Esqueleto::local_de_mundo(int i) const {
   const Matriz& w = mundo_[size_t(i)];
   const int pai = m.ossos[size_t(i)].pai;
   Matriz l = w;
-  if (pai >= 0) {
-    const Matriz& p = mundo_[size_t(pai)];
+  // a raiz de uma instancia tem a base como pai
+  if (pai >= 0 || tem_base) {
+    const Matriz& p = pai >= 0 ? mundo_[size_t(pai)] : base;
     const double det = p.a * p.d - p.b * p.c;
     const double ia = p.d / det, ib = -p.b / det, ic = -p.c / det, id = p.a / det;
     const double dx = w.x - p.x, dy = w.y - p.y;

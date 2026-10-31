@@ -271,6 +271,7 @@ export class Viewer {
         this.nucleo ??= await NucleoCena.criar(this.ctx.gl);
         // os filhos das instancias de novo a cada abertura (podem ter mudado no disco)
         this.instArquivos.clear();
+        this.instFalhou.clear();
         await this.prepararInstancias();
         const gl = this.ctx.gl;
         for (const page of atlas.pages) {
@@ -358,10 +359,13 @@ export class Viewer {
   // o documento inteiro no nucleo (modo "nucleo"); em erro o desenho volta ao spine-webgl
   private loadNucleo(): boolean {
     if (this.runtime !== "nucleo" || !this.nucleo || !this.doc) return false;
-    // instancias de arquivos que ainda nao vieram (acabaram de ser postas): busca e refaz
-    if (this.arquivosFaltando().length) {
-      this.nucleoError = "carregando os arquivos das instancias";
-      void this.prepararInstancias().then(() => this.rebuild());
+    // instancias de arquivos que ainda nao vieram (acabaram de ser postas): busca e refaz; o que
+    // nao existe fica anotado (sem buscar de novo a cada quadro) ate recarregarInstancias
+    const faltam = this.arquivosFaltando();
+    if (faltam.length) {
+      const novos = faltam.filter((c) => !this.instFalhou.has(c));
+      this.nucleoError = novos.length ? "carregando os arquivos das instancias" : `instancia: nao achei ${faltam.join(", ")}`;
+      if (novos.length) void this.prepararInstancias().then(() => this.rebuild());
       return false;
     }
     try {
@@ -379,6 +383,13 @@ export class Viewer {
   // carregar o pai, e as paginas deles depois
 
   private instArquivos = new Set<string>();
+  private instFalhou = new Set<string>();
+  // um arquivo de instancia apareceu ou mudou (instance.extract gravou o filho): busca de novo
+  recarregarInstancias() {
+    this.instFalhou.clear();
+    this.instArquivos.clear();
+    void this.prepararInstancias().then(() => this.rebuild());
+  }
   private caminhoDoc() {
     return this.doc?.file?.tres ?? this.doc?.file?.skeleton ?? "";
   }
@@ -398,7 +409,10 @@ export class Viewer {
       const c = fila.shift()!;
       if (this.instArquivos.has(c)) continue;
       const r = await fetch(`/api/file?p=${encodeURIComponent(c)}`);
-      if (!r.ok) continue;
+      if (!r.ok) {
+        this.instFalhou.add(c);
+        continue;
+      }
       const texto = await r.text();
       N.registrarArquivo(c, texto);
       this.instArquivos.add(c);

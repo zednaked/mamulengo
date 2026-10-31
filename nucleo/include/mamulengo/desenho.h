@@ -20,14 +20,16 @@ struct Lote {
   uint32_t inicio = 0, quantos = 0;  // em `indices` (ComecaRecorte: o leque do poligono)
   int efeito = -1;  // indice em Desenho::efeitos (o lote de um slot com efeitos), -1 sem efeitos
   int luz = -1;     // indice em Desenho::grupos_luz (lote iluminado: a pagina tem relevo), -1 sem luz
+  float profundidade = 0;  // a camada do slot (com a da instancia), para a luz (docs/NUCLEO.md "Luzes")
 };
 
 // as luzes de um personagem no desenho (docs/NUCLEO.md "Luzes"): a ambiente e ate MAX_LUZES
-// pontos em mundo; por ponto x, y, altura, r, g, b (ja vezes alfa e forca) e raio
+// pontos em mundo; por ponto x, y, altura, r, g, b (ja vezes alfa e forca), raio e profundidade
+constexpr int FLOATS_LUZ = 8;
 struct GrupoLuz {
   float ambiente[3] = {1, 1, 1};
   int quantas = 0;
-  float luzes[MAX_LUZES][7] = {};
+  float luzes[MAX_LUZES][FLOATS_LUZ] = {};
 };
 
 // os efeitos de um lote (docs/NUCLEO.md "Efeitos"): os valores e a caixa da imagem na pagina

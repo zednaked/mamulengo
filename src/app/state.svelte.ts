@@ -244,6 +244,10 @@ class AppState {
       g.drawImage(bmp, 0, 0);
       return { width: bmp.width, height: bmp.height, data: g.getImageData(0, 0, bmp.width, bmp.height).data };
     },
+    text: async (path) => {
+      const r = await fetch(fileUrl(path));
+      return r.ok ? await r.text() : null;
+    },
     region: (name) => {
       const text = this.doc?.atlas.text;
       if (!text) return null;
@@ -262,7 +266,9 @@ class AppState {
       return null;
     }
     try {
-      return execute(this.doc, calls, "ui", label, { merge }, this.pixels);
+      const r = execute(this.doc, calls, "ui", label, { merge }, this.pixels);
+      void this.gravarArquivos(r);
+      return r;
     } catch (e: any) {
       if (/executeAsync/.test(String(e?.message))) {
         this.runAsync(calls, label);
@@ -297,12 +303,68 @@ class AppState {
   async runAsync(calls: Call | Call[], label?: string, source = "ui"): Promise<any[] | null> {
     if (!this.doc) return null;
     try {
-      return await executeAsync(this.doc, calls, source, label, {}, this.pixels);
+      const r = await executeAsync(this.doc, calls, source, label, {}, this.pixels);
+      await this.gravarArquivos(r);
+      return r;
     } catch (e: any) {
       if (source !== "ui") throw e;
       this.toast(String(e?.message ?? e));
       return null;
     }
+  }
+
+  // Entrar numa instancia (docs/NUCLEO.md "Instancias"): abre o .boneco filho para editar; o pai
+  // fica na pilha (com a animacao e o instante), e voltar o reabre, ja com o filho novo
+  pilhaInstancias = $state<{ asset: AssetInfo; animation: string | null; time: number; instance: string }[]>([]);
+  async entrarInstancia(nome: string) {
+    const doc = this.doc;
+    const inst = ((doc?.json as any)?.instances ?? []).find((x: any) => x.name === nome);
+    if (!doc || !inst || !this.asset) return this.toast(`instancia nao existe: ${nome}`);
+    if (doc.dirty) return this.toast("salve antes de entrar na instancia (o pai le o filho do disco ao voltar)");
+    const base = doc.file.tres ?? "";
+    const partes: string[] = [];
+    for (const x of (base.slice(0, base.lastIndexOf("/") + 1) + inst.boneco).split("/")) {
+      if (x === "..") partes.pop();
+      else if (x !== ".") partes.push(x);
+    }
+    const caminho = partes.join("/");
+    let filho = this.assets.find((a) => a.tres === caminho);
+    if (!filho) {
+      await this.loadAssets(true);
+      filho = this.assets.find((a) => a.tres === caminho);
+    }
+    if (!filho) return this.toast(`o filho ${inst.boneco} nao esta entre os personagens abertos pelo editor (fora das raizes?)`);
+    const v = this.viewer;
+    this.pilhaInstancias = [...this.pilhaInstancias, { asset: this.asset, animation: v?.view.animation ?? null, time: v?.view.time ?? 0, instance: nome }];
+    await this.open(filho);
+    // a animacao que a instancia tocava, se o filho tem
+    if (inst.animation && v) v.setAnimation(inst.animation);
+  }
+  async voltarInstancia() {
+    const topo = this.pilhaInstancias[this.pilhaInstancias.length - 1];
+    if (!topo) return;
+    if (this.doc?.dirty) return this.toast("salve antes de voltar (o pai le este arquivo do disco)");
+    this.pilhaInstancias = this.pilhaInstancias.slice(0, -1);
+    await this.open(topo.asset);
+    const v = this.viewer;
+    if (v) {
+      v.setAnimation(topo.animation);
+      v.poseAt(topo.time);
+    }
+  }
+
+  // Arquivos que um comando produziu (instance.extract: o .boneco do filho), gravados ao lado do
+  // documento; depois o viewer rele as instancias
+  async gravarArquivos(results: any[] | null) {
+    const dir = this.doc?.file.tres ? this.doc.file.tres.slice(0, this.doc.file.tres.lastIndexOf("/") + 1) : null;
+    const novos = (results ?? []).map((r) => r?.arquivo).filter((a) => a?.caminho && typeof a.texto === "string");
+    if (!novos.length) return;
+    if (!dir) throw new Error("o documento nao tem pasta (salve antes): o arquivo do filho nao foi gravado");
+    for (const a of novos) {
+      const r = await fetch(fileUrl(dir + a.caminho), { method: "PUT", body: a.texto, headers: { "x-mamulengo-source": "comando" } });
+      if (!r.ok) throw new Error(`nao gravei ${a.caminho}: ${(await r.json()).error}`);
+    }
+    this.viewer?.recarregarInstancias();
   }
 
   // Liga um viewer (novo, ex: viewport remontado) ao documento ja aberto.

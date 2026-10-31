@@ -50,9 +50,10 @@ void main() { vuv = uv; vcor = cor; vmundo = pos; gl_Position = proj * vec4(pos,
 
 const LUZ = `// luzes (docs/NUCLEO.md "Luzes"): a normal do relevo girada para o mundo pelas derivadas de tela
 // (para onde andam +u e +v da textura), ambiente mais a soma de cada luz: cor x max(N.L, 0) x
-// atenuacao (1 - distancia no plano / raio)^2; L vai do pixel a luz, com a altura dela em z
+// atenuacao (1 - distancia / raio)^2; L vai do pixel a luz, com a altura dela em z. luzZ: a camada
+// da luz menos a do lote (soma na altura e entra na distancia; 0 na mesma camada)
 uniform bool iluminado; uniform sampler2D relevo; uniform vec3 ambiente; uniform int nluz;
-uniform vec4 luzP[8]; uniform vec3 luzC[8];
+uniform vec4 luzP[8]; uniform vec3 luzC[8]; uniform float luzZ[8];
 vec3 luz(vec2 uv, vec2 mundo) {
   vec3 n = texture(relevo, uv).rgb * 2.0 - 1.0;
   vec2 dpx = dFdx(mundo), dpy = dFdy(mundo), dux = dFdx(uv), duy = dFdy(uv);
@@ -66,8 +67,8 @@ vec3 luz(vec2 uv, vec2 mundo) {
   vec3 soma = ambiente;
   for (int i = 0; i < 8; i++) {
     if (i >= nluz) break;
-    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z);
-    float at = clamp(1.0 - length(L.xy) / luzP[i].w, 0.0, 1.0);
+    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z + luzZ[i]);
+    float at = clamp(1.0 - length(vec3(L.xy, luzZ[i])) / luzP[i].w, 0.0, 1.0);
     soma += luzC[i] * max(dot(N, normalize(L)), 0.0) * at * at;
   }
   return soma;
@@ -207,7 +208,7 @@ export class Desenhista {
     for (const u of ["proj", "pma", "motor", "ef", "caixa", "pagina"]) this.uEf[u] = gl.getUniformLocation(this.progEf, u);
     for (const p of [this.prog, this.progEf]) {
       const u: Record<string, WebGLUniformLocation | null> = {};
-      for (const n of ["iluminado", "relevo", "ambiente", "nluz", "luzP", "luzC", "tex"]) u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["iluminado", "relevo", "ambiente", "nluz", "luzP", "luzC", "luzZ", "tex"]) u[n] = gl.getUniformLocation(p, n);
       this.uLuz.set(p, u);
       gl.useProgram(p);
       gl.uniform1i(u.tex, 0);
@@ -259,9 +260,12 @@ export class Desenhista {
     const lotes = N.HEAP32.subarray(pl, pl + nl * 7);
     const ng = N._mm_num_grupos_luz(),
       pg = N._mm_grupos_luz() / 4;
-    const grupos = ng ? N.HEAPF32.subarray(pg, pg + ng * 60) : null;
+    const grupos = ng ? N.HEAPF32.subarray(pg, pg + ng * 68) : null;
+    const pz = N._mm_lotes_profundidade() / 4;
+    const profs = N.HEAPF32.subarray(pz, pz + nl);
     const luzP = new Float32Array(32),
-      luzC = new Float32Array(24);
+      luzC = new Float32Array(24),
+      luzZ = new Float32Array(8);
     const ne = N._mm_num_efeitos(),
       pe = N._mm_efeitos() / 4;
     const efeitos = ne ? N.HEAPF32.subarray(pe, pe + ne * 29) : null;
@@ -331,17 +335,19 @@ export class Desenhista {
       const acesa = grupo >= 0 && grupos && p.relevo;
       gl.uniform1i(ul.iluminado, acesa ? 1 : 0);
       if (acesa) {
-        const o = grupo * 60,
+        const o = grupo * 68,
           n = Math.min(8, grupos![o + 3]);
         for (let k = 0; k < n; k++) {
-          const q = o + 4 + k * 7;
+          const q = o + 4 + k * 8;
           luzP.set([grupos![q], grupos![q + 1], grupos![q + 2], grupos![q + 6]], k * 4);
           luzC.set([grupos![q + 3], grupos![q + 4], grupos![q + 5]], k * 3);
+          luzZ[k] = grupos![q + 7] - profs[i];
         }
         gl.uniform3f(ul.ambiente, grupos![o], grupos![o + 1], grupos![o + 2]);
         gl.uniform1i(ul.nluz, n);
         gl.uniform4fv(ul.luzP, luzP);
         gl.uniform3fv(ul.luzC, luzC);
+        gl.uniform1fv(ul.luzZ, luzZ);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, p.relevo!);
         gl.activeTexture(gl.TEXTURE0);

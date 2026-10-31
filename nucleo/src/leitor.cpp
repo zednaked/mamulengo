@@ -108,7 +108,7 @@ int tipo_efeito(std::string_view nome) {
 }
 
 // luzes (docs/NUCLEO.md "Luzes"): os campos na ordem dos canais
-const std::vector<CampoEfeito> CAMPOS_LUZ = {{"cor", true}, {"forca", false}, {"raio", false}, {"altura", false}};
+const std::vector<CampoEfeito> CAMPOS_LUZ = {{"cor", true}, {"forca", false}, {"raio", false}, {"altura", false}, {"profundidade", false}};
 const std::vector<CampoEfeito> CAMPOS_AMBIENTE = {{"cor", true}, {"forca", false}};
 
 // os canais dos `campos` lidos de `j` para `v` (o que falta fica como esta em `v`)
@@ -353,6 +353,7 @@ class Leitor {
       d.inicio = j.num("inicio", 0);
       d.velocidade = j.num("velocidade", 1);
       d.laco = j.sim("repetir", true);
+      d.mix = std::max(0.0, j.num("mix", 0));
       m.instancias_do_slot[size_t(d.slot)].push_back(int(m.instancias.size()));
       m.instancias.push_back(std::move(d));
     }
@@ -582,6 +583,7 @@ class Leitor {
       if (const Json* p = s.acha("parte"); p && p->texto()) d.parte_setup = id_nome(p->str());
       if (const Json* c = s.acha("cor"); c && c->texto()) d.cor = cor_hex(c->str());
       d.blend = ler_blend(s.str("blend", "normal"));
+      d.profundidade = s.num("profundidade", 0);
       for (const auto& [nome_ef, j] : s["efeitos"].campos()) {
         const int t = tipo_efeito(nome_ef);
         if (t < 0) falha("slot " + d.nome + ": efeito desconhecido " + nome_ef);
@@ -968,7 +970,7 @@ class Leitor {
       an.luzes.push_back(std::move(tl));
     }
 
-    // instancias: nome -> chaves em degrau (animacao, inicio, velocidade, repetir); o campo que falta
+    // instancias: nome -> chaves em degrau (animacao, inicio, velocidade, repetir, mix); o campo que falta
     // vale o da chave anterior (na primeira, o da instancia)
     for (const auto& [nome_in, chaves] : a["instancias"].campos()) {
       const int ii = m.instancia(nome_in);
@@ -978,18 +980,20 @@ class Leitor {
       TimelineInstancia ti;
       ti.instancia = ii;
       int an_f = di.animacao;
-      double ini = di.inicio, vel = di.velocidade;
+      double ini = di.inicio, vel = di.velocidade, mix = di.mix;
       bool laco = di.laco;
       for (const Json& k : chaves.itens()) {
         if (const Json* x = k.acha("animacao"); x && x->texto()) an_f = animacao_filho(f, x->str(), "animacao " + nome + ": instancia " + nome_in);
         ini = k.num("inicio", ini);
         vel = k.num("velocidade", vel);
         laco = k.sim("repetir", laco);
+        mix = std::max(0.0, k.num("mix", mix));
         ti.tempos.push_back(f32(k.num("tempo", 0)));
         ti.animacoes.push_back(an_f);
         ti.inicios.push_back(ini);
         ti.velocidades.push_back(vel);
         ti.lacos.push_back(laco ? 1 : 0);
+        ti.mixes.push_back(mix);
       }
       if (!ti.tempos.empty()) conta(ti.tempos.back());
       an.instancias.push_back(std::move(ti));

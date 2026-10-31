@@ -178,7 +178,7 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       for (int i = 0; i < g.quantas; ++i) {
         if (i) out += ',';
         out += '[';
-        for (int c = 0; c < 7; ++c) {
+        for (int c = 0; c < FLOATS_LUZ; ++c) {
           if (c) out += ',';
           escreve_num(out, g.luzes[i][c]);
         }
@@ -262,7 +262,7 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
     bool primeira = true;
     for (size_t i = 0; i < m.instancias.size(); ++i) {
       const EstadoInstancia& in = e.instancias()[i];
-      if (e.slots()[size_t(m.instancias[i].slot)].cor.a <= 0 || !in.pronto) continue;
+      if (e.slots()[size_t(m.instancias[i].slot)].cor.a <= 0 || in.ultima_anim == -2) continue;
       if (!primeira) out += ',';
       primeira = false;
       escreve_texto(out, m.instancias[i].nome);
@@ -272,6 +272,7 @@ inline void escreve_pose(std::string& out, const Esqueleto& e, std::vector<doubl
       else out += "null";
       out += ",\"tempo\":";
       escreve_num(out, in.ultimo_t);
+      if (in.ultimo_alfa < 1) out += ",\"mistura\":", escreve_num(out, in.ultimo_alfa);
       out += ',';
       std::vector<double> vf;
       escreve_pose(out, *in.e, vf);

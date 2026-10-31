@@ -48,7 +48,7 @@ const MIME: Record<string, string> = {
   ".atlas": "text/plain",
   ".tres": "text/plain",
 };
-const WRITABLE = new Set([".spine-json", ".json", ".atlas", ".png", ".webp", ".tres"]);
+const WRITABLE = new Set([".spine-json", ".json", ".atlas", ".png", ".webp", ".tres", ".boneco"]);
 
 export function mamulengo(opts: { roots: string[] }): Plugin {
   const roots = opts.roots.map((r) => resolve(r));

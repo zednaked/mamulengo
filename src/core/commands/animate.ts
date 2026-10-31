@@ -96,6 +96,7 @@ const KeyValue = z
     interval: z.number().min(0).optional().describe("trail: segundos entre uma copia e a seguinte (padrao 0.05)"),
     alpha: z.number().min(0).max(1).optional().describe("trail: alfa da copia mais nova (0 a 1, padrao 0.5)"),
     height: z.number().optional().describe("light: altura da luz sobre o plano (negativa: rasante por tras)"),
+    depth: z.number().optional().describe("light: a camada da luz, em px (positiva para perto de quem assiste)"),
     animation: z.string().optional().describe("instance: a animacao do filho"),
     start: z.number().optional().describe("instance: o tempo do filho na chave"),
     speed: z.number().optional().describe("instance: velocidade do filho"),

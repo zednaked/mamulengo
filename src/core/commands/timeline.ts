@@ -18,7 +18,7 @@ export const Target = z
     z.object({ ambient: z.literal(true) }),
     z.object({ instance: z.string() }),
   ])
-  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}}, {"particles":"faiscas"} (rate, burst), {"light":"chave"} (timeline light: color, strength, radius, height), {"ambient":true} (timeline ambient: color, strength) ou {"instance":"letra_0"} (timeline instance: animation, start, speed, loop)');
+  .describe('Quem a timeline anima: {"bone":"head"}, {"slot":"eye"}, {"constraint":"hair_physics"}, {"deform":{"slot":"body","attachment":"body"}}, {"particles":"faiscas"} (rate, burst), {"light":"chave"} (timeline light: color, strength, radius, height), {"ambient":true} (timeline ambient: color, strength) ou {"instance":"letra_0"} (timeline instance: animation, start, speed, loop, mix)');
 export type Target = z.infer<typeof Target>;
 
 export const TIMELINE_NAMES = {
@@ -212,7 +212,7 @@ export function keyFields(kind: string, a: Record<string, any>): Record<string, 
   }
   if (kind === "instance") {
     if (a.animation !== undefined) out.animation = a.animation;
-    for (const f of ["start", "speed"]) if (a[f] !== undefined) out[f] = round(a[f]);
+    for (const f of ["start", "speed", "mix"]) if (a[f] !== undefined) out[f] = round(a[f]);
     if (a.loop !== undefined) out.loop = a.loop;
     return out;
   }

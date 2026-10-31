@@ -228,6 +228,7 @@ struct Contexto {
   const Efeitos* efeitos = nullptr;  // os de shader do slot da instancia (pecas sem efeitos proprios)
   int pagina_base = 0;               // as paginas deste esqueleto na tabela do desenho
   int grupo = -1;                    // o grupo de luz do pai (-1: o deste esqueleto)
+  double profundidade = 0;           // a camada do slot da instancia (soma na dos slots do filho)
 };
 
 void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx);
@@ -271,6 +272,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       o[2] = v[LUZ_ALTURA];
       for (int c = 0; c < 3; ++c) o[3 + c] = v[c] * v[LUZ_A] * v[LUZ_FORCA];
       o[6] = v[LUZ_RAIO];
+      o[7] = float(v[LUZ_PROFUNDIDADE] + ctx.profundidade);
     }
     if (relevo && (g.quantas > 0 || g.ambiente[0] != 1 || g.ambiente[1] != 1 || g.ambiente[2] != 1)) {
       grupo = int(d.grupos_luz.size());
@@ -281,11 +283,13 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   auto iluminado = [&](int pagina, Blend blend) {
     return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela ? grupo : -1;
   };
+  // a camada do slot sendo desenhado (os lotes de camadas diferentes nao se juntam)
+  float prof = float(ctx.profundidade);
   auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1, int luz = -1) -> Lote& {
     if (pagina >= 0) pagina += ctx.pagina_base;
     if (c == Comando::Triangulos && efeito < 0 && !d.lotes.empty()) {
       Lote& u = d.lotes.back();
-      if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0 && u.luz == luz) return u;
+      if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0 && u.luz == luz && u.profundidade == prof) return u;
     }
     Lote l;
     l.comando = c;
@@ -293,6 +297,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
     l.blend = blend;
     l.efeito = efeito;
     l.luz = luz;
+    l.profundidade = prof;
     l.inicio = uint32_t(d.indices.size());
     d.lotes.push_back(l);
     return d.lotes.back();
@@ -480,12 +485,14 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       c.efeitos = s.efeitos.algum() ? &s.efeitos : ctx.efeitos;
       c.pagina_base = ctx.pagina_base + m.filho_pagina_base[size_t(di.filho)];
       c.grupo = grupo;
+      c.profundidade = ctx.profundidade + m.slots[size_t(si)].profundidade;
       desenhar_em(*e.instancias()[size_t(ii)].e, d, c);
     }
   };
   for (int si : e.ordem()) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
+    prof = float(ctx.profundidade + ds.profundidade);
     if (s.parte >= 0) {
       const Parte& p = m.partes[size_t(s.parte)];
       if (p.tipo == TipoParte::Recorte) {

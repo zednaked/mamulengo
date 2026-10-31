@@ -261,7 +261,7 @@ defineCommand({
   name: "slot.set",
   group: "slot",
   summary:
-    "Muda propriedades do slot na setup pose: bone, attachment (null esconde), color, dark, blend, visible. Trocar o bone mantem as imagens no mesmo lugar da tela (keepWorld, padrao true): regioes, malhas sem peso e seus deforms, pontos, caixas e recortes sao recalculados no osso novo.",
+    "Muda propriedades do slot na setup pose: bone, attachment (null esconde), color, dark, blend, visible, depth (so .boneco: a camada para a luz). Trocar o bone mantem as imagens no mesmo lugar da tela (keepWorld, padrao true): regioes, malhas sem peso e seus deforms, pontos, caixas e recortes sao recalculados no osso novo.",
   params: z.object({
     slot: z.string(),
     bone: z.string().optional(),
@@ -271,6 +271,7 @@ defineCommand({
     dark: z.string().nullable().optional(),
     blend: z.enum(["normal", "additive", "multiply", "screen"]).optional(),
     visible: z.boolean().optional(),
+    depth: z.number().optional().describe("so .boneco: a camada do slot para a luz, em px (positiva para perto de quem assiste; a instancia soma a dela nos slots do filho)"),
   }),
   label: (p) => `slot ${p.slot}`,
   run({ e }, p) {
@@ -281,7 +282,7 @@ defineCommand({
     if (p.bone && p.bone !== cur.bone && keepWorld) rebaseSlot(e, slot, cur.bone, p.bone);
     for (const [k, v] of Object.entries(props)) {
       if (v === undefined) continue;
-      const want = v === null || (k === "blend" && v === "normal") || (k === "visible" && v === true) || (k === "color" && /^ffffffff?$/i.test(v as string)) ? undefined : v;
+      const want = v === null || (k === "blend" && v === "normal") || (k === "visible" && v === true) || (k === "depth" && v === 0) || (k === "color" && /^ffffffff?$/i.test(v as string)) ? undefined : v;
       if (cur[k] !== want) e.set(["slots", i, k], want);
     }
     return { index: i };

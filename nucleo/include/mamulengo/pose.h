@@ -109,10 +109,15 @@ struct EstadoInstancia {
   // a timeline da instancia pos o tempo do filho neste quadro (senao: inicio + velocidade x relogio)
   bool por_timeline = false;
   double tempo_filho = 0;
+  // mistura (a chave em vigor tem mix e comecou ha menos que ele): a animacao anterior no tempo
+  // dela e quanto da nova (0 a 1)
+  int mix_animacao = -1;
+  double mix_tempo = 0, mix_alfa = 1;
+  bool mix_laco = true;
   // o ultimo calculo (um filho sem memoria parado no mesmo instante e lugar nao e refeito)
   bool pronto = false;
   int ultima_anim = -2;
-  double ultimo_t = 0;
+  double ultimo_t = 0, ultimo_alfa = 1;
   double ultima_base[6] = {0};
   EstadoInstancia() = default;
   EstadoInstancia(const EstadoInstancia& o);
@@ -132,6 +137,9 @@ class Esqueleto {
   void setup();
   // volta a pose local ao setup e aplica a animacao no tempo dela (em loop se `loop`)
   void aplicar(int animacao, double tempo, bool loop = true);
+  // a mistura de duas animacoes (docs/NUCLEO.md "Instancias"): as duas aplicadas desde o setup e a
+  // pose local de cada uma misturada por `alfa` (0: so `de`, 1: so `para`); as rajadas so da `para`
+  void aplicar_cruzado(int de, double tempo_de, bool loop_de, int para, double tempo_para, bool loop_para, double alfa);
 
   // ---- timelines com peso (o Estado usa; `sai`: a animacao esta saindo de um mix)
   void aplicar_osso(const TimelineOsso& tl, double t, double alfa, Mistura mist, bool sai);
@@ -224,6 +232,8 @@ class Esqueleto {
   void luzes_setup();
   void instancias_setup();
   void atualizar_instancias();
+  // aplicar sem as rajadas (a animacao que sai numa mistura)
+  bool sem_rajadas_ = false;
   // aplicar() sem Estado: a animacao e o tempo da ultima vez (para as rajadas)
   int ultima_anim_ = -1;
   double ultimo_tempo_ = 0;

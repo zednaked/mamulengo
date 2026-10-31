@@ -10,6 +10,8 @@ export interface AssetProvider {
   image(region: string): Promise<{ width: number; height: number; data: Uint8Array | Uint8ClampedArray } | null>;
   // tamanho original de uma regiao
   region(name: string): { width: number; height: number } | null;
+  // texto de um arquivo (caminho absoluto, como doc.file): o .boneco filho de uma instancia
+  text?(path: string): Promise<string | null>;
 }
 
 export interface CommandCtx {

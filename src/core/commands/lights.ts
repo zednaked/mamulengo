@@ -20,7 +20,7 @@ defineCommand({
   name: "light.set",
   group: "bone",
   summary:
-    "Cria ou muda uma luz (so do Mamulengo, para .boneco; o Spine nao tem). Fica presa ao osso (padrao: a raiz) no ponto x,y e ilumina as paginas com relevo (tools/relevo.ts gera o relevo a partir das imagens): color em hex, strength (1), radius em pixels do mundo (300: a luz some nessa distancia), height acima do plano (80; negativa: rasante por tras, contraluz). Varias luzes somam com a ambiente (ambient.set). Para animar: key.set com target {light: nome}, timeline light {color, strength, radius, height}; a posicao anda com o osso.",
+    "Cria ou muda uma luz (so do Mamulengo, para .boneco; o Spine nao tem). Fica presa ao osso (padrao: a raiz) no ponto x,y e ilumina as paginas com relevo (tools/relevo.ts gera o relevo a partir das imagens): color em hex, strength (1), radius em pixels do mundo (300: a luz some nessa distancia), height acima do plano (80; negativa: rasante por tras, contraluz). Varias luzes somam com a ambiente (ambient.set). Para animar: key.set com target {light: nome}, timeline light {color, strength, radius, height, depth}; a posicao anda com o osso. depth (camada): a luz atenua pela distancia em 3D ate a camada de cada slot e, atras dele, vira contraluz.",
   params: z.object({
     name: z.string().min(1),
     bone: z.string().optional(),
@@ -30,6 +30,7 @@ defineCommand({
     strength: z.number().min(0).optional(),
     radius: z.number().min(0).optional(),
     height: z.number().optional(),
+    depth: z.number().optional().describe("a camada da luz, em px (positiva para perto de quem assiste): ilumina mais os slots da mesma profundidade (slot.set depth)"),
   }),
   label: (p) => `luz ${p.name}`,
   run({ e }, p) {
@@ -38,7 +39,7 @@ defineCommand({
     const i = lista.findIndex((l) => l.name === p.name);
     const novo: Record<string, any> = { ...(i >= 0 ? lista[i] : { name: p.name, bone: bones(e.json)[0]?.name }) };
     if (p.bone) novo.bone = p.bone;
-    for (const f of ["x", "y", "strength", "radius", "height"] as const) if (p[f] !== undefined) novo[f] = round(p[f]!);
+    for (const f of ["x", "y", "strength", "radius", "height", "depth"] as const) if (p[f] !== undefined) novo[f] = round(p[f]!);
     if (p.color) novo.color = p.color.toLowerCase();
     if (i < 0) e.set(["lights"], [...lista, novo]);
     else if (JSON.stringify(novo) !== JSON.stringify(lista[i])) e.set(["lights", i], novo);

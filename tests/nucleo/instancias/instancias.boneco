@@ -25,7 +25,7 @@
    "ossos": {"braco": {"girar": [{"tempo": 0, "valor": 0}, {"tempo": 2.4, "valor": 90}]}},
    "slots": {"s3": {"rgba": [{"tempo": 0, "cor": "ffffffff", "curva": "degrau"}, {"tempo": 1.0, "cor": "ffffff00", "curva": "degrau"}, {"tempo": 1.7, "cor": "ffffffff"}]}},
    "instancias": {
-    "robo_b": [{"tempo": 0, "animacao": "idle", "inicio": 0}, {"tempo": 0.8, "animacao": "ganhou", "inicio": 0, "velocidade": 2}, {"tempo": 1.6, "repetir": true}],
+    "robo_b": [{"tempo": 0, "animacao": "idle", "inicio": 0}, {"tempo": 0.75, "animacao": "ganhou", "inicio": 0, "velocidade": 2, "mix": 0.5}, {"tempo": 1.6, "repetir": true}],
     "meio": [{"tempo": 0.5, "inicio": 1}]
    }
   }

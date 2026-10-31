@@ -506,6 +506,24 @@ runtimeOk("constraints");
     );
     await run("animation.delete", { name: "t.inst" });
   }
+
+  // instance.extract: a subarvore de um osso vira um .boneco (no resultado) e uma instancia no
+  // lugar; desfazer volta tudo
+  {
+    const antes = doc.serialize();
+    const b = doc.json.bones.find((x: any) => x.parent && !doc.json.bones.some((y: any) => y.parent === x.name) && doc.json.slots.some((s: any) => s.bone === x.name));
+    const slotsDele = doc.json.slots.filter((s: any) => s.bone === b.name).map((s: any) => s.name);
+    const r = await run("instance.extract", { bone: b.name, boneco: "t.filho.boneco" });
+    const filho = JSON.parse(r.arquivo.texto);
+    const ok =
+      !doc.json.bones.some((x: any) => x.name === b.name) &&
+      doc.json.instances?.[0]?.boneco === "t.filho.boneco" &&
+      filho.ossos[0].nome === b.name &&
+      !filho.ossos[0].pai &&
+      slotsDele.every((n: string) => filho.slots.some((s: any) => s.nome === n) && !doc.json.slots.some((s: any) => s.name === n && s.name !== r.slot));
+    doc.undo();
+    check(ok && doc.serialize() === antes, `instance.extract: ${b.name} vira ${filho.ossos.length} osso(s) e ${filho.slots.length} slot(s) no filho, a instancia no lugar, desfazer volta`);
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

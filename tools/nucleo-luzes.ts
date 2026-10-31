@@ -3,7 +3,7 @@
 // (chaves lineares ou degrau; campo que falta herda da chave anterior; limites), poe cada luz em
 // mundo pela matriz do osso dela (a do nucleo-pose) e compara com o grupo que o desenho do nucleo
 // monta: a ambiente (cor x alfa x forca), so as luzes acesas (forca, raio e alfa > 0), na ordem
-// do arquivo, ate 8, e cada uma com x, y, altura, cor x alfa x forca e raio.
+// do arquivo, ate 8, e cada uma com x, y, altura, cor x alfa x forca, raio e profundidade.
 //
 //   npx tsx tools/nucleo-luzes.ts [tests/nucleo/luzes/luzes.boneco] [--nucleo nucleo/build/nucleo-pose]
 import { readFileSync } from "node:fs";
@@ -16,7 +16,7 @@ const bin = resolve(i >= 0 ? args.splice(i, 2)[1] : "nucleo/build/nucleo-pose");
 const arq = resolve(args[0] ?? "tests/nucleo/luzes/luzes.boneco");
 const b = JSON.parse(readFileSync(arq, "utf8"));
 
-const LUZ: [string, number[]][] = [["cor", [1, 1, 1, 1]], ["forca", [1]], ["raio", [300]], ["altura", [80]]];
+const LUZ: [string, number[]][] = [["cor", [1, 1, 1, 1]], ["forca", [1]], ["raio", [300]], ["altura", [80]], ["profundidade", [0]]];
 const AMB: [string, number[]][] = [["cor", [1, 1, 1, 1]], ["forca", [1]]];
 const hex = (s: string) => [0, 2, 4, 6].map((k) => (s.length > k ? parseInt(s.slice(k, k + 2), 16) / 255 : 1));
 const f32 = Math.fround;
@@ -69,7 +69,7 @@ for (const [anim, a] of Object.entries<any>(b.animacoes ?? { "-": {} })) {
       if (!(v[4] > 0 && v[5] > 0 && v[3] > 0) || pontos.length >= 8) continue;
       const [ma, mb, mc, md, mx, my] = quadros[q].ossos[l.osso ?? b.ossos[0].nome];
       const [lx, ly] = [l.x ?? 0, l.y ?? 0];
-      pontos.push([ma * lx + mb * ly + mx, mc * lx + md * ly + my, v[6], v[0] * v[3] * v[4], v[1] * v[3] * v[4], v[2] * v[3] * v[4], v[5]]);
+      pontos.push([ma * lx + mb * ly + mx, mc * lx + md * ly + my, v[6], v[0] * v[3] * v[4], v[1] * v[3] * v[4], v[2] * v[3] * v[4], v[5], v[7]]);
     }
     const ambiente = [0, 1, 2].map((c) => am[c] * am[3] * am[4]);
     const grupo = relevo && (pontos.length > 0 || ambiente.some((x) => Math.abs(x - 1) > 1e-7));

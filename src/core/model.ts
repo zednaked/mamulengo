@@ -193,7 +193,7 @@ export const isEffect = (timeline: string) => timeline in EFFECTS;
 // `animations.<a>.lights.<nome>` e `animations.<a>.ambient` (chaves). As chaves funcionam como as
 // dos efeitos (campos, cor em 4 canais, chave completa)
 export const LIGHT_FIELDS: Record<string, [string, number[]][]> = {
-  light: [["color", [1, 1, 1, 1]], ["strength", [1]], ["radius", [300]], ["height", [80]]],
+  light: [["color", [1, 1, 1, 1]], ["strength", [1]], ["radius", [300]], ["height", [80]], ["depth", [0]]],
   ambient: [["color", [1, 1, 1, 1]], ["strength", [1]]],
 };
 // todas as timelines de campos (efeitos, luz, ambiente)

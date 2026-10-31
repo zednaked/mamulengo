@@ -366,18 +366,25 @@ EMSCRIPTEN_KEEPALIVE const int32_t* mm_lotes() {
   for (const Lote& l : desenho.lotes) lotes.insert(lotes.end(), {int32_t(l.comando), l.pagina, int32_t(l.blend), int32_t(l.inicio), int32_t(l.quantos), int32_t(l.efeito), int32_t(l.luz)});
   return lotes.data();
 }
-// grupos de luz (docs/NUCLEO.md "Luzes") em 60 floats: a ambiente (r, g, b), quantas luzes, e 8
-// luzes de 7 (x, y, altura, r, g, b, raio)
+// grupos de luz (docs/NUCLEO.md "Luzes") em 68 floats: a ambiente (r, g, b), quantas luzes, e 8
+// luzes de 8 (x, y, altura, r, g, b, raio, profundidade)
 EMSCRIPTEN_KEEPALIVE const float* mm_grupos_luz() {
   grupos.clear();
   for (const GrupoLuz& g : desenho.grupos_luz) {
     grupos.insert(grupos.end(), g.ambiente, g.ambiente + 3);
     grupos.push_back(float(g.quantas));
-    for (int i = 0; i < MAX_LUZES; ++i) grupos.insert(grupos.end(), g.luzes[i], g.luzes[i] + 7);
+    for (int i = 0; i < MAX_LUZES; ++i) grupos.insert(grupos.end(), g.luzes[i], g.luzes[i] + FLOATS_LUZ);
   }
   return grupos.data();
 }
 EMSCRIPTEN_KEEPALIVE int mm_num_grupos_luz() { return int(desenho.grupos_luz.size()); }
+// a camada de cada lote (para a luz), um float por lote, na ordem de mm_lotes
+std::vector<float> profundidades;
+EMSCRIPTEN_KEEPALIVE const float* mm_lotes_profundidade() {
+  profundidades.clear();
+  for (const Lote& l : desenho.lotes) profundidades.push_back(l.profundidade);
+  return profundidades.data();
+}
 // efeitos dos lotes em 29 floats: os 23 canais de shader (docs/NUCLEO.md "Efeitos"), a caixa da imagem
 // na pagina (u0, v0, u1, v1) e o tamanho da pagina
 EMSCRIPTEN_KEEPALIVE const float* mm_efeitos() {

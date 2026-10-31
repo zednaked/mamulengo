@@ -391,9 +391,15 @@ luzes, ambiente e relevo, com aviso.
 | `forca` | 1 | quanto ela soma (a partir de 0) |
 | `raio` | 300 | em pixels do mundo: a luz some nessa distância no plano (a partir de 0) |
 | `altura` | 80 | acima do plano; baixa ilumina rasante, negativa vira contraluz |
+| `profundidade` | 0 | a camada da luz, em px (positiva para perto de quem assiste) |
+
+**Camadas.** Cada slot tem `profundidade` (0; px, positiva para perto de quem assiste), a camada
+dele para a luz; numa instância, a do slot dela soma na de todos os slots do filho (e nas luzes
+do filho). Uma luz atrás do personagem ilumina mais o que está no fundo que o personagem, e, para
+ele, vira contraluz. Com tudo em 0, a conta é a de antes.
 
 A ambiente tem `cor` (`ffffffff`) e `forca` (1); o padrão não muda nada. Animáveis:
-`animacoes.<a>.luzes.<nome>` (canais `r g b a forca raio altura`) e `animacoes.<a>.ambiente`
+`animacoes.<a>.luzes.<nome>` (canais `r g b a forca raio altura profundidade`) e `animacoes.<a>.ambiente`
 (`r g b a forca`), com chaves como as dos efeitos (o campo que falta vale o da chave anterior; a
 mistura é a da cor). Limites: cor de 0 a 1, força e raio a partir de 0.
 
@@ -417,22 +423,25 @@ detalhe 0,2 (numa página 2x ou 3x, a borda vezes isso).
 alguma coisa (alguma luz acesa ou a ambiente diferente de branco inteiro): a ambiente
 `cor * alfa * forca` e as luzes acesas (força, raio e alfa maiores que 0), na ordem do arquivo,
 até 8, cada uma com a posição em mundo (o ponto pela matriz do osso), a altura, `cor * alfa *
-forca` e o raio. Um lote de página com relevo e blend que não é aditivo nem tela aponta para o
-grupo (lotes com e sem luz não se juntam). Por fragmento, com `n` o relevo, `p` o ponto em mundo
+forca`, o raio e a profundidade. Um lote de página com relevo e blend que não é aditivo nem tela
+aponta para o grupo (lotes com e sem luz não se juntam) e leva a profundidade do slot (lotes de
+camadas diferentes não se juntam). Por fragmento, com `n` o relevo, `p` o ponto em mundo
 e `uv` a textura:
 
 1. a normal vai para o mundo pelas derivadas de tela: `J` leva `(du, dv)` a `(dx, dy)` (de
    `dFdx` e `dFdy` de `p` e `uv`), e `N = normalize(n.x * Ju - n.y * Jv, n.z)` com `Ju`, `Jv` as
    colunas de `J` normalizadas (o y do relevo sobe e o v da textura desce). Vale para peça
    girada, espelhada ou deformada por malha, sem dado por vértice; com `J` degenerado, `N = (0, 0, 1)`;
-2. `L = (luz.xy - p, altura)`, atenuação `a = clamp(1 - |L.xy| / raio, 0, 1)`;
+2. com `dz = luz.profundidade - lote.profundidade`: `L = (luz.xy - p, altura + dz)`, atenuação
+   `a = clamp(1 - |(L.xy, dz)| / raio, 0, 1)`;
 3. a cor da imagem (depois do tingir, antes da linha e do halo) vezes
    `ambiente + soma(cor * max(N . normalize(L), 0) * a^2)`.
 
 Conferência: `npx tsx tools/nucleo-luzes.ts` calcula os canais das luzes e da ambiente pelas
 timelines, põe cada luz em mundo pela matriz do osso (a do `nucleo-pose`) e compara com o grupo
 que o desenho do núcleo monta, em `tests/nucleo/luzes/luzes.boneco` (o robô CC0 com relevo,
-quatro luzes, uma apagada, uma contraluz e a ambiente animada). O desenho foi olhado no editor
+quatro luzes, uma apagada, uma contraluz numa camada atrás com a profundidade animada, um slot
+numa camada e a ambiente animada). O desenho foi olhado no editor
 e no Godot 4.7.2 (Compatibility), com o mesmo resultado.
 
 ## Partículas
@@ -563,6 +572,7 @@ fora das skins (como as partículas); a exportação para o Spine as tira e avis
 | `skin` | a default | a skin do filho |
 | `inicio`, `velocidade` | 0, 1 | o tempo do filho: `inicio + velocidade × relógio` |
 | `repetir` | true | sem repetir, o filho para no fim (e antes do 0 fica no 0) |
+| `mix` | 0 | segundos de mistura quando uma chave troca a animação do filho |
 
 **Leitura.** Cada arquivo é lido uma vez e o modelo dele é dividido entre todas as instâncias
 (também entre pais diferentes). Um filho pode ter instâncias (os caminhos são sempre relativos ao
@@ -575,8 +585,16 @@ desenho são as do pai e depois as de cada filho (`paginas_desenho`), com o cami
 `animacao`, `inicio`, `velocidade`, `repetir` (o que falta vem da chave anterior; na primeira, da
 instância). Da chave `k` em diante o tempo do filho é `inicio + velocidade × (t − tempo_k)`, com
 `t` o tempo da animação do pai; antes da primeira chave vale a instância, com o relógio. A chave
-manda só na animação que entra ou toca (não na que sai num mix). Para a troca não dar salto, as
-animações do filho podem começar e acabar na mesma pose (o filho não mistura animações).
+manda só na animação que entra ou toca (não na que sai num mix).
+
+**Mistura.** A chave `k` com `mix > 0` que troca a animação (a da chave `k − 1` é outra) mistura
+por `mix` segundos: enquanto `t − tempo_k < mix`, a anterior continua no tempo dela
+(`inicio_{k−1} + velocidade_{k−1} × (t − tempo_{k−1})`, no laço dela ou no limite) e a pose do
+filho é a das duas aplicadas desde o setup, misturadas com `α = (t − tempo_k) / mix`: a pose local
+de cada osso (o giro pelo menor caminho), a cor, os efeitos e o deformar (da mesma imagem) de cada
+slot, as luzes, a taxa das partículas e os parâmetros das restrições; a imagem do slot e a ordem
+de desenho trocam em `α = 0,5`; as rajadas são só da nova. No instante da chave a pose é a da
+anterior. Como tudo sai do tempo do pai, arrastar o cursor dá a mesma mistura.
 
 **Atualização** (no fim do `atualizar_mundo` do pai, depois das partículas), para cada instância
 com o alfa do slot acima de 0: a base `B = M_osso × T(x, y) × R(rotacao) × S(escala_x, escala_y)`;
@@ -596,8 +614,9 @@ luzes dele). Com o recorte na CPU, o recorte do pai não corta o filho.
 
 Conferência: `npx tsx tools/nucleo-instancias.ts` refaz, por instante, a animação e o tempo de
 cada instância de `tests/nucleo/instancias/instancias.boneco` (quatro instâncias do robô CC0:
-livre no relógio, trocando de animação por chaves, uma que some e um arquivo intermediário com
-mais duas, aninhado) e o mundo de cada osso do filho (o filho sozinho no `nucleo-pose`, vezes a
+livre no relógio, trocando de animação por chaves (uma com mistura), uma que some e um arquivo
+intermediário com mais duas, aninhado), a fração da mistura e o mundo de cada osso do filho (no
+começo da mistura, o da animação anterior) (o filho sozinho no `nucleo-pose`, vezes a
 base), e compara com o que o núcleo calculou. No `nucleo-pose`, a saída ganha `relogio` e
 `instancias` (por instância visível: `animacao`, `tempo` e a pose do filho, recursiva). O
 desenho foi olhado no editor (modo núcleo) e no Godot 4.7.2 com `exemplos/vinheta` (nove letras e

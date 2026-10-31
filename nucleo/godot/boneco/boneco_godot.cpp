@@ -133,10 +133,11 @@ const char *EFEITOS =
 
 // luzes (docs/NUCLEO.md "Luzes"; a mesma conta de src/render/desenhista.ts): a normal do relevo
 // girada para o mundo pelas derivadas de tela, ambiente mais cada luz com cor x max(N.L, 0) x
-// atenuacao^2. mundo_v e o ponto no espaco do esqueleto (y para cima)
+// atenuacao^2; luzZ e a camada da luz menos a do lote (soma na altura e entra na distancia). mundo_v
+// e o ponto no espaco do esqueleto (y para cima)
 const char *LUZ =
     "uniform sampler2D relevo : filter_linear;\nuniform vec3 ambiente = vec3(1.0);\nuniform int nluz = 0;\n"
-    "uniform vec4 luzP[8];\nuniform vec3 luzC[8];\nvarying vec2 mundo_v;\n"
+    "uniform vec4 luzP[8];\nuniform vec3 luzC[8];\nuniform float luzZ[8];\nvarying vec2 mundo_v;\n"
     "vec3 luz(vec2 uv, vec2 mundo) {\n"
     "  vec3 n = texture(relevo, uv).rgb * 2.0 - 1.0;\n"
     "  vec2 dpx = dFdx(mundo); vec2 dpy = dFdy(mundo); vec2 dux = dFdx(uv); vec2 duy = dFdy(uv);\n"
@@ -149,8 +150,8 @@ const char *LUZ =
     "  vec3 soma = ambiente;\n"
     "  for (int i = 0; i < 8; i++) {\n"
     "    if (i >= nluz) break;\n"
-    "    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z);\n"
-    "    float at = clamp(1.0 - length(L.xy) / luzP[i].w, 0.0, 1.0);\n"
+    "    vec3 L = vec3(luzP[i].xy - mundo, luzP[i].z + luzZ[i]);\n"
+    "    float at = clamp(1.0 - length(vec3(L.xy, luzZ[i])) / luzP[i].w, 0.0, 1.0);\n"
     "    soma += luzC[i] * max(dot(N, normalize(L)), 0.0) * at * at;\n"
     "  }\n"
     "  return soma;\n}\n";
@@ -814,16 +815,19 @@ void BonecoSprite::_desenhar() {
       if (luz) {
         const mamulengo::GrupoLuz &g = desenho.grupos_luz[size_t(lt.luz)];
         Array p4, c3;
+        PackedFloat32Array z;
         for (int q = 0; q < mamulengo::MAX_LUZES; q++) {
           const float *l = g.luzes[q];
           p4.push_back(Vector4(l[0], l[1], l[2], l[6]));
           c3.push_back(Vector3(l[3], l[4], l[5]));
+          z.push_back(l[7] - lt.profundidade);
         }
         rs->material_set_param(me, "relevo", rel->get_rid());
         rs->material_set_param(me, "ambiente", Vector3(g.ambiente[0], g.ambiente[1], g.ambiente[2]));
         rs->material_set_param(me, "nluz", g.quantas);
         rs->material_set_param(me, "luzP", p4);
         rs->material_set_param(me, "luzC", c3);
+        rs->material_set_param(me, "luzZ", z);
       }
       rs->material_set_param(me, "pma", li.pma);
       lista[size_t(k)].material = me;

@@ -105,7 +105,7 @@ void Esqueleto::restricao_ik(int ri) {
   const Matriz ident;
   auto mundo_pai = [&](int o) -> const Matriz& {
     const int p = m.ossos[size_t(o)].pai;
-    return p >= 0 ? mundo_[size_t(p)] : ident;
+    return p >= 0 ? mundo_[size_t(p)] : tem_base ? base : ident;
   };
 
   if (d.ossos.size() == 1) {

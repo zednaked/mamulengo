@@ -284,6 +284,9 @@
 >
   <header>
     <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
+    {#if app.pilhaInstancias.length}
+      <button class="voltar-inst" onclick={() => app.voltarInstancia()} title="Voltar para {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}, de onde voce entrou na instancia {app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}">← {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}</button>
+    {/if}
     <button class="painel" class:on={!recolhe.left} onclick={() => alterna("left")} title="Mostrar ou esconder o painel da esquerda: esqueleto, ordem, imagens (Ctrl+[)">◧</button>
     <AssetPicker />
     <PsdImport />
@@ -430,6 +433,10 @@
     height: 7px;
     border-radius: 50%;
     background: #5bd68a;
+  }
+  header button.voltar-inst {
+    border-color: #7fd8ff;
+    color: #7fd8ff;
   }
   header button.painel {
     padding: 4px 8px;
