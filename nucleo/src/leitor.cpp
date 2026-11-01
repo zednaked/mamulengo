@@ -157,6 +157,12 @@ Blend ler_blend(const std::string& s) {
   if (s == "multiplica") return Blend::Multiplica;
   if (s == "multiplica_motor") return Blend::MultiplicaMotor;
   if (s == "tela") return Blend::Tela;
+  if (s == "sobrepor") return Blend::Sobrepor;
+  if (s == "luz_suave") return Blend::LuzSuave;
+  if (s == "escurecer") return Blend::Escurecer;
+  if (s == "clarear") return Blend::Clarear;
+  if (s == "diferenca") return Blend::Diferenca;
+  if (s == "subexpor") return Blend::Subexpor;
   return Blend::Normal;
 }
 
@@ -273,6 +279,12 @@ class Leitor {
       m.eventos.push_back(std::move(e));
     }
     for (const auto& [nome, a] : r["animacoes"].campos()) ler_animacao(nome, a);
+    // slider: a animacao que ele toca, agora que as animacoes existem
+    for (DadosRestricao& d : m.restricoes)
+      if (d.tipo == TipoRestricao::Slider) {
+        d.slider.animacao = m.animacao(d.slider.nome_animacao);
+        if (d.slider.animacao < 0) falha("slider " + d.nome + ": animacao desconhecida " + d.slider.nome_animacao);
+      }
     // mix: o padrao e os pares de -> para (nomes de animacao)
     m.mix_padrao = r["mix"].num("padrao", 0);
     for (const Json& p : r["mix"]["pares"].itens()) {
@@ -469,6 +481,27 @@ class Leitor {
         const double cx[4] = {0, 0, g.rw, g.rw}, cy[4] = {g.rh, 0, 0, g.rh};
         for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &d.uvs[i * 2]);
       }
+      // variacoes: as imagens da lista que estao na pagina da primeira
+      for (const Json& nome : j["variacoes"].itens()) {
+        auto iv = imagens.find(nome.str());
+        if (iv == imagens.end()) continue;
+        const Imagem& g = iv->second;
+        if (d.pagina < 0 && d.variacoes.empty()) {
+          // sem `imagem`: a primeira variacao vale tambem como a imagem do emissor
+          d.pagina = g.pagina;
+          d.meia_largura = g.rw / 2;
+          d.meia_altura = g.rh / 2;
+          const double cx[4] = {0, 0, g.rw, g.rw}, cy[4] = {g.rh, 0, 0, g.rh};
+          for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &d.uvs[i * 2]);
+        }
+        if (g.pagina != d.pagina) continue;
+        DadosEmissor::Variacao v;
+        v.meia_largura = g.rw / 2;
+        v.meia_altura = g.rh / 2;
+        const double cx[4] = {0, 0, g.rw, g.rw}, cy[4] = {g.rh, 0, 0, g.rh};
+        for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &v.uvs[i * 2]);
+        d.variacoes.push_back(v);
+      }
       if (d.orbita) {
         d.atras = slot(j["atras"], "particulas (orbita: atras)");
         par("raios", d.raios);
@@ -566,6 +599,7 @@ class Leitor {
       d.escala_y = o.num("escala_y", 1);
       d.cisalha_x = o.num("cisalha_x", 0);
       d.cisalha_y = o.num("cisalha_y", 0);
+      d.so_skin = o.sim("skin", false);
       std::string h = o.str("heranca", "normal");
       if (h == "onlyTranslation") d.heranca = Heranca::SoTranslacao;
       else if (h == "noRotationOrReflection") d.heranca = Heranca::SemRotacaoOuReflexo;
@@ -686,6 +720,18 @@ class Leitor {
             case TipoParte::Malha:
               ler_geometria(p, j, int(j["uvs"].tamanho() / 2));
               p.contorno = int(j.num("contorno", 0));
+              if (const Json* g = j.acha("geleia")) {
+                Geleia& ge = p.geleia;
+                ge.ativa = true;
+                ge.rigidez = std::max(0.0, g->num("rigidez", ge.rigidez));
+                ge.contagio = std::max(0.0, g->num("contagio", ge.contagio));
+                ge.amortecimento = std::max(0.0, g->num("amortecimento", ge.amortecimento));
+                ge.gravidade = g->num("gravidade", ge.gravidade);
+                ge.massa = std::max(0.01, g->num("massa", ge.massa));
+                for (const Json& w : (*g)["moleza"].itens()) ge.moleza.push_back(float(std::clamp(w.num(1), 0.0, 1.0)));
+                if (int(ge.moleza.size()) != p.num_vertices) ge.moleza.assign(size_t(p.num_vertices), 1.0f);
+                for (const Json& sg : (*g)["seguem"].itens()) ge.nomes_seguem.push_back(sg.str());
+              }
               break;
             case TipoParte::MalhaLigada: {
               Ligacao lg;
@@ -716,6 +762,21 @@ class Leitor {
           m.partes.push_back(std::move(p));
           m.partes[size_t(idx)].deform_de = idx;
           ler_desenho(idx, j);
+          // geleia: as arestas da malha, uma vez cada
+          if (Parte& pg = m.partes[size_t(idx)]; pg.geleia.ativa) {
+            std::vector<std::pair<uint16_t, uint16_t>> ar;
+            for (size_t t = 0; t + 2 < pg.triangulos.size(); t += 3)
+              for (int k = 0; k < 3; ++k) {
+                uint16_t a = pg.triangulos[t + size_t(k)], b = pg.triangulos[t + size_t((k + 1) % 3)];
+                if (a > b) std::swap(a, b);
+                ar.emplace_back(a, b);
+              }
+            std::sort(ar.begin(), ar.end());
+            ar.erase(std::unique(ar.begin(), ar.end()), ar.end());
+            for (auto [a, b] : ar) pg.geleia.arestas.push_back(a), pg.geleia.arestas.push_back(b);
+            for (const std::string& ns : pg.geleia.nomes_seguem)
+              if (const int sg = m.slot(ns); sg >= 0 && sg != si) pg.geleia.seguem.push_back(sg);
+          }
           (void)sk_idx;
           s->por_slot[size_t(si)].emplace_back(id_nome(nome_parte), idx);
         }
@@ -810,6 +871,25 @@ class Leitor {
       } else if (tipo == "transformacao") {
         r.tipo = TipoRestricao::Transformacao;
         ler_transformacao(r.transf, j);
+      } else if (tipo == "slider") {
+        r.tipo = TipoRestricao::Slider;
+        DadosSlider& s = r.slider;
+        s.nome_animacao = j.str("animacao", "");
+        if (const Json* o = j.acha("osso"); o && o->texto()) {
+          s.osso = osso(*o, "slider");
+          PropTransf p = PropTransf::Girar;
+          const std::string nome_p = j.str("propriedade", "rotate");
+          if (!prop_transf(nome_p, p)) falha("slider " + r.nome + ": propriedade desconhecida " + nome_p);
+          s.prop = PropSlider(uint8_t(p));
+        }
+        s.local = j.sim("local_", j.sim("local", false));
+        s.somar = j.sim("somar", false);
+        s.repetir = j.sim("repetir", false);
+        s.de = j.num("de", 0);
+        s.para = j.num("para", 0);
+        s.escala = j.num("escalar", j.num("escala", 1));
+        s.mix = j.num("mix", 1);
+        s.tempo = j.num("tempo", 0);
       } else {
         falha("restricao " + r.nome + ": tipo nao suportado " + tipo);
       }
@@ -1177,6 +1257,20 @@ class Leitor {
           tl.preparar();
           t.tl = std::move(tl);
         } else falha("animacao " + nome + ": timeline de caminho desconhecida " + tipo);
+        conta(t.tl.fim());
+        an.restricoes.push_back(std::move(t));
+      }
+    }
+    // slider: tempo e mix
+    for (const auto& [nome_r, tls] : a["slider"].campos()) {
+      int ri = restricao(nome_r, TipoRestricao::Slider);
+      for (const auto& [tipo, chaves] : tls.campos()) {
+        TimelineRestricao t;
+        t.restricao = ri;
+        if (tipo == "tempo" || tipo == "time") t.prop = PropRestricao::SliderTempo;
+        else if (tipo == "mix") t.prop = PropRestricao::SliderMix;
+        else falha("animacao " + nome + ": timeline de slider desconhecida " + tipo);
+        t.tl = ler_timeline(chaves, {{"valor", 0}});
         conta(t.tl.fim());
         an.restricoes.push_back(std::move(t));
       }

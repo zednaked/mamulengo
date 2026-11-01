@@ -19,6 +19,7 @@
   import PsdImport from "./app/PsdImport.svelte";
   import { connectBridge } from "./bridge/client.ts";
   import { deleteVertex, stopMeshEdit } from "./app/meshedit.ts";
+  import { abrirDesenhar } from "./app/drawedit.ts";
 
   // quantas malhas o personagem tem (o botao "malhas" diz, e fica desligado sem nenhuma)
   const numMalhas = $derived.by(() => {
@@ -66,6 +67,14 @@
       localStorage.setItem("mamulengo.recolhe", JSON.stringify(recolhe));
     } catch {}
     savePrefs({ layout: { ...layoutNormal }, layoutCompacto: { ...layoutCompacto }, recolhe: { ...recolhe } });
+  }
+  // volta varios niveis de instancia de uma vez (para no caminho se algum pedir para salvar)
+  async function voltarAte(nivel: number) {
+    while (app.pilhaInstancias.length > nivel) {
+      const antes = app.pilhaInstancias.length;
+      await app.voltarInstancia();
+      if (app.pilhaInstancias.length === antes) break;
+    }
   }
   function alterna(lado: "left" | "right" | "foot" | "act") {
     recolhe[lado] = !recolhe[lado];
@@ -273,6 +282,7 @@
     else if (!mod && e.key === "4") app.tool = "deform";
     else if (!mod && e.key === "5") (app.tool = "bone"), (app.mode = "setup");
     else if (!mod && (e.key === "6" || e.key === "h")) app.tool = "pan";
+    else if (!mod && e.key === "7") abrirDesenhar();
     else if (!mod && e.key === "[") app.brushRadius = Math.max(15, app.brushRadius / 1.2);
     else if (!mod && e.key === "]") app.brushRadius = Math.min(250, app.brushRadius * 1.2);
     else if (app.meshEdit && (e.key === "Delete" || e.key === "Backspace")) {
@@ -306,7 +316,13 @@
   <header>
     <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
     {#if app.pilhaInstancias.length}
-      <button class="voltar-inst" onclick={() => app.voltarInstancia()} title="Voltar para {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}, de onde você entrou na instância {app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}">← {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}</button>
+      <!-- dentro de uma instancia: o caminho de onde se entrou; cada nome volta direto para ele -->
+      <nav class="caminho-inst" aria-label="Onde você está">
+        {#each app.pilhaInstancias as p, i}
+          <button onclick={() => voltarAte(i)} title="Voltar para {p.asset.name}">{p.asset.name}</button><span class="sep">›</span>
+        {/each}
+        <span class="atual" title="Você está dentro da instância {app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}">{app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}</span>
+      </nav>
     {/if}
     <button class="painel" class:on={!recolhe.left} onclick={() => alterna("left")} title="Mostrar ou esconder o painel da esquerda: esqueleto, ordem, imagens (Ctrl+[)">◧</button>
     <AssetPicker />
@@ -318,6 +334,7 @@
       <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 <span class="rot">Deformar</span></button>
       <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animações">🦴 <span class="rot">Osso</span></button>
       <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a câmera arrastando (6 ou H). Também: botão do meio ou direito, ou segurar Espaço">✋ <span class="rot">Câmera</span></button>
+      <button class:on={!!app.drawEdit} onclick={() => abrirDesenhar()} title="Desenhar em vetor, como no Figma (7): na peça escolhida (uma imagem em PNG vira desenho), ou uma peça nova no osso escolhido. Dois cliques numa peça desenhada também abrem">✒️ <span class="rot">Desenhar</span></button>
 
     </div>
     <div class="seg">
@@ -462,9 +479,29 @@
     border-radius: 50%;
     background: #5bd68a;
   }
-  header button.voltar-inst {
-    border-color: #7fd8ff;
+  .caminho-inst {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 13px;
     color: #7fd8ff;
+    border: 1px solid #7fd8ff;
+    border-radius: 8px;
+    padding: 1px 4px;
+  }
+  .caminho-inst button {
+    border: none;
+    background: none;
+    color: #7fd8ff;
+    padding: 2px 4px;
+    text-decoration: underline;
+  }
+  .caminho-inst .sep {
+    color: var(--dim);
+  }
+  .caminho-inst .atual {
+    padding: 2px 4px;
+    font-weight: 600;
   }
   header button.painel {
     padding: 4px 8px;

@@ -171,7 +171,7 @@ function prepararImagem(v: Viewer): Imagem | null {
   if (!sv || !parte) return null;
   if (app.mode !== "setup" && app.play.animation) return (app.avisar("A posição da imagem no osso é da Pose base: escolha Pose base e arraste com Ctrl."), null);
   if (parte.kind !== "region") return (app.avisar(`${sl} é uma malha: o desenho dela se ajusta em Editar malha, no inspetor.`), null);
-  const att = doc.json.skins?.find((s: any) => s.name === "default")?.attachments?.[sl]?.[parte.name];
+  const att = doc.json.skins?.find((s: any) => s.name === app.skinDe(sl, parte.name))?.attachments?.[sl]?.[parte.name];
   if (!att) return null;
   const o = sv.bone;
   const x = att.x ?? 0,
@@ -280,7 +280,7 @@ function arrastarImagem(d: Drag, world: { x: number; y: number }, k: number) {
   const im = d.imagem!;
   const o = im.osso;
   const det = o.a * o.d - o.b * o.c || 1;
-  const args: any = { slot: im.slot, name: im.nome };
+  const args: any = { slot: im.slot, name: im.nome, skin: app.skinDe(im.slot, im.nome) };
   if (d.tool === "move") {
     const dx = (world.x - d.start.x) * k,
       dy = (world.y - d.start.y) * k;

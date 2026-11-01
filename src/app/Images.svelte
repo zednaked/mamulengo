@@ -45,12 +45,24 @@
     const s = app.selection.slot;
     if (!s) return app.toast("Arraste a imagem para o personagem, ou escolha uma parte para trocar a imagem dela.");
     const slot = app.doc!.json.slots.find((x: any) => x.name === s);
+    // com uma skin escolhida: a camada continua mostrando a mesma imagem pelo nome, e so nesta skin
+    // esse nome passa a usar a outra imagem (o jeito das skins do Spine); na Pose base
+    if (app.skin && slot?.attachment && !(app.mode === "animate" && app.play.animation)) {
+      const de = app.skinDe(s, slot.attachment);
+      const cur0 = app.doc!.json.skins.find((k: any) => k.name === de)?.attachments?.[s]?.[slot.attachment];
+      if (cur0 && (cur0.type ?? "region") === "region") {
+        const r = app.pixels.region(name);
+        const args: any = { slot: s, name: slot.attachment, skin: app.skin, path: name === slot.attachment ? undefined : name, x: cur0.x, y: cur0.y, rotation: cur0.rotation, scaleX: cur0.scaleX, scaleY: cur0.scaleY, ...(r ? { width: r.width, height: r.height } : {}) };
+        if (app.run({ cmd: "attachment.region", args }, `${slot.attachment} = ${name} na skin ${app.skin}`)) app.avisar(`Na skin ${app.skin}, ${s} agora mostra ${name}; nas outras skins continua como estava.`);
+        return;
+      }
+    }
     const cur = slot?.attachment ? app.doc!.json.skins?.[0]?.attachments?.[s]?.[slot.attachment] : null;
     const calls: any[] = [];
     if (!app.doc!.json.skins?.some((sk: any) => sk.attachments?.[s]?.[name])) {
       // nova imagem no mesmo lugar da atual
       const place = cur && (cur.type ?? "region") === "region" ? { x: cur.x, y: cur.y, rotation: cur.rotation, scaleX: cur.scaleX, scaleY: cur.scaleY } : {};
-      calls.push({ cmd: "attachment.region", args: { slot: s, name, ...place } });
+      calls.push({ cmd: "attachment.region", args: { slot: s, name, skin: app.skinEdicao, ...place } });
     }
     if (app.mode === "animate" && app.play.animation) calls.push({ cmd: "key.set", args: { anim: app.play.animation, target: { slot: s }, timeline: "attachment", time: +app.play.time.toFixed(4), name } });
     else calls.push({ cmd: "slot.set", args: { slot: s, attachment: name } });

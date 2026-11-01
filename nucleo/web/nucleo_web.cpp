@@ -258,6 +258,19 @@ EMSCRIPTEN_KEEPALIVE int mm_instancia(int modelo) {
 
 EMSCRIPTEN_KEEPALIVE void mm_limpar_instancias() { instancias.clear(); }
 
+// a skin da instancia pelo nome (vale a partir do proximo setup: mm_reiniciar, mm_tocar);
+// devolve o indice ou -1 se nao existe
+EMSCRIPTEN_KEEPALIVE int mm_skin(int inst, const char* nome) {
+  Instancia& in = *instancias[size_t(inst)];
+  const auto& sk = in.modelo->skins;
+  for (size_t i = 0; i < sk.size(); ++i)
+    if (sk[i].nome == nome) {
+      in.e.skin(int(i));
+      return int(i);
+    }
+  return -1;
+}
+
 // solta uma instancia so (as medidas abrem e fecham a delas sem mexer nas do editor)
 EMSCRIPTEN_KEEPALIVE void mm_liberar_instancia(int inst) {
   if (inst >= 0 && size_t(inst) < instancias.size()) instancias[size_t(inst)].reset();

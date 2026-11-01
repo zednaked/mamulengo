@@ -160,6 +160,7 @@ export const CAMPOS: Record<string, string> = {
   lights: "luzes",
   ambient: "ambiente",
   image: "imagem",
+  variants: "variacoes",
   rate: "taxa",
   life: "vida",
   speed: "velocidade",
@@ -186,13 +187,36 @@ export const CAMPOS: Record<string, string> = {
   band: "faixa",
   tilt: "inclinacao",
   depth: "profundidade",
+  // desenhos (so do Mamulengo; o ambiente Desenhar): as formas vetoriais de cada imagem
+  drawings: "desenhos",
+  shapes: "formas",
+  points: "pontos",
+  in: "entrada",
+  out: "saida",
+  fill: "preenchimento",
+  stroke: "traco",
+  align: "alinhar",
+  join: "quina",
+  cap: "ponta",
+  hidden: "escondida",
+  holes: "furos",
+  // geleia (so do Mamulengo; docs/NUCLEO.md "Geleia"): a malha mole; amortecimento, gravidade e
+  // massa ja estao acima
+  jelly: "geleia",
+  stiffness: "rigidez",
+  coupling: "contagio",
+  wobble: "moleza",
+  followers: "seguem",
 };
 
 // valores de enum que mudam de nome (por campo)
 export const VALORES: Record<string, Record<string, string>> = {
-  blend: { additive: "aditivo", multiply: "multiplica", screen: "tela" },
+  blend: { additive: "aditivo", multiply: "multiplica", screen: "tela", overlay: "sobrepor", softLight: "luz_suave", darken: "escurecer", lighten: "clarear", difference: "diferenca", colorDodge: "subexpor" },
   type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
   curve: { stepped: "degrau" },
+  align: { inside: "dentro", center: "centro", outside: "fora" },
+  join: { miter: "viva", round: "redonda", bevel: "chanfrada" },
+  cap: { butt: "reta", round: "redonda", square: "quadrada" },
 };
 
 export const CAMPOS_VOLTA: Record<string, string> = Object.fromEntries(Object.entries(CAMPOS).map(([a, b]) => [b, a]));

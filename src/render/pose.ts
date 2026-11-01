@@ -7,7 +7,7 @@
 // invertido, e o viewer desfaz isso na tela; nos outros dois, y para cima).
 import { BlendMode, BoundingBoxAttachment, ClippingAttachment, Color, MeshAttachment, PathAttachment, PointAttachment, RegionAttachment, Vector2, type Bone, type ShapeRenderer, type Skeleton, type Slot } from "@esotericsoftware/spine-webgl";
 
-export type Blend = "normal" | "additive" | "multiply" | "screen";
+export type Blend = "normal" | "additive" | "multiply" | "screen" | "overlay" | "softLight" | "darken" | "lighten" | "difference" | "colorDodge";
 export type PartKind = "region" | "mesh" | "linkedmesh" | "clipping" | "path" | "point" | "boundingbox";
 
 export interface Local {

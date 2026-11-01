@@ -17,5 +17,7 @@ import "./particles.ts";
 import "./lights.ts";
 import "./instances.ts";
 import "./laco.ts";
+import "./desenho.ts";
+import "./googly.ts";
 
 export * from "./registry.ts";

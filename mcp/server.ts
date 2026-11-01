@@ -275,7 +275,8 @@ server.registerTool(
 server.registerTool(
   "mamulengo_view",
   {
-    description: "Controla a visualizacao (nao altera o documento): animation, time, playing, loop, speed, showBones, showMeshes, select {bone|slot}, fit, sequence (previa de transicao na tela do usuario).",
+    description:
+      "Controla a visualizacao (nao altera o documento): animation, time, playing, loop, speed, showBones, showMeshes, select {bone|slot}, fit, rect [x, y, w, h] (enquadra um retangulo do mundo), sequence (previa de transicao na tela do usuario), draw {slot, tool, shape, point} (abre o Desenhar na parte desenhada, com a ferramenta e a forma escolhidas; null fecha).",
     inputSchema: {
       animation: z.string().nullable().optional(),
       time: z.number().optional(),
@@ -286,7 +287,9 @@ server.registerTool(
       showMeshes: z.boolean().optional(),
       select: z.object({ bone: z.string().optional(), slot: z.string().optional() }).optional(),
       fit: z.boolean().optional(),
+      rect: z.array(z.number()).length(4).optional(),
       sequence,
+      draw: z.object({ slot: z.string(), tool: z.enum(["select", "pen", "rect", "ellipse"]).optional(), shape: z.number().int().nullable().optional(), point: z.number().int().nullable().optional() }).nullable().optional(),
     },
   },
   wrap(async (a) => text(await call("view", a))),

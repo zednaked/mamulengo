@@ -78,7 +78,7 @@
     rotate: "girar", translate: "mover", translatex: "mover x", translatey: "mover y", scale: "esticar", scalex: "esticar x", scaley: "esticar y",
     shear: "inclinar", shearx: "inclinar x", sheary: "inclinar y", attachment: "imagem", rgba: "cor", rgb: "cor", alpha: "transparência", rgba2: "cor e sombra",
     deform: "deformar", sequence: "sequência", outline: "contorno", glow: "brilho", dissolve: "dissolver", tint: "tingir", smear: "borrar", trail: "rastro", adjust: "ajuste",
-    rate: "taxa", burst: "rajada", mix: "mistura", instance: "instância",
+    rate: "taxa", burst: "rajada", mix: "mistura", instance: "instância", light: "luz", ambient: "ambiente",
   };
 
   // todas as timelines da animacao, com a parte (osso, slot, constraint) a que pertencem
@@ -111,6 +111,12 @@
       if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys });
     // instancias (so do Mamulengo): uma linha por instancia, as chaves que trocam o que o filho toca
     for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partSel: { instance: n }, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instância", keys });
+    // luzes e ambiente (so do Mamulengo; docs/NUCLEO.md "Luzes"): uma linha por luz, que escolhe o
+    // osso dela, e a da luz ambiente
+    const luzes = new Map<string, string>(((json as any).lights ?? []).map((l: any) => [l.name, l.bone]));
+    for (const [n, keys] of Object.entries<any>(a.lights ?? {}))
+      if (luzes.has(n)) out.push({ part: `l:${n}`, partLabel: `☀ ${n}`, partSel: { bone: luzes.get(n) }, partColor: "#ffe08a", target: { light: n }, timeline: "light", label: "luz", keys });
+    if (Array.isArray(a.ambient) && a.ambient.length) out.push({ part: "amb", partLabel: "☀ ambiente", partColor: "#ffe08a", target: { ambient: true }, timeline: "ambient", label: "ambiente", keys: a.ambient });
     if (a.events?.length) out.push({ part: "ev", partLabel: "eventos", partColor: "#ffffff", timeline: "events", label: "eventos", keys: a.events });
     if (a.drawOrder?.length) out.push({ part: "do", partLabel: "ordem", partColor: "#ff9f6c", timeline: "drawOrder", label: "ordem", keys: a.drawOrder });
     return out;
@@ -138,7 +144,9 @@
     const a = app.play.animation ? app.doc?.json.animations?.[app.play.animation] : null;
     if (!a) return [];
     const tls = collect(a);
-    const out: Row[] = [{ id: "all", label: "tudo", color: "#9a93a8", cells: merged(tls), kind: "all" }];
+    // no detalhe de uma parte, a primeira linha diz qual (antes so "tudo", sem dizer onde se estava)
+    const nomeParte = app.selection.slot ?? app.selection.bone;
+    const out: Row[] = [{ id: "all", label: detail && nomeParte ? nomeParte : "tudo", color: "#9a93a8", cells: merged(tls), kind: "all" }];
     const { bone, slot } = app.selection;
     if (bone || slot) {
       for (const tl of tls) {
@@ -171,6 +179,20 @@
     return [...m.values()];
   });
   const curveRefs = $derived(pickedRefs.filter((r) => !NOCURVE.has(r.timeline)));
+  // uma chave de evento escolhida: o nome dele, para renomear (todos os disparos acompanham)
+  const eventoEscolhido = $derived(picked.length === 1 && picked[0].row.timeline === "events" ? ((picked[0].cell.refs[0] as any)?.name ?? null) : null);
+  function renomearEvento(de: string, para: string) {
+    para = para.trim();
+    if (!para || para === de) return;
+    if (app.run({ cmd: "event.rename", args: { name: de, to: para } }, `evento ${de} vira ${para}`)) app.avisar(`O evento ${de} agora se chama ${para}, em todas as animações. Ctrl+Z desfaz.`);
+  }
+  // apagar uma timeline inteira (o x no nome da linha)
+  function apagarTimeline(r: Row) {
+    const anim = app.play.animation;
+    if (!anim || !r.timeline) return;
+    if (app.run({ cmd: "timeline.delete", args: { anim, target: r.target ?? {}, timeline: r.timeline } }, `apaga a timeline ${r.label}`)) app.avisar(`A linha ${r.label} saiu de ${anim} (todas as chaves). Ctrl+Z desfaz.`);
+  }
+
   const single = $derived(picked.length === 1 && picked[0].row.kind === "detail" && !NOCURVE.has(picked[0].row.timeline!) ? picked[0] : null);
   const singleKeys = $derived.by(() => {
     app.version;
@@ -389,6 +411,16 @@
   }
 
   // o laco em chaves (src/core/commands/laco.ts)
+  // emendar: a animacao comeca e/ou termina na pose de entrada de outra (anim.match)
+  function emendar(v: string) {
+    const anim = app.play.animation;
+    if (!anim || !v) return;
+    const [at, like] = v.split("|");
+    const r = app.run({ cmd: "anim.match", args: { anim, like, at } }, `${anim} ${at === "inicio" ? "começa" : at === "fim" ? "termina" : "começa e termina"} como ${like}`);
+    if (!r) return;
+    if (!r[0]?.keys) app.avisar(`${anim} já ${at === "inicio" ? "começa" : "termina"} na pose em que ${like} começa: nada a mudar.`);
+    else app.avisar(`${anim} agora ${at === "inicio" ? "começa" : at === "fim" ? "termina" : "começa e termina"} na pose de ${like} (${r[0].keys} chave${r[0].keys > 1 ? "s" : ""}): o jogo emenda uma na outra sem salto. Ctrl+Z desfaz.`);
+  }
   function fecharLaco() {
     const anim = app.play.animation;
     if (!anim) return;
@@ -455,7 +487,7 @@
     for (const it of items) {
       const tt = tkey(t + it.offset);
       const tg = it.target;
-      const part = !tg ? (it.timeline === "events" ? "ev" : "do") : tg.bone ? `b:${tg.bone}` : tg.slot ? `s:${tg.slot}` : tg.deform ? `s:${tg.deform.slot}` : `c:${tg.constraint}`;
+      const part = !tg ? (it.timeline === "events" ? "ev" : "do") : tg.bone ? `b:${tg.bone}` : tg.slot ? `s:${tg.slot}` : tg.deform ? `s:${tg.deform.slot}` : tg.light ? `l:${tg.light}` : tg.ambient ? "amb" : tg.particles ? `p:${tg.particles}` : tg.instance ? `i:${tg.instance}` : `c:${tg.constraint}`;
       ids.add(`${part}@${tt}`);
       ids.add(tg?.deform ? `d:${tg.deform.slot}:${tg.deform.attachment}:${it.timeline}@${tt}` : `${part}:${it.timeline}@${tt}`);
     }
@@ -706,6 +738,15 @@
       <span class="laco">
         <button class="mini" title="Fechar o laço: copia a primeira chave de cada parte para depois da última, e a repetição emenda sem pulo" onclick={fecharLaco}>⥁<span class="rot"> fechar o laço</span></button>
         <button class="mini" title="Vai e volta: acrescenta a volta (as chaves de trás para a frente, com as curvas espelhadas); a animação dobra de duração. Vale também no jogo" onclick={vaiEVolta}>⇄<span class="rot"> vai e volta</span></button>
+        {#if others.length}
+          <select class="mini" value="" onchange={(e) => { emendar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Emendar sem salto: esta animação termina (ou começa) na pose em que outra começa, para o jogo tocar uma depois da outra">
+            <option value="">⇆ emendar…</option>
+            {#each others as o}
+              <option value="fim|{o}">terminar como {o} começa</option>
+              <option value="inicio|{o}">começar como {o} começa</option>
+            {/each}
+          </select>
+        {/if}
       </span>
     {/if}
   </div>
@@ -721,6 +762,9 @@
         {#if principleRefs.length}
           <button class="curve" title="Recuo no sentido contrário antes deste movimento" onclick={() => principle("anim.anticipate")}>↶<span class="rot"> antecipar</span></button>
           <button class="curve" title="Passa um pouco do ponto e assenta" onclick={() => principle("anim.overshoot")}>↷<span class="rot"> passar do ponto</span></button>
+        {/if}
+        {#if eventoEscolhido}
+          <label class="ev-nome" title="O nome do evento (o jogo recebe no sinal animation_event). Trocar aqui renomeia em todos os disparos, em todas as animações">evento <input value={eventoEscolhido} onchange={(e) => renomearEvento(eventoEscolhido, (e.target as HTMLInputElement).value)} /></label>
         {/if}
         <button class="del" title="Apagar chaves selecionadas (Del)" onclick={deleteKeys}>apagar{pickedRefs.length > 1 ? ` ${pickedRefs.length}` : ""}</button>
       </span>
@@ -800,7 +844,7 @@
     <div class="head">
       <div class="corner">
         {#if detail}
-          <button class="mini back" title="Ver todas as partes animadas (Esc no viewport)" onclick={() => app.select({})}>‹ todas</button>
+          <button class="mini back" title="Voltar para todas as partes animadas (ou Esc com o mouse sobre o desenho)" onclick={() => app.select({})}>‹ todas</button>
         {:else}
           <span class="dim">partes</span>
         {/if}
@@ -841,6 +885,11 @@
             {:else}
               <button class="label link" style:color={r.color} title="Ver as timelines de {r.label}" onclick={() => app.select(r.part!)}>{r.label}</button>
             {/if}
+          {:else if r.kind === "detail" && r.timeline && app.play.animation}
+            <div class="label com-x" style:color={r.color} title={r.label}>
+              <span>{r.label}</span>
+              <button class="tl-x" onclick={() => apagarTimeline(r)} title="apagar esta linha inteira (todas as chaves de {r.label} nesta animação; Ctrl+Z desfaz)">✕</button>
+            </div>
           {:else}
             <div class="label" style:color={r.color} title={r.label}>{r.label}</div>
           {/if}
@@ -887,6 +936,37 @@
 </div>
 
 <style>
+  .label.com-x {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .label.com-x span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tl-x {
+    background: none;
+    border: none;
+    padding: 0 3px;
+    font-size: 10px;
+    opacity: 0;
+    color: var(--dim);
+  }
+  .label.com-x:hover .tl-x {
+    opacity: 0.8;
+  }
+  .ev-nome {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .ev-nome input {
+    width: 110px;
+  }
   .tl {
     display: flex;
     flex-direction: column;
@@ -1041,10 +1121,16 @@
     font-size: 12px;
     white-space: nowrap;
   }
+  /* largura fixa: tocando, o texto muda a cada quadro e empurrava a barra (o menu de emendar
+     aberto andava junto e saia cortado) */
   .time {
     font-variant-numeric: tabular-nums;
     font-size: 15px;
-    min-width: 150px;
+    width: 17em;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .ev {
     display: flex;

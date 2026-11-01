@@ -80,19 +80,28 @@ function emoldurar(m: Moldura, quadro: HTMLCanvasElement, t: number, out: HTMLCa
   if (leg) {
     const al = Math.max(0, Math.min(1, (t - leg.de) / 0.25, (leg.ate - t) / 0.25));
     g.font = fonte(700, w * 0.032);
-    const tw = g.measureText(leg.texto).width,
-      ph = w * 0.06,
-      y = topo + h - ph * 0.9;
+    // quebra em linhas que cabem em 88% da largura (palavra por palavra); a caixa cresce para cima
+    const max = w * 0.88;
+    const linhas: string[] = [];
+    for (const p of leg.texto.split(" ")) {
+      const l = linhas.length ? linhas[linhas.length - 1] + " " + p : p;
+      if (linhas.length && g.measureText(l).width <= max) linhas[linhas.length - 1] = l;
+      else linhas.push(p);
+    }
+    const tw = Math.max(...linhas.map((l) => g.measureText(l).width)),
+      lh = w * 0.042,
+      ph = w * 0.06 + lh * (linhas.length - 1),
+      y = topo + h - w * 0.054 - (ph - w * 0.06) / 2;
     g.globalAlpha = al;
     g.fillStyle = "rgba(24, 20, 34, 0.55)";
     g.strokeStyle = destaque;
     g.lineWidth = 2;
     g.beginPath();
-    g.roundRect(W / 2 - tw / 2 - ph * 0.4, y - ph / 2, tw + ph * 0.8, ph, ph / 2);
+    g.roundRect(W / 2 - tw / 2 - w * 0.024, y - ph / 2, tw + w * 0.048, ph, Math.min(ph / 2, w * 0.03));
     g.fill();
     g.stroke();
     g.fillStyle = "#ffffff";
-    g.fillText(leg.texto, W / 2, y + 1);
+    linhas.forEach((l, i) => g.fillText(l, W / 2, y + 1 + (i - (linhas.length - 1) / 2) * lh));
     g.globalAlpha = 1;
   }
   if (base) {

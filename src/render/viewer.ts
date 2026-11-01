@@ -202,6 +202,39 @@ export class Viewer {
     return () => this.listeners.delete(fn);
   }
 
+  // a skin mostrada (null: a padrao)
+  skin: string | null = null;
+  setSkin(nome: string | null) {
+    this.skin = nome;
+    if (this.nucleo) this.nucleo.usarSkin(nome);
+    if (this.skeleton && this.data) {
+      for (const sk of [this.skeleton, this.ghost].filter(Boolean) as Skeleton[]) {
+        if (nome && this.data.findSkin(nome)) sk.setSkin(nome);
+        else sk.setSkin(this.data.defaultSkin);
+        sk.setupPoseSlots();
+      }
+    }
+    this.invalidatePose();
+    this.poseAt(this.view.time);
+  }
+
+  // paginas que o editor desenha (src/app/desenho.ts) em vez de buscar no servidor
+  paginaPropria: ((page: string) => Promise<ImageBitmap | null>) | null = null;
+
+  // troca a textura de uma pagina ja carregada (a dos desenhos, a cada mudanca nas formas)
+  async trocarPagina(page: string, img: OffscreenCanvas | HTMLCanvasElement | ImageBitmap) {
+    if (this.nucleo && this.runtime === "nucleo") {
+      const gl = this.ctx.gl;
+      this.nucleo.poeTextura(page, img, { min: gl.LINEAR, mag: gl.LINEAR });
+    }
+    const p = this.atlas?.pages.find((x) => x.name === page);
+    if (p) {
+      const bmp = await createImageBitmap(img, { premultiplyAlpha: "premultiply", colorSpaceConversion: "none" });
+      (p.texture as GLTexture | null)?.dispose();
+      p.setTexture(new GLTexture(this.ctx, bmp, true, false));
+    }
+  }
+
   // Carrega texturas das paginas do atlas. urlFor resolve o nome da pagina.
   async setDocument(doc: Document, urlFor: (page: string) => string) {
     this.doc = doc;
@@ -223,6 +256,15 @@ export class Viewer {
     this.textureInfo = {};
     await Promise.all(
       atlas.pages.map(async (page) => {
+        // pagina feita no editor (os desenhos): sem servidor
+        const propria = await this.paginaPropria?.(page.name);
+        if (propria) {
+          if (nucleo) crus.set(page.name, propria);
+          const bmp = await createImageBitmap(propria, { premultiplyAlpha: "premultiply", colorSpaceConversion: "none" });
+          page.setTexture(new GLTexture(this.ctx, bmp, true, false));
+          this.textureInfo[page.name] = { origin: "desenho", note: null };
+          return;
+        }
         const r = await fetch(urlFor(page.name));
         if (!r.ok) throw new Error(`pagina do atlas nao carregou: ${page.name}`);
         const origin = r.headers.get("x-texture-origin") ?? "source";
@@ -338,6 +380,12 @@ export class Viewer {
       if (this.flip) this.skeleton.scaleY = -1;
       this.ghost = new Skeleton(data);
       if (this.flip) this.ghost.scaleY = -1;
+      // a skin escolhida (a que nao existe mais fica na padrao)
+      if (this.skin && data.findSkin(this.skin))
+        for (const sk of [this.skeleton, this.ghost]) {
+          sk.setSkin(this.skin);
+          sk.setupPoseSlots();
+        }
       this.state = new AnimationState(new AnimationStateData(data));
       // mix como o spine-godot (so faz diferenca na previa de transicao)
       if (this.flip) likeSpineGodot(this.state);
@@ -494,6 +542,8 @@ export class Viewer {
   // essas animacoes) ou em transformacao de osso na setup. Devolve false se precisa
   // reconstruir tudo.
   private patch(): boolean {
+    // as formas dos desenhos nao mexem no esqueleto: so a textura muda (src/app/desenho.ts)
+    if (this.pending) this.pending = this.pending.filter((p) => p[0] !== "drawings");
     const paths = this.pending;
     const doc = this.doc;
     const data = this.data;

@@ -659,6 +659,7 @@ double Estado::aplicar_de(Entrada* para, Esqueleto& e, Mistura mist) {
 
 bool Estado::aplicar(Esqueleto& e) {
   if (mudou_) recalcular_modos();
+  e.devolver_slider();
   bool aplicou = false;
   for (size_t ti = 0; ti < trilhas_.size(); ++ti) {
     Entrada* cur = trilhas_[ti];

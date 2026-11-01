@@ -1,0 +1,1748 @@
+{
+ "boneco": 0,
+ "nome": "curta",
+ "paginas": [
+  {
+   "arquivo": "vinheta.png",
+   "tamanho": [
+    2048,
+    73
+   ]
+  },
+  {
+   "arquivo": "efeitos.png",
+   "tamanho": [
+    256,
+    1224
+   ]
+  },
+  {
+   "arquivo": "fundo.png",
+   "tamanho": [
+    256,
+    144
+   ]
+  },
+  {
+   "arquivo": "cortina.png",
+   "tamanho": [
+    2048,
+    1284
+   ],
+   "relevo": "cortina_relevo.png"
+  },
+  {
+   "arquivo": "chita.png",
+   "tamanho": [
+    1024,
+    600
+   ],
+   "relevo": "chita_relevo.png"
+  },
+  {
+   "arquivo": "grao.png",
+   "tamanho": [
+    1024,
+    1024
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "subtitulo",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    1160,
+    73
+   ]
+  },
+  {
+   "nome": "barra",
+   "pagina": 0,
+   "ret": [
+    1164,
+    0,
+    240,
+    12
+   ]
+  },
+  {
+   "nome": "foco",
+   "pagina": 1,
+   "ret": [
+    0,
+    0,
+    256,
+    256
+   ]
+  },
+  {
+   "nome": "feixe",
+   "pagina": 1,
+   "ret": [
+    0,
+    260,
+    128,
+    256
+   ]
+  },
+  {
+   "nome": "vazamento",
+   "pagina": 1,
+   "ret": [
+    0,
+    520,
+    256,
+    256
+   ]
+  },
+  {
+   "nome": "vinheta_lente",
+   "pagina": 1,
+   "ret": [
+    0,
+    780,
+    256,
+    144
+   ]
+  },
+  {
+   "nome": "halo",
+   "pagina": 1,
+   "ret": [
+    0,
+    928,
+    128,
+    128
+   ]
+  },
+  {
+   "nome": "ponto",
+   "pagina": 1,
+   "ret": [
+    132,
+    928,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "confete",
+   "pagina": 1,
+   "ret": [
+    0,
+    1060,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "serpentina",
+   "pagina": 1,
+   "ret": [
+    68,
+    1060,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "estrela5",
+   "pagina": 1,
+   "ret": [
+    136,
+    1060,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "nota",
+   "pagina": 1,
+   "ret": [
+    0,
+    1128,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "losango",
+   "pagina": 1,
+   "ret": [
+    68,
+    1128,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "bolinha",
+   "pagina": 1,
+   "ret": [
+    136,
+    1128,
+    64,
+    64
+   ]
+  },
+  {
+   "nome": "ribalta",
+   "pagina": 1,
+   "ret": [
+    0,
+    1196,
+    256,
+    16
+   ]
+  },
+  {
+   "nome": "liso",
+   "pagina": 1,
+   "ret": [
+    0,
+    1216,
+    8,
+    8
+   ]
+  },
+  {
+   "nome": "fundo",
+   "pagina": 2,
+   "ret": [
+    0,
+    0,
+    256,
+    144
+   ]
+  },
+  {
+   "nome": "cortina",
+   "pagina": 3,
+   "ret": [
+    0,
+    0,
+    1040,
+    1120
+   ]
+  },
+  {
+   "nome": "bambinela",
+   "pagina": 3,
+   "ret": [
+    0,
+    1124,
+    2000,
+    160
+   ]
+  },
+  {
+   "nome": "chita",
+   "pagina": 4,
+   "ret": [
+    0,
+    0,
+    1000,
+    600
+   ]
+  },
+  {
+   "nome": "grao",
+   "pagina": 5,
+   "ret": [
+    0,
+    0,
+    1024,
+    1024
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./images/",
+  "audio": "",
+  "x": -480,
+  "y": -263,
+  "largura": 960,
+  "altura": 540
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "cena_boneco",
+   "pai": "root"
+  },
+  {
+   "nome": "letras",
+   "pai": "root"
+  },
+  {
+   "nome": "letra_0",
+   "pai": "letras",
+   "x": -331.75,
+   "y": -100
+  },
+  {
+   "nome": "letra_1",
+   "pai": "letras",
+   "x": -231.75,
+   "y": -100
+  },
+  {
+   "nome": "letra_2",
+   "pai": "letras",
+   "x": -126,
+   "y": -100
+  },
+  {
+   "nome": "letra_3",
+   "pai": "letras",
+   "x": -19.25,
+   "y": -100
+  },
+  {
+   "nome": "letra_4",
+   "pai": "letras",
+   "x": 44.5,
+   "y": -100
+  },
+  {
+   "nome": "letra_5",
+   "pai": "letras",
+   "x": 104.5,
+   "y": -100
+  },
+  {
+   "nome": "letra_6",
+   "pai": "letras",
+   "x": 187.25,
+   "y": -100
+  },
+  {
+   "nome": "letra_7",
+   "pai": "letras",
+   "x": 269.5,
+   "y": -100
+  },
+  {
+   "nome": "letra_8",
+   "pai": "letras",
+   "x": 353,
+   "y": -100
+  },
+  {
+   "nome": "barra",
+   "pai": "root",
+   "y": -167
+  },
+  {
+   "nome": "subtitulo",
+   "pai": "root",
+   "y": -205
+  },
+  {
+   "nome": "luz_varre",
+   "pai": "root",
+   "x": -620,
+   "y": -60
+  },
+  {
+   "nome": "feixe_e",
+   "pai": "root",
+   "x": -360,
+   "y": 290,
+   "rotacao": -70,
+   "comprimento": 420
+  },
+  {
+   "nome": "feixe_d",
+   "pai": "root",
+   "x": 360,
+   "y": 290,
+   "rotacao": -110,
+   "comprimento": 420
+  },
+  {
+   "nome": "lampada_0",
+   "pai": "root",
+   "x": -380,
+   "y": 38
+  },
+  {
+   "nome": "lampada_1",
+   "pai": "root",
+   "x": -343.81,
+   "y": 38
+  },
+  {
+   "nome": "lampada_2",
+   "pai": "root",
+   "x": -307.619,
+   "y": 38
+  },
+  {
+   "nome": "lampada_3",
+   "pai": "root",
+   "x": -271.429,
+   "y": 38
+  },
+  {
+   "nome": "lampada_4",
+   "pai": "root",
+   "x": -235.238,
+   "y": 38
+  },
+  {
+   "nome": "lampada_5",
+   "pai": "root",
+   "x": -199.048,
+   "y": 38
+  },
+  {
+   "nome": "lampada_6",
+   "pai": "root",
+   "x": -162.857,
+   "y": 38
+  },
+  {
+   "nome": "lampada_7",
+   "pai": "root",
+   "x": -126.667,
+   "y": 38
+  },
+  {
+   "nome": "lampada_8",
+   "pai": "root",
+   "x": -90.476,
+   "y": 38
+  },
+  {
+   "nome": "lampada_9",
+   "pai": "root",
+   "x": -54.286,
+   "y": 38
+  },
+  {
+   "nome": "lampada_10",
+   "pai": "root",
+   "x": -18.095,
+   "y": 38
+  },
+  {
+   "nome": "lampada_11",
+   "pai": "root",
+   "x": 18.095,
+   "y": 38
+  },
+  {
+   "nome": "lampada_12",
+   "pai": "root",
+   "x": 54.286,
+   "y": 38
+  },
+  {
+   "nome": "lampada_13",
+   "pai": "root",
+   "x": 90.476,
+   "y": 38
+  },
+  {
+   "nome": "lampada_14",
+   "pai": "root",
+   "x": 126.667,
+   "y": 38
+  },
+  {
+   "nome": "lampada_15",
+   "pai": "root",
+   "x": 162.857,
+   "y": 38
+  },
+  {
+   "nome": "lampada_16",
+   "pai": "root",
+   "x": 199.048,
+   "y": 38
+  },
+  {
+   "nome": "lampada_17",
+   "pai": "root",
+   "x": 235.238,
+   "y": 38
+  },
+  {
+   "nome": "lampada_18",
+   "pai": "root",
+   "x": 271.429,
+   "y": 38
+  },
+  {
+   "nome": "lampada_19",
+   "pai": "root",
+   "x": 307.619,
+   "y": 38
+  },
+  {
+   "nome": "lampada_20",
+   "pai": "root",
+   "x": 343.81,
+   "y": 38
+  },
+  {
+   "nome": "lampada_21",
+   "pai": "root",
+   "x": 410,
+   "y": 8
+  },
+  {
+   "nome": "lampada_22",
+   "pai": "root",
+   "x": 401.213,
+   "y": 29.213
+  },
+  {
+   "nome": "lampada_23",
+   "pai": "root",
+   "x": 410,
+   "y": 8
+  },
+  {
+   "nome": "lampada_24",
+   "pai": "root",
+   "x": 410,
+   "y": -24
+  },
+  {
+   "nome": "lampada_25",
+   "pai": "root",
+   "x": 410,
+   "y": -56
+  },
+  {
+   "nome": "lampada_26",
+   "pai": "root",
+   "x": 410,
+   "y": -88
+  },
+  {
+   "nome": "lampada_27",
+   "pai": "root",
+   "x": 380,
+   "y": -150
+  },
+  {
+   "nome": "lampada_28",
+   "pai": "root",
+   "x": 401.213,
+   "y": -141.213
+  },
+  {
+   "nome": "lampada_29",
+   "pai": "root",
+   "x": 380,
+   "y": -150
+  },
+  {
+   "nome": "lampada_30",
+   "pai": "root",
+   "x": 343.81,
+   "y": -150
+  },
+  {
+   "nome": "lampada_31",
+   "pai": "root",
+   "x": 307.619,
+   "y": -150
+  },
+  {
+   "nome": "lampada_32",
+   "pai": "root",
+   "x": 271.429,
+   "y": -150
+  },
+  {
+   "nome": "lampada_33",
+   "pai": "root",
+   "x": 235.238,
+   "y": -150
+  },
+  {
+   "nome": "lampada_34",
+   "pai": "root",
+   "x": 199.048,
+   "y": -150
+  },
+  {
+   "nome": "lampada_35",
+   "pai": "root",
+   "x": 162.857,
+   "y": -150
+  },
+  {
+   "nome": "lampada_36",
+   "pai": "root",
+   "x": 126.667,
+   "y": -150
+  },
+  {
+   "nome": "lampada_37",
+   "pai": "root",
+   "x": 90.476,
+   "y": -150
+  },
+  {
+   "nome": "lampada_38",
+   "pai": "root",
+   "x": 54.286,
+   "y": -150
+  },
+  {
+   "nome": "lampada_39",
+   "pai": "root",
+   "x": 18.095,
+   "y": -150
+  },
+  {
+   "nome": "lampada_40",
+   "pai": "root",
+   "x": -18.095,
+   "y": -150
+  },
+  {
+   "nome": "lampada_41",
+   "pai": "root",
+   "x": -54.286,
+   "y": -150
+  },
+  {
+   "nome": "lampada_42",
+   "pai": "root",
+   "x": -90.476,
+   "y": -150
+  },
+  {
+   "nome": "lampada_43",
+   "pai": "root",
+   "x": -126.667,
+   "y": -150
+  },
+  {
+   "nome": "lampada_44",
+   "pai": "root",
+   "x": -162.857,
+   "y": -150
+  },
+  {
+   "nome": "lampada_45",
+   "pai": "root",
+   "x": -199.048,
+   "y": -150
+  },
+  {
+   "nome": "lampada_46",
+   "pai": "root",
+   "x": -235.238,
+   "y": -150
+  },
+  {
+   "nome": "lampada_47",
+   "pai": "root",
+   "x": -271.429,
+   "y": -150
+  },
+  {
+   "nome": "lampada_48",
+   "pai": "root",
+   "x": -307.619,
+   "y": -150
+  },
+  {
+   "nome": "lampada_49",
+   "pai": "root",
+   "x": -343.81,
+   "y": -150
+  },
+  {
+   "nome": "lampada_50",
+   "pai": "root",
+   "x": -410,
+   "y": -120
+  },
+  {
+   "nome": "lampada_51",
+   "pai": "root",
+   "x": -401.213,
+   "y": -141.213
+  },
+  {
+   "nome": "lampada_52",
+   "pai": "root",
+   "x": -410,
+   "y": -120
+  },
+  {
+   "nome": "lampada_53",
+   "pai": "root",
+   "x": -410,
+   "y": -88
+  },
+  {
+   "nome": "lampada_54",
+   "pai": "root",
+   "x": -410,
+   "y": -56
+  },
+  {
+   "nome": "lampada_55",
+   "pai": "root",
+   "x": -410,
+   "y": -24
+  },
+  {
+   "nome": "lampada_56",
+   "pai": "root",
+   "x": -380,
+   "y": 38
+  },
+  {
+   "nome": "lampada_57",
+   "pai": "root",
+   "x": -401.213,
+   "y": 29.213
+  },
+  {
+   "nome": "plateia_0",
+   "pai": "root",
+   "x": -430,
+   "y": -324,
+   "escala_x": 0.8,
+   "escala_y": 0.8
+  },
+  {
+   "nome": "plateia_1",
+   "pai": "root",
+   "x": -330,
+   "y": -334.56,
+   "escala_x": 0.896,
+   "escala_y": 0.896
+  },
+  {
+   "nome": "plateia_2",
+   "pai": "root",
+   "x": -220,
+   "y": -319.6,
+   "escala_x": 0.76,
+   "escala_y": 0.76
+  },
+  {
+   "nome": "plateia_3",
+   "pai": "root",
+   "x": -120,
+   "y": -331.04,
+   "escala_x": 0.864,
+   "escala_y": 0.864
+  },
+  {
+   "nome": "plateia_4",
+   "pai": "root",
+   "x": -10,
+   "y": -337.2,
+   "escala_x": 0.92,
+   "escala_y": 0.92
+  },
+  {
+   "nome": "plateia_5",
+   "pai": "root",
+   "x": 100,
+   "y": -324,
+   "escala_x": 0.8,
+   "escala_y": 0.8
+  },
+  {
+   "nome": "plateia_6",
+   "pai": "root",
+   "x": 210,
+   "y": -332.8,
+   "escala_x": 0.88,
+   "escala_y": 0.88
+  },
+  {
+   "nome": "plateia_7",
+   "pai": "root",
+   "x": 320,
+   "y": -320.48,
+   "escala_x": 0.768,
+   "escala_y": 0.768
+  },
+  {
+   "nome": "plateia_8",
+   "pai": "root",
+   "x": 430,
+   "y": -329.28,
+   "escala_x": 0.848,
+   "escala_y": 0.848
+  },
+  {
+   "nome": "cortina_e",
+   "pai": "root",
+   "x": -490,
+   "y": -270
+  },
+  {
+   "nome": "cortina_d",
+   "pai": "root",
+   "x": 490,
+   "y": -270,
+   "escala_x": -1
+  },
+  {
+   "nome": "bambinela",
+   "pai": "root",
+   "y": 232
+  },
+  {
+   "nome": "grao",
+   "pai": "root"
+  },
+  {
+   "nome": "vazamento",
+   "pai": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "fundo",
+   "osso": "root",
+   "parte": "fundo"
+  },
+  {
+   "nome": "pano",
+   "osso": "root",
+   "parte": "chita",
+   "profundidade": -180
+  },
+  {
+   "nome": "foco",
+   "osso": "root",
+   "parte": "foco",
+   "blend": "aditivo",
+   "cor": "ffe7c400"
+  },
+  {
+   "nome": "halo",
+   "osso": "cena_boneco",
+   "parte": "halo",
+   "blend": "aditivo",
+   "cor": "ff2e8800"
+  },
+  {
+   "nome": "marionete",
+   "osso": "cena_boneco"
+  },
+  {
+   "nome": "letra_0",
+   "osso": "letra_0"
+  },
+  {
+   "nome": "letra_1",
+   "osso": "letra_1"
+  },
+  {
+   "nome": "letra_2",
+   "osso": "letra_2"
+  },
+  {
+   "nome": "letra_3",
+   "osso": "letra_3"
+  },
+  {
+   "nome": "letra_4",
+   "osso": "letra_4"
+  },
+  {
+   "nome": "letra_5",
+   "osso": "letra_5"
+  },
+  {
+   "nome": "letra_6",
+   "osso": "letra_6"
+  },
+  {
+   "nome": "letra_7",
+   "osso": "letra_7"
+  },
+  {
+   "nome": "letra_8",
+   "osso": "letra_8"
+  },
+  {
+   "nome": "barra",
+   "osso": "barra",
+   "parte": "barra"
+  },
+  {
+   "nome": "subtitulo",
+   "osso": "subtitulo",
+   "parte": "subtitulo",
+   "efeitos": {
+    "dissolver": {
+     "valor": 0,
+     "cor": "ff2e88ff",
+     "borda": 0.12,
+     "grao": 6
+    }
+   }
+  },
+  {
+   "nome": "grao",
+   "osso": "grao",
+   "parte": "grao",
+   "blend": "tela",
+   "cor": "ffffff14"
+  },
+  {
+   "nome": "vinheta_lente",
+   "osso": "root",
+   "parte": "vinheta_lente",
+   "cor": "000000b0"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "fundo": {
+     "fundo": {
+      "largura": 1000,
+      "altura": 580,
+      "y": 7
+     }
+    },
+    "pano": {
+     "chita": {
+      "largura": 1000,
+      "altura": 600,
+      "y": 10
+     }
+    },
+    "halo": {
+     "halo": {
+      "largura": 380,
+      "altura": 380,
+      "x": 0,
+      "y": 137
+     }
+    },
+    "barra": {
+     "barra": {
+      "largura": 120,
+      "altura": 6
+     }
+    },
+    "subtitulo": {
+     "subtitulo": {
+      "largura": 580,
+      "altura": 36.5
+     }
+    },
+    "foco": {
+     "foco": {
+      "largura": 460,
+      "altura": 470,
+      "y": 30
+     }
+    },
+    "grao": {
+     "grao": {
+      "largura": 1300,
+      "altura": 1300,
+      "y": 7
+     }
+    },
+    "vinheta_lente": {
+     "vinheta_lente": {
+      "largura": 1000,
+      "altura": 562,
+      "y": 7
+     }
+    }
+   }
+  }
+ ],
+ "instancias": [
+  {
+   "nome": "marionete",
+   "slot": "marionete",
+   "boneco": "marionete.boneco",
+   "animacao": "danca"
+  },
+  {
+   "nome": "letra_0",
+   "slot": "letra_0",
+   "boneco": "letra.boneco",
+   "skin": "M",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_1",
+   "slot": "letra_1",
+   "boneco": "letra.boneco",
+   "skin": "a",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_2",
+   "slot": "letra_2",
+   "boneco": "letra.boneco",
+   "skin": "m",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_3",
+   "slot": "letra_3",
+   "boneco": "letra.boneco",
+   "skin": "u",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_4",
+   "slot": "letra_4",
+   "boneco": "letra.boneco",
+   "skin": "l",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_5",
+   "slot": "letra_5",
+   "boneco": "letra.boneco",
+   "skin": "e",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_6",
+   "slot": "letra_6",
+   "boneco": "letra.boneco",
+   "skin": "n",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_7",
+   "slot": "letra_7",
+   "boneco": "letra.boneco",
+   "skin": "g",
+   "animacao": "chega",
+   "repetir": false
+  },
+  {
+   "nome": "letra_8",
+   "slot": "letra_8",
+   "boneco": "letra.boneco",
+   "skin": "o",
+   "animacao": "chega",
+   "repetir": false
+  }
+ ],
+ "luzes": [
+  {
+   "nome": "chave",
+   "osso": "root",
+   "x": -320,
+   "y": 320,
+   "cor": "fff6faff",
+   "forca": 0.32,
+   "raio": 2200,
+   "altura": 420
+  }
+ ],
+ "ambiente": {
+  "cor": "e8e2ffff",
+  "forca": 0.6
+ },
+ "animacoes": {
+  "abertura": {
+   "instancias": {
+    "marionete": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.15,
+      "repetir": false
+     }
+    ],
+    "letra_0": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.15,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_1": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.1,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_2": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.05,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_3": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_4": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.05,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_5": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.1,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_6": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.15,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_7": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.2,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_8": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.25,
+      "repetir": false
+     },
+     {
+      "tempo": 1.05,
+      "animacao": "sai",
+      "inicio": 0,
+      "repetir": false
+     }
+    ]
+   },
+   "slots": {
+    "barra": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "marionete": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "fundo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.5,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "pano": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.5,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "foco": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.5,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "halo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.5,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   },
+   "efeitos": {
+    "subtitulo": {
+     "dissolver": [
+      {
+       "tempo": 0,
+       "valor": 1
+      }
+     ]
+    }
+   }
+  },
+  "fechamento": {
+   "instancias": {
+    "marionete": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.2,
+      "repetir": false
+     },
+     {
+      "tempo": 1.2,
+      "animacao": "reverencia",
+      "inicio": 0,
+      "repetir": false
+     }
+    ],
+    "letra_0": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.25,
+      "repetir": false
+     }
+    ],
+    "letra_1": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.21,
+      "repetir": false
+     }
+    ],
+    "letra_2": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.17,
+      "repetir": false
+     }
+    ],
+    "letra_3": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.13,
+      "repetir": false
+     }
+    ],
+    "letra_4": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.09,
+      "repetir": false
+     }
+    ],
+    "letra_5": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.05,
+      "repetir": false
+     }
+    ],
+    "letra_6": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": 0.01,
+      "repetir": false
+     }
+    ],
+    "letra_7": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.03,
+      "repetir": false
+     }
+    ],
+    "letra_8": [
+     {
+      "tempo": 0,
+      "animacao": "chega",
+      "inicio": -0.07,
+      "repetir": false
+     }
+    ]
+   },
+   "slots": {
+    "fundo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "pano": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "foco": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "halo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "marionete": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "barra": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "subtitulo": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_0": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_1": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_2": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_3": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_4": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_5": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_6": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_7": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "letra_8": {
+     "rgba": [
+      {
+       "tempo": 0,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.4,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   },
+   "efeitos": {
+    "subtitulo": {
+     "dissolver": [
+      {
+       "tempo": 0,
+       "valor": 1
+      },
+      {
+       "tempo": 0.75,
+       "valor": 1
+      },
+      {
+       "tempo": 1.3,
+       "valor": 0
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "barra": {
+     "escalar": [
+      {
+       "tempo": 0,
+       "x": 0,
+       "y": 1
+      },
+      {
+       "tempo": 0.6,
+       "x": 0,
+       "y": 1,
+       "curva": [
+        0.7,
+        0,
+        0.8,
+        1
+       ]
+      },
+      {
+       "tempo": 0.95,
+       "x": 1.15,
+       "y": 1,
+       "curva": [
+        1.06,
+        1.15,
+        1.13,
+        1
+       ]
+      },
+      {
+       "tempo": 1.1,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   }
+  }
+ }
+}

@@ -37,6 +37,7 @@ defineCommand({
     slot: z.string().optional(),
     bone: z.string().optional(),
     image: z.string().optional(),
+    variants: z.array(z.string()).optional().describe("imagens que se revezam: cada particula sorteia uma ao nascer (fumaca que nao parece carimbo); so as da mesma pagina da primeira"),
     x: z.number().optional(),
     y: z.number().optional(),
     rate: z.number().min(0).optional(),
@@ -84,10 +85,10 @@ defineCommand({
     const novo: any = i >= 0 ? { ...lista[i] } : { name };
     if (i < 0) {
       if (!p.slot) throw new Error("emissor novo: diga o slot (lugar na ordem de desenho)");
-      novo.image = p.image ?? imageOfSlot(e.json, p.slot);
+      novo.image = p.image ?? p.variants?.[0] ?? imageOfSlot(e.json, p.slot);
       if (!novo.image) throw new Error(`o slot ${p.slot} não mostra imagem: diga image`);
     }
-    const num = (v: any) => (Array.isArray(v) ? v.map(round) : typeof v === "number" ? round(v) : v);
+    const num = (v: any) => (Array.isArray(v) ? v.map((x) => (typeof x === "number" ? round(x) : x)) : typeof v === "number" ? round(v) : v);
     for (const [k, v] of Object.entries(campos)) if (v !== undefined) novo[k] = num(v);
     // a escala do emissor fica "escala" nos dois formatos (scale e a timeline escalar)
     if (scale !== undefined) novo.escala = num(scale);

@@ -9,7 +9,7 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
@@ -32,6 +32,8 @@ import { extractRegion, parseAtlas, unpackAtlas } from "./atlas.ts";
 import { createFromPsd, updateFromPsd } from "./psd.ts";
 import sharp from "sharp";
 import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
+import { arquivoBinario, gravarBonecoArquivo, lerBonecoArquivo } from "./boneco-binario.ts";
+import { listarEfeitos, porEfeito } from "./efeitos.ts";
 
 export const BRIDGE_PATH = "/__mamulengo";
 const EXPORTS = join(homedir(), ".cache", "mamulengo", "exports");
@@ -275,6 +277,82 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             const { tres } = skeletonOf(p);
             const md = draftFicha(json, name ?? basename(p).replace(/\.(spine-json|json)$/, ""), gameContext(p, tres, Object.keys(json.animations ?? {})));
             return send(200, md, "text/markdown; charset=utf-8");
+          }
+          // o .boneco em disco: formato (texto ou binario) e tamanho; e trocar o formato
+          if (url.pathname === "/api/boneco/info") {
+            const p = resolve(url.searchParams.get("p") ?? "");
+            if (!inside(p) || !p.endsWith(".boneco") || !existsSync(p)) return send(404, { error: `nao e um .boneco: ${p}` });
+            return send(200, { binario: arquivoBinario(p), bytes: statSync(p).size });
+          }
+          if (url.pathname === "/api/boneco/formato" && req.method === "POST") {
+            const b = JSON.parse((await readBody(req)).toString("utf8"));
+            const p = resolve(b.boneco ?? "");
+            if (!inside(p) || !p.endsWith(".boneco")) return send(403, { error: `so .boneco dentro das raizes: ${p}` });
+            const antes = statSync(p).size;
+            const obj = lerBonecoArquivo(p);
+            backup(p);
+            const tmp = p + ".mamulengo-tmp";
+            gravarBonecoArquivo(tmp, obj, !!b.binario);
+            renameSync(tmp, p);
+            cache = null;
+            return send(200, { binario: !!b.binario, antes, depois: statSync(p).size });
+          }
+          // arte HD a partir do SVG original (tools/atlas-hd.ts --gravar): o SVG vai ao lado do
+          // .boneco (<nome>-fonte.svg, para refazer) e a pagina sai em <pagina>-hd.webp
+          if (url.pathname === "/api/atlas-hd" && req.method === "POST") {
+            const p = resolve(url.searchParams.get("boneco") ?? "");
+            if (!inside(p) || !p.endsWith(".boneco")) return send(403, { error: `so .boneco dentro das raizes: ${p}` });
+            const svg = join(dirname(p), basename(p, ".boneco") + "-fonte.svg");
+            const corpo = await readBody(req);
+            if (corpo.length) writeFileSync(svg, corpo);
+            if (!existsSync(svg)) return send(400, { error: "mande o SVG da arte" });
+            backup(p);
+            const repo = fileURLToPath(new URL("..", import.meta.url));
+            const fator = url.searchParams.get("fator") ?? "3";
+            const id = url.searchParams.get("id") ?? "{nome}";
+            const r = spawnSync(process.execPath, ["--import", "tsx", join(repo, "tools/atlas-hd.ts"), p, svg, "--fator", fator, "--id", id, "--gravar"], { cwd: repo, encoding: "utf8", maxBuffer: 1 << 26 });
+            if (r.status !== 0) return send(500, { error: (r.stderr || r.stdout || "arte HD falhou").slice(-800) });
+            cache = null;
+            return send(200, { ok: true, saida: r.stdout.trim().split("\n").slice(-8) });
+          }
+          // biblioteca de efeitos (server/efeitos.ts): a lista, e por um efeito no .boneco (as imagens
+          // numa pagina <nome>-efeitos.png; o emissor quem cria e o editor, pelo particles.set)
+          if (url.pathname === "/api/efeitos") return send(200, listarEfeitos());
+          if (url.pathname === "/api/efeito" && req.method === "POST") {
+            const b = JSON.parse((await readBody(req)).toString("utf8"));
+            const p = resolve(b.boneco ?? "");
+            if (!inside(p) || !p.endsWith(".boneco")) return send(403, { error: `so .boneco dentro das raizes: ${p}` });
+            backup(p);
+            const r = await porEfeito(p, String(b.efeito ?? ""));
+            cache = null;
+            return send(200, r);
+          }
+          // versao leve (tools/boneco-leve.ts): <nome>-leve.boneco ao lado, paginas repacotadas numa
+          // fracao da resolucao; o original nao muda
+          if (url.pathname === "/api/boneco/leve" && req.method === "POST") {
+            const b = JSON.parse((await readBody(req)).toString("utf8"));
+            const p = resolve(b.boneco ?? "");
+            if (!inside(p) || !p.endsWith(".boneco")) return send(403, { error: `so .boneco dentro das raizes: ${p}` });
+            const repo = fileURLToPath(new URL("..", import.meta.url));
+            const fator = String(Number(b.fator) > 0 ? Number(b.fator) : 0.5);
+            const r = spawnSync(process.execPath, ["--import", "tsx", join(repo, "tools/boneco-leve.ts"), p, "--fator", fator], { cwd: repo, encoding: "utf8", maxBuffer: 1 << 26 });
+            if (r.status !== 0) return send(500, { error: (r.stderr || r.stdout || "versao leve falhou").slice(-800) });
+            cache = null;
+            return send(200, { ok: true, saida: r.stdout.trim().split("\n") });
+          }
+          // relevo das paginas de um .boneco (docs/NUCLEO.md "Luzes"): tools/relevo.ts --gravar, que
+          // regrava o .boneco; o editor salva antes e reabre depois
+          if (url.pathname === "/api/relevo" && req.method === "POST") {
+            const b = JSON.parse((await readBody(req)).toString("utf8"));
+            const p = resolve(b.boneco ?? "");
+            if (!inside(p) || !p.endsWith(".boneco")) return send(403, { error: `so .boneco dentro das raizes: ${p}` });
+            backup(p);
+            const repo = fileURLToPath(new URL("..", import.meta.url));
+            const extra = ["borda", "profundidade", "detalhe", "camadas"].flatMap((k) => (typeof b[k] === "number" ? [`--${k}`, String(b[k])] : []));
+            const r = spawnSync(process.execPath, ["--import", "tsx", join(repo, "tools/relevo.ts"), p, ...extra, "--gravar"], { cwd: repo, encoding: "utf8", maxBuffer: 1 << 26 });
+            if (r.status !== 0) return send(500, { error: (r.stderr || r.stdout || "relevo falhou").slice(-800) });
+            cache = null;
+            return send(200, { ok: true, saida: r.stdout.trim().split("\n").slice(-6) });
           }
           // anotacoes do personagem (<nome>.notas.json): listar e mudar (criar, responder, resolver...)
           if (url.pathname === "/api/notes") {

@@ -1,5 +1,8 @@
 // Comandos de setup pose: ossos, slots, attachments.
 import { z } from "zod";
+
+// os blends do slot: os do Spine e, so no .boneco (desenho do nucleo), os que leem a tela
+export const BLENDS = ["normal", "additive", "multiply", "screen", "overlay", "softLight", "darken", "lighten", "difference", "colorDodge"] as const;
 import { defineCommand } from "./registry.ts";
 import { BONE_DEFAULTS, EFFECTS, boneIndex, bones, descendants, requireBone, requireSkin, requireSlot, skins, slotIndex, slots } from "../model.ts";
 import { round } from "./timeline.ts";
@@ -233,7 +236,7 @@ defineCommand({
     bone: z.string(),
     attachment: z.string().optional().describe("attachment visivel na setup pose"),
     color: z.string().optional(),
-    blend: z.enum(["normal", "additive", "multiply", "screen"]).optional(),
+    blend: z.enum(BLENDS).optional(),
     index: z.number().int().min(0).optional().describe("posicao na ordem de desenho; padrao: na frente de todos"),
     above: z.string().optional().describe("alternativa a index: fica logo na frente deste slot"),
     below: z.string().optional().describe("alternativa a index: fica logo atras deste slot"),
@@ -270,7 +273,7 @@ defineCommand({
     attachment: z.string().nullable().optional(),
     color: z.string().optional(),
     dark: z.string().nullable().optional(),
-    blend: z.enum(["normal", "additive", "multiply", "screen"]).optional(),
+    blend: z.enum(BLENDS).optional(),
     visible: z.boolean().optional(),
     depth: z.number().optional().describe("so .boneco: a camada do slot para a luz, em px (positiva para perto de quem assiste; a instancia soma a dela nos slots do filho)"),
   }),

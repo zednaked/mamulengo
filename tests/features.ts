@@ -148,6 +148,67 @@ await run("mesh.create", { slot: "braco", name: "braco", mode: "grid", grid: [1,
 await run("mesh.weights", { slot: "braco", attachment: "braco", bones: ["ombro", "mao"] });
 runtimeOk("malhas com pesos");
 
+// blends que leem a tela (so do nucleo): no .boneco em portugues; na exportacao para o Spine saem
+// normais, com aviso
+{
+  const s0 = doc.json.slots[0].name;
+  const antes = doc.json.slots[0].blend;
+  await run("slot.set", { slot: s0, blend: "softLight" });
+  const bo = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), atlasText, "t");
+  const sp = (await import("../src/boneco/spine.ts")).exportarSpine(bo, { soSpine: true });
+  const volta = (await import("../src/boneco/spine.ts")).exportarSpine(bo);
+  check(
+    bo.slots[0].blend === "luz_suave" && volta.json.slots[0].blend === "softLight" && !sp.json.slots[0].blend && sp.avisos.some((x: string) => x.includes("luz_suave")),
+    "blends: luz suave vai ao .boneco como luz_suave, volta igual e sai normal no Spine com aviso",
+  );
+  await run("slot.set", { slot: s0, blend: antes ?? "normal" });
+}
+
+// geleia (so do nucleo): preset, moleza automatica pela distancia ao osso, vai ao .boneco em
+// portugues, acompanha a malha que ganha ponto e sai na exportacao para o Spine
+{
+  const gj = await run("mesh.jelly", { slot: "braco", attachment: "braco", preset: "slime" });
+  const a = doc.json.skins[0].attachments.braco.braco;
+  const n = a.uvs.length / 2;
+  const j0 = structuredClone(a.jelly);
+  const bo = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), atlasText, "t");
+  const ge = bo.skins[0].partes.braco.braco.geleia;
+  const mv = await run("query.mesh", { slot: "braco", attachment: "braco" });
+  await run("mesh.addVertex", { slot: "braco", attachment: "braco", at: mv.vertices[0].world, where: "inside" }).catch(() => run("mesh.addVertex", { slot: "braco", attachment: "braco", at: [(mv.vertices[0].world[0] + mv.vertices[2].world[0]) / 2, (mv.vertices[0].world[1] + mv.vertices[2].world[1]) / 2], where: "auto" }));
+  const n2 = doc.json.skins[0].attachments.braco.braco.uvs.length / 2;
+  const so = (await import("../src/boneco/spine.ts")).exportarSpine(bo, { soSpine: true });
+  check(
+    gj.enabled && j0.stiffness === 45 && j0.gravity === 60 && j0.wobble.length === n && Math.min(...j0.wobble) === 0 && Math.max(...j0.wobble) === 1 && ge?.rigidez === 45 && ge?.contagio === 60 && ge?.moleza?.length === n && n2 === n + 1 && doc.json.skins[0].attachments.braco.braco.jelly.wobble.length === n2 && !so.json.skins[0].attachments.braco.braco.jelly && so.avisos.some((x: string) => x.includes("geleia")),
+    `geleia: mesh.jelly slime, moleza de 0 (preso no osso) a 1 em ${n} pontos, geleia/rigidez/moleza no .boneco, segue a malha (${n2} pontos), sai no Spine com aviso`,
+  );
+  await run("mesh.jelly", { slot: "braco", attachment: "braco", enabled: false });
+  check(!doc.json.skins[0].attachments.braco.braco.jelly, "geleia: enabled false tira");
+}
+
+// olho maluco: eye.googly cola olhos (branco, pupila no osso pendurado com fisica, brilho) em
+// lugares aleatorios da parte opaca, pede as imagens da biblioteca no atlas e desfaz inteiro
+{
+  const s0 = doc.json.slots.find((s: any) => {
+    const a = s.attachment && doc.json.skins?.[0]?.attachments?.[s.name]?.[s.attachment];
+    return a && (!a.type || a.type === "region");
+  })!;
+  let semImagem = "";
+  await run("eye.googly", { slot: s0.name }).catch((e: any) => (semImagem = String(e.message)));
+  const comOlho: AssetProvider = { image: assets.image, region: (n) => (n.startsWith("efeito_googly_") ? { width: 128, height: 128 } : assets.region(n)) };
+  const antes = doc.serialize();
+  const [r] = await executeAsync(doc, { cmd: "eye.googly", args: { slot: s0.name, count: 2, seed: 3, size: 12 } }, "teste", undefined, {}, comOlho);
+  const nomes = doc.json.slots.map((s: any) => s.name);
+  const fis = (doc.json as any).constraints?.filter((c: any) => c.type === "physics" && c.bone?.startsWith(`${s0.name}_olho`)) ?? [];
+  const sk = skeletonAt(doc.json, null, 0);
+  const ang = (Math.atan2(boneWorld(sk, `${r.eyes[0]}_pupila`).c, boneWorld(sk, `${r.eyes[0]}_pupila`).a) * 180) / Math.PI;
+  const ordem = nomes.indexOf(`${r.eyes[0]}_branco`) > nomes.indexOf(s0.name) && nomes.indexOf(`${r.eyes[0]}_pupila`) > nomes.indexOf(`${r.eyes[0]}_branco`);
+  doc.undo();
+  check(
+    semImagem.includes("efeito_googly_branco") && r.eyes.length === 2 && fis.length === 2 && fis[0].gravity < 0 && Math.abs(ang + 90) < 0.5 && ordem && doc.serialize() === antes,
+    `eye.googly: ${r.eyes.length} olhos em ${s0.name} (pupila pendurada a ${ang.toFixed(1)} graus, fisica com gravidade), sem as imagens avisa, desfazer volta`,
+  );
+}
+
 // regressao (achada no teste de aceitacao): inserir/reordenar ossos nao pode mudar
 // para onde as malhas com pesos apontam (elas guardam indices de osso)
 {
@@ -275,6 +336,25 @@ await run("key.set", { anim: "1.idle", target: { bone: "alvo_mao" }, timeline: "
 await run("key.set", { anim: "1.idle", target: { constraint: "ik_braco" }, timeline: "ik", time: 0, mix: 1 });
 await run("key.set", { anim: "1.idle", target: { constraint: "ik_braco" }, timeline: "ik", time: 1, mix: 0.5 });
 runtimeOk("constraints");
+
+// slider: girar um osso percorre uma animacao inteira; vai ao .boneco em portugues e volta igual
+{
+  await run("bone.add", { name: "t_manivela", x: 40 });
+  await run("slider.create", { name: "t_slider", animation: "1.idle", bone: "t_manivela", property: "rotate", from: 0, to: 0.5, scale: 0.01, additive: true, loop: true, mix: 0.8 });
+  await run("constraint.set", { name: "t_slider", props: { local: true } });
+  const sp = await import("../src/boneco/spine.ts");
+  const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+  const r = bo.restricoes.find((c: any) => c.nome === "t_slider");
+  const volta = sp.exportarSpine(bo).json.constraints.find((c: any) => c.name === "t_slider");
+  const orig = doc.json.constraints.find((c: any) => c.name === "t_slider");
+  check(
+    r?.tipo === "slider" && r.animacao === "1.idle" && r.osso === "t_manivela" && r.somar && r.repetir && r.local_ && r.escalar === 0.01 && JSON.stringify(volta) === JSON.stringify(orig),
+    "slider: slider.create com osso, somar, repetir e local vai ao .boneco e volta igual",
+  );
+  runtimeOk("slider");
+  await run("constraint.delete", { name: "t_slider" });
+  await run("bone.delete", { bone: "t_manivela" });
+}
 
 // IK sem bendPositive dobra para o lado desenhado (a pose de setup nao muda ao ligar)
 {
@@ -470,6 +550,107 @@ runtimeOk("constraints");
     await run("animation.delete", { name: "t.laco" });
     await run("animation.delete", { name: "t.vaivem" });
   }
+  // desenho vetorial (ambiente Desenhar): imagem desenhada numa parte nova, formas por pontos, svg,
+  // retangulo com cantos e elipse, ponto no meio de um lado, ajuste ao desenho mantendo a parte
+  // no lugar, pagina do atlas e ida e volta ao .boneco em portugues
+  {
+    const des = await import("../src/core/desenho.ts");
+    const n0 = doc.history().length;
+    const osso = doc.json.bones[1].name;
+    await run("draw.create", { image: "t.desenho", width: 100, height: 80, slot: "t.desenho", bone: osso, x: 12, y: -4 });
+    await run("draw.shape", { image: "t.desenho", rect: [10, 10, 60, 40], cornerRadius: 8, fill: "#ff8800", stroke: { width: 3, align: "inside", join: "round" } });
+    const sv = await run("draw.shape", { image: "t.desenho", name: "gota", svg: "M 20 60 C 30 40 50 40 60 60 Z m 10 5 l 10 0 l 0 8 z" });
+    await run("draw.shape", { image: "t.desenho", ellipse: [80, 20, 15, 10], stroke: { color: "112233" } });
+    const antes = des.svgPath(doc.json.drawings["t.desenho"].shapes[1]);
+    const sp = await run("draw.split", { image: "t.desenho", shape: "gota", seg: 0, t: 0.5 });
+    const depoisSplit = des.flatten(doc.json.drawings["t.desenho"].shapes[1], 1);
+    // o ponto novo esta em cima da curva de antes
+    const novo = doc.json.drawings["t.desenho"].shapes[1].points[sp.index];
+    const naCurva = des.flatten(des.parseSvgPath(antes)[0], 0.5).some(([x, y]) => Math.hypot(x - novo.x, y - novo.y) < 0.6);
+    await run("draw.point", { image: "t.desenho", shape: 0, index: 1, radius: 4 });
+    await run("draw.order", { image: "t.desenho", shape: "elipse", index: 0 });
+    const W = () => {
+      const a = doc.json.skins[0].attachments["t.desenho"]["t.desenho"];
+      const m = boneWorld(skeletonAt(doc.json, null, 0), osso);
+      return [m.a * a.x + m.b * a.y + m.x, m.c * a.x + m.d * a.y + m.y, a.width, a.height];
+    };
+    const w0 = W();
+    const fit = await run("draw.fit", { image: "t.desenho", margin: 0 });
+    const w1 = W();
+    const d = doc.json.drawings["t.desenho"];
+    const lay = des.layoutDrawings(doc.json.drawings)!;
+    const at = des.atlasWithDrawings("a.png\nsize:4,4\nfilter:Linear,Linear\nx\nbounds:0,0,4,4\n", "t-desenhos.png", lay);
+    const bo = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), at, "t");
+    const volta = (await import("../src/boneco/spine.ts")).exportarSpine(bo);
+    let recusou = false;
+    await run("draw.remove", { image: "t.desenho" }).catch(() => (recusou = true));
+    const get = await run("draw.get", {});
+    check(
+      sv.added.length === 2 &&
+        sv.added[1].name === "gota_2" &&
+        depoisSplit.length > 0 &&
+        naCurva &&
+        d.shapes[0].name === "elipse" &&
+        d.shapes[1].points[1].radius === 4 &&
+        fit.width === d.width &&
+        Math.abs(w1[2] - fit.width) < 1e-6 &&
+        // o centro da parte andou o deslocamento do centro da imagem (pixel = unidade, sem escala)
+        Math.abs(Math.hypot(w1[0] - w0[0], w1[1] - w0[1]) - Math.hypot(fit.offset[0] * -1 + fit.width / 2 - 50, fit.offset[1] * -1 + fit.height / 2 - 40)) < 1e-3 &&
+        at.includes("t-desenhos.png\nsize:") &&
+        at.includes("bounds:2,2,") &&
+        bo.desenhos?.["t.desenho"]?.formas?.[1]?.traco?.alinhar === "dentro" &&
+        bo.desenhos["t.desenho"].formas[1].traco.quina === "redonda" &&
+        JSON.stringify(volta.json.drawings) === JSON.stringify(doc.json.drawings) &&
+        recusou &&
+        get[0].usedBy[0] === "t.desenho/t.desenho",
+      `desenho: draw.create/shape/split/point/order/fit, ${fit.width}x${fit.height} sem sair do lugar, pagina ${lay.width}x${lay.height}, .boneco com desenhos/formas/traco em portugues e volta igual`,
+    );
+    // furos: svg de dois subcaminhos (letra O), draw.hole, draw.cut, ponto no furo, mover leva os furos
+    const o = await run("draw.shape", { image: "t.desenho", name: "o", svg: "M10 10 L50 10 L50 50 L10 50 Z M20 20 L40 20 L40 40 L20 40 Z", holes: true });
+    const io = o.added[0].index;
+    const h2 = await run("draw.hole", { image: "t.desenho", shape: io, ellipse: [30, 30, 3, 3] });
+    await run("draw.point", { image: "t.desenho", shape: io, contour: 1, index: 0, x: 21 });
+    const cort = await run("draw.shape", { image: "t.desenho", name: "cortador", rect: [12, 12, 4, 4] });
+    const cut = await run("draw.cut", { image: "t.desenho", shape: cort.added[0].index, into: io });
+    const fo = doc.json.drawings["t.desenho"].shapes[cut.index];
+    await run("draw.move", { image: "t.desenho", shapes: [cut.index], dx: 1, dy: 0 });
+    const fm = doc.json.drawings["t.desenho"].shapes[cut.index];
+    const boF = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), at, "t").desenhos["t.desenho"].formas.find((f: any) => f.nome === "o");
+    check(
+      o.added.length === 1 && h2.contour === 2 && fo.holes.length === 3 && fo.holes[0].points[0].x === 21 && fm.holes[2].points[0].x === 13 && fm.points[0].x === 11 && boF?.furos?.length === 3 && des.svgPath(fm).split("M").length === 5,
+      `desenho: furos por svg, draw.hole, draw.cut e ponto num furo; mover leva os furos; no .boneco "furos" (${fo.holes.length})`,
+    );
+    // o desenho passou da imagem: draw.cover cresce a imagem e a peca fica no mesmo lugar da tela
+    const wAntes = W();
+    const dAntes = { w: doc.json.drawings["t.desenho"].width, h: doc.json.drawings["t.desenho"].height };
+    await run("draw.point", { image: "t.desenho", shape: 1, index: 0, x: -20 });
+    const cov = await run("draw.cover", { image: "t.desenho" });
+    const dDepois = doc.json.drawings["t.desenho"];
+    const wDepois = W();
+    const pxMundo = (w: number[]) => w[2] / dDepois.width;
+    check(
+      !!cov.grown && dDepois.width > dAntes.w && dDepois.shapes.every((f: any) => (des.shapeBounds(f)?.[0] ?? 0) >= 0) && Math.abs(wDepois[2] / dDepois.width - wAntes[2] / dAntes.w) < 1e-6 && pxMundo(wDepois) > 0 && Object.keys(cov.added).length === 0,
+      `desenho: draw.cover cresce a imagem ${dAntes.w}x${dAntes.h} -> ${dDepois.width}x${dDepois.height} na mesma escala, com as formas dentro`,
+    );
+    // trocar uma imagem do atlas pelo desenho: todas as partes que a usam apontam para ele
+    const usada = Object.entries<any>(doc.json.skins[0].attachments).flatMap(([sl, m]: any) => Object.entries<any>(m).map(([n, a]: any) => ({ sl, n, a }))).find((x) => (x.a.type ?? "region") === "region" && x.sl !== "t.desenho");
+    const img = usada!.a.path ?? usada!.n;
+    const rr = await run("draw.replace", { image: img, drawing: "t.desenho" });
+    check(rr.replaced.includes(`${usada!.sl}/${usada!.n}`) && doc.json.skins[0].attachments[usada!.sl][usada!.n].path === "t.desenho" && !!rr.warning, `desenho: draw.replace troca ${img} pelo desenho (${rr.replaced.join(", ")}) e avisa do tamanho diferente`);
+    // vetorizar: a cabeca (circulo amarelo com dois olhos) vira desenho; desenhada de volta em SVG,
+    // fica perto da imagem (pixels da parte opaca com erro pequeno)
+    const tr = await run("draw.trace", { image: "cabeca", replace: false });
+    const dt = doc.json.drawings[tr.drawing];
+    const svgT = `<svg xmlns="http://www.w3.org/2000/svg" width="${dt.width}" height="${dt.height}">` + dt.shapes.map((x: any) => `<path d="${des.svgPath(x)}" fill="#${x.fill.slice(0, 6)}" fill-rule="evenodd"/>`).join("") + "</svg>";
+    const a1 = await sharp(Buffer.from(svgT)).ensureAlpha().raw().toBuffer();
+    const a0 = (await assets.image("cabeca"))!.data;
+    let erro = 0;
+    for (let i = 0; i < a1.length; i++) erro += Math.abs(a1[i] - a0[i]);
+    erro /= a1.length * 255;
+    check(tr.colors[0] === "ffd166" && tr.colors.includes("222222") && tr.shapes === 3 && tr.points < 30 && erro < 0.02, `desenho: draw.trace vetoriza a cabeca em ${tr.shapes} formas e ${tr.points} pontos (${tr.colors.join(", ")}), erro medio ${(erro * 100).toFixed(2)}%`);
+    while (doc.history().length > n0) doc.undo();
+    check(!doc.json.drawings && !doc.json.slots.some((x: any) => x.name === "t.desenho"), "desenho: desfazer tira a imagem desenhada e a parte");
+  }
   // camada de ajuste: setup e chave (matiz negativo), vai ao .boneco como "ajuste" em portugues
   {
     const s0 = doc.json.slots[0].name;
@@ -642,6 +823,15 @@ runtimeOk("constraints");
         fogo?.blend === "aditivo" && fogo?.cor?.length === 4 && fogo?.onda?.[1] === 6 && raio?.tipo === "raio" && raio?.ate === ossos2[2] && raio?.segmentos === 12 && raio?.desvio === 0.2 && raio?.ramos === 2 && raio?.troca === 0.05,
         `particulas: fogo (tons, blend, onda) e raio (tipo, ate, segmentos, desvio, ramos, troca) chegam ao .boneco (${JSON.stringify(raio)})`,
       );
+    }
+    // variacoes: cada particula sorteia uma das imagens; a primeira vale como imagem do emissor
+    {
+      const imgs = doc.json.slots.filter((s: any) => s.attachment).slice(0, 2).map((s: any) => s.attachment);
+      await run("particles.set", { name: "t.fumaca", slot: s0.name, variants: imgs, rate: 6 });
+      const { importarSpine } = await import("../src/boneco/spine.ts");
+      const fu = importarSpine(doc.json, atlasText, "t").particulas.find((x: any) => x.nome === "t.fumaca");
+      check(fu?.imagem === imgs[0] && JSON.stringify(fu?.variacoes) === JSON.stringify(imgs), `particulas: variants vira variacoes no .boneco, a primeira e a imagem (${JSON.stringify(fu?.variacoes)})`);
+      await run("particles.delete", { name: "t.fumaca" });
     }
     await run("particles.delete", { name: "t.fogo" });
     await run("particles.delete", { name: "t.raio" });
@@ -1013,6 +1203,14 @@ await run("skin.create", { name: "verde", copyFrom: "default" });
 await run("linkedmesh.create", { slot: "corpo", name: "corpo_verde", source: "corpo", skin: "verde", path: "corpo" });
 check(doc.json.skins.find((s: any) => s.name === "verde").attachments.corpo.corpo_verde.skin === "verde", "linked mesh em skin nao-default grava o campo skin");
 runtimeOk("linked mesh em skin nao-default");
+// osso exclusivo de skin: tirar da lista volta a ser de todas (antes ficava exclusivo de nenhuma)
+{
+  const ob = doc.json.bones[doc.json.bones.length - 1].name;
+  await run("skin.require", { skin: "verde", bones: [ob] });
+  const marcado = !!doc.json.bones.find((b: any) => b.name === ob).skin;
+  await run("skin.require", { skin: "verde", bones: [] });
+  check(marcado && !doc.json.bones.find((b: any) => b.name === ob).skin && !doc.json.skins.find((s: any) => s.name === "verde").bones, "skin.require: osso que sai da lista da skin volta a ser de todas");
+}
 
 // edicao de malha: cada operacao continua lendo no runtime, mexe so no que deveria
 // (posicoes de setup e deformadas dos outros vertices iguais, deforms do mesmo tamanho

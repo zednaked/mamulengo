@@ -238,9 +238,18 @@ defineCommand({
       const v = p[k];
       if (!v) continue;
       if (k === "bones") v.forEach((b) => requireBone(e.json, b));
+      const antes: string[] = e.json.skins[i][k] ?? [];
       e.set(["skins", i, k], v.length ? v : undefined);
-      // o osso precisa saber que depende de skin
-      if (k === "bones") for (const b of v) e.set(["bones", e.json.bones.findIndex((x: any) => x.name === b), "skin"], true);
+      // o osso precisa saber que depende de skin; o que saiu da lista e nao esta em outra skin volta
+      // a ser de todas (senao ficaria exclusivo de nenhuma e nunca apareceria)
+      if (k === "bones") {
+        for (const b of v) e.set(["bones", e.json.bones.findIndex((x: any) => x.name === b), "skin"], true);
+        for (const b of antes)
+          if (!v.includes(b) && !e.json.skins.some((sk: any) => sk.bones?.includes(b))) {
+            const bi = e.json.bones.findIndex((x: any) => x.name === b);
+            if (bi >= 0 && e.json.bones[bi].skin) e.set(["bones", bi, "skin"], undefined);
+          }
+      }
     }
     return { ok: true };
   },

@@ -18,7 +18,7 @@ import { parseAtlas } from "../core/atlas-text.ts";
 export const VERSAO = 0;
 
 // caminhos (so as chaves do esquema, sem indices) cujas chaves sao nomes do artista
-const MAPA_DE_NOMES = /^(events|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
+const MAPA_DE_NOMES = /^(events|drawings|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
 
 function traduz(n: any, campos: Record<string, string>, valores: Record<string, Record<string, string>>, eNome: (p: string) => boolean, p: string[] = []): any {
   if (Array.isArray(n)) return n.map((x) => traduz(x, campos, valores, eNome, p));
@@ -249,7 +249,24 @@ export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
       delete a.luzes;
       delete a.ambiente;
     }
+    // a geleia e do nucleo: no Spine a malha fica dura
+    const moles: string[] = [];
+    for (const sk of resto.skins ?? []) for (const [sl, ps] of Object.entries<any>(sk.partes ?? {})) for (const [n, a] of Object.entries<any>(ps)) if (a.geleia) (moles.push(`${sl}/${n}`), delete a.geleia);
+    if (moles.length) avisos.push(`a geleia das malhas (${moles.join(", ")}) nao existe no Spine e ficou de fora: elas ficam duras`);
+    // os desenhos viram so a imagem (a pagina dos desenhos vai no atlas, como as outras)
+    if (resto.desenhos) {
+      avisos.push(`os desenhos vetoriais (${Object.keys(resto.desenhos).join(", ")}) vao so como imagem; as formas nao existem no Spine`);
+      delete resto.desenhos;
+    }
   }
+  // os blends que leem a tela sao do nucleo: no Spine, normal
+  const LE_TELA = ["sobrepor", "luz_suave", "escurecer", "clarear", "diferenca", "subexpor"];
+  if (opts.soSpine)
+    for (const s of resto.slots ?? [])
+      if (LE_TELA.includes(s.blend)) {
+        avisos.push(`slot ${s.nome}: o blend ${s.blend} nao existe no Spine e saiu normal`);
+        delete s.blend;
+      }
   for (const s of resto.slots ?? []) {
     if (s.blend === "multiplica") {
       avisos.push(`slot ${s.nome}: multiply com transparencia sai como multiply do Spine (no Godot a parte transparente escurece); para ficar igual, pinte de branco a parte transparente da imagem`);

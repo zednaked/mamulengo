@@ -8,6 +8,7 @@ import { applySequence, type SequenceParam } from "../app/sequence.ts";
 import { createFromPsd, updateFromPsd } from "../app/psd.ts";
 import { dropDraft } from "../app/drafts.ts";
 import type { Runtime } from "../render/viewer.ts";
+import { startDrawEdit, stopDrawEdit } from "../app/drawedit.ts";
 void execute;
 
 type Handler = (params: any) => Promise<any> | any;
@@ -219,13 +220,15 @@ const handlers: Record<string, Handler> = {
       dirty: app.doc?.dirty ?? false,
       view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data }, medidas: { modo: modoMedidas(), ...estatisticasMedidas } } : null,
       selection: app.selection,
+      // o Desenhar aberto na tela (imagem, ferramenta, forma e ponto escolhidos, caminho da caneta)
+      draw: app.drawEdit ? { ...app.drawEdit } : null,
       runtimeError: v?.error ?? null,
       history: app.doc?.history().slice(-15) ?? [],
     };
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
     // imagem de referencia por cima (file: caminho dentro das raizes); null tira
@@ -258,6 +261,15 @@ const handlers: Record<string, Handler> = {
     if (p.select) {
       app.selection = p.select;
       v.selection = p.select;
+    }
+    // o Desenhar na tela do usuario: a parte desenhada, a ferramenta e a forma/ponto escolhidos
+    if (p.draw === null) stopDrawEdit();
+    else if (p.draw) {
+      if (app.drawEdit?.slot !== p.draw.slot && !startDrawEdit(p.draw.slot)) throw new Error(`a parte ${p.draw.slot} nao mostra uma imagem desenhada (region com drawings)`);
+      const de = app.drawEdit!;
+      if (p.draw.tool) de.tool = p.draw.tool;
+      if (p.draw.shape !== undefined) de.shape = p.draw.shape;
+      if (p.draw.point !== undefined) de.point = p.draw.point;
     }
     if (p.fit) v.frameAll();
     // um retangulo do mundo [x, y, largura, altura] (y para cima) inteiro na tela, sem folga

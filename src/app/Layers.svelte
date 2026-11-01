@@ -6,6 +6,38 @@
   import { movingBone } from "./interact.ts";
 
   let filter = $state("");
+
+  // skins: variacoes de visual (outra roupa, outra cor). A escolhida e a mostrada, e imagem nova
+  // numa camada entra nela
+  const skins = $derived((app.version, (app.doc?.json.skins ?? []).map((s: any) => s.name as string)));
+  let renSkin = $state<string | null>(null);
+  let textoSkin = $state("");
+  const livre = (base: string) => {
+    let n = base;
+    for (let k = 2; skins.includes(n); k++) n = `${base}_${k}`;
+    return n;
+  };
+  function novaSkin(copia: boolean) {
+    const de = app.skinEdicao;
+    const nome = livre(copia ? `${de}_copia` : "skin");
+    if (app.run({ cmd: "skin.create", args: { name: nome, ...(copia ? { copyFrom: de } : {}) } }, copia ? `duplica a skin ${de}` : "skin nova")) {
+      app.verSkin(nome);
+      app.avisar(copia ? `${nome} é uma cópia de ${de}: troque as imagens das camadas (aba Imagens ou o inspetor) e elas mudam só nela.` : `${nome} está vazia: as imagens que você puser nas camadas agora entram nela (o que ela não tem vem da padrão).`);
+    }
+  }
+  function renomearSkin() {
+    const de = renSkin;
+    renSkin = null;
+    const para = textoSkin.trim();
+    if (!de || !para || para === de) return;
+    if (app.run({ cmd: "skin.rename", args: { name: de, to: para } }, `renomeia a skin ${de}`)) app.verSkin(para);
+  }
+  function apagarSkin(nome: string) {
+    if (app.run({ cmd: "skin.delete", args: { name: nome } }, `apaga a skin ${nome}`)) {
+      app.verSkin(null);
+      app.avisar(`A skin ${nome} foi apagada. Ctrl+Z desfaz.`);
+    }
+  }
   // trocas que ainda nao entraram e brilhos apagados: so com o filtro ou pedindo
   let showHidden = $state(false);
 
@@ -93,6 +125,25 @@
 </script>
 
 <div class="layers">
+  {#if app.doc}
+    <div class="skins" title="Skins: variações de visual do personagem (outra roupa, outra cor). A escolhida é a mostrada, e imagem nova numa camada entra nela">
+      <span class="dim">skin</span>
+      {#if renSkin}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="ren-skin" bind:value={textoSkin} onkeydown={(e) => (e.key === "Enter" ? renomearSkin() : e.key === "Escape" && (renSkin = null))} onblur={renomearSkin} autofocus />
+      {:else}
+        <select value={app.skinEdicao} onchange={(e) => app.verSkin((e.target as HTMLSelectElement).value)}>
+          {#each skins as n}<option value={n}>{n}</option>{/each}
+        </select>
+      {/if}
+      <button onclick={() => novaSkin(true)} title="duplicar esta skin (para trocar só algumas imagens)">⧉</button>
+      <button onclick={() => novaSkin(false)} title="skin nova vazia (o que ela não tem vem da padrão)">+</button>
+      {#if app.skin}
+        <button onclick={() => ((renSkin = app.skin), (textoSkin = app.skin ?? ""))} title="renomear esta skin">✎</button>
+        <button onclick={() => apagarSkin(app.skin!)} title="apagar esta skin (Ctrl+Z desfaz)">🗑</button>
+      {/if}
+    </div>
+  {/if}
   <input class="search" placeholder="procurar" title="Procurar camada ou imagem" bind:value={filter} />
   <div class="hint" title="A lista vai da frente (em cima) para trás (embaixo). Arraste uma linha para mudar a ordem; numa animação isso vira chave no instante atual. Embaixo do nome: a imagem e o osso que move a peça.">↑ frente · arraste para reordenar</div>
   <label class="hint"><input type="checkbox" bind:checked={showHidden} /> mostrar as escondidas agora</label>
@@ -114,6 +165,22 @@
 </div>
 
 <style>
+  .skins {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .skins select,
+  .ren-skin {
+    flex: 1;
+    min-width: 0;
+  }
+  .skins button {
+    padding: 2px 6px;
+    font-size: 12px;
+  }
   .layers {
     display: flex;
     flex-direction: column;

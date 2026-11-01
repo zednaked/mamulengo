@@ -31,7 +31,8 @@ export function carregarNucleo(url = new URL(NO_REPO, import.meta.url).href): Pr
 export type PaginaGL = { tex: WebGLTexture; pma: boolean; relevo?: WebGLTexture | null };
 
 // blend na ordem do enum Blend do nucleo: normal, aditivo, multiplica, multiplica do motor, tela
-// (a cor sai pre-multiplicada do shader)
+// (a cor sai pre-multiplicada do shader); do 5 em diante (sobrepor, luz suave, escurecer, clarear,
+// diferenca, subexpor) le a tela: FRAGMENTO_MODO
 const blends = (gl: WebGL2RenderingContext): [number, number][] => [
   [gl.ONE, gl.ONE_MINUS_SRC_ALPHA],
   [gl.ONE, gl.ONE],
@@ -89,6 +90,35 @@ void main() {
   float a = t.a * vcor.a;
   // multiplica do motor: so a cor, sem o alfa (o retangulo escuro do Godot)
   saida = motor ? vec4(c, 1.0) : vec4(c * a, a);
+}`;
+
+// os blends que leem a tela (docs/NUCLEO.md "Blends"; blend 5 em diante): o que ja esta desenhado
+// (copiado para `tela`) misturado com a cor da peca pela formula do modo (as do W3C, "Compositing
+// and Blending"), por cima na medida do alfa
+const FRAGMENTO_MODO = `#version 300 es
+precision highp float;
+in vec2 vuv; in vec4 vcor; in vec2 vmundo;
+uniform sampler2D tex; uniform sampler2D tela; uniform bool pma; uniform int modo; uniform vec4 vista;
+out vec4 saida;
+vec3 mistura(vec3 b, vec3 s) {
+  if (modo == 5) return mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, b));
+  if (modo == 6) {
+    vec3 D = mix(((16.0 * b - 12.0) * b + 4.0) * b, sqrt(b), step(0.25, b));
+    return mix(b - (1.0 - 2.0 * s) * b * (1.0 - b), b + (2.0 * s - 1.0) * (D - b), step(0.5, s));
+  }
+  if (modo == 7) return min(b, s);
+  if (modo == 8) return max(b, s);
+  if (modo == 9) return abs(b - s);
+  if (modo == 10) return mix(min(vec3(1.0), b / max(1.0 - s, 1e-5)), vec3(0.0), step(b, vec3(0.0)));
+  return s;
+}
+void main() {
+  vec4 t = texture(tex, vuv);
+  if (pma && t.a > 0.0) t.rgb /= t.a;
+  vec3 c = t.rgb * vcor.rgb;
+  float a = t.a * vcor.a;
+  vec3 b = texture(tela, (gl_FragCoord.xy - vista.xy) / vista.zw).rgb;
+  saida = vec4(mistura(b, c) * a, a);
 }`;
 
 // os efeitos de um slot (docs/NUCLEO.md "Efeitos"): ef sao os 23 canais (linha 0-4, brilho
@@ -228,6 +258,8 @@ export class Desenhista {
   private progAj: WebGLProgram;
   private uAj: Record<string, WebGLUniformLocation | null> = {};
   private tela: WebGLTexture;
+  private progModo: WebGLProgram;
+  private uModo: Record<string, WebGLUniformLocation | null> = {};
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -267,6 +299,11 @@ export class Desenhista {
     gl.useProgram(this.progAj);
     gl.uniform1i(this.uAj.tex, 0);
     gl.uniform1i(this.uAj.tela, 2);
+    this.progModo = programa(FRAGMENTO_MODO);
+    for (const u of ["proj", "tex", "tela", "pma", "modo", "vista"]) this.uModo[u] = gl.getUniformLocation(this.progModo, u);
+    gl.useProgram(this.progModo);
+    gl.uniform1i(this.uModo.tex, 0);
+    gl.uniform1i(this.uModo.tela, 2);
     this.tela = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.tela);
     for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
@@ -401,6 +438,24 @@ export class Desenhista {
       }
       const p = paginas[pag];
       if (!p?.tex || !quantos) continue;
+      if (blend >= 5) {
+        // blend que le a tela: copia o que ja esta desenhado e mistura (sem efeitos nem luz)
+        const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this.tela);
+        gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, vp[0], vp[1], vp[2], vp[3], 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, p.tex);
+        if (usando !== this.progModo) gl.useProgram((usando = this.progModo));
+        gl.uniformMatrix4fv(this.uModo.proj, false, proj);
+        gl.uniform1i(this.uModo.pma, p.pma ? 1 : 0);
+        gl.uniform1i(this.uModo.modo, blend);
+        gl.uniform4f(this.uModo.vista, vp[0], vp[1], vp[2], vp[3]);
+        gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.drawElements(gl.TRIANGLES, quantos, gl.UNSIGNED_INT, inicio * 4);
+        chamadas++;
+        continue;
+      }
       gl.bindTexture(gl.TEXTURE_2D, p.tex);
       const quer = ef >= 0 && efeitos ? this.progEf : this.prog;
       if (quer !== usando) gl.useProgram((usando = quer));

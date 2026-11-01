@@ -62,6 +62,25 @@
     }
   }
 
+  // o arquivo (.boneco): formato, arte HD a partir do SVG, relevo
+  let info = $state<{ binario: boolean; bytes: number } | null>(null);
+  $effect(() => {
+    app.versionsTick;
+    const t = app.asset?.tres;
+    info = null;
+    if (t?.endsWith(".boneco")) fetch(`/api/boneco/info?p=${encodeURIComponent(t)}`).then((r) => (r.ok ? r.json() : null)).then((j) => (info = j));
+  });
+  let svgInput = $state<HTMLInputElement>();
+  let fator = $state(3);
+  let idSvg = $state("{nome}");
+  let fatorLeve = $state(0.5);
+  async function arteHd(f: FileList | null) {
+    const svg = f?.[0];
+    if (!svg) return;
+    await app.arteHd(svg, fator, idSvg);
+    if (svgInput) svgInput.value = "";
+  }
+
   const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 </script>
 
@@ -69,6 +88,40 @@
   {#if !app.asset}
     <p class="dim">Abra um personagem.</p>
   {:else}
+    {#if info}
+      <div class="arquivo">
+        <div class="tit">Arquivo</div>
+        <div class="linha">
+          <span>formato: <b>{info.binario ? "binário" : "texto"}</b> · {Math.round(info.bytes / 1024)} KB</span>
+          <button disabled={app.relevoRodando} onclick={() => app.converterFormato(!info!.binario)} title={info.binario ? "Volta a gravar em texto (JSON): maior, mas legível e com diff no git" : "Grava em binário: bem menor e mais rápido de carregar no jogo; o editor continua lendo e gravando"}>{info.binario ? "para texto" : "para binário"}</button>
+        </div>
+        <div class="linha">
+          <span title="A página do atlas refeita a partir do vetor original da arte (cada imagem pelo objeto do SVG com o id dela), nítida de perto">arte HD do SVG</span>
+          <select bind:value={fator} title="quantas vezes maior">
+            <option value={2}>2x</option>
+            <option value={3}>3x</option>
+            <option value={4}>4x</option>
+          </select>
+          <input class="id" bind:value={idSvg} title="o id no SVG de cada imagem: {'{nome}'} vira o nome dela, * casa qualquer trecho" />
+          <button disabled={app.relevoRodando} onclick={() => svgInput?.click()}>SVG…</button>
+          <input bind:this={svgInput} type="file" accept=".svg,image/svg+xml" hidden onchange={(e) => arteHd((e.target as HTMLInputElement).files)} />
+        </div>
+        <div class="linha">
+          <span title="O mapa de normais das páginas, calculado da própria arte, para as luzes iluminarem as peças">relevo</span>
+          <button disabled={app.relevoRodando} onclick={() => app.gerarRelevo()}>{app.relevoRodando ? "trabalhando…" : /^relevo:/m.test(app.doc?.atlas.text ?? "") ? "refazer" : "gerar"}</button>
+        </div>
+        <div class="linha">
+          <span title="Uma cópia para aparelhos fracos: todas as imagens juntas no menor número de páginas (menos trocas de textura) e em resolução menor. Sai ao lado, como <nome>-leve.boneco; o esqueleto e as animações são os mesmos">versão leve</span>
+          <select bind:value={fatorLeve} title="a resolução das páginas">
+            <option value={0.5}>metade</option>
+            <option value={0.25}>um quarto</option>
+            <option value={1}>inteira (só junta)</option>
+          </select>
+          <button disabled={app.relevoRodando} onclick={() => app.versaoLeve(fatorLeve)}>gerar</button>
+        </div>
+        <p class="dim small">Formato, arte HD e relevo regravam o arquivo: o editor salva antes e reabre depois; para desfazer, restaure a versão de antes, logo abaixo.</p>
+      </div>
+    {/if}
     <div class="mark">
       <input bind:value={label} placeholder="nome da versão" title="Ex: aprovado pela direção de arte" onkeydown={(e) => e.key === "Enter" && mark()} />
       <button class="go" onclick={mark} disabled={busy || !label.trim()} title="Salva e guarda o estado atual com esse nome">Marcar</button>
@@ -107,6 +160,33 @@
 </div>
 
 <style>
+  .arquivo {
+    border: 1px solid var(--line, #3a3448);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .arquivo .tit {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .arquivo .linha {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .arquivo .linha > span {
+    flex: 1;
+    min-width: 0;
+  }
+  .arquivo .id {
+    width: 70px;
+  }
   .versions {
     display: flex;
     flex-direction: column;

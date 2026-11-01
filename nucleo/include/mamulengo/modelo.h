@@ -64,9 +64,14 @@ struct DadosOsso {
   double comprimento = 0;
   double x = 0, y = 0, rotacao = 0, escala_x = 1, escala_y = 1, cisalha_x = 0, cisalha_y = 0;
   Heranca heranca = Heranca::Normal;
+  // so de skin: ativo so com uma skin que o lista em Skin::ossos (e o pai ativo)
+  bool so_skin = false;
 };
 
-enum class Blend : uint8_t { Normal, Aditivo, Multiplica, MultiplicaMotor, Tela };
+// os blends que leem a tela (docs/NUCLEO.md "Blends"): do Sobrepor em diante o desenhista copia o
+// que ja esta desenhado e mistura pela formula do modo
+enum class Blend : uint8_t { Normal, Aditivo, Multiplica, MultiplicaMotor, Tela, Sobrepor, LuzSuave, Escurecer, Clarear, Diferenca, Subexpor };
+inline bool le_tela(Blend b) { return uint8_t(b) >= uint8_t(Blend::Sobrepor); }
 
 struct Cor {
   float r = 1, g = 1, b = 1, a = 1;
@@ -130,6 +135,22 @@ struct DadosSlot {
 
 enum class TipoParte : uint8_t { Regiao, Malha, MalhaLigada, Recorte, Caminho, Ponto, Caixa };
 
+// geleia (docs/NUCLEO.md "Geleia"): a malha mole. Cada vertice tem massa e e puxado por uma
+// mola para onde o rig o poe (`rigidez`) e pelos vizinhos (`contagio`: a forma entre eles volta
+// a do rig, e o balanco corre pela malha); `moleza` por vertice diz quanto ele sai do rig (0
+// preso, 1 todo solto; vazia ou de outro tamanho: todos 1)
+struct Geleia {
+  bool ativa = false;
+  double rigidez = 120, contagio = 80, amortecimento = 3, gravidade = 0, massa = 1;
+  std::vector<float> moleza;
+  // as arestas da malha (pares de vertices), tiradas dos triangulos
+  std::vector<uint16_t> arestas;
+  // slots que seguem a geleia (olho, boca, antena em cima da barriga mole): cada um anda com o
+  // deslocamento da malha no ponto em que o centro dele cai quando a geleia comeca
+  std::vector<int> seguem;
+  std::vector<std::string> nomes_seguem;
+};
+
 struct Parte {
   TipoParte tipo = TipoParte::Regiao;
   std::string nome;
@@ -174,6 +195,8 @@ struct Parte {
   Cor cor;
   // recorte: o slot em que o recorte acaba (-1: vale ate o fim do desenho)
   int fim = -1;
+  // malha mole
+  Geleia geleia;
 };
 
 // skin: para cada slot, os pares (id do nome, indice em Modelo::partes)
@@ -186,7 +209,19 @@ struct Skin {
 
 // ---- restricoes
 
-enum class TipoRestricao : uint8_t { IK, Transformacao, Caminho, Fisica };
+enum class TipoRestricao : uint8_t { IK, Transformacao, Caminho, Fisica, Slider };
+
+// slider (docs/NUCLEO.md "Slider"): toca uma animacao inteira num instante; sem osso, o instante e
+// `tempo` (animavel); com osso, sai de uma propriedade dele: (valor - de) x escala + para
+enum class PropSlider : uint8_t { Girar, X, Y, EscalaX, EscalaY, CisalhaY };
+struct DadosSlider {
+  int animacao = -1;
+  std::string nome_animacao;  // resolvida depois de ler as animacoes
+  int osso = -1;
+  PropSlider prop = PropSlider::Girar;
+  bool local = false, somar = false, repetir = false;
+  double de = 0, para = 0, escala = 1, mix = 1, tempo = 0;
+};
 
 struct DadosIK {
   std::vector<int> ossos;
@@ -248,6 +283,7 @@ struct DadosRestricao {
   DadosTransformacao transf;
   DadosCaminho caminho;
   DadosFisica fisica;
+  DadosSlider slider;
 };
 
 // ---- animacoes
@@ -281,6 +317,13 @@ struct DadosEmissor {
   int pagina = -1;                     // da imagem (-1: sem imagem, nao desenha)
   float uvs[8] = {0};                  // cantos da imagem: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita
   double meia_largura = 0, meia_altura = 0;  // metade do retangulo com pixels
+  // variacoes (campo `variacoes`, nomes de imagens): cada particula sorteia uma ao nascer; so as da pagina da
+  // primeira (um lote). Vazia: todas usam a imagem acima
+  struct Variacao {
+    float uvs[8] = {0};
+    double meia_largura = 0, meia_altura = 0;
+  };
+  std::vector<Variacao> variacoes;
   double taxa = 10;
   double vida[2] = {1, 1}, velocidade[2] = {100, 100}, escala[2] = {1, 1}, giro[2] = {0, 0};
   double angulo = 90, abertura = 30, gravidade = 0, arrasto = 0;
@@ -383,6 +426,7 @@ enum class PropRestricao : uint8_t {
   CaminhoPosicao, CaminhoEspacamento, CaminhoMix,  // mix: 3 canais
   FisicaInercia, FisicaForca, FisicaAmortecimento, FisicaMassa, FisicaVento, FisicaGravidade, FisicaMix,
   FisicaReiniciar,
+  SliderTempo, SliderMix,
 };
 struct TimelineRestricao {
   int restricao;  // -1: todas as fisicas (timelines globais)

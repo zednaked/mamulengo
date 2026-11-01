@@ -53,6 +53,7 @@ struct Materiais {
   // passo, com efeitos e/ou com luz (indice efeitos + 2 x luz, de 1 a 3)
   RID shader_proprio[PASSOS][4];
   RID shader_ajuste;
+  RID shader_modo;
 };
 Materiais &cache() {
   static Materiais m;
@@ -210,6 +211,34 @@ RID shader_ajuste() {
   return sh;
 }
 
+// os blends que leem a tela (docs/NUCLEO.md "Blends"; a mesma conta de src/render/desenhista.ts):
+// o que ja esta desenhado (o backbuffer, copiado antes do item) misturado com a cor da peca pela
+// formula do modo, por cima na medida do alfa
+RID shader_modo() {
+  RID &sh = cache().shader_modo;
+  if (sh.is_valid()) return sh;
+  const char *codigo =
+      "shader_type canvas_item;\nrender_mode blend_premul_alpha, unshaded;\n"
+      "uniform sampler2D tela : hint_screen_texture, filter_nearest;\nuniform bool pma = false;\nuniform int modo = 5;\n"
+      "varying vec4 cor_v;\nvoid vertex() { cor_v = COLOR; }\n"
+      "vec3 mistura(vec3 b, vec3 s) {\n"
+      "  if (modo == 5) return mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, b));\n"
+      "  if (modo == 6) {\n"
+      "    vec3 D = mix(((16.0 * b - 12.0) * b + 4.0) * b, sqrt(b), step(0.25, b));\n"
+      "    return mix(b - (1.0 - 2.0 * s) * b * (1.0 - b), b + (2.0 * s - 1.0) * (D - b), step(0.5, s));\n  }\n"
+      "  if (modo == 7) return min(b, s);\n  if (modo == 8) return max(b, s);\n  if (modo == 9) return abs(b - s);\n"
+      "  if (modo == 10) return mix(min(vec3(1.0), b / max(1.0 - s, 1e-5)), vec3(0.0), step(b, vec3(0.0)));\n"
+      "  return s;\n}\n"
+      "void fragment() {\n"
+      "  vec4 t = texture(TEXTURE, UV);\n  if (pma && t.a > 0.0) t.rgb /= t.a;\n"
+      "  vec3 c = t.rgb * cor_v.rgb;\n  float a = t.a * cor_v.a;\n"
+      "  COLOR = vec4(mistura(texture(tela, SCREEN_UV).rgb, c) * a, a);\n}\n";
+  RenderingServer *rs = RenderingServer::get_singleton();
+  sh = rs->shader_create();
+  rs->shader_set_code(sh, codigo);
+  return sh;
+}
+
 RID material_passo(Passo passo, bool pma) {
   RID &m = cache().material[passo][pma ? 1 : 0];
   if (m.is_valid()) return m;
@@ -249,6 +278,8 @@ void boneco_liberar_materiais() {
     }
   if (cache().shader_ajuste.is_valid()) rs->free_rid(cache().shader_ajuste);
   cache().shader_ajuste = RID();
+  if (cache().shader_modo.is_valid()) rs->free_rid(cache().shader_modo);
+  cache().shader_modo = RID();
 }
 
 // ---- BonecoData
@@ -781,6 +812,8 @@ void BonecoSprite::_desenhar() {
     Passo passo;
     bool pma;
     bool ajuste;
+    // blend que le a tela (o numero do enum Blend; 0: nao)
+    int modo = 0;
   };
   std::vector<Item> lista;
   for (int l = 0; l < int(desenho.lotes.size()); ++l) {
@@ -791,6 +824,10 @@ void BonecoSprite::_desenhar() {
     }
     if (lt.comando != Comando::Triangulos || lt.quantos == 0) continue;
     const bool pma = lt.pagina >= 0 && lt.pagina < int(data->modelo->paginas_desenho.size()) && data->modelo->paginas_desenho[size_t(lt.pagina)].pma;
+    if (mamulengo::le_tela(lt.blend)) {
+      lista.push_back({l, RID(), NORMAL_PMA, pma, false, int(lt.blend)});
+      continue;
+    }
     switch (lt.blend) {
       case Blend::Aditivo: lista.push_back({l, material_passo(ADITIVO, pma), ADITIVO, pma, false}); break;
       case Blend::Multiplica: lista.push_back({l, material_passo(MULTIPLICA, pma), MULTIPLICA, pma, false}); break;
@@ -830,13 +867,26 @@ void BonecoSprite::_desenhar() {
     const RID it = itens[k];
     rs->canvas_item_clear(it);
     const bool ajuste = k < int(lista.size()) && lista[size_t(k)].ajuste;
-    // a camada de ajuste le a tela: o backbuffer e copiado (a viewport inteira) antes do item
-    if (copia_item[k] != ajuste) {
-      rs->canvas_item_set_copy_to_backbuffer(it, ajuste, Rect2());
-      copia_item.write[k] = ajuste;
+    const int modo = k < int(lista.size()) ? lista[size_t(k)].modo : 0;
+    // a camada de ajuste e os blends que leem a tela: o backbuffer e copiado (a viewport inteira)
+    // antes do item
+    if (copia_item[k] != (ajuste || modo)) {
+      rs->canvas_item_set_copy_to_backbuffer(it, ajuste || modo, Rect2());
+      copia_item.write[k] = ajuste || modo;
     }
     if (k >= int(lista.size())) continue;
     const mamulengo::Lote &lt = desenho.lotes[size_t(lista[size_t(k)].lote)];
+    if (modo) {
+      if (!material_efeito[k].is_valid()) material_efeito.write[k] = rs->material_create();
+      const RID me = material_efeito[k];
+      if (passo_efeito[k] != PASSOS * 4 + 1) {
+        rs->material_set_shader(me, shader_modo());
+        passo_efeito.write[k] = PASSOS * 4 + 1;
+      }
+      rs->material_set_param(me, "modo", modo);
+      rs->material_set_param(me, "pma", lista[size_t(k)].pma);
+      lista[size_t(k)].material = me;
+    }
     if (ajuste) {
       if (!material_efeito[k].is_valid()) material_efeito.write[k] = rs->material_create();
       const RID me = material_efeito[k];
@@ -864,8 +914,8 @@ void BonecoSprite::_desenhar() {
     }
     // luz: o relevo da pagina carregado e um grupo de luz no lote
     const Ref<Texture2D> rel = lt.luz >= 0 && lt.pagina >= 0 && lt.pagina < data->relevos.size() ? data->relevos[lt.pagina] : Ref<Texture2D>();
-    const bool luz = !ajuste && rel.is_valid();
-    if (!ajuste && (lt.efeito >= 0 || luz)) {
+    const bool luz = !ajuste && !modo && rel.is_valid();
+    if (!ajuste && !modo && (lt.efeito >= 0 || luz)) {
       // slot com efeitos ou iluminado: o material proprio do item, com os valores deste quadro
       const Item &li = lista[size_t(k)];
       const bool efeitos = lt.efeito >= 0;

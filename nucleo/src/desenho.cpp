@@ -281,13 +281,14 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   }
   // o slot e iluminado: ha grupo, a pagina tem relevo e o blend nao e de luz (aditivo, tela)
   auto iluminado = [&](int pagina, Blend blend) {
-    return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela ? grupo : -1;
+    return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela && !le_tela(blend) ? grupo : -1;
   };
   // a camada do slot sendo desenhado (os lotes de camadas diferentes nao se juntam)
   float prof = float(ctx.profundidade);
   auto lote = [&](Comando c, int pagina, Blend blend, int efeito = -1, int luz = -1) -> Lote& {
     if (pagina >= 0) pagina += ctx.pagina_base;
-    if (c == Comando::Triangulos && efeito < 0 && !d.lotes.empty()) {
+    // os blends que leem a tela nao se juntam: cada slot le o que ficou depois do anterior
+    if (c == Comando::Triangulos && efeito < 0 && !le_tela(blend) && !d.lotes.empty()) {
       Lote& u = d.lotes.back();
       if (u.comando == c && u.pagina == pagina && u.blend == blend && u.efeito < 0 && u.luz == luz && u.profundidade == prof) return u;
     }
@@ -463,11 +464,14 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
         double px = p.x;
         if (de.onda[0] != 0) px += de.onda[0] * std::sin(2 * PI * (de.onda[1] * p.idade + p.fase));
         const double cs = std::cos(p.rot * GRAU) * esc, sn = std::sin(p.rot * GRAU) * esc;
-        const double l0 = -de.meia_largura, r0 = de.meia_largura, b0 = -de.meia_altura, t0 = de.meia_altura;
+        // a variacao sorteada no nascimento (ou a imagem do emissor)
+        const DadosEmissor::Variacao* va = p.var >= 0 && size_t(p.var) < de.variacoes.size() ? &de.variacoes[size_t(p.var)] : nullptr;
+        const double mw = va ? va->meia_largura : de.meia_largura, mh = va ? va->meia_altura : de.meia_altura;
+        const double l0 = -mw, r0 = mw, b0 = -mh, t0 = mh;
         const double cx[4] = {l0, l0, r0, r0}, cy[4] = {b0, t0, t0, b0};
         float q[8];
         for (int k = 0; k < 4; ++k) q[k * 2] = float(px + cx[k] * cs - cy[k] * sn), q[k * 2 + 1] = float(p.y + cx[k] * sn + cy[k] * cs);
-        quad(q, de.uvs, cr, cg, cb, ca);
+        quad(q, va ? va->uvs : de.uvs, cr, cg, cb, ca);
       }
       d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
     }
@@ -492,6 +496,8 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   for (int si : e.ordem()) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
+    // osso so de outra skin: a camada some
+    if (!e.ativo(ds.osso)) continue;
     prof = float(ctx.profundidade + ds.profundidade);
     // a camada de ajuste (docs/NUCLEO.md "Ajuste"): no lugar da imagem do slot, um comando que
     // muda o que ja foi desenhado, pela mascara da imagem (sem imagem, a tela inteira)

@@ -1,9 +1,14 @@
 <script lang="ts">
+  import { untrack } from "svelte";
+  import { parseAtlas } from "../core/atlas-text.ts";
   import { app } from "./state.svelte.ts";
   import { slotWorldBox } from "./interact.ts";
   import { applyLocal } from "./interact.ts";
   import { startMeshEdit } from "./meshedit.ts";
   import MeshPanel from "./MeshPanel.svelte";
+  import DrawPanel from "./DrawPanel.svelte";
+  import { abrirDesenhar, newDrawnPart, startDrawEdit } from "./drawedit.ts";
+  import { drawingOfSlot } from "../core/commands/desenho.ts";
   import { EFFECT_NAMES, effectAt, effectFields, fieldsAt } from "../core/model.ts";
 
   const FIELDS = [
@@ -40,13 +45,13 @@
   const imagemNoOsso = $derived.by(() => {
     app.version;
     if (!slot?.attachment || !app.doc) return null;
-    const a = app.doc.json.skins?.find((s: any) => s.name === "default")?.attachments?.[slot.name]?.[slot.attachment];
+    const a = app.doc.json.skins?.find((s: any) => s.name === app.skinDe(slot.name, slot.attachment))?.attachments?.[slot.name]?.[slot.attachment];
     if (!a || (a.type ?? "region") !== "region") return null;
     return { x: a.x ?? 0, y: a.y ?? 0, rotation: a.rotation ?? 0, scaleX: a.scaleX ?? 1, scaleY: a.scaleY ?? 1 };
   });
   function setImagem(campo: string, valor: number) {
     if (!slot?.attachment || !Number.isFinite(valor)) return;
-    app.run({ cmd: "attachment.region", args: { slot: slot.name, name: slot.attachment, [campo]: valor } }, `imagem de ${slot.name}`);
+    app.run({ cmd: "attachment.region", args: { slot: slot.name, name: slot.attachment, skin: app.skinDe(slot.name, slot.attachment), [campo]: valor } }, `imagem de ${slot.name}`);
   }
 
   // cor atual do slot (com a animacao aplicada, com uma animacao aberta)
@@ -146,7 +151,7 @@
     { k: "angle", label: "direção", max: 360, step: 5, dica: "graus no osso (0 = ao longo do osso)" },
     { k: "gravity", label: "gravidade", max: 1000, step: 10, dica: "px/s2 para baixo" },
   ] as const;
-  const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0, width: 6, jitter: 0.15, segments: 10 };
+  const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0, width: 6, jitter: 0.15, segments: 10, count: 12, period: 2, band: 10, tilt: 0, depth: 0.3 };
   // o raio: a taxa e a intensidade (0 a 1), e os controles sao os da linha
   const CAMPOS_RAIO = [
     { k: "rate", label: "intensidade", max: 1, step: 0.01, dica: "0 apaga, 1 cheio" },
@@ -154,7 +159,18 @@
     { k: "jitter", label: "desvio", max: 0.5, step: 0.01, dica: "quanto foge para os lados (fracao do comprimento)" },
     { k: "segments", label: "segmentos", max: 30, step: 1, dica: "pedacos da linha" },
   ];
-  const camposDe = (p: any) => (p.type === "lightning" ? CAMPOS_RAIO : CAMPOS_P);
+  // a orbita: particulas girando em volta do osso, atras (slot behind) e na frente (este slot)
+  const CAMPOS_ORBITA = [
+    { k: "rate", label: "intensidade", max: 1, step: 0.01, dica: "0 apaga, 1 cheio" },
+    { k: "count", label: "quantas", max: 40, step: 1, dica: "partículas na órbita" },
+    { k: "period", label: "volta", max: 8, step: 0.1, dica: "segundos por volta" },
+    { k: "radiiX", label: "largura", max: 600, step: 5, dica: "raio da elipse na horizontal, px" },
+    { k: "radiiY", label: "altura", max: 400, step: 5, dica: "raio da elipse na vertical, px" },
+    { k: "band", label: "faixa", max: 100, step: 1, dica: "quanto fogem para cima e para baixo da elipse, px" },
+    { k: "tilt", label: "inclinação", max: 90, step: 1, dica: "graus" },
+    { k: "depth", label: "profundidade", max: 1, step: 0.05, dica: "quanto a da frente cresce e a de trás encolhe" },
+  ];
+  const camposDe = (p: any) => (p.type === "lightning" ? CAMPOS_RAIO : p.type === "orbit" ? CAMPOS_ORBITA : CAMPOS_P);
   const emissores = $derived.by(() => {
     app.version;
     app.play.time;
@@ -172,7 +188,7 @@
           rate = ks[k].value ?? rate;
           if (k < ks.length - 1 && ks[k].curve !== "stepped") rate += (((ks[k + 1].value ?? rate) - rate) * (app.play.time - (ks[k].time ?? 0))) / ((ks[k + 1].time ?? 0) - (ks[k].time ?? 0));
         }
-        const v = (k: string) => (k === "rate" ? rate : Array.isArray(p[k]) ? p[k][1] : (p[k] ?? PADRAO_P[k]));
+        const v = (k: string) => (k === "rate" ? rate : k === "radiiX" ? (p.radii?.[0] ?? 140) : k === "radiiY" ? (p.radii?.[1] ?? 40) : Array.isArray(p[k]) ? p[k][1] : (p[k] ?? PADRAO_P[k]));
         return { p, v };
       });
   });
@@ -225,16 +241,40 @@
       app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { particles: nome }, timeline: "rate", time, value: valor } }, `taxa ${nome} @${time}`, `p-rate-${nome}-${time}`);
       return;
     }
+    // orbita: largura e altura sao os dois raios da elipse
+    if (campo === "radiiX" || campo === "radiiY") {
+      const em = ((app.doc?.json as any).particles ?? []).find((x: any) => x.name === nome);
+      const r: [number, number] = [...(em?.radii ?? [120, 40])] as [number, number];
+      r[campo === "radiiX" ? 0 : 1] = valor;
+      app.run({ cmd: "particles.set", args: { name: nome, radii: r } }, `particulas ${nome}`, `p-${campo}-${nome}`);
+      return;
+    }
     // campos com [min, max]: o controle muda o maior e mantem a proporcao do menor
     const par = CAMPOS_P.find((c) => c.k === campo && "par" in c);
     const val = par ? (Array.isArray(atual) ? [+(atual[0] * (valor / (atual[1] || 1))).toFixed(3), valor] : [valor * 0.5, valor]) : valor;
     app.run({ cmd: "particles.set", args: { name: nome, [campo]: val } }, `particulas ${nome}`, `p-${campo}-${nome}`);
   }
-  function novoEmissor() {
+  // a lista da biblioteca de efeitos, para o menu "+ efeito" (so .boneco)
+  $effect(() => {
+    if (app.asset?.tres?.endsWith(".boneco")) app.carregarEfeitos();
+  });
+  function novoEmissor(tipo: "particles" | "lightning" | "orbit" = "particles") {
     if (!slot) return;
-    let nome = `${slot.name}_particulas`;
-    for (let n = 2; ((app.doc?.json as any).particles ?? []).some((p: any) => p.name === nome); n++) nome = `${slot.name}_particulas_${n}`;
-    if (app.run({ cmd: "particles.set", args: { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] } }, `particulas em ${slot.name}`)) app.avisar(`Partículas em ${slot.name}: aparecem no desenho Mamulengo; os controles estão logo abaixo.`);
+    const base = tipo === "lightning" ? "raio" : tipo === "orbit" ? "orbita" : "particulas";
+    let nome = `${slot.name}_${base}`;
+    for (let n = 2; ((app.doc?.json as any).particles ?? []).some((p: any) => p.name === nome); n++) nome = `${slot.name}_${base}_${n}`;
+    const args: any =
+      tipo === "lightning"
+        ? { name: nome, slot: slot.name, type: "lightning", rate: 1, length: 220, angle: 90, segments: 10, jitter: 0.15, width: 6, refresh: 0.08, branches: 1, color: ["bfe6ffff"], blend: "additive" }
+        : tipo === "orbit"
+          ? (() => {
+              // as que passam atras desenham na camada mais de tras que nao e esta
+              const atras = app.doc!.json.slots.find((x: any) => x.name !== slot.name)?.name;
+              return { name: nome, slot: slot.name, type: "orbit", behind: atras, rate: 1, count: 12, period: 2, radii: [140, 40], band: 10, tilt: 0, depth: 0.3, scale: [0.4, 0.4] };
+            })()
+          : { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] };
+    const nomeT = tipo === "lightning" ? "Raio" : tipo === "orbit" ? "Órbita" : "Partículas";
+    if (app.run({ cmd: "particles.set", args }, `${base} em ${slot.name}`)) app.avisar(`${nomeT} em ${slot.name}: aparece no desenho do núcleo; os controles estão logo abaixo.`);
   }
   function rajada(nome: string) {
     const time = +app.play.time.toFixed(4);
@@ -242,6 +282,202 @@
   }
 
   // tipo da imagem atual do slot (region vira malha; malha pode ganhar pesos)
+  // ---- instancias (so .boneco; docs/NUCLEO.md "Instancias"): as que desenham no lugar desta camada
+  const instancias = $derived.by(() => {
+    app.version;
+    if (!slot || !app.doc || !ehBoneco) return [] as any[];
+    return ((app.doc.json as any).instances ?? []).filter((i: any) => i.slot === slot.name);
+  });
+  const pastaDoc = $derived(app.doc?.file.tres ? app.doc.file.tres.slice(0, app.doc.file.tres.lastIndexOf("/") + 1) : "");
+  // o caminho do filho, relativo a este arquivo, resolvido
+  const caminhoFilho = (rel: string) => {
+    const partes: string[] = [];
+    for (const x of (pastaDoc + rel).split("/")) {
+      if (x === "..") partes.pop();
+      else if (x !== ".") partes.push(x);
+    }
+    return partes.join("/");
+  };
+  // as animacoes e skins de cada filho, lidas do arquivo dele (pelo .spine-json virtual)
+  let doFilho = $state<Record<string, { anims: string[]; skins: string[] }>>({});
+  $effect(() => {
+    for (const i of instancias) {
+      const c = caminhoFilho(i.boneco);
+      if (doFilho[c]) continue;
+      doFilho[c] = { anims: [], skins: [] };
+      fetch(`/api/file?p=${encodeURIComponent(c + ".spine-json")}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => j && (doFilho[c] = { anims: Object.keys(j.animations ?? {}), skins: (j.skins ?? []).map((s: any) => s.name) }))
+        .catch(() => {});
+    }
+  });
+  // os .boneco que podem virar instancia aqui (os personagens da lista, fora este), relativos a este
+  const bonecosPossiveis = $derived.by(() => {
+    if (!pastaDoc) return [] as { rel: string; nome: string }[];
+    const meu = app.doc?.file.tres;
+    const rel = (alvo: string) => {
+      const a = pastaDoc.split("/").filter(Boolean),
+        b = alvo.split("/").filter(Boolean);
+      let k = 0;
+      while (k < a.length && k < b.length - 1 && a[k] === b[k]) k++;
+      return [...Array(a.length - k).fill(".."), ...b.slice(k)].join("/");
+    };
+    return app.assets.filter((x) => x.tres.endsWith(".boneco") && x.tres !== meu).map((x) => ({ rel: rel(x.tres), nome: `${x.project} / ${x.name}` }));
+  });
+  function novaInstancia(rel: string) {
+    if (!slot || !rel) return;
+    const base = rel.split("/").pop()!.replace(/\.boneco$/, "").replace(/[^\w.-]+/g, "_");
+    let nome = base;
+    for (let k = 2; ((app.doc?.json as any).instances ?? []).some((i: any) => i.name === nome); k++) nome = `${base}_${k}`;
+    if (app.run({ cmd: "instance.set", args: { name: nome, slot: slot.name, boneco: rel } }, `instância ${nome} em ${slot.name}`)) app.avisar(`${nome} desenha no lugar de ${slot.name}, presa ao osso dela. Escolha a animação do filho logo abaixo.`);
+  }
+  const animsDe = (i: any, f: { anims: string[] } | undefined): string[] => (f?.anims.length ? f.anims : i.animation ? [i.animation] : []);
+  const instSet = (nome: string, campo: string, valor: any, arrasto = false) =>
+    app.run({ cmd: "instance.set", args: { name: nome, [campo]: valor } }, `instância ${nome}: ${campo}`, arrasto ? `inst-${nome}-${campo}` : undefined, arrasto);
+  let renInst = $state<string | null>(null);
+  let textoInst = $state("");
+  function renomearInst() {
+    const de = renInst;
+    renInst = null;
+    const para = textoInst.trim();
+    if (de && para && para !== de) app.run({ cmd: "instance.rename", args: { name: de, to: para } }, `renomeia ${de}`);
+  }
+  async function embutir(nome: string) {
+    const r = await app.runAsync({ cmd: "instance.inline", args: { name: nome } }, `embute ${nome}`);
+    if (r) app.avisar(`${nome} foi embutida: os ossos, camadas e animações do filho agora estão neste personagem. Ctrl+Z desfaz.`);
+  }
+  async function extrair(osso: string) {
+    if (app.doc?.dirty) await app.save();
+    const arq = `${osso}.boneco`;
+    const r = await app.runAsync({ cmd: "instance.extract", args: { bone: osso, boneco: arq } }, `extrai ${osso} para ${arq}`);
+    if (r?.[0]) {
+      app.select({ slot: r[0].slot });
+      await app.save();
+      await app.loadAssets(true);
+      app.avisar(`${osso} e o que pende dele foram para ${arq}; no lugar ficou a instância ${r[0].instance}.${r[0].avisos?.length ? " " + r[0].avisos.join(" ") : ""} Para editar o filho, use "entrar ↳".`);
+    }
+  }
+
+  // osso exclusivo da skin mostrada (skin.require)
+  const soNaSkin = $derived.by(() => {
+    app.version;
+    const sk = app.doc?.json.skins?.find((s: any) => s.name === app.skin);
+    return !!bone && !!sk?.bones?.includes(bone.name);
+  });
+  function trocaSoNaSkin(liga: boolean) {
+    const sk = app.doc?.json.skins?.find((s: any) => s.name === app.skin);
+    if (!sk || !bone) return;
+    const ossos: string[] = (sk.bones ?? []).filter((b: string) => b !== bone.name);
+    if (liga) ossos.push(bone.name);
+    if (app.run({ cmd: "skin.require", args: { skin: sk.name, bones: ossos } }, `${bone.name} ${liga ? "só" : "não só"} na skin ${sk.name}`) && liga) app.avisar(`${bone.name} só fica ativo com a skin ${sk.name} (nas outras ele e o que pende dele somem).`);
+  }
+
+  // renomear (dois cliques no nome) e apagar (🗑) osso, camada e parte. Apagar osso com malha que
+  // tem pesos nele pede o segundo clique (force); tudo desfaz com Ctrl+Z
+  let renomeando = $state<{ tipo: "osso" | "slot" | "parte"; de: string } | null>(null);
+  let textoRen = $state("");
+  const comecaRen = (tipo: "osso" | "slot" | "parte", de: string) => ((renomeando = { tipo, de }), (textoRen = de));
+  function renomear() {
+    const r = renomeando;
+    renomeando = null;
+    const para = textoRen.trim();
+    if (!r || !para || para === r.de) return;
+    const call =
+      r.tipo === "osso"
+        ? { cmd: "bone.rename", args: { bone: r.de, to: para } }
+        : r.tipo === "slot"
+          ? { cmd: "slot.rename", args: { slot: r.de, to: para } }
+          : { cmd: "attachment.rename", args: { slot: slot!.name, from: r.de, to: para } };
+    if (!app.run(call, `renomeia ${r.de} para ${para}`)) return;
+    if (r.tipo === "osso") app.select({ ...app.selection, bone: para });
+    if (r.tipo === "slot") app.select({ ...app.selection, slot: para });
+  }
+  let forcarOsso = $state<string | null>(null);
+  function apagarOsso(nome: string) {
+    const force = forcarOsso === nome;
+    try {
+      const r = app.run({ cmd: "bone.delete", args: { bone: nome, force } }, `apaga o osso ${nome}`, undefined, !force);
+      if (r) {
+        forcarOsso = null;
+        app.select({});
+        app.avisar(`${nome} apagado, com os filhos e as camadas presas neles. Ctrl+Z desfaz.`);
+        return;
+      }
+    } catch {}
+    if (force) return (forcarOsso = null);
+    // a recusa (malha com pesos nele): o segundo clique apaga mesmo assim
+    forcarOsso = nome;
+    app.toast(`${nome} puxa malhas com pesos: apagar tira os pesos dele delas. Clique de novo em 🗑 para apagar mesmo assim.`);
+    setTimeout(() => forcarOsso === nome && (forcarOsso = null), 5000);
+  }
+  function apagarSlot(nome: string) {
+    if (app.run({ cmd: "slot.delete", args: { slot: nome } }, `apaga a camada ${nome}`)) {
+      app.select({ bone: app.selection.bone });
+      app.avisar(`A camada ${nome} foi apagada, com as imagens e as chaves dela. Ctrl+Z desfaz.`);
+    }
+  }
+  function apagarParte(nome: string) {
+    if (!slot) return;
+    const sk = app.doc?.json.skins?.find((x: any) => x.attachments?.[slot.name]?.[nome])?.name ?? "default";
+    if (app.run({ cmd: "attachment.delete", args: { slot: slot.name, name: nome, skin: sk } }, `apaga a imagem ${nome} de ${slot.name}`)) app.avisar(`A imagem ${nome} saiu de ${slot.name}. Ctrl+Z desfaz.`);
+  }
+
+  // giro em 2,5D (deform.turn): numa animacao, a malha da peca vira como um cilindro no instante
+  // atual (uma chave de deform). Os controles comecam em 0 a cada peca e instante
+  let giro = $state({ vira: 0, olha: 0, persp: 0.25 });
+  let giroSeq = 0;
+  $effect(() => {
+    void slot?.name, app.play.time;
+    untrack(() => (giro = { vira: 0, olha: 0, persp: giro.persp }));
+  });
+  function girar() {
+    if (!slot?.attachment || !app.play.animation || !geleiaOuMalha) return;
+    const time = +app.play.time.toFixed(4);
+    const axis = Math.abs(giro.vira) >= Math.abs(giro.olha) ? "vertical" : "horizontal";
+    const angle = axis === "vertical" ? giro.vira : giro.olha;
+    const tilt = axis === "vertical" ? giro.olha : giro.vira;
+    app.run(
+      { cmd: "deform.turn", args: { anim: app.play.animation, slot: slot.name, attachment: slot.attachment, skin: geleiaOuMalha.skin, time, angle, axis, ...(tilt ? { tilt } : {}), perspective: giro.persp } },
+      `gira ${slot.name} @${time}`,
+      `giro-${slot.name}-${time}-${giroSeq}`,
+      true,
+    );
+  }
+  const geleiaOuMalha = $derived.by(() => {
+    app.version;
+    if (!slot?.attachment || !app.doc) return null;
+    const sk = app.doc.json.skins?.find((x: any) => x.attachments?.[slot.name]?.[slot.attachment]);
+    const a = sk?.attachments[slot.name][slot.attachment];
+    return a?.type === "mesh" ? { skin: sk.name } : null;
+  });
+
+  // geleia da malha da parte (so .boneco: o desenho do nucleo)
+  const geleia = $derived.by(() => {
+    app.version;
+    if (!slot?.attachment || !app.doc || !ehBoneco) return null;
+    const sk = app.doc.json.skins?.find((x: any) => x.attachments?.[slot.name]?.[slot.attachment]);
+    const a = sk?.attachments[slot.name][slot.attachment];
+    if (!a || a.type !== "mesh") return null;
+    return { skin: sk.name, j: a.jelly ?? null };
+  });
+  let seqGeleia = 0;
+  function setGeleia(args: any, label: string, arrasto = false) {
+    if (!slot?.attachment || !geleia) return;
+    app.run({ cmd: "mesh.jelly", args: { slot: slot.name, attachment: slot.attachment, skin: geleia.skin, ...args } }, label, arrasto ? `geleia-${slot.name}-${seqGeleia}` : undefined, arrasto);
+  }
+  const CAMPOS_GELEIA = [
+    { k: "stiffness", label: "rigidez", min: 5, max: 400, step: 1, dica: "quanto a malha volta para o rig (mais = balanço curto e rápido)" },
+    { k: "coupling", label: "contágio", min: 0, max: 300, step: 1, dica: "quanto um ponto puxa o vizinho (mais = a onda corre pela peça inteira)" },
+    { k: "damping", label: "amortecer", min: 0.2, max: 15, step: 0.1, dica: "quanto o balanço se perde (mais = assenta logo)" },
+    { k: "gravity", label: "peso", min: -200, max: 300, step: 1, dica: "puxa para baixo (px/s²): a peça cede, como slime" },
+  ] as const;
+
+  // a imagem da parte e um desenho (vetor): abre o Desenhar
+  const desenho = $derived.by(() => {
+    app.version;
+    return slot?.attachment && app.doc ? drawingOfSlot(app.doc.json, slot.name) : null;
+  });
+
   const attKind = $derived.by(() => {
     app.version;
     if (!slot?.attachment || !app.doc) return null;
@@ -249,6 +485,46 @@
     if (!a) return null;
     return { type: a.type ?? "region", weighted: a.type === "mesh" && a.vertices.length > a.uvs.length };
   });
+
+  // as imagens do atlas (para malha ligada) e a sequencia possivel desta imagem (nome_1, nome_2...)
+  const imagensAtlas = $derived.by(() => {
+    app.version;
+    const t = app.doc?.atlas.text;
+    return t ? [...new Set(parseAtlas(app.desenhos.semDesenhos(t)).regions.map((r) => r.name))] : [];
+  });
+  const sequencia = $derived.by(() => {
+    if (!slot?.attachment || !app.doc) return null;
+    const a = app.doc.json.skins?.find((x: any) => x.attachments?.[slot.name]?.[slot.attachment])?.attachments[slot.name][slot.attachment];
+    if (!a || a.sequence) return null;
+    const img = (a.path ?? slot.attachment) as string;
+    const m = /^(.*?)([_-]?)(\d+)$/.exec(img);
+    const base = m ? m[1] : img;
+    for (const sep of m ? [m[2]] : ["_", "-", ""]) {
+      let n = 0;
+      while (imagensAtlas.includes(`${base}${sep}${n + 1}`)) n++;
+      if (n >= 2) return { base, sep, n };
+    }
+    return null;
+  });
+  function virarSequencia() {
+    const q = sequencia;
+    if (!slot?.attachment || !q) return;
+    const sk = app.skinDe(slot.name, slot.attachment);
+    const calls: any[] = [];
+    const a = app.doc!.json.skins.find((x: any) => x.name === sk).attachments[slot.name][slot.attachment];
+    // o caminho da imagem vira o prefixo dos quadros
+    if ((a.path ?? slot.attachment) !== q.base + q.sep) calls.push({ cmd: "attachment.region", args: { slot: slot.name, name: slot.attachment, skin: sk, path: q.base + q.sep } });
+    calls.push({ cmd: "sequence.set", args: { slot: slot.name, attachment: slot.attachment, skin: sk, count: q.n, start: 1, digits: 0, setup: 0 } });
+    if (app.run(calls, `${slot.attachment} vira sequência`)) app.avisar(`${slot.attachment} agora é uma sequência de ${q.n} quadros; numa animação, a timeline "sequência" escolhe o quadro e a velocidade.`);
+  }
+  function malhaLigada(img: string) {
+    if (!slot?.attachment || !img) return;
+    let nome = img;
+    for (let k = 2; slot.atts.includes(nome); k++) nome = `${img}_${k}`;
+    const sk = app.skinDe(slot.name, slot.attachment);
+    if (app.run({ cmd: "linkedmesh.create", args: { slot: slot.name, name: nome, source: slot.attachment, sourceSkin: sk, skin: app.skinEdicao, path: img, timelines: true } }, `malha ligada ${nome}`))
+      app.avisar(`${nome} usa a malha e os pesos de ${slot.attachment} com a imagem ${img}: escolha em "imagem" para mostrar (dobra igual, deforms inclusive).`);
+  }
 
   async function makeMesh() {
     if (!slot?.attachment) return;
@@ -328,8 +604,115 @@
     if (!b || !app.doc) return [];
     return (app.doc.json.constraints ?? [])
       .filter((c: any) => c.bone === b || c.target === b || c.source === b || c.bones?.includes(b))
-      .map((c: any) => ({ name: c.name, type: c.type, strength: c.strength ?? 100, mix: c.mix ?? 1, target: c.target as string | undefined, bones: (c.bones ?? []) as string[] }));
+      .map((c: any) => ({ name: c.name, type: c.type, strength: c.strength ?? 100, mix: c.mix ?? c.mixRotate ?? 1, target: c.target as string | undefined, bones: (c.bones ?? []) as string[], raw: c, index: (app.doc!.json.constraints ?? []).indexOf(c) }));
   });
+  const totalCons = $derived((app.version, app.doc?.json.constraints?.length ?? 0));
+
+  // renomear luz e emissor de particulas (dois cliques no nome)
+  let renLista = $state<string | null>(null);
+  let textoLista = $state("");
+  function renomearLista() {
+    const r = renLista;
+    renLista = null;
+    const para = textoLista.trim();
+    if (!r || !para) return;
+    const [tipo, de] = [r.slice(0, r.indexOf(":")), r.slice(r.indexOf(":") + 1)];
+    if (para !== de) app.run({ cmd: tipo === "luz" ? "light.rename" : "particles.rename", args: { name: de, to: para } }, `renomeia ${de}`);
+  }
+
+  // acompanhar (pose.follow): numa animacao, a cadeia deste osso gira para ele manter a relacao da
+  // Pose base com outro osso em cada instante (a mao que segura o oculos acompanha a cabeca)
+  function acompanhar(alvo: string) {
+    const j = app.doc?.json;
+    const anim = app.play.animation;
+    if (!j || !bone || !alvo || !anim) return;
+    const pai = new Map<string, string>(j.bones.filter((b: any) => b.parent).map((b: any) => [b.name, b.parent]));
+    const acima = (n: string) => {
+      const out: string[] = [];
+      for (let p: string | undefined = n; p; p = pai.get(p)) out.push(p);
+      return out;
+    };
+    const doAlvo = new Set(acima(alvo));
+    // os ancestrais deste osso que nao movem o alvo, do mais alto para o osso (no maximo 3)
+    const cadeia = acima(bone.name).filter((n) => !doAlvo.has(n) && pai.has(n)).slice(0, 3).reverse();
+    if (!cadeia.length) return app.toast(`${bone.name} e ${alvo} se movem juntos: não há o que girar.`);
+    const r = app.run({ cmd: "pose.follow", args: { anim, bone: bone.name, relativeTo: alvo, chain: cadeia } }, `${bone.name} acompanha ${alvo} em ${anim}`);
+    if (r) app.avisar(`${bone.name} acompanha ${alvo} em ${anim}, girando ${cadeia.join(" › ")} (chaves de girar). Ctrl+Z desfaz.`);
+  }
+
+  // ---- criar e mexer nas restricoes pela tela (2b, grupo 3)
+  const nomeLivre = (base: string) => {
+    const usados = new Set((app.doc?.json.constraints ?? []).map((c: any) => c.name));
+    let n = base;
+    for (let k = 2; usados.has(n); k++) n = `${base}_${k}`;
+    return n;
+  };
+  // os ossos fora da cadeia de um osso (nem ele nem os que pendem dele)
+  function forDe(osso: string): string[] {
+    const j = app.doc?.json;
+    if (!j) return [];
+    return alvosPossiveis([osso]);
+  }
+  // os slots que tem uma parte caminho (path)
+  const caminhos = $derived.by(() => {
+    app.version;
+    const j = app.doc?.json;
+    if (!j) return [] as string[];
+    const out = new Set<string>();
+    for (const sk of j.skins ?? []) for (const [sl, ps] of Object.entries<any>(sk.attachments ?? {})) for (const a of Object.values<any>(ps)) if (a.type === "path") out.add(sl);
+    return [...out];
+  });
+  function novaRestricao(tipo: string) {
+    if (!bone) return;
+    const b = bone.name;
+    const anims = Object.keys(app.doc?.json.animations ?? {});
+    let call: any = null;
+    if (tipo === "copia") {
+      const fonte = bone.parent && forDe(b).includes(bone.parent) ? bone.parent : forDe(b).find((x) => x !== "root") ?? forDe(b)[0];
+      if (!fonte) return app.toast("Não há outro osso fora deste para copiar.");
+      call = { cmd: "transform.create", args: { name: nomeLivre(`${b}_copia`), source: fonte, bones: [b], copy: ["rotate"] } };
+    } else if (tipo === "caminho") {
+      if (!caminhos.length) return app.toast("Não há caminho (parte path) neste personagem: crie um antes, e então o osso pode segui-lo.");
+      call = { cmd: "pathc.create", args: { name: nomeLivre(`${b}_caminho`), bones: [b], target: caminhos[0], position: 0 } };
+    } else if (tipo === "slider") {
+      if (!anims.length) return app.toast("Crie uma animação antes: o slider faz este osso dirigir uma animação inteira.");
+      call = { cmd: "slider.create", args: { name: nomeLivre(`${b}_slider`), animation: anims[0], bone: b, property: "rotate", from: 0, to: 90 } };
+    } else if (tipo === "balanco") {
+      call = { cmd: "physics.preset", args: { bone: b, preset: "cabelo", name: nomeLivre(`${b}_fisica`) } };
+    }
+    if (call && app.run(call, `restrição ${tipo} em ${b}`)) app.avisar(`${call.args.name} criada em ${b}: os controles estão logo abaixo.`);
+  }
+  const conSet = (nome: string, props: any, label: string) => app.run({ cmd: "constraint.set", args: { name: nome, props } }, label);
+  // copia: o que copiar (girar, mover, escala) vira o mapa properties do 4.3
+  const COPIA: [string, string, string[]][] = [
+    ["rotate", "girar", ["rotate"]],
+    ["xy", "mover", ["x", "y"]],
+    ["scale", "escala", ["scaleX", "scaleY"]],
+  ];
+  const copiaTem = (c: any, k: string) => COPIA.find((x) => x[0] === k)![2].some((p) => c.properties?.[p]);
+  function copiaTroca(c: any, k: string, liga: boolean) {
+    const props = { ...(c.properties ?? {}) };
+    for (const p of COPIA.find((x) => x[0] === k)![2]) {
+      if (liga) props[p] = { to: { [p]: {} } };
+      else delete props[p];
+    }
+    conSet(c.name, { properties: props }, `${c.name} copia ${k}`);
+  }
+  function copiaMix(c: any, v: number) {
+    conSet(c.name, { mixRotate: v, mixX: v, mixY: v, mixScaleX: v, mixScaleY: v, mixShearY: v }, `mix ${c.name}`);
+  }
+  let renCon = $state<string | null>(null);
+  let textoCon = $state("");
+  function renomearCon() {
+    const de = renCon;
+    renCon = null;
+    const para = textoCon.trim();
+    if (de && para && para !== de) app.run({ cmd: "constraint.rename", args: { name: de, to: para } }, `renomeia ${de}`);
+  }
+  function ordemCon(nome: string, i: number) {
+    if (i < 0 || i >= totalCons) return;
+    if (app.run({ cmd: "constraint.order", args: { name: nome, index: i } }, `ordem de ${nome}`)) app.avisar(`${nome} agora é a ${i + 1}ª a ser aplicada (a ordem importa quando uma depende da outra).`);
+  }
   // ossos que podem ser alvo de um IK: nenhum da cadeia nem pendurado nela (o alvo seguiria a
   // propria cadeia que ele move)
   function alvosPossiveis(cadeia: string[]): string[] {
@@ -381,7 +764,21 @@
 
 <div class="insp">
   {#if bone}
-    <div class="title"><span class="ico">🦴</span>{bone.name}</div>
+    <div class="title">
+      <span class="ico">🦴</span>
+      {#if renomeando?.tipo === "osso" && renomeando.de === bone.name}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="ren" bind:value={textoRen} onkeydown={(e) => (e.key === "Enter" ? renomear() : e.key === "Escape" && (renomeando = null))} onblur={renomear} autofocus />
+      {:else}
+        <button class="nome-t" ondblclick={() => comecaRen("osso", bone.name)} title="dois cliques para renomear (tudo que aponta para ele acompanha)">{bone.name}</button>
+      {/if}
+      {#if bone.parent}<button class="lixo" class:armado={forcarOsso === bone.name} onclick={() => apagarOsso(bone.name)} title="apagar o osso, com os filhos e as camadas presas neles (Ctrl+Z desfaz)">🗑</button>{/if}
+    </div>
+    {#if app.skin}
+      <label class="so-skin" title="Osso exclusivo da skin {app.skin}: só fica ativo (e só mostra o que pende dele) com ela">
+        <input type="checkbox" checked={soNaSkin} onchange={(e) => trocaSoNaSkin((e.target as HTMLInputElement).checked)} /> só na skin {app.skin}
+      </label>
+    {/if}
     <div class="dim small">pai: {bone.parent ?? "(raiz)"} · {app.mode === "animate" && app.play.animation ? `chave em ${app.play.time.toFixed(2)}s` : "pose de montagem"}</div>
     <details class="fine" open={fineOpen} ontoggle={(e) => (fineOpen = (e.target as HTMLDetailsElement).open)}>
       <summary>ajuste fino</summary>
@@ -395,14 +792,87 @@
     </details>
     <div class="quick">
       <button onclick={quickIk} title="O osso e o pai passam a alcançar um alvo: mova o alvo e o membro dobra sozinho">🎯 Alcançar (IK)</button>
+      <button onclick={() => newDrawnPart(bone.name)} title="Uma peça nova presa a este osso, desenhada com a caneta (vetor, como no Figma)">✒️ Desenhar peça nova</button>
+      {#if ehBoneco && bone.parent}<button onclick={() => extrair(bone.name)} title="Leva este osso e o que pende dele (camadas, partes, restrições, animações) para um .boneco novo ao lado deste, e põe no lugar uma instância dele. Salva antes">📦 Extrair para .boneco</button>{/if}
+      {#if animando}
+        <select value="" onchange={(e) => { acompanhar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Nesta animação, este osso mantém em cada instante a relação que tem com outro na Pose base (a mão que segura os óculos acompanha a cabeça): a cadeia dele gira e vira chave">
+          <option value="">🤝 acompanhar…</option>
+          {#each (app.doc?.json.bones ?? []).map((b: any) => b.name).filter((n: string) => n !== bone.name) as n}<option value={n}>{n}</option>{/each}
+        </select>
+      {/if}
+      <select value="" onchange={(e) => { novaRestricao((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="uma restrição neste osso">
+        <option value="">+ restrição…</option>
+        <option value="copia">copiar outro osso (girar, mover, escala)</option>
+        <option value="caminho">seguir um caminho</option>
+        <option value="slider" title="girar (ou mover, escalar) este osso percorre uma animação inteira">dirigir uma animação (slider)</option>
+        <option value="balanco">balanço (física)</option>
+      </select>
+      <select value="" onchange={(e) => { const t = (e.target as HTMLSelectElement).value as any; (e.target as HTMLSelectElement).value = ""; if (t) app.comecarCaptura(t, bone.name, app.selection.slot ?? null); }} title="uma parte especial numa camada nova presa a este osso: você clica os pontos na tela">
+        <option value="">+ parte especial…</option>
+        <option value="clipping">✂ recorte (máscara{app.selection.slot ? ` de ${app.selection.slot}` : ""})</option>
+        <option value="boundingbox">▢ caixa de clique e colisão</option>
+        <option value="path">〰 caminho (para um osso seguir)</option>
+        <option value="point">• ponto (para prender efeitos no jogo)</option>
+      </select>
     </div>
     {#if cons.length}
       <div class="cons">
         {#each cons as c (c.name)}
           <div class="con">
             <span class="ctype">{CTYPE[c.type] ?? c.type}</span>
-            <span class="cname" title={c.name}>{c.name}</span>
-            {#if c.type === "physics"}
+            {#if renCon === c.name}
+              <!-- svelte-ignore a11y_autofocus -->
+              <input class="ren" bind:value={textoCon} onkeydown={(e) => (e.key === "Enter" ? renomearCon() : e.key === "Escape" && (renCon = null))} onblur={renomearCon} autofocus />
+            {:else}
+              <button class="cname nome-t" title="{c.name} · dois cliques para renomear · {c.index + 1}ª a ser aplicada" ondblclick={() => ((renCon = c.name), (textoCon = c.name))}>{c.name}</button>
+            {/if}
+            <span class="ord">
+              <button class="x" disabled={c.index <= 0} title="aplicar antes" onclick={() => ordemCon(c.name, c.index - 1)}>↑</button>
+              <button class="x" disabled={c.index >= totalCons - 1} title="aplicar depois" onclick={() => ordemCon(c.name, c.index + 1)}>↓</button>
+              <button class="x" title="remover" onclick={() => app.run({ cmd: "constraint.delete", args: { name: c.name } })}>✕</button>
+            </span>
+            {#if c.type === "transform"}
+              <label class="alvo-ik" title="o osso de onde vem o movimento">de
+                <select value={c.raw.source} onchange={(e) => conSet(c.name, { source: (e.target as HTMLSelectElement).value }, `fonte de ${c.name}`)}>
+                  {#each alvosPossiveis(c.bones) as n}<option value={n}>{n}</option>{/each}
+                </select>
+              </label>
+              <span class="copia">
+                {#each COPIA as [k, rot]}
+                  <label><input type="checkbox" checked={copiaTem(c.raw, k)} onchange={(e) => copiaTroca(c.raw, k, (e.target as HTMLInputElement).checked)} /> {rot}</label>
+                {/each}
+              </span>
+              <label class="slider" title="quanto copia (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.mix} onchange={(e) => copiaMix(c.raw, +(e.target as HTMLInputElement).value)} /></label>
+            {:else if c.type === "path"}
+              <label class="alvo-ik" title="a camada com o caminho (parte path) que o osso segue">caminho
+                <select value={c.raw.slot ?? c.raw.target} onchange={(e) => conSet(c.name, { slot: (e.target as HTMLSelectElement).value }, `caminho de ${c.name}`)}>
+                  {#each caminhos as n}<option value={n}>{n}</option>{/each}
+                </select>
+              </label>
+              <label class="slider" title="onde o osso fica ao longo do caminho (0 no começo, 1 no fim); numa animação, vire chave pela timeline">posição <input type="range" min="0" max="1" step="0.01" value={c.raw.position ?? 0} oninput={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { position: +(e.target as HTMLInputElement).value } } }, `posição ${c.name}`, `pos-${c.name}`, true)} /></label>
+              <label class="slider" title="quanto vale (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.raw.mixRotate ?? 1} onchange={(e) => { const v = +(e.target as HTMLInputElement).value; conSet(c.name, { mixRotate: v, mixX: v, mixY: v }, `mix ${c.name}`); }} /></label>
+            {:else if c.type === "slider"}
+              <label class="alvo-ik" title="a animação que este osso dirige">anima
+                <select value={c.raw.animation} onchange={(e) => conSet(c.name, { animation: (e.target as HTMLSelectElement).value }, `animação de ${c.name}`)}>
+                  {#each Object.keys(app.doc?.json.animations ?? {}) as n}<option value={n}>{n}</option>{/each}
+                </select>
+              </label>
+              <label class="alvo-ik" title="a propriedade do osso que dirige">por
+                <select value={c.raw.property ?? "rotate"} onchange={(e) => conSet(c.name, { property: (e.target as HTMLSelectElement).value }, `propriedade de ${c.name}`)}>
+                  {#each [["rotate", "giro"], ["x", "x"], ["y", "y"], ["scaleX", "escala x"], ["scaleY", "escala y"], ["shearY", "cisalha y"]] as [v, t]}<option value={v}>{t}</option>{/each}
+                </select>
+              </label>
+              <span class="copia" title="de quanto a quanto a propriedade percorre a animação inteira">
+                <label>de <input class="num-c" type="number" value={c.raw.from ?? 0} onchange={(e) => conSet(c.name, { from: +(e.target as HTMLInputElement).value }, `de ${c.name}`)} /></label>
+                <label>até <input class="num-c" type="number" value={c.raw.to ?? 0} onchange={(e) => conSet(c.name, { to: +(e.target as HTMLInputElement).value }, `até ${c.name}`)} /></label>
+              </span>
+              <span class="copia">
+                <label title="a propriedade do osso em relação ao pai (sem marcar: no mundo)"><input type="checkbox" checked={!!c.raw.local} onchange={(e) => conSet(c.name, { local: (e.target as HTMLInputElement).checked }, `local ${c.name}`)} /> local</label>
+                <label title="soma a animação dirigida por cima do que já está (sem marcar: substitui)"><input type="checkbox" checked={!!c.raw.additive} onchange={(e) => conSet(c.name, { additive: (e.target as HTMLInputElement).checked }, `somar ${c.name}`)} /> somar</label>
+                <label title="passando do fim, a animação volta ao começo (sem marcar: para no fim)"><input type="checkbox" checked={!!c.raw.loop} onchange={(e) => conSet(c.name, { loop: (e.target as HTMLInputElement).checked }, `repetir ${c.name}`)} /> repetir</label>
+              </span>
+              <label class="slider" title="quanto vale (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.raw.mix ?? 1} onchange={(e) => conSet(c.name, { mix: +(e.target as HTMLInputElement).value }, `mix ${c.name}`)} /></label>
+            {:else if c.type === "physics"}
               <label class="slider" title="mole ↔ duro">mole <input type="range" min="20" max="300" value={c.strength} onchange={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { strength: +(e.target as HTMLInputElement).value } } }, `dureza ${c.name}`)} /> duro</label>
             {:else}
               {#if c.type === "ik"}
@@ -414,7 +884,6 @@
               {/if}
               <label class="slider" title="quanto vale (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.mix} onchange={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { mix: +(e.target as HTMLInputElement).value } } }, `mix ${c.name}`)} /></label>
             {/if}
-            <button class="x" title="remover" onclick={() => app.run({ cmd: "constraint.delete", args: { name: c.name } })}>✕</button>
           </div>
         {/each}
       </div>
@@ -423,11 +892,17 @@
       <div class="efeitos">
         <div class="dim small secao" title="Luzes presas a este osso: iluminam as partes que têm relevo. {animando ? 'Mexer grava chave neste instante.' : 'Na Pose base muda o valor inicial.'}">
           Luzes{#if semRelevo}&nbsp;· <span title="As imagens deste personagem ainda não têm relevo (mapa de normais), então a luz não aparece nelas. O relevo sai da própria arte (docs/NUCLEO.md, Luzes).">sem relevo ainda</span>{/if}
+          <button class="relevo-b" disabled={app.relevoRodando} onclick={() => app.gerarRelevo()} title="Calcula o relevo (mapa de normais) das páginas a partir da própria arte, para as luzes iluminarem as peças. Salva o personagem antes; volta pelas Versões">{app.relevoRodando ? "calculando…" : semRelevo ? "gerar relevo" : "refazer relevo"}</button>
         </div>
         {#each luzesDoOsso as l (l.n)}
           <div class="ef">
             <div class="efnome" title="luz presa em {bone.name}">
-              <span>💡 {l.n}</span>
+              {#if renLista === `luz:${l.n}`}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input class="ren" bind:value={textoLista} onkeydown={(e) => (e.key === "Enter" ? renomearLista() : e.key === "Escape" && (renLista = null))} onblur={renomearLista} autofocus />
+              {:else}
+                <button class="nome-t" ondblclick={() => ((renLista = `luz:${l.n}`), (textoLista = l.n))} title="dois cliques para renomear">💡 {l.n}</button>
+              {/if}
               <input type="color" value={"#" + l.v.color.slice(0, 6)} title="cor" oninput={(e) => setLuz(l.n, "color", (e.target as HTMLInputElement).value.slice(1) + l.v.color.slice(6, 8))} />
               {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "light.delete", args: { name: l.n } }, `apaga ${l.n}`)} title="apagar a luz">✕</button>{/if}
             </div>
@@ -461,17 +936,37 @@
   {/if}
 
   {#if slot}
-    <div class="title slot"><span class="ico">🖼</span>{slot.name}</div>
+    <div class="title slot">
+      <span class="ico">🖼</span>
+      {#if renomeando?.tipo === "slot" && renomeando.de === slot.name}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="ren" bind:value={textoRen} onkeydown={(e) => (e.key === "Enter" ? renomear() : e.key === "Escape" && (renomeando = null))} onblur={renomear} autofocus />
+      {:else}
+        <button class="nome-t" ondblclick={() => comecaRen("slot", slot.name)} title="dois cliques para renomear a camada (animações e skins acompanham)">{slot.name}</button>
+      {/if}
+      <button class="lixo" onclick={() => apagarSlot(slot.name)} title="apagar a camada, com as imagens e as chaves dela (Ctrl+Z desfaz)">🗑</button>
+    </div>
     <div class="dim small">
       Camada: muda qual imagem aparece, cor, transparência, ordem e malha. Quem move esta imagem e o osso
       <b>{app.selection.bone ?? slot.bone}</b>{(app.selection.bone ?? slot.bone) !== slot.bone ? ` (pelos pesos da malha; a camada fica presa em ${slot.bone})` : ""}: arrastar na tela move o osso.
     </div>
     <div class="fields">
       <label for="slot-imagem">imagem</label>
-      <select id="slot-imagem" value={slot.attachment ?? ""} onchange={(e) => slotSet({ attachment: (e.target as HTMLSelectElement).value || null })}>
-        <option value="">(nenhuma)</option>
-        {#each slot.atts as a}<option value={a}>{a}</option>{/each}
-      </select>
+      <div class="imagem-linha">
+        {#if renomeando?.tipo === "parte" && slot.attachment && renomeando.de === slot.attachment}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input class="ren" bind:value={textoRen} onkeydown={(e) => (e.key === "Enter" ? renomear() : e.key === "Escape" && (renomeando = null))} onblur={renomear} autofocus />
+        {:else}
+          <select id="slot-imagem" value={slot.attachment ?? ""} onchange={(e) => slotSet({ attachment: (e.target as HTMLSelectElement).value || null })}>
+            <option value="">(nenhuma)</option>
+            {#each slot.atts as a}<option value={a}>{a}</option>{/each}
+          </select>
+        {/if}
+        {#if slot.attachment}
+          <button class="lixo" onclick={() => comecaRen("parte", slot.attachment)} title="renomear esta imagem da camada (as chaves de troca acompanham)">✎</button>
+          <button class="lixo" onclick={() => apagarParte(slot.attachment)} title="tirar esta imagem da camada (Ctrl+Z desfaz)">🗑</button>
+        {/if}
+      </div>
       {#if imagemNoOsso}
         <span class="rotulo" title="Onde a imagem fica dentro do osso da peça (vale para todas as animações). Na tela: Ctrl + arrastar, na Pose base">no osso</span>
         <div class="imagem-osso">
@@ -486,6 +981,16 @@
         <option value="additive">brilho (aditivo)</option>
         <option value="multiply">multiplicar</option>
         <option value="screen">tela</option>
+        {#if ehBoneco}
+          <optgroup label="leem o que está embaixo (núcleo)">
+            <option value="overlay">sobrepor</option>
+            <option value="softLight">luz suave</option>
+            <option value="darken">escurecer</option>
+            <option value="lighten">clarear</option>
+            <option value="difference">diferença</option>
+            <option value="colorDodge">subexpor</option>
+          </optgroup>
+        {/if}
       </select>
       {#if slot.blend === "multiply" || slot.blend === "screen"}
         <span></span>
@@ -494,6 +999,10 @@
             ? "No jogo (spine-godot) multiplicar ignora a transparência: a imagem inteira escurece o fundo, inclusive as bordas transparentes."
             : "No jogo (spine-godot) tela vira subtração: escurece em vez de clarear."}
         </div>
+      {/if}
+      {#if ["overlay", "softLight", "darken", "lighten", "difference", "colorDodge"].includes(slot.blend)}
+        <span></span>
+        <div class="dim">Mistura com o que já está desenhado embaixo. Só no desenho do núcleo e no jogo pelo BonecoSprite; nesta camada efeitos e luz não valem, e cada uma custa uma cópia da tela.</div>
       {/if}
       <span class="rotulo">camada</span>
       <div class="order">
@@ -513,14 +1022,41 @@
           <button disabled={!relTo} onclick={() => relTo && slot && app.placeLayer(slot.name, relTo, "back")} title="Atrás desta camada">atrás</button>
         </div>
       {/if}
-      {#if attKind}
+      {#if desenho}
+        <span></span>
+        <div class="mesh">
+          {#if app.drawEdit?.slot !== slot.name}
+            <button class="edit" onclick={() => startDrawEdit(slot.name)} title="Mexer nas formas desta imagem com a caneta e a seleção (vai para a Pose base). Atalho: dois cliques na peça">✏️ Desenhar</button>
+          {/if}
+        </div>
+      {/if}
+      {#if app.drawEdit?.slot === slot.name}
+        <div class="wide"><DrawPanel /></div>
+      {/if}
+      {#if attKind && !desenho && (attKind.type === "region" || attKind.type === "mesh")}
+        <span></span>
+        <div class="mesh">
+          <button onclick={() => abrirDesenhar()} title="Transforma esta imagem em desenho vetorial (cada cor vira uma camada de formas com curvas) e abre o Desenhar; Ctrl+Z volta para a imagem">✒️ Vetorizar e desenhar</button>
+        </div>
+      {/if}
+      {#if attKind && !desenho}
         <span></span>
         <div class="mesh">
           {#if attKind.type === "region"}
             <button onclick={makeMesh} title="Transforma a imagem em malha, para deformar com o pincel">🫧 Deixar deformável</button>
+            {#if sequencia}
+              <button onclick={virarSequencia} title="As imagens {sequencia.base}{sequencia.sep}1 a {sequencia.base}{sequencia.sep}{sequencia.n} passam a ser quadros desta imagem (flipbook); o quadro mostrado anima pela timeline (sequência)">🎞 Virar sequência ({sequencia.n} quadros)</button>
+            {/if}
           {:else if attKind.type === "mesh" || attKind.type === "linkedmesh"}
             {#if attKind.type === "mesh"}
               <button onclick={bindToBones} title="Prende a malha aos ossos proximos, para dobrar junto">🦴 {attKind.weighted ? "Refazer dobra" : "Dobrar com os ossos"}</button>
+              {#if attKind.weighted}
+                <button onclick={() => app.run({ cmd: "mesh.unbind", args: { slot: slot.name, attachment: slot.attachment, skin: app.skinDe(slot.name, slot.attachment) } }, `solta ${slot.attachment} dos ossos`) && app.avisar(`${slot.attachment} não tem mais pesos: segue só o osso da camada, na forma da Pose base.`)} title="Tira os pesos: a malha volta a seguir só o osso da camada">✂ Soltar dos ossos</button>
+              {/if}
+              <select value="" onchange={(e) => { malhaLigada((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Outra imagem que usa esta mesma malha e os mesmos pesos (troca de textura que dobra igual)">
+                <option value="">+ malha ligada com a imagem…</option>
+                {#each imagensAtlas as im}<option value={im}>{im}</option>{/each}
+              </select>
             {/if}
             {#if app.meshEdit?.slot !== slot.name}
               <button class="edit" onclick={() => startMeshEdit(slot.name, slot.attachment)} title="Mover, criar e apagar pontos da malha e pintar quanto cada osso puxa (vai para a Pose base)">✏️ Editar malha</button>
@@ -539,6 +1075,118 @@
         </div>
       {/if}
     </div>
+    {#if ehBoneco}
+      <div class="efeitos">
+        <div class="dim small secao" title="Outro .boneco desenhado no lugar desta camada (na ordem de desenho dela), preso ao osso dela, tocando a animação dele">◆ Instâncias</div>
+        {#each instancias as i (i.name)}
+          {@const f = doFilho[caminhoFilho(i.boneco)]}
+          <div class="ef">
+            <div class="efnome">
+              {#if renInst === i.name}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input class="ren" bind:value={textoInst} onkeydown={(e) => (e.key === "Enter" ? renomearInst() : e.key === "Escape" && (renInst = null))} onblur={renomearInst} autofocus />
+              {:else}
+                <button class="nome-t" ondblclick={() => ((renInst = i.name), (textoInst = i.name))} title="{i.boneco} · dois cliques para renomear">◆ {i.name}</button>
+              {/if}
+              <button onclick={() => app.entrarInstancia(i.name)} title="abrir {i.boneco} para editar (← no topo volta)">entrar ↳</button>
+              <button onclick={() => embutir(i.name)} title="trazer o filho para dentro deste personagem (o caminho de volta do extrair)">embutir</button>
+              <button class="tira" onclick={() => app.run({ cmd: "instance.delete", args: { name: i.name } }, `apaga ${i.name}`)} title="apagar a instância">✕</button>
+            </div>
+            <label class="efcampo" title="a animação do filho (sem: a pose de montagem dele)">
+              <span>anima</span>
+              <select value={i.animation ?? ""} onchange={(e) => instSet(i.name, "animation", (e.target as HTMLSelectElement).value || undefined)}>
+                <option value="">(pose de montagem)</option>
+                {#each animsDe(i, f) as a}<option value={a}>{a}</option>{/each}
+              </select>
+              <span></span>
+            </label>
+            {#if (f?.skins.length ?? 0) > 1}
+              <label class="efcampo">
+                <span>skin</span>
+                <select value={i.skin ?? "default"} onchange={(e) => instSet(i.name, "skin", (e.target as HTMLSelectElement).value)}>
+                  {#each f!.skins as s}<option value={s}>{s}</option>{/each}
+                </select>
+                <span></span>
+              </label>
+            {/if}
+            <label class="efcampo" title="o tempo do filho anda nessa velocidade">
+              <span>velocidade</span>
+              <input type="range" min="0" max="3" step="0.05" value={i.speed ?? 1} oninput={(e) => instSet(i.name, "speed", +(e.target as HTMLInputElement).value, true)} />
+              <span class="num">{(i.speed ?? 1).toFixed(2)}</span>
+            </label>
+            <label class="efcampo" title="de onde a animação do filho começa (segundos)">
+              <span>começa em</span>
+              <input type="range" min="0" max="5" step="0.05" value={i.start ?? 0} oninput={(e) => instSet(i.name, "start", +(e.target as HTMLInputElement).value, true)} />
+              <span class="num">{(i.start ?? 0).toFixed(2)}</span>
+            </label>
+            <label class="efcampo"><span>repete</span><input type="checkbox" checked={i.loop !== false} onchange={(e) => instSet(i.name, "loop", (e.target as HTMLInputElement).checked)} /><span></span></label>
+            <div class="imagem-osso">
+              {#each [["x", "x", 1], ["y", "y", 1], ["rotation", "giro", 1], ["scaleX", "esc x", 0.05], ["scaleY", "esc y", 0.05]] as [k, rot, passo]}
+                <label class="mini-campo">{rot}<input type="number" step={passo} value={+(i[k as string] ?? (String(k).startsWith("scale") ? 1 : 0)).toFixed(2)} onchange={(e) => instSet(i.name, k as string, +(e.target as HTMLInputElement).value)} /></label>
+              {/each}
+            </div>
+          </div>
+        {/each}
+        {#if !animando && bonecosPossiveis.length}
+          <select value="" onchange={(e) => { novaInstancia((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="outro .boneco desenhado no lugar desta camada">
+            <option value="">+ instância de…</option>
+            {#each bonecosPossiveis as b}<option value={b.rel}>{b.nome}</option>{/each}
+          </select>
+        {/if}
+      </div>
+    {/if}
+    {#if geleiaOuMalha}
+      <div class="efeitos">
+        <div class="dim small secao" title="Vira a malha como um cilindro (cabeça, tronco, objeto redondo): os traços deslizam, a borda que se afasta encolhe. Grava uma chave de deformar no instante da régua. A malha precisa ter pontos por dentro.">🔄 Girar em 2,5D</div>
+        {#if animando}
+          <div class="ef">
+            {#each [["vira", "vira", "para os lados (à direita: positivo)"], ["olha", "olha", "para cima e para baixo"]] as [k, rot, dica]}
+              <label class="efcampo" title={dica}>
+                <span>{rot}</span>
+                <input type="range" min="-60" max="60" step="1" value={(giro as any)[k]} oninput={(e) => (((giro as any)[k] = +(e.target as HTMLInputElement).value), girar())} onchange={() => giroSeq++} />
+                <span class="num">{(giro as any)[k]}°</span>
+              </label>
+            {/each}
+            <label class="efcampo" title="quanto a borda que se afasta encolhe">
+              <span>perspectiva</span>
+              <input type="range" min="0" max="1" step="0.05" bind:value={giro.persp} onchange={() => (giro.vira || giro.olha) && (girar(), giroSeq++)} />
+              <span class="num">{giro.persp.toFixed(2)}</span>
+            </label>
+          </div>
+        {:else}
+          <div class="dim small">Abra uma animação: o giro vira uma chave no instante da régua.</div>
+        {/if}
+      </div>
+    {/if}
+    {#if geleia}
+      <div class="efeitos">
+        <div class="dim small secao" title="A malha fica mole: balança quando o osso mexe e assenta (só no desenho do núcleo e no jogo; não muda o rig). A moleza começa em 0 perto do osso da peça (presa) e chega a 1 na ponta.">
+          <label class="ck"><input type="checkbox" checked={!!geleia.j} onchange={(e) => setGeleia({ enabled: (e.target as HTMLInputElement).checked }, (e.target as HTMLInputElement).checked ? "geleia ligada" : "geleia desligada")} /> 🍮 Geleia</label>
+        </div>
+        {#if geleia.j}
+          <div class="ef">
+            <div class="presets">
+              {#each [["gelatina", "gelatina"], ["borracha", "borracha"], ["slime", "slime"], ["agua_viva", "água-viva"]] as [v, t]}
+                <button onclick={() => setGeleia({ preset: v }, `geleia ${t}`)}>{t}</button>
+              {/each}
+            </div>
+            {#each CAMPOS_GELEIA as c}
+              <label class="efcampo" title={c.dica}>
+                <span>{c.label}</span>
+                <input type="range" min={c.min} max={c.max} step={c.step} value={geleia.j[c.k] ?? 0} oninput={(e) => setGeleia({ [c.k]: +(e.target as HTMLInputElement).value }, `geleia: ${c.label}`, true)} onchange={() => seqGeleia++} />
+                <span class="num">{(+(geleia.j[c.k] ?? 0)).toFixed(c.step < 1 ? 1 : 0)}</span>
+              </label>
+            {/each}
+            <label class="efcampo" title="como a moleza sobe a partir do osso: à esquerda tudo mole por igual, à direita só a ponta mole">
+              <span>base firme</span>
+              <input type="range" min="0.3" max="4" step="0.1" value="1.5" onchange={(e) => setGeleia({ wobble: "auto", curve: +(e.target as HTMLInputElement).value }, "moleza da geleia")} />
+              <span class="num"></span>
+            </label>
+            <div class="dim small">Toque uma animação para ver balançar.</div>
+          </div>
+        {/if}
+      </div>
+    {/if}
     {#if ehBoneco}
       <div class="efeitos">
         <div class="dim small secao" title="Contorno, brilho, dissolver, ajuste de cor e partículas desta parte. Aparecem no desenho núcleo e no jogo. {app.mode === 'animate' && app.play.animation ? 'Mexer grava chave neste instante.' : 'Na Pose base muda o valor inicial.'}">Efeitos e partículas</div>
@@ -561,7 +1209,12 @@
         {#each emissores as em (em.p.name)}
           <div class="ef">
             <div class="efnome" title="emissor de partículas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
-              <span>✦ {em.p.name}</span>
+              {#if renLista === `p:${em.p.name}`}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input class="ren" bind:value={textoLista} onkeydown={(e) => (e.key === "Enter" ? renomearLista() : e.key === "Escape" && (renLista = null))} onblur={renomearLista} autofocus />
+              {:else}
+                <button class="nome-t" ondblclick={() => ((renLista = `p:${em.p.name}`), (textoLista = em.p.name))} title="dois cliques para renomear">✦ {em.p.name}</button>
+              {/if}
               {#if animando && em.p.type !== "lightning"}<button onclick={() => rajada(em.p.name)} title="rajada: 12 nascem de uma vez neste instante">rajada</button>{/if}
               {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "particles.delete", args: { name: em.p.name } }, `apaga ${em.p.name}`)} title="apagar o emissor">✕</button>{/if}
             </div>
@@ -574,7 +1227,23 @@
             {/each}
           </div>
         {/each}
-        {#if !animando}<button onclick={novoEmissor} title="partículas que nascem do osso desta camada e desenham logo depois dela">+ partículas</button>{/if}
+        {#if !animando}
+          <div class="presets">
+            <button onclick={() => novoEmissor("particles")} title="partículas que nascem do osso desta camada e desenham logo depois dela">+ partículas</button>
+            <button onclick={() => novoEmissor("lightning")} title="um raio: linha quebrada que sai do osso desta camada, refeita a cada instante">+ raio</button>
+            <button onclick={() => novoEmissor("orbit")} title="partículas girando em volta do osso desta camada, passando atrás e na frente">+ órbita</button>
+            {#if app.asset?.tres?.endsWith(".boneco")}
+              <select value="" onfocus={() => app.carregarEfeitos()} onchange={(e) => { const v = (e.target as HTMLSelectElement).value; (e.target as HTMLSelectElement).value = ""; if (v && slot) app.efeitoDaBiblioteca(v, slot.name); }} title="um efeito pronto da biblioteca (fumaça, puff, poeira, explosão...): as imagens entram no personagem e o emissor nasce nesta camada">
+                <option value="">+ efeito…</option>
+                {#each app.efeitosLista ?? [] as ef}<option value={ef.nome} title={ef.texto}>{ef.titulo}</option>{/each}
+              </select>
+              <select value="" onchange={(e) => { const v = +(e.target as HTMLSelectElement).value; (e.target as HTMLSelectElement).value = ""; if (v && slot) app.olhoMaluco(slot.name, v); }} title="olhos de boneco com a pupila solta, colados em lugares sorteados desta camada (a pupila cai e rola quando a peça mexe)">
+                <option value="">+ olho maluco…</option>
+                {#each [1, 2, 3, 5] as n}<option value={n}>{n === 1 ? "um, em lugar sorteado" : `${n}, em lugares sorteados`}</option>{/each}
+              </select>
+            {/if}
+          </div>
+        {/if}
         {#if faltam.length && (app.mode !== "animate" || !app.play.animation)}
           <select value="" onchange={(e) => { ligar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="liga um efeito nesta camada">
             <option value="">+ efeito...</option>
@@ -624,6 +1293,20 @@
   }
   .wide {
     grid-column: 1 / -1;
+  }
+  .relevo-b {
+    font-size: 11px;
+    padding: 2px 6px;
+    margin-left: 6px;
+  }
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .presets button {
+    font-size: 11px;
+    padding: 3px 6px;
   }
   .efeitos {
     display: flex;
@@ -689,6 +1372,27 @@
     border-radius: 8px;
     font-size: 12px;
   }
+  .con > .alvo-ik,
+  .con > .slider {
+    grid-column: 1 / -1;
+  }
+  .copia {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+  }
+  .copia label {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .num-c {
+    width: 56px;
+  }
+  .ord {
+    display: flex;
+  }
   .ctype {
     color: var(--accent2);
   }
@@ -724,6 +1428,56 @@
     display: flex;
     gap: 6px;
     align-items: center;
+  }
+  .so-skin {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--accent2);
+  }
+  .nome-t {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    cursor: text;
+    text-align: left;
+  }
+  .ren {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+  }
+  .lixo {
+    margin-left: auto;
+    background: none;
+    border: none;
+    padding: 2px 5px;
+    opacity: 0.55;
+    font-size: 13px;
+  }
+  .lixo:hover {
+    opacity: 1;
+  }
+  .lixo.armado {
+    opacity: 1;
+    background: #5a1f2c;
+    border-radius: 6px;
+  }
+  .imagem-linha {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    min-width: 0;
+  }
+  .imagem-linha select {
+    flex: 1;
+    min-width: 0;
+  }
+  .imagem-linha .lixo {
+    margin-left: 0;
   }
   .title.slot {
     margin-top: 10px;

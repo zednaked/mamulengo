@@ -45,6 +45,21 @@ struct EstadoSlot {
   // rastro (docs/NUCLEO.md "Rastro"): os vertices em mundo dos quadros recentes, do mais antigo
   // ao atual, com o relogio de cada um (so de slot com rastro ligado)
   std::vector<std::pair<double, std::vector<double>>> rastro;
+  // geleia (docs/NUCLEO.md "Geleia"): posicao e velocidade de cada vertice em mundo, o alvo (onde
+  // o rig poe) no relogio anterior, o tempo que sobrou do ultimo passo e a saida (vertices em
+  // mundo como a peca aparece); parte -1: sem geleia
+  std::vector<double> geleia_p, geleia_v, geleia_alvo, geleia_xy;
+  double geleia_t = -1, geleia_sobra = 0;
+  int geleia_parte = -1;
+  // os slots que seguem esta geleia: slot, triangulo (indice do primeiro vertice em triangulos) e
+  // as coordenadas baricentricas do centro dele, tiradas quando a geleia comecou
+  struct Seguidor {
+    int slot, tri;
+    double b0, b1, b2;
+  };
+  std::vector<Seguidor> geleia_seguem;
+  // quanto este slot anda por seguir uma geleia (somado aos vertices dele)
+  double segue_dx = 0, segue_dy = 0;
 };
 
 // uma copia do rastro: os vertices (x, y) e o quanto do alfa da peca ela tem
@@ -64,6 +79,7 @@ enum class Mistura : uint8_t { Setup, Primeira, Substitui, Soma };
 struct Particula {
   double x = 0, y = 0, vx = 0, vy = 0, rot = 0, giro = 0, idade = 0, vida = 1;
   double fase = 0;  // do balanco (onda), sorteada no nascimento
+  int var = -1;     // a variacao da imagem (sorteada no nascimento; -1: a imagem do emissor)
 };
 
 // estado de um emissor: a taxa animavel e a memoria entre quadros
@@ -83,6 +99,7 @@ struct EstadoRestricao {
   bool comprime = false, estica = false;
   double mix_girar = 1, mix_x = 1, mix_y = 1, mix_escala_x = 1, mix_escala_y = 1, mix_cisalha_y = 1;  // transf, caminho
   double posicao = 0, espacamento = 0;  // caminho
+  double tempo = 0;  // slider (o mix e o `mix` de cima)
   // fisica: parametros
   double inercia = 1, forca = 100, amortecimento = 1, massa_inv = 1, vento = 0, gravidade = 0;
   // fisica: memoria entre quadros
@@ -184,7 +201,13 @@ class Esqueleto {
   void atualizar_mundo();
 
   // skin ativa (indice em Modelo::skins); nao muda as partes ja nos slots
-  void skin(int s) { skin_ = s; }
+  void skin(int s) {
+    skin_ = s;
+    atualizar_ativos();
+  }
+  // o osso esta ativo (nao e so de outra skin, nem pende de um que e); slot de osso inativo nao
+  // desenha
+  bool ativo(int osso) const { return ativos_.empty() || ativos_[size_t(osso)]; }
   int skin() const { return skin_; }
 
   std::vector<Local> local;
@@ -250,7 +273,25 @@ class Esqueleto {
   void restricao_caminho(int r);
   void restricao_fisica(int r);
   void restricao_transformacao(int r);
+  void restricao_slider(int r);
+  // o que os sliders mudaram nos slots vale so neste quadro: os slots de antes deles, devolvidos
+  // no proximo aplicar (os ossos ja voltam no fim de atualizar_mundo)
+  struct SlotAntes {
+    int parte;
+    Cor cor;
+    Efeitos efeitos;
+    std::vector<double> deform;
+  };
+  std::vector<SlotAntes> slots_antes_slider_;
+
+ public:
+  void devolver_slider();
+
+ private:
   void atualizar_particulas();
+  void atualizar_geleia();
+  std::vector<char> ativos_;
+  void atualizar_ativos();
   // pose local a partir do mundo (depois que uma restricao mexe no mundo do osso)
   Local local_de_mundo(int i) const;
   // depois de uma restricao que escreve no mundo: leva o mundo para a pose local, para que uma

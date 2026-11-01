@@ -10,12 +10,16 @@
 //   para cada propriedade do alvo, em mundo, fonte local, alvo local e somando) e 200
 //   aleatorios (varias propriedades, escala e deslocamento por alvo, limites, mixes, fonte
 //   espelhada pela animacao);
+// - slider/: restricao slider (docs/NUCLEO.md "Slider"): casos dirigidos (sem osso pelo tempo, com
+//   repetir e mix; com osso por cada propriedade, em mundo e local, com o pai girado, escalado e
+//   deslocado; de, para, escala, somar; timelines de tempo e mix; cor de slot) e 150 aleatorios;
 // - eventos/: o pessoa e o monstro (CC0) com eventos de usuario em toda animacao, dois no
 //   mesmo tempo e um no 0, para os roteiros de tras para frente do nucleo-estado.
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { importarSpine } from "../src/boneco/spine.ts";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const saida = resolve(process.argv[2] ?? join(tmpdir(), "nucleo-fixtures"));
@@ -114,6 +118,97 @@ function transformacao(dir: string) {
   return n;
 }
 
+function slider(dir: string) {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const rnd = gerador(11);
+  const u = (a: number, b: number) => +(a + (b - a) * rnd()).toFixed(3);
+  const PS = ["rotate", "x", "y", "scaleX", "scaleY", "shearY"];
+  // o esqueleto em JSON do Spine (o importador faz os nomes do .boneco)
+  const caso = (nome: string, sl: any, dirige: any, pai: any = {}, sl2?: any) => {
+    const json: any = {
+      skeleton: { spine: "4.3.23" },
+      bones: [
+        { name: "root" },
+        { name: "pai", parent: "root", ...pai },
+        { name: "ctrl", parent: "pai" },
+        { name: "a", parent: "root", x: 50, rotation: 10 },
+        { name: "b", parent: "a", x: 30, scaleX: 1.2 },
+        { name: "c", parent: "root", x: -40 },
+      ],
+      slots: [{ name: "sa", bone: "a", color: "ffffffff" }, { name: "sb", bone: "b" }],
+      skins: [{ name: "default", attachments: {} }],
+      constraints: [{ type: "slider", name: "s", animation: "anima", ...sl }, ...(sl2 ? [{ type: "slider", name: "s2", animation: "anima2", ...sl2 }] : [])],
+      animations: {
+        anima: {
+          bones: {
+            a: { rotate: [{ value: 0, curve: [0.2, 20, 0.4, 70] }, { time: 0.6, value: 80 }, { time: 1.2, value: -30 }], translate: [{ x: 0, y: 0 }, { time: 1.2, x: 25, y: -10 }] },
+            b: { scale: [{ x: 1, y: 1 }, { time: 1.2, x: 1.5, y: 0.7 }] },
+          },
+          slots: { sa: { rgba: [{ color: "ffffffff" }, { time: 1.2, color: "3366ccaa" }] } },
+        },
+        anima2: { bones: { c: { rotate: [{ value: 0 }, { time: 1, value: 90 }] } } },
+        dirige,
+      },
+    };
+    writeFileSync(join(dir, `${nome}.boneco`), JSON.stringify(importarSpine(json, "", nome)));
+  };
+  const gira = (de: number, ate: number) => ({ rotate: [{ value: de }, { time: 1, value: ate }] });
+  let n = 0;
+  // sem osso: o tempo, com repetir, mix e timelines
+  for (const [k, sl] of Object.entries<any>({ tempo: { time: 0.4 }, tempo_alem: { time: 2 }, repete: { time: 2.5, loop: true }, mix: { time: 0.7, mix: 0.4 }, soma: { time: 0.7, additive: true }, soma_mix: { time: 0.9, additive: true, mix: 0.6 } })) {
+    caso(`tempo-${k}`, sl, { bones: { a: gira(0, 40) } });
+    n++;
+  }
+  caso("tl-tempo", {}, { slider: { s: { time: [{ value: 0 }, { time: 1, value: 1.5 }] } } });
+  caso("tl-tempo-depois", { time: 0.3 }, { slider: { s: { time: [{ time: 0.5, value: 1 }, { time: 1, value: 0.2 }] } } });
+  caso("tl-mix", { time: 0.8 }, { slider: { s: { mix: [{ value: 0 }, { time: 1, value: 1 }] } } });
+  n += 3;
+  // com osso: cada propriedade, em mundo e local, com o pai mexido
+  const anda: Record<string, any> = {
+    rotate: { rotate: [{ value: -20 }, { time: 1, value: 140 }] },
+    x: { translate: [{ x: -30, y: 0 }, { time: 1, x: 90, y: 20 }] },
+    y: { translate: [{ x: 0, y: -40 }, { time: 1, x: 10, y: 70 }] },
+    scaleX: { scale: [{ x: 0.5, y: 1 }, { time: 1, x: 2.5, y: 1.2 }] },
+    scaleY: { scale: [{ x: 1, y: 0.4 }, { time: 1, x: 1.1, y: 2.2 }] },
+    shearY: { shear: [{ x: 0, y: -20 }, { time: 1, x: 5, y: 60 }] },
+  };
+  const escala: Record<string, number> = { rotate: 0.01, x: 0.015, y: 0.012, scaleX: 0.7, scaleY: 0.6, shearY: 0.02 };
+  for (const p of PS)
+    for (const local of [false, true])
+      for (const [np, pai] of Object.entries<any>({ parado: {}, girado: { rotation: 35, x: 12, y: -8 }, escalado: { scaleX: 1.6, scaleY: 0.7 } })) {
+        caso(`osso-${p}-${local ? "local" : "mundo"}-${np}`, { bone: "ctrl", property: p, scale: escala[p], from: p.startsWith("scale") ? 0.5 : 5, to: 0.05, local }, { bones: { ctrl: anda[p] } }, pai);
+        n++;
+      }
+  caso("osso-repete", { bone: "ctrl", property: "rotate", scale: 0.02, loop: true }, { bones: { ctrl: gira(-60, 200) } });
+  caso("osso-soma-mix", { bone: "ctrl", property: "rotate", scale: 0.01, additive: true, mix: 0.5 }, { bones: { ctrl: gira(0, 120), a: gira(0, 30) } });
+  caso("dois-sliders", { time: 0.6 }, { bones: { ctrl: gira(0, 100) } }, {}, { bone: "ctrl", property: "rotate", scale: 0.01 });
+  n += 3;
+  // aleatorios
+  for (let i = 0; i < 150; i++) {
+    const sl: any = {};
+    if (rnd() < 0.7) {
+      sl.bone = "ctrl";
+      sl.property = PS[Math.floor(rnd() * PS.length)];
+      sl.scale = u(-0.03, 0.03) || 0.01;
+      if (sl.property.startsWith("scale")) sl.scale = u(-1, 1);
+      if (rnd() < 0.5) sl.from = u(-20, 20);
+      if (rnd() < 0.5) sl.to = u(-0.5, 0.5);
+      if (rnd() < 0.4) sl.local = true;
+    } else sl.time = u(-0.5, 2.5);
+    if (rnd() < 0.4) sl.loop = true;
+    if (rnd() < 0.3) sl.additive = true;
+    if (rnd() < 0.4) sl.mix = u(0, 1);
+    const dirige: any = { bones: { ctrl: { rotate: [{ value: u(-90, 90) }, { time: 1, value: u(-200, 200) }], translate: [{ x: u(-50, 50), y: u(-50, 50) }, { time: 1, x: u(-50, 50), y: u(-50, 50) }], scale: [{ x: u(0.3, 2), y: u(0.3, 2) }, { time: 1, x: u(0.3, 2), y: u(0.3, 2) }] } } };
+    if (rnd() < 0.4) dirige.bones.a = gira(u(-40, 40), u(-40, 40));
+    if (!sl.bone && rnd() < 0.5) dirige.slider = { s: { time: [{ value: u(0, 1) }, { time: 1, value: u(0, 2) }] } };
+    if (rnd() < 0.3) (dirige.slider ??= {}), ((dirige.slider.s ??= {}).mix = [{ value: u(0, 1) }, { time: 1, value: u(0, 1) }]);
+    caso(`aleatorio-${String(i).padStart(3, "0")}`, sl, dirige, { rotation: u(-90, 90), x: u(-30, 30), scaleX: u(0.5, 1.8), scaleY: u(0.5, 1.8) });
+    n++;
+  }
+  return n;
+}
+
 function eventos(dir: string) {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -135,5 +230,6 @@ function eventos(dir: string) {
 }
 
 const n = transformacao(join(saida, "transformacao"));
+const ns = slider(join(saida, "slider"));
 eventos(join(saida, "eventos"));
-console.log(`${saida}: ${n} casos de transformacao, 2 bonecos com eventos`);
+console.log(`${saida}: ${n} casos de transformacao, ${ns} de slider, 2 bonecos com eventos`);

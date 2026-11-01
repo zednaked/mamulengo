@@ -28,7 +28,7 @@ export interface CommandCtx {
 
 export interface CommandDef<S extends z.ZodType = z.ZodType> {
   name: string;
-  group: "skeleton" | "bone" | "slot" | "attachment" | "skin" | "constraint" | "animation" | "key" | "query" | "view" | "file" | "recipe";
+  group: "skeleton" | "bone" | "slot" | "attachment" | "skin" | "constraint" | "animation" | "key" | "query" | "view" | "file" | "recipe" | "drawing";
   summary: string;
   params: S;
   readonly?: boolean;

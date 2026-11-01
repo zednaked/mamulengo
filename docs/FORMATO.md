@@ -70,9 +70,37 @@ Timelines: nos ossos `girar`, `mover` (`mover_x`, `mover_y`), `escalar`, `cisalh
 `gravidade`...). Chave: `tempo`, `valor` (ou `x`/`y`, `cor`, `nome`), `curva` (`"degrau"` ou
 os 4 valores da bezier por canal, como no Spine).
 
-Valores que mudam de nome: blend `aditivo`, `multiplica`, `multiplica_motor`, `tela`; tipo de
+Valores que mudam de nome: blend `aditivo`, `multiplica`, `multiplica_motor`, `tela` e os que
+leem a tela, só do Mamulengo (`sobrepor`, `luz_suave`, `escurecer`, `clarear`, `diferenca`,
+`subexpor`; docs/NUCLEO.md "Blends"); tipo de
 parte `regiao`, `malha`, `malha_ligada`, `recorte`, `caminho`, `ponto`, `caixa`; tipo de
 restrição `ik`, `transformacao`, `caminho`, `fisica`, `slider`.
+
+Desenhos (o ambiente Desenhar do editor): `desenhos` guarda, por imagem, as formas vetoriais de
+que ela é feita. A imagem continua sendo uma região de uma página (`<personagem>-desenhos.png`),
+refeita pelo editor a cada mudança e gravada ao salvar; quem só lê imagem (o jogo, o Spine) não
+precisa das formas. Coordenadas em pixels da imagem, origem no canto de cima, y para baixo, como
+no SVG; as alças são relativas ao ponto; ponto sem alças é canto, e `raio` o arredonda quando os
+dois lados são retos. `hd` (padrão 2) é quantos pixels de textura por pixel da imagem.
+
+```jsonc
+"desenhos": { "mao": { "largura": 120, "altura": 100, "hd": 3, "formas": [
+  { "nome": "palma", "fechado": true, "preenchimento": "f4a261ff",
+    "pontos": [ { "x": 60, "y": 10, "entrada": [-22, 0], "saida": [22, 0] }, { "x": 100, "y": 50, "raio": 6 }, ... ],
+    "traco": { "cor": "3d2b1fff", "largura": 4, "alinhar": "dentro", "quina": "redonda", "ponta": "redonda" } },
+  { "nome": "aro", "fechado": true, "pontos": [...], "furos": [ { "pontos": [...], "fechado": true } ] },
+  { "nome": "brilho", "escondida": true, ... } ] } }
+```
+
+Malha mole: a parte `malha` pode ter `geleia` (`rigidez`, `contagio`, `amortecimento`,
+`gravidade`, `massa`, `moleza` por vértice e os slots que `seguem`); a conta está em
+docs/NUCLEO.md, "Geleia". A exportação para o Spine a tira, com aviso (a malha fica dura).
+
+`furos` são contornos que tiram do preenchimento da forma (par-ímpar, como `fill-rule: evenodd`).
+
+`alinhar`: `dentro`, `centro` (padrão) ou `fora`; `quina`: `viva` (padrão), `redonda` ou
+`chanfrada`; `ponta` (traço aberto): `reta` (padrão), `redonda` ou `quadrada`. A exportação para
+o Spine tira os desenhos, com aviso, e leva a página como qualquer outra.
 
 Malha, caminho, recorte e caixa com pesos: `pesos` com, por vértice, a lista
 `[osso, x, y, peso]` (o osso pelo nome), em vez do vetor misto do Spine em que o leitor

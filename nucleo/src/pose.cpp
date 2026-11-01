@@ -44,6 +44,11 @@ Esqueleto::Esqueleto(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo
       case TipoRestricao::Caminho: for (int o : d.caminho.ossos) marcar(o); break;
       case TipoRestricao::Transformacao: for (int o : d.transf.ossos) marcar(o); break;
       case TipoRestricao::Fisica: marcar(d.fisica.osso); break;
+      case TipoRestricao::Slider:
+        // os ossos que a animacao do slider mexe
+        if (d.slider.animacao >= 0)
+          for (const TimelineOsso& to : m.animacoes[size_t(d.slider.animacao)].ossos) marcar(to.osso);
+        break;
     }
     for (size_t i = 0; i < m.ossos.size(); ++i) {
       if (marca[i]) continue;
@@ -57,8 +62,95 @@ Esqueleto::Esqueleto(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo
   setup();
 }
 
+// Slider (docs/NUCLEO.md "Slider"): a animacao dele entra inteira no instante t, por cima da pose
+// atual, na medida do mix (somar: soma o valor das chaves). Os slots mexidos so valem neste quadro
+void Esqueleto::restricao_slider(int ri) {
+  const Modelo& m = *m_;
+  const DadosSlider& d = m.restricoes[size_t(ri)].slider;
+  const EstadoRestricao& e = rest_[size_t(ri)];
+  if (d.animacao < 0 || e.mix <= 0) return;
+  const Animacao& an = m.animacoes[size_t(d.animacao)];
+  double t;
+  if (d.osso >= 0) {
+    double v = 0;
+    const Matriz& w = mundo_[size_t(d.osso)];
+    const Local& l = local[size_t(d.osso)];
+    switch (d.prop) {
+      case PropSlider::Girar: {
+        // como a fonte da transformacao: a rotacao de mundo em [0, 360)
+        if (d.local) v = l.rotacao;
+        else {
+          v = std::fmod(std::atan2(w.c, w.a) * 180 / M_PI, 360.0);
+          if (v < 0) v += 360;
+        }
+        break;
+      }
+      case PropSlider::X: v = d.local ? l.x : w.x; break;
+      case PropSlider::Y: v = d.local ? l.y : w.y; break;
+      case PropSlider::EscalaX: v = d.local ? l.escala_x : std::sqrt(w.a * w.a + w.c * w.c); break;
+      case PropSlider::EscalaY: v = d.local ? l.escala_y : std::sqrt(w.b * w.b + w.d * w.d); break;
+      case PropSlider::CisalhaY: v = d.local ? l.cisalha_y : (std::atan2(w.d, w.b) - std::atan2(w.c, w.a)) * 180 / M_PI - 90; break;
+    }
+    t = (v - d.de) * d.escala + d.para;
+  } else {
+    // sem osso, um tempo negativo deixa o slider parado (nao aplica nada), como no oraculo
+    if (e.tempo < 0) return;
+    t = e.tempo;
+  }
+  const double dur = an.duracao;
+  if (d.repetir && dur > 0) {
+    t = std::fmod(t, dur);
+    if (t < 0) t += dur;
+  } else {
+    t = std::clamp(t, 0.0, std::max(0.0, dur));
+  }
+  // os slots de antes (uma vez por quadro, antes do primeiro slider)
+  if (slots_antes_slider_.empty())
+    for (const EstadoSlot& s : slots_) slots_antes_slider_.push_back({s.parte, s.cor, s.efeitos, s.deform});
+  const Mistura mist = d.somar ? Mistura::Soma : Mistura::Substitui;
+  const double a = std::min(1.0, e.mix);
+  for (const TimelineParte& tp : an.partes) mudar_parte(tp.slot, parte_no_tempo(tp, t, nullptr));
+  for (const TimelineCor& tc : an.cores) aplicar_cor(tc, t, a, mist);
+  for (const TimelineEfeito& te : an.efeitos) aplicar_efeito(te, t, a, mist);
+  for (const TimelineOsso& to : an.ossos) aplicar_osso(to, t, a, mist, false);
+  for (const TimelineDeformar& td : an.deformar) aplicar_deformar(td, t, a, mist);
+  // o mundo dos ossos que a animacao mexeu, do pai para o filho (os filhos que ela nao mexe vem
+  // depois, pela lista da restricao)
+  std::vector<char> mexe(m.ossos.size(), 0);
+  for (const TimelineOsso& to : an.ossos) mexe[size_t(to.osso)] = 1;
+  for (size_t i = 0; i < m.ossos.size(); ++i)
+    if (mexe[i]) mundo_osso(int(i));
+}
+
+void Esqueleto::devolver_slider() {
+  if (slots_antes_slider_.empty()) return;
+  for (size_t i = 0; i < slots_.size() && i < slots_antes_slider_.size(); ++i) {
+    SlotAntes& a = slots_antes_slider_[i];
+    EstadoSlot& s = slots_[i];
+    s.parte = a.parte;
+    s.cor = a.cor;
+    s.efeitos = a.efeitos;
+    s.deform.swap(a.deform);
+  }
+  slots_antes_slider_.clear();
+}
+
+void Esqueleto::atualizar_ativos() {
+  const Modelo& m = *m_;
+  ativos_.assign(m.ossos.size(), 1);
+  if (m.skins.empty()) return;
+  const auto& lista = m.skins[size_t(skin_)].ossos;
+  for (size_t i = 0; i < m.ossos.size(); ++i) {
+    const DadosOsso& d = m.ossos[i];
+    bool a = !d.so_skin || std::find(lista.begin(), lista.end(), int(i)) != lista.end();
+    if (d.pai >= 0) a = a && ativos_[size_t(d.pai)];
+    ativos_[i] = a;
+  }
+}
+
 void Esqueleto::setup() {
   const Modelo& m = *m_;
+  atualizar_ativos();
   for (size_t i = 0; i < m.ossos.size(); ++i) {
     const DadosOsso& d = m.ossos[i];
     local[i] = Local{d.x, d.y, d.rotacao, d.escala_x, d.escala_y, d.cisalha_x, d.cisalha_y};
@@ -75,6 +167,10 @@ void Esqueleto::setup() {
     s.borrar_ant.clear();
     s.borrar_t = s.borrar_t_ant = -1;
     s.rastro.clear();
+    s.geleia_p.clear(), s.geleia_v.clear(), s.geleia_alvo.clear(), s.geleia_xy.clear();
+    s.geleia_t = -1, s.geleia_sobra = 0, s.geleia_parte = -1;
+    s.geleia_seguem.clear();
+    s.segue_dx = s.segue_dy = 0;
   }
   luzes_setup();
   instancias_setup();
@@ -110,6 +206,10 @@ void Esqueleto::setup() {
         e.mix_y = d.caminho.mix_y;
         e.posicao = d.caminho.posicao;
         e.espacamento = d.caminho.espacamento;
+        break;
+      case TipoRestricao::Slider:
+        e.mix = d.slider.mix;
+        e.tempo = d.slider.tempo;
         break;
       case TipoRestricao::Fisica:
         e.inercia = d.fisica.inercia;
@@ -423,6 +523,7 @@ void Esqueleto::atualizar_particulas() {
       p.vida = d.vida[0] + (d.vida[1] - d.vida[0]) * s_vida;
       p.giro = d.giro[0] + (d.giro[1] - d.giro[0]) * s_giro;
       p.fase = sorteio(idx, j + 4);
+      if (!d.variacoes.empty()) p.var = std::min(int(sorteio(idx, j + 5) * double(d.variacoes.size())), int(d.variacoes.size()) - 1);
       e.vivas.push_back(p);
     }
   }
@@ -531,6 +632,8 @@ void Esqueleto::aplicar_restricao(const TimelineRestricao& tr, double t, double 
       case PropRestricao::FisicaGravidade: abs(e.gravidade, d.fisica.gravidade, um(0)); break;
       case PropRestricao::FisicaMix: abs(e.mix, d.fisica.mix, um(0)); break;
       case PropRestricao::FisicaReiniciar: break;  // TODO: reiniciar no tempo da chave
+      case PropRestricao::SliderTempo: abs(e.tempo, d.slider.tempo, um(0)); break;
+      case PropRestricao::SliderMix: abs(e.mix, d.slider.mix, um(0)); break;
     }
   };
   if (tr.restricao >= 0) {
@@ -565,6 +668,7 @@ void Esqueleto::mudar_parte(int si, int p) {
 
 void Esqueleto::aplicar(int ai, double tempo, bool loop) {
   const Modelo& m = *m_;
+  devolver_slider();
   // volta ao setup local, dos slots, da ordem e dos parametros das restricoes (a fisica
   // guarda a memoria dela)
   for (size_t i = 0; i < m.ossos.size(); ++i) {
@@ -599,6 +703,9 @@ void Esqueleto::aplicar(int ai, double tempo, bool loop) {
         e.inercia = d.fisica.inercia, e.forca = d.fisica.forca, e.amortecimento = d.fisica.amortecimento;
         e.massa_inv = d.fisica.massa_inv, e.vento = d.fisica.vento, e.gravidade = d.fisica.gravidade;
         e.mix = d.fisica.mix;
+        break;
+      case TipoRestricao::Slider:
+        e.mix = d.slider.mix, e.tempo = d.slider.tempo;
         break;
     }
   }
@@ -887,12 +994,14 @@ void Esqueleto::atualizar_mundo() {
       case TipoRestricao::Caminho: restricao_caminho(int(r)); break;
       case TipoRestricao::Fisica: restricao_fisica(int(r)); break;
       case TipoRestricao::Transformacao: restricao_transformacao(int(r)); break;
+      case TipoRestricao::Slider: restricao_slider(int(r)); break;
     }
     for (int o : descendentes_[r]) mundo_osso(o);
   }
   local.swap(antes_);
   atualizar_particulas();
   if (!inst_.empty()) atualizar_instancias();
+  atualizar_geleia();
   // borrar: os vertices deste relogio; o do relogio anterior vira o `ant` quando o relogio anda
   // (varios atualizar_mundo no mesmo relogio so trocam o atual). Relogio que volta: sem anterior
   for (size_t i = 0; i < slots_.size(); ++i) {
@@ -1072,17 +1181,127 @@ size_t Esqueleto::vertices(int si, std::vector<double>& out) const {
     const Matriz& w = mundo_[size_t(m_->slots[size_t(si)].osso)];
     for (int i = 0; i < 4; ++i) {
       const double x = p.cantos[i * 2], y = p.cantos[i * 2 + 1];
-      out[size_t(i) * 2] = w.a * x + w.b * y + w.x;
-      out[size_t(i) * 2 + 1] = w.c * x + w.d * y + w.y;
+      out[size_t(i) * 2] = w.a * x + w.b * y + w.x + s.segue_dx;
+      out[size_t(i) * 2 + 1] = w.c * x + w.d * y + w.y + s.segue_dy;
     }
     return 8;
   }
   if (p.tipo == TipoParte::Malha || p.tipo == TipoParte::MalhaLigada) {
     out.resize(size_t(p.num_vertices) * 2);
-    vertices_geometria(si, p, out.data());
+    // malha mole: a saida da geleia (do mesmo relogio e da mesma parte)
+    if (s.geleia_parte == s.parte && s.geleia_xy.size() == out.size()) std::copy(s.geleia_xy.begin(), s.geleia_xy.end(), out.begin());
+    else vertices_geometria(si, p, out.data());
+    if (s.segue_dx != 0 || s.segue_dy != 0)
+      for (size_t k = 0; k < out.size(); k += 2) out[k] += s.segue_dx, out[k + 1] += s.segue_dy;
     return out.size();
   }
   return 0;
+}
+
+// Geleia (docs/NUCLEO.md "Geleia"): cada vertice da malha mole e uma massa puxada por uma mola
+// para onde o rig o poe e pelos vizinhos (a diferenca entre eles volta a do rig). Integra em passos
+// fixos de 1/120 s pelo relogio do esqueleto, com o alvo andando em linha reta do relogio anterior
+// ao atual. Relogio que volta, salto de mais de 0,25 s ou parte trocada: volta ao rig, parada
+void Esqueleto::atualizar_geleia() {
+  const Modelo& m = *m_;
+  for (EstadoSlot& s : slots_) s.segue_dx = s.segue_dy = 0;
+  for (size_t si = 0; si < slots_.size(); ++si) {
+    EstadoSlot& s = slots_[si];
+    const Parte* p = s.parte >= 0 ? &m.partes[size_t(s.parte)] : nullptr;
+    if (!p || p->tipo != TipoParte::Malha || !p->geleia.ativa) {
+      if (s.geleia_parte >= 0) s.geleia_p.clear(), s.geleia_v.clear(), s.geleia_alvo.clear(), s.geleia_xy.clear(), s.geleia_parte = -1, s.geleia_t = -1;
+      continue;
+    }
+    const Geleia& g = p->geleia;
+    const size_t n = size_t(p->num_vertices) * 2;
+    std::vector<double>& alvo = tmp_;
+    alvo.resize(n);
+    vertices_geometria(int(si), *p, alvo.data());
+    const double dt = relogio_ - s.geleia_t;
+    if (s.geleia_parte != s.parte || s.geleia_p.size() != n || s.geleia_t < 0 || dt < 0 || dt > 0.25) {
+      s.geleia_p = alvo;
+      s.geleia_v.assign(n, 0);
+      s.geleia_alvo = alvo;
+      s.geleia_sobra = 0;
+      s.geleia_parte = s.parte;
+      // quem segue: o centro de cada slot agora, no triangulo que o contem (ou no mais perto)
+      s.geleia_seguem.clear();
+      std::vector<double> xy;
+      for (int sg : g.seguem) {
+        const size_t nv = vertices(sg, xy);
+        if (!nv) continue;
+        double cx = 0, cy = 0;
+        for (size_t k = 0; k < nv; k += 2) cx += xy[k], cy += xy[k + 1];
+        cx /= double(nv / 2), cy /= double(nv / 2);
+        EstadoSlot::Seguidor best{sg, -1, 0, 0, 0};
+        double fora = 1e300;
+        for (size_t t = 0; t + 2 < p->triangulos.size(); t += 3) {
+          const size_t a = size_t(p->triangulos[t]) * 2, b = size_t(p->triangulos[t + 1]) * 2, c = size_t(p->triangulos[t + 2]) * 2;
+          const double det = (alvo[b + 1] - alvo[c + 1]) * (alvo[a] - alvo[c]) + (alvo[c] - alvo[b]) * (alvo[a + 1] - alvo[c + 1]);
+          if (std::abs(det) < 1e-12) continue;
+          const double l1 = ((alvo[b + 1] - alvo[c + 1]) * (cx - alvo[c]) + (alvo[c] - alvo[b]) * (cy - alvo[c + 1])) / det;
+          const double l2 = ((alvo[c + 1] - alvo[a + 1]) * (cx - alvo[c]) + (alvo[a] - alvo[c]) * (cy - alvo[c + 1])) / det;
+          const double l3 = 1 - l1 - l2;
+          const double f = -std::min({l1, l2, l3});
+          if (f < fora) fora = f, best = {sg, int(t), l1, l2, l3};
+        }
+        if (best.tri >= 0) s.geleia_seguem.push_back(best);
+      }
+    } else if (dt > 0) {
+      const double h = 1.0 / 120;
+      const double perda = std::exp(-g.amortecimento * h);
+      double feito = 0;
+      s.geleia_sobra += dt;
+      std::vector<double>& P = s.geleia_p;
+      std::vector<double>& V = s.geleia_v;
+      std::vector<double> a(n), t(n);
+      while (s.geleia_sobra >= h) {
+        s.geleia_sobra -= h;
+        feito += h;
+        // o alvo deste passo: entre o do relogio anterior e o de agora
+        const double f = std::min(1.0, feito / dt);
+        for (size_t k = 0; k < n; ++k) t[k] = s.geleia_alvo[k] + (alvo[k] - s.geleia_alvo[k]) * f;
+        for (size_t k = 0; k < n; k += 2) {
+          a[k] = g.rigidez * (t[k] - P[k]);
+          a[k + 1] = g.rigidez * (t[k + 1] - P[k + 1]) - g.gravidade;
+        }
+        for (size_t e = 0; e + 1 < g.arestas.size(); e += 2) {
+          const size_t i = size_t(g.arestas[e]) * 2, j = size_t(g.arestas[e + 1]) * 2;
+          const double dx = g.contagio * ((t[i] - t[j]) - (P[i] - P[j]));
+          const double dy = g.contagio * ((t[i + 1] - t[j + 1]) - (P[i + 1] - P[j + 1]));
+          a[i] += dx, a[i + 1] += dy;
+          a[j] -= dx, a[j + 1] -= dy;
+        }
+        for (size_t k = 0; k < n; k += 2) {
+          // preso (moleza 0): fica no rig e segura os vizinhos
+          if (g.moleza[k / 2] <= 0) {
+            P[k] = t[k], P[k + 1] = t[k + 1], V[k] = V[k + 1] = 0;
+            continue;
+          }
+          V[k] = (V[k] + a[k] / g.massa * h) * perda;
+          V[k + 1] = (V[k + 1] + a[k + 1] / g.massa * h) * perda;
+          P[k] += V[k] * h;
+          P[k + 1] += V[k + 1] * h;
+        }
+      }
+      s.geleia_alvo = alvo;
+    }
+    s.geleia_t = relogio_;
+    // a saida: o rig mais o desvio da massa, na medida da moleza de cada vertice
+    s.geleia_xy.resize(n);
+    for (size_t k = 0; k < n; k += 2) {
+      const double w = g.moleza[k / 2];
+      s.geleia_xy[k] = alvo[k] + (s.geleia_p[k] - alvo[k]) * w;
+      s.geleia_xy[k + 1] = alvo[k + 1] + (s.geleia_p[k + 1] - alvo[k + 1]) * w;
+    }
+    // quem segue anda com o deslocamento da malha no ponto dele
+    for (const EstadoSlot::Seguidor& sg : s.geleia_seguem) {
+      const size_t a = size_t(p->triangulos[size_t(sg.tri)]) * 2, b = size_t(p->triangulos[size_t(sg.tri) + 1]) * 2, c = size_t(p->triangulos[size_t(sg.tri) + 2]) * 2;
+      EstadoSlot& f = slots_[size_t(sg.slot)];
+      f.segue_dx += sg.b0 * (s.geleia_xy[a] - alvo[a]) + sg.b1 * (s.geleia_xy[b] - alvo[b]) + sg.b2 * (s.geleia_xy[c] - alvo[c]);
+      f.segue_dy += sg.b0 * (s.geleia_xy[a + 1] - alvo[a + 1]) + sg.b1 * (s.geleia_xy[b + 1] - alvo[b + 1]) + sg.b2 * (s.geleia_xy[c + 1] - alvo[c + 1]);
+    }
+  }
 }
 
 }  // namespace mamulengo

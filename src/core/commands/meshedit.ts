@@ -291,6 +291,8 @@ function commit(e: Editor, loc: Loc, c: Commit): { vertices: number; triangles: 
   set("vertices", vertices);
   set("triangles", tris);
   set("hull", c.hull);
+  // malha mole: os pontos mudaram, a moleza e refeita pela distancia ao osso
+  if (m.jelly && (m.jelly.wobble?.length ?? 0) !== c.verts.length) e.set([...path, "jelly", "wobble"], autoWobble(e.json, loc.skin, loc.slot, loc.name));
   if (m.edges) {
     const edges: number[] = [];
     for (let i = 0; i < c.hull; i++) edges.push(i * 2, ((i + 1) % c.hull) * 2);
@@ -635,5 +637,124 @@ defineCommand({
     );
     commit(e, loc, { verts, hull: m.hull ?? 0, inner: innerEdges(m, (i) => i), triangles: m.triangles });
     return { touched, changed: changed.size, deformKeys: keys, influences: verts.reduce((s, v) => s + v.inf!.length, 0) };
+  },
+});
+
+// --- geleia (docs/NUCLEO.md "Geleia"): a malha mole
+
+// moleza automatica: 0 no ponto mais perto da origem do osso do slot (preso), 1 no mais longe,
+// subindo devagar no comeco (a base fica firme e a ponta balanca)
+export function autoWobble(json: SpineJson, skin: string, slot: string, attachment: string, curve = 1.5): number[] {
+  const mv = meshView(json, skin, slot, attachment);
+  const bone = slots(json).find((s) => s.name === slot)!.bone;
+  const W = boneWorld(skeletonAt(json, null, 0), bone);
+  const d = mv.world.map(([x, y]) => Math.hypot(x - W.x, y - W.y));
+  const lo = Math.min(...d),
+    hi = Math.max(...d);
+  return d.map((v) => round(hi - lo > 1e-6 ? ((v - lo) / (hi - lo)) ** curve : 1));
+}
+
+function distToPolygon(p: Pt, poly: Pt[]): number {
+  let d = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i],
+      b = poly[(i + 1) % poly.length];
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1];
+    const l = dx * dx + dy * dy;
+    const t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0;
+    d = Math.min(d, Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy));
+  }
+  return d;
+}
+
+// as pecas que ficam em cima da malha mole na Pose base (o centro delas dentro do contorno dela):
+// olho, boca, antena na barriga; elas seguem a geleia
+export function autoFollowers(json: SpineJson, skin: string, slot: string, attachment: string): string[] {
+  const mv = meshView(json, skin, slot, attachment);
+  const hull = mv.world.slice(0, Math.max(3, mv.hull));
+  const sk = skeletonAt(json, null, 0);
+  const xs = hull.map((p) => p[0]),
+    ys = hull.map((p) => p[1]);
+  const folga = 0.06 * Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const out: string[] = [];
+  for (const s of slots(json)) {
+    if (s.name === slot || !s.attachment) continue;
+    const a = skins(json).map((k) => k.attachments?.[s.name]?.[s.attachment]).find(Boolean);
+    if (!a) continue;
+    const t = a.type ?? "region";
+    let c: Pt | null = null;
+    if (t === "region") {
+      const W = boneWorld(sk, s.bone);
+      c = apply(W, a.x ?? 0, a.y ?? 0) as Pt;
+    } else if (t === "mesh") {
+      try {
+        const w = meshView(json, "default", s.name, s.attachment).world;
+        c = [w.reduce((x, p) => x + p[0], 0) / w.length, w.reduce((y, p) => y + p[1], 0) / w.length];
+      } catch {}
+    }
+    // o centro em cima da malha, ou o osso preso nela (a antena: a imagem sai para fora, a base
+    // fica no alto da cabeca), com uma folga de 6% do tamanho da malha
+    const W = boneWorld(sk, s.bone);
+    const perto = (p: Pt) => pointInPolygon(p[0], p[1], hull) || distToPolygon(p, hull) < folga;
+    if ((c && pointInPolygon(c[0], c[1], hull)) || perto([W.x, W.y])) out.push(s.name);
+  }
+  return out;
+}
+
+export const JELLY_PRESETS: Record<string, { stiffness: number; coupling: number; damping: number; gravity?: number }> = {
+  gelatina: { stiffness: 120, coupling: 80, damping: 3 },
+  borracha: { stiffness: 260, coupling: 220, damping: 7 },
+  slime: { stiffness: 45, coupling: 60, damping: 2.2, gravity: 60 },
+  agua_viva: { stiffness: 22, coupling: 35, damping: 1.4 },
+};
+
+defineCommand({
+  name: "mesh.jelly",
+  group: "attachment",
+  summary:
+    "Geleia (so .boneco, desenho do nucleo): a malha fica mole, balanca e assenta quando o osso mexe; as pecas em cima dela (followers) andam junto. Cada ponto e puxado para onde o rig o poe (stiffness) e pelos vizinhos (coupling: o balanco corre pela malha); damping tira o balanco; gravity puxa para baixo (px/s2); mass divide as forcas. wobble: por ponto, 0 preso a 1 solto (padrao: pela distancia ao osso do slot, base firme e ponta mole; um numero vale para todos). preset gelatina, borracha, slime ou agua_viva. enabled false tira.",
+  params: z.object({
+    ...Target,
+    enabled: z.boolean().default(true),
+    preset: z.enum(["gelatina", "borracha", "slime", "agua_viva"]).optional(),
+    stiffness: z.number().min(0).optional(),
+    coupling: z.number().min(0).optional(),
+    damping: z.number().min(0).optional(),
+    gravity: z.number().optional(),
+    mass: z.number().min(0.01).optional(),
+    wobble: z.union([z.array(z.number().min(0).max(1)), z.number().min(0).max(1), z.literal("auto")]).optional(),
+    followers: z.union([z.array(z.string()), z.literal("auto")]).optional().describe("slots que andam com a geleia (olho, boca em cima da barriga); padrao ao ligar: os que ficam em cima da malha"),
+    curve: z.number().min(0.2).max(5).default(1.5).describe("com wobble auto: quanto a moleza demora a subir a partir do osso (1 linear, maior = base mais firme)"),
+  }),
+  label: (p) => `geleia em ${p.slot}/${p.attachment}`,
+  run({ e }, p) {
+    const loc = locateMesh(e.json, p.skin, p.slot, p.attachment);
+    if (loc.mesh.type === "linkedmesh") throw new Error("geleia so em malha (nao ligada)");
+    const path = ["skins", loc.si, "attachments", loc.slot, loc.name, "jelly"];
+    if (!p.enabled) {
+      if (loc.mesh.jelly) e.set(path, undefined);
+      return { enabled: false };
+    }
+    const cur = loc.mesh.jelly ?? {};
+    const base = { ...JELLY_PRESETS.gelatina, ...cur, ...(p.preset ? JELLY_PRESETS[p.preset] : {}) };
+    for (const k of ["stiffness", "coupling", "damping", "gravity", "mass"] as const) if (p[k] !== undefined) (base as any)[k] = p[k];
+    const n = loc.mesh.uvs.length / 2;
+    let wobble: number[];
+    if (Array.isArray(p.wobble)) {
+      if (p.wobble.length !== n) throw new Error(`wobble com ${p.wobble.length} valores: a malha tem ${n} pontos`);
+      wobble = p.wobble.map(round);
+    } else if (typeof p.wobble === "number") wobble = Array(n).fill(round(p.wobble));
+    else if (p.wobble === "auto" || !cur.wobble || cur.wobble.length !== n || p.curve !== 1.5) wobble = autoWobble(e.json, loc.skin, loc.slot, loc.name, p.curve);
+    else wobble = cur.wobble;
+    const out: any = { stiffness: round(base.stiffness), coupling: round(base.coupling), damping: round(base.damping) };
+    if (base.gravity) out.gravity = round(base.gravity);
+    if (base.mass !== undefined && base.mass !== 1) out.mass = round(base.mass);
+    out.wobble = wobble;
+    const seguem = Array.isArray(p.followers) ? p.followers : p.followers === "auto" || !cur.followers ? autoFollowers(e.json, loc.skin, loc.slot, loc.name) : cur.followers;
+    for (const f of seguem) if (!slots(e.json).some((s) => s.name === f)) throw new Error(`followers: slot desconhecido ${f}`);
+    if (seguem.length) out.followers = seguem;
+    e.set(path, out);
+    return { enabled: true, ...out, wobble: undefined, points: n, presos: wobble.filter((w) => w === 0).length };
   },
 });

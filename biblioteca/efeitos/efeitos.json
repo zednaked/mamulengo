@@ -1,0 +1,51 @@
+{
+  "fumaca": {
+    "titulo": "fumaça subindo",
+    "texto": "fumaça escura que sobe devagar, cresce e some (chaminé, motor, algo queimando)",
+    "imagens": ["fumaca_1", "fumaca_2", "fumaca_3", "fumaca_4", "fumaca_5", "fumaca_6"],
+    "emissor": { "rate": 7, "life": [1.4, 2.2], "speed": [25, 55], "angle": 90, "spread": 30, "gravity": -18, "drag": 0.6, "scale": [0.3, 0.95], "spin": [-35, 35], "wave": [6, 0.5], "color": ["ffffff00", "ffffffb0", "ffffff80", "ffffff00"] }
+  },
+  "vapor": {
+    "titulo": "vapor",
+    "texto": "fumaça branca e leve subindo (xícara, panela, respiração no frio)",
+    "imagens": ["puff_1", "puff_2", "puff_3", "puff_4", "puff_5", "puff_6"],
+    "emissor": { "rate": 5, "life": [1.2, 1.8], "speed": [20, 40], "angle": 90, "spread": 20, "gravity": -12, "drag": 0.5, "scale": [0.2, 0.7], "spin": [-25, 25], "wave": [5, 0.6], "color": ["ffffff00", "ffffff90", "ffffff00"] }
+  },
+  "puff": {
+    "titulo": "puff",
+    "texto": "nuvenzinha branca que estoura de uma vez (aparecer, sumir, trocar de roupa): use rajadas",
+    "imagens": ["puff_1", "puff_2", "puff_3", "puff_4", "puff_5", "puff_6"],
+    "emissor": { "rate": 0, "life": [0.35, 0.7], "speed": [80, 200], "angle": 90, "spread": 360, "drag": 4, "scale": [0.45, 0.95], "spin": [-120, 120], "color": ["ffffffee", "ffffffaa", "ffffff00"] }
+  },
+  "poeira": {
+    "titulo": "poeira do chão",
+    "texto": "poeira que espirra para os lados rente ao chão (aterrissagem, pisada, freada): use rajadas",
+    "imagens": ["puff_1", "puff_2", "puff_3", "puff_4", "puff_5", "puff_6"],
+    "emissor": { "rate": 0, "life": [0.4, 0.8], "speed": [90, 220], "angle": 90, "spread": 150, "gravity": 120, "drag": 3.5, "scale": [0.45, 0.95], "spin": [-90, 90], "color": ["d8c8b0dd", "d8c8b088", "d8c8b000"] }
+  },
+  "explosao": {
+    "titulo": "explosão",
+    "texto": "bola de fogo que se espalha e apaga (impacto, estouro, prêmio): use rajadas; junto com o flash fica mais forte",
+    "imagens": ["explosao_1", "explosao_2", "explosao_3", "explosao_4", "explosao_5", "explosao_6"],
+    "emissor": { "rate": 0, "life": [0.35, 0.7], "speed": [60, 240], "angle": 90, "spread": 360, "drag": 4.5, "scale": [0.45, 1.15], "spin": [-150, 150], "color": ["ffffffff", "ffffffdd", "ffffff00"] }
+  },
+  "flash": {
+    "titulo": "flash",
+    "texto": "clarão curto e amarelo (tiro, faísca, golpe): use rajadas de poucas partículas",
+    "imagens": ["flash_1", "flash_2", "flash_3", "flash_4", "flash_5", "flash_6"],
+    "emissor": { "rate": 0, "life": [0.12, 0.25], "speed": [0, 30], "angle": 90, "spread": 360, "scale": [0.7, 1.3], "spin": [-60, 60], "blend": "additive", "color": ["ffffffff", "ffffff00"] }
+  },
+  "pum": {
+    "titulo": "pum",
+    "texto": "nuvem verde que sai e se arrasta (pum, gás, veneno): use rajadas",
+    "imagens": ["pum_1", "pum_2", "pum_3", "pum_4", "pum_5", "pum_6"],
+    "emissor": { "rate": 0, "life": [0.7, 1.3], "speed": [40, 90], "angle": -90, "spread": 70, "gravity": -15, "drag": 1.6, "scale": [0.4, 1.1], "spin": [-40, 40], "wave": [4, 1], "color": ["ffffffcc", "ffffff99", "ffffff00"] }
+  },
+  "olho_maluco": {
+    "tipo": "olho",
+    "titulo": "olho maluco",
+    "texto": "olho de boneco com a pupila solta, que cai, rola e chacoalha (eye.googly)",
+    "imagens": ["googly_branco", "googly_pupila", "googly_brilho"],
+    "olho": { "pupila": 0.588, "curso": 0.19, "brilho": [0.194, -0.168, 0.364] }
+  }
+}

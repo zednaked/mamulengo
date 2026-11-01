@@ -7,6 +7,8 @@ import { dropDraft, getDraft, putDraft, type Draft } from "./drafts.ts";
 import type { Runtime, Viewer } from "../render/viewer.ts";
 import type { Op } from "../core/ops.ts";
 import { fichaPath } from "../core/ficha.ts";
+import { drawingsOf } from "../core/desenho.ts";
+import { Desenhos, drawingPixels } from "./desenho.ts";
 
 export interface AssetInfo {
   id: string;
@@ -56,6 +58,25 @@ export interface MeshEdit {
   strength: number;
   // mover ponto estica a imagem junto (senao anda sobre ela)
   stretch: boolean;
+}
+
+// o ambiente Desenhar (src/app/drawedit.ts): a imagem desenhada em edicao, na Pose base
+export interface DrawEdit {
+  image: string;
+  slot: string;
+  skin: string;
+  attachment: string;
+  tool: "select" | "pen" | "rect" | "ellipse";
+  // forma e ponto escolhidos (indices em drawings.<image>.shapes); contour: de qual contorno e o
+  // ponto (0 = o principal, 1.. = os furos)
+  shape: number | null;
+  point: number | null;
+  contour: number;
+  // contorno aberto sendo feito com a caneta (o proximo clique acrescenta um ponto no fim)
+  pen: number | null;
+  penContour: number;
+  // modo furo: caneta, retangulo e elipse furam a forma escolhida
+  hole: boolean;
 }
 
 export const fileUrl =(p: string) => `/api/file?p=${encodeURIComponent(p)}`;
@@ -161,6 +182,79 @@ class AppState {
   }
   // editar malha (na Pose base): pontos ou pintura de pesos do slot escolhido
   meshEdit = $state<MeshEdit | null>(null);
+  // desenhar uma imagem vetorial (na Pose base)
+  drawEdit = $state<DrawEdit | null>(null);
+  // clicar pontos na tela para uma parte especial (recorte, caixa, caminho, ponto): os pontos em
+  // pixels do mundo (espaco do esqueleto), na Pose base
+  captura = $state<{ tipo: "clipping" | "boundingbox" | "path" | "point"; bone: string; slot: string | null; pontos: [number, number][] } | null>(null);
+  comecarCaptura(tipo: "clipping" | "boundingbox" | "path" | "point", bone: string, slot: string | null) {
+    this.mode = "setup";
+    if (this.viewer) this.viewer.view.playing = false;
+    this.drawEdit = null;
+    this.meshEdit = null;
+    this.captura = { tipo, bone, slot, pontos: [] };
+  }
+  // conclui: cria a camada nova no osso e a parte com os pontos
+  concluirCaptura() {
+    const c = this.captura;
+    this.captura = null;
+    if (!c || !this.doc) return;
+    const min = c.tipo === "point" ? 1 : c.tipo === "path" ? 2 : 3;
+    if (c.pontos.length < min) return this.toast(`Precisa de pelo menos ${min} ponto${min > 1 ? "s" : ""}.`);
+    const NOME: Record<string, string> = { clipping: "recorte", boundingbox: "caixa", path: "caminho", point: "ponto" };
+    const usados = new Set(this.doc.json.slots.map((s: any) => s.name));
+    let nome = NOME[c.tipo];
+    for (let k = 2; usados.has(nome); k++) nome = `${NOME[c.tipo]}_${k}`;
+    // recorte: logo atras da camada escolhida, recortando ate ela; os outros na frente de tudo
+    const calls: any[] = [{ cmd: "slot.add", args: { name: nome, bone: c.bone, ...(c.tipo === "clipping" && c.slot ? { below: c.slot } : {}) } }];
+    const P = c.pontos.map(([x, y]) => [+x.toFixed(2), +y.toFixed(2)]);
+    if (c.tipo === "clipping") calls.push({ cmd: "clipping.create", args: { slot: nome, name: nome, points: P, ...(c.slot ? { end: c.slot } : {}), show: true } });
+    else if (c.tipo === "boundingbox") calls.push({ cmd: "boundingbox.create", args: { slot: nome, name: nome, points: P } }, { cmd: "slot.set", args: { slot: nome, attachment: nome } });
+    else if (c.tipo === "point") calls.push({ cmd: "point.create", args: { slot: nome, name: nome, at: P[0] } }, { cmd: "slot.set", args: { slot: nome, attachment: nome } });
+    else {
+      // caminho: alcas suaves pelos vizinhos (um sexto da distancia entre o anterior e o seguinte)
+      const out: number[][] = [];
+      P.forEach((p, i) => {
+        const a = P[Math.max(0, i - 1)],
+          b = P[Math.min(P.length - 1, i + 1)];
+        const t = [(b[0] - a[0]) / 6, (b[1] - a[1]) / 6];
+        out.push([p[0] - t[0], p[1] - t[1]], p, [p[0] + t[0], p[1] + t[1]]);
+      });
+      calls.push({ cmd: "path.create", args: { slot: nome, name: nome, points: out } }, { cmd: "slot.set", args: { slot: nome, attachment: nome } });
+    }
+    if (this.run(calls, `${NOME[c.tipo]} em ${c.bone}`)) {
+      this.select({ bone: c.bone, slot: nome });
+      const dica: Record<string, string> = {
+        clipping: c.slot ? `só o que está dentro dele aparece em ${c.slot}` : "mova a camada na Ordem para escolher o que ele recorta",
+        boundingbox: "o jogo usa para clique e colisão",
+        path: "um osso pode segui-lo (+ restrição › seguir um caminho)",
+        point: "o jogo usa para prender efeitos",
+      };
+      this.avisar(`${nome} criado em ${c.bone}: ${dica[c.tipo]}.`);
+    }
+  }
+
+  // a skin mostrada; imagem nova numa camada entra nela (null: a padrao)
+  skin = $state<string | null>(null);
+  get skinEdicao() {
+    return this.skin ?? "default";
+  }
+  verSkin(nome: string | null) {
+    this.skin = nome && nome !== "default" ? nome : null;
+    this.viewer?.setSkin(this.skin);
+    this.version++;
+  }
+  // a skin onde mora a imagem `att` da camada: a mostrada se ela tem, senao a primeira que tem
+  skinDe(slot: string, att: string): string {
+    const sks: any[] = this.doc?.json.skins ?? [];
+    if (sks.find((s) => s.name === this.skinEdicao)?.attachments?.[slot]?.[att]) return this.skinEdicao;
+    return sks.find((s) => s.attachments?.[slot]?.[att])?.name ?? "default";
+  }
+  // a pagina do atlas feita das formas (src/app/desenho.ts)
+  desenhos = new Desenhos();
+  // o atlas como esta no disco e os desenhos da ultima gravacao da pagina
+  private atlasDisco = "";
+  private desenhosGravados: string | null = null;
   // chaves copiadas na timeline (resultado de keys.copy): vale entre animacoes e personagens
   keyClipboard = $state.raw<{ time: number; items: any[] } | null>(null);
   private seq = 0;
@@ -192,17 +286,23 @@ class AppState {
       this.fileText = sk;
       const doc = Document.fromText(sk, { text: at, pages: {} });
       doc.file = { skeleton: asset.skeleton, atlas: asset.atlas, tres: asset.tres };
+      this.atlasDisco = at;
+      this.desenhosGravados = null;
+      this.desenhos.preparar(doc);
       this.unsub?.();
       this.unsub = doc.onChange((e) => this.onChange(e));
       this.doc = doc;
       this.asset = asset;
       this.selection = {};
       this.meshEdit = null;
+      this.drawEdit = null;
+      this.skin = null;
+      if (this.viewer) this.viewer.skin = null;
       this.version++;
       const dir = asset.atlas.slice(0, asset.atlas.lastIndexOf("/") + 1);
       // o modo muda antes de carregar, para as texturas virem uma vez so
       this.runtime = runtimeDe(asset);
-      if (this.viewer) this.viewer.runtime = this.runtime;
+      if (this.viewer) (this.viewer.runtime = this.runtime), (this.viewer.paginaPropria = (p) => this.desenhos.bitmap(p));
       await this.viewer?.setDocument(doc, (page) => `/api/texture?p=${encodeURIComponent(dir + page)}`);
       this.log({ label: `abriu ${asset.project} / ${asset.name}`, source: "ui", kind: "info", ops: 0 });
       const d = await getDraft(asset.id);
@@ -233,6 +333,12 @@ class AppState {
 
   private onChange(e: ChangeEvent) {
     this.version++;
+    // as formas de um desenho mudaram: a pagina dos desenhos e refeita
+    const desenho = (ops: Op[] | undefined) => !!ops?.some((o) => o.path[0] === "drawings");
+    if (this.doc && (desenho(e.tx.ops) || desenho(e.tx.inverse) || desenho(e.replaced?.ops))) {
+      const doc = this.doc;
+      this.desenhos.agendar(doc, this.viewer, () => this.reloadAtlas(doc.atlas.text));
+    }
     // rascunho (com folga para nao serializar a cada passo de um arraste)
     clearTimeout(this.draftTimer);
     const id = this.asset?.id;
@@ -253,6 +359,8 @@ class AppState {
   // Imagens para comandos que precisam de pixels: regioes do atlas aberto.
   pixels: AssetProvider = {
     image: async (region) => {
+      const d = drawingsOf(this.doc?.json)[region];
+      if (d) return drawingPixels(d);
       const atlas = this.doc?.file.atlas;
       if (!atlas) return null;
       const r = await fetch(`/api/region?atlas=${encodeURIComponent(atlas)}&name=${encodeURIComponent(region)}`);
@@ -268,9 +376,12 @@ class AppState {
       return r.ok ? await r.text() : null;
     },
     region: (name) => {
+      // imagem desenhada: o tamanho dela (a pagina guarda em alta resolucao)
+      const d = drawingsOf(this.doc?.json)[name];
+      if (d) return { width: d.width, height: d.height };
       const text = this.doc?.atlas.text;
       if (!text) return null;
-      const r = parseAtlas(text).regions.find((x) => x.name === name);
+      const r = parseAtlas(this.desenhos.semDesenhos(text)).regions.find((x) => x.name === name);
       return r ? { width: r.originalWidth, height: r.originalHeight } : null;
     },
   };
@@ -389,6 +500,7 @@ class AppState {
   // Liga um viewer (novo, ex: viewport remontado) ao documento ja aberto.
   async attachViewer(v: Viewer) {
     this.viewer = v;
+    v.paginaPropria = (p) => this.desenhos.bitmap(p);
     this.applyHidden();
     const doc = this.doc;
     if (!doc?.file.atlas) return;
@@ -416,6 +528,7 @@ class AppState {
     const doc = this.doc;
     if (!doc?.file.skeleton) throw new Error("Abra um personagem primeiro.");
     const text = doc.serialize();
+    await this.gravarDesenhos(doc);
     // o servidor guarda cada gravacao como versao; source diz quem gravou
     const r = await fetch(fileUrl(doc.file.skeleton), { method: "PUT", body: text, headers: { "x-mamulengo-source": source } });
     const j = await r.json();
@@ -427,6 +540,126 @@ class AppState {
     this.log({ label: `salvou ${doc.file.skeleton.split("/").pop()} (${j.bytes} bytes)`, source, kind: "info", ops: 0 });
     this.versionsTick++;
     return { bytes: j.bytes, version: j.version };
+  }
+
+  // a pagina dos desenhos (PNG) e o atlas, se mudaram, antes do esqueleto
+  private async gravarDesenhos(doc: Document) {
+    const atlas = doc.file.atlas;
+    if (!atlas) return;
+    const dir = atlas.slice(0, atlas.lastIndexOf("/") + 1);
+    const agora = JSON.stringify(drawingsOf(doc.json));
+    if (this.desenhos.layout && agora !== this.desenhosGravados) {
+      // a pagina das formas de agora (o redesenho agendado pode nao ter rodado ainda)
+      const png = await this.desenhos.png(doc);
+      if (png) {
+        const r = await fetch(fileUrl(dir + this.desenhos.page), { method: "PUT", body: png });
+        if (!r.ok) throw new Error(`Não consegui gravar a página dos desenhos: ${(await r.json()).error}`);
+      }
+    }
+    if (doc.atlas.text !== this.atlasDisco) {
+      const r = await fetch(fileUrl(atlas), { method: "PUT", body: doc.atlas.text });
+      if (!r.ok) throw new Error(`Não consegui gravar o atlas: ${(await r.json()).error}`);
+      this.atlasDisco = doc.atlas.text;
+    }
+    this.desenhosGravados = agora;
+  }
+
+  // ferramentas que regravam o .boneco no servidor (relevo, arte HD, formato): salva antes, roda,
+  // e o personagem reabre do disco no mesmo instante e com a mesma vista
+  relevoRodando = $state(false);
+  async noArquivo(nome: string, faz: (boneco: string) => Promise<any>, aviso: (r: any) => string) {
+    const asset = this.asset;
+    const v = this.viewer;
+    if (!asset?.tres?.endsWith(".boneco") || this.relevoRodando) return null;
+    this.relevoRodando = true;
+    try {
+      if (this.doc?.dirty) await this.save();
+      const r = await faz(asset.tres);
+      const vista = v ? { anim: v.view.animation, t: v.view.time, cam: { ...v.cam } } : null;
+      await this.open(asset);
+      if (v && vista) {
+        v.setAnimation(vista.anim);
+        v.poseAt(vista.t);
+        Object.assign(v.cam, vista.cam);
+      }
+      this.versionsTick++;
+      // aviso vazio: quem chamou avisa depois (efeito e olho maluco)
+      const msg = aviso(r);
+      if (msg) this.avisar(msg);
+      return r;
+    } catch (e: any) {
+      this.toast(`Não consegui ${nome}: ${e?.message ?? e}`);
+      return null;
+    } finally {
+      this.relevoRodando = false;
+    }
+  }
+  private async postar(url: string, body: BodyInit) {
+    const r = await fetch(url, { method: "POST", body });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    return j;
+  }
+  gerarRelevo(opts: Record<string, number> = {}) {
+    return this.noArquivo("gerar o relevo", (b) => this.postar("/api/relevo", JSON.stringify({ boneco: b, ...opts })), () => "O relevo das páginas foi calculado da própria arte: as luzes já iluminam as peças. Para voltar, use Versões.");
+  }
+  converterFormato(binario: boolean) {
+    return this.noArquivo(
+      "trocar o formato",
+      (b) => this.postar("/api/boneco/formato", JSON.stringify({ boneco: b, binario })),
+      (r) => `O .boneco agora está em ${binario ? "binário" : "texto"}: ${Math.round(r.antes / 1024)} KB → ${Math.round(r.depois / 1024)} KB. O editor lê e grava nos dois formatos.`,
+    );
+  }
+  // efeito da biblioteca (biblioteca/efeitos) numa camada: o servidor poe as imagens numa pagina
+  // de efeitos do .boneco (salva antes e reabre), e o emissor nasce pelo particles.set (desfazivel)
+  efeitosLista = $state<{ nome: string; titulo: string; texto: string; rajadas: boolean }[] | null>(null);
+  async carregarEfeitos() {
+    if (!this.efeitosLista) this.efeitosLista = await fetch("/api/efeitos").then((r) => (r.ok ? r.json() : []));
+    return this.efeitosLista;
+  }
+  async efeitoDaBiblioteca(efeito: string, slot: string) {
+    const ef = (await this.carregarEfeitos())?.find((e) => e.nome === efeito);
+    const r = await this.noArquivo("trazer o efeito", (b) => this.postar("/api/efeito", JSON.stringify({ boneco: b, efeito })), (r) => (r.novas ? `As imagens do efeito entraram na página ${r.pagina}.` : "O efeito já estava no personagem."));
+    if (!r) return;
+    let nome = `${slot}_${efeito}`;
+    for (let n = 2; ((this.doc?.json as any).particles ?? []).some((p: any) => p.name === nome); n++) nome = `${slot}_${efeito}_${n}`;
+    if (this.run({ cmd: "particles.set", args: { name: nome, slot, variants: r.imagens, ...r.emissor } }, `${efeito} em ${slot}`))
+      this.avisar(`${ef?.titulo ?? efeito} em ${slot}${ef?.rajadas ? ": este sai em rajadas; ponha uma chave de rajada na timeline (botão rajada, logo abaixo)" : ""}.`);
+  }
+  // olho maluco (eye.googly) em lugares aleatorios da camada: as imagens vem da biblioteca (como um
+  // efeito), depois o comando cola os olhos (desfazivel)
+  async olhoMaluco(slot: string, count: number) {
+    const r = await this.noArquivo("trazer o olho maluco", (b) => this.postar("/api/efeito", JSON.stringify({ boneco: b, efeito: "olho_maluco" })), () => "");
+    if (!r) return;
+    const seed = 1 + Math.floor(Math.random() * 9999);
+    if (this.run({ cmd: "eye.googly", args: { slot, count, seed } }, `olho maluco em ${slot}`))
+      this.avisar(`${count === 1 ? "Um olho maluco" : `${count} olhos malucos`} em ${slot}, em lugares sorteados: a pupila cai e rola quando a peça mexe. Não gostou do lugar? Desfaça e ponha de novo.`);
+  }
+  // versao leve ao lado (o original nao muda): salva antes, para ela sair do que esta na tela
+  async versaoLeve(fator: number) {
+    const asset = this.asset;
+    if (!asset?.tres?.endsWith(".boneco") || this.relevoRodando) return;
+    this.relevoRodando = true;
+    try {
+      if (this.doc?.dirty) await this.save();
+      const r = await this.postar("/api/boneco/leve", JSON.stringify({ boneco: asset.tres, fator }));
+      await this.loadAssets(true);
+      // a ultima linha e a do proprio personagem (antes vem a dos filhos das instancias)
+      const m = /: (\d+) -> (\d+) paginas, ([\d.]+) -> ([\d.]+) Mpx; (\d+) lotes.*? -> (\d+) lotes/.exec(String(r.saida.at(-1) ?? ""));
+      const conta = m ? `: ${m[1]} → ${m[2]} páginas, ${m[3]} → ${m[4]} megapixels de textura, ${m[5]} → ${m[6]} lotes de desenho (somando o primeiro quadro de cada animação)` : "";
+      this.avisar(`Versão leve ao lado, ${asset.name}-leve${conta}. O original não mudou.`);
+    } catch (e: any) {
+      this.toast(`Não consegui fazer a versão leve: ${e?.message ?? e}`);
+    } finally {
+      this.relevoRodando = false;
+    }
+  }
+  arteHd(svg: Blob | null, fator: number, id: string) {
+    return this.noArquivo(
+      "fazer a arte HD",
+      (b) => this.postar(`/api/atlas-hd?boneco=${encodeURIComponent(b)}&fator=${fator}&id=${encodeURIComponent(id)}`, svg ?? new Blob([])),
+      () => `A página do atlas saiu do SVG em ${fator}x (nítida de perto). Para voltar, use Versões.`,
+    );
   }
 
   // olho das listas Esqueleto e Ordem: esconde na tela, nao grava nada
@@ -531,6 +764,7 @@ class AppState {
       this.asset = m.asset;
       this.mirrorAsset = m.asset.id;
       this.selection = {};
+      this.desenhos.preparar(doc);
       this.version++;
       const dir = m.asset.atlas.slice(0, m.asset.atlas.lastIndexOf("/") + 1);
       await this.viewer?.setDocument(doc, (page) => `/api/texture?p=${encodeURIComponent(dir + page)}&t=${Date.now()}`);

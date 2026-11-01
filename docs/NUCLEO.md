@@ -162,6 +162,13 @@ deslocamento por entrada de peso, somado ao `(x, y)` dela. A chave traz `desloca
 (índice do primeiro valor) e os `vertices` a partir dali; os demais são zero. Interpola
 entre chaves com a curva.
 
+## Skins
+
+A skin ativa decide qual parte cada nome de imagem do slot usa (a da skin, senão a da padrão).
+Ossos com `skin: true` só ficam ativos com uma skin que os lista em `ossos` (e com o pai ativo):
+o slot de um osso inativo não desenha. Trocar a skin (`Esqueleto::skin`; no wasm `mm_skin`) vale
+a partir do próximo setup.
+
 ## Restrições
 
 **IK:** um ou dois ossos tentam alcançar o osso alvo.
@@ -217,6 +224,28 @@ alvo, limites, mixes, fonte que fica espelhada na animação), 183 iguais; os 17
 diferem sem os deslocamentos do topo (18 sem eles): são combinações de `limitar`, `somar` e
 escala que a conta acima ainda não cobre (em aberto). Um asset privado com a fonte em mundo
 girando e movendo outro osso diferia centenas de px antes e agora bate em todas as animações.
+
+**Slider:** a restrição dirige uma animação inteira (`animacao`) por um número `t`, medido no
+oráculo:
+- sem `osso`: `t` é o campo `tempo` (que a timeline `tempo` anima). Um `tempo` negativo deixa o
+  slider parado: não aplica nada, com ou sem `repetir`;
+- com `osso`: `t = (valor − de) × escalar + para` (`escalar` padrão 1), e o `tempo` não conta.
+  O valor é a `propriedade` do osso (`rotate`, `x`, `y`, `scaleX`, `scaleY`, `shearY`) no mundo:
+  o giro de mundo em [0, 360), a escala pelo comprimento da coluna da matriz e a cisalha y pela
+  mesma conta da transformação; com `local_`, a pose local;
+- `repetir`: `t` módulo a duração (resto positivo); sem `repetir`, preso a [0, duração].
+  `maximo` não muda nada em nenhuma medida.
+
+A animação controlada se aplica inteira no instante `t` (ossos, cores, efeitos, partes, deform),
+na ordem das restrições, e os filhos dos ossos que ela mexe são recalculados:
+- sem `somar`: `atual + (valor − atual) × mix`;
+- com `somar`: soma o valor das chaves × `mix` (a cor mistura como sem `somar`).
+
+As timelines `animacoes.X.slider.<nome>.{tempo, mix}` interpolam; antes da primeira chave vale
+o setup. A cada quadro o núcleo devolve os slots ao que eram antes do primeiro slider, para a
+próxima aplicação partir do mesmo lugar. Conferido em 198 casos gerados
+(`tools/nucleo-fixtures.ts`, `slider/`: cada propriedade, mundo e local, somar, repetir, mix,
+timelines e 100 aleatórios), todos iguais ao oráculo.
 
 ## Desenho
 
@@ -405,6 +434,61 @@ do lote copia o backbuffer da viewport (`canvas_item_set_copy_to_backbuffer`) e 
 `hint_screen_texture`. Cada ajuste custa uma cópia da tela, e o desfoque 49 leituras por pixel:
 para a cena toda, um ou dois bastam.
 
+## Blends
+
+Além dos do Spine (`normal`, `aditivo`, `multiplica`, `tela`), seis que misturam a cor da peça
+com o que já está desenhado embaixo, pelas fórmulas do W3C ("Compositing and Blending Level 1"),
+com `b` o que está embaixo e `s` a cor da peça (textura vezes cor do slot, o pma desfeito):
+- `sobrepor`: `b <= 0,5 ? 2 b s : 1 - 2 (1 - b)(1 - s)`;
+- `luz_suave`: `s <= 0,5 ? b - (1 - 2 s) b (1 - b) : b + (2 s - 1)(D(b) - b)`, com
+  `D(b) = b <= 0,25 ? ((16 b - 12) b + 4) b : √b`;
+- `escurecer`: `min(b, s)`; `clarear`: `max(b, s)`; `diferenca`: `|b - s|`;
+- `subexpor`: `b = 0 ? 0 : min(1, b / (1 - s))`.
+
+O resultado entra por cima na medida do alfa da peça: `b + (mistura - b) α`. O desenhista copia
+a tela antes do lote (na web, `copyTexImage2D`; no Godot, o backbuffer do item), como na camada de
+ajuste; cada slot com um desses modos é um lote só dele (lotes seguidos não se juntam, para cada
+um ler o que o anterior deixou) e custa uma cópia da tela. Nesses slots os efeitos e a luz não
+valem. No spine-core (os modos godot e spine do editor) e na exportação para o Spine saem
+`normal`.
+
+## Geleia
+
+A malha mole: barriga, bochecha, slime, gelatina. Cada vértice de uma `malha` com `geleia` é uma
+massa puxada por uma mola para onde o rig o põe e pelos vizinhos; quando o osso mexe, a parte
+mole atrasa, passa do ponto, balança e assenta. Não muda o rig nem os ossos, só onde os vértices
+são desenhados (e o que lê os vértices depois: borrar, rastro, recorte por cima).
+
+**No `.boneco`**, na parte malha: `"geleia": {"rigidez", "contagio", "amortecimento",
+"gravidade", "massa", "moleza": [por vértice, 0 a 1], "seguem": [slots]}`.
+- `rigidez` (padrão 120): a mola de cada vértice até a posição do rig;
+- `contagio` (80): para cada aresta da malha (tirada dos triângulos), a diferença entre os dois
+  vértices puxada para a do rig; é o que faz a onda correr pela peça;
+- `amortecimento` (3): perda de velocidade por segundo, `v *= exp(-amortecimento * h)`;
+- `gravidade` (0): px/s² para baixo (y para cima: soma `-gravidade` na aceleração y);
+- `massa` (1): divide as forças;
+- `moleza`: quanto cada vértice sai do rig. 0 é preso: fica no rig e segura os vizinhos pelas
+  arestas. Vazia ou de outro tamanho: todos 1.
+- `seguem`: slots que andam com a geleia (o olho e a boca na barriga mole).
+
+**A conta**, a cada `atualizar_mundo`, por slot com a parte malha com geleia:
+1. o alvo `T` são os vértices em mundo como o rig os põe (pesos e deformar);
+2. começo (setup, parte trocada, relógio que volta, ou mais de 0,25 s desde a última vez): as
+   massas `P` ficam em `T`, paradas; os que seguem guardam o triângulo da malha em que o centro
+   deles cai agora (ou o mais perto) e as coordenadas baricêntricas nele;
+3. senão, o tempo desde o relógio anterior entra em passos fixos de `h = 1/120 s` (o resto fica
+   para a próxima vez). Em cada passo o alvo é o anterior andando em linha reta até `T`, e:
+   `a = rigidez (t - p) + Σ contagio ((tᵢ - tⱼ) - (pᵢ - pⱼ)) + (0, -gravidade)`,
+   `v = (v + a / massa · h) · exp(-amortecimento h)`, `p += v h`; vértice com moleza 0: `p = t`;
+4. a saída de cada vértice é `t + moleza (p - t)`;
+5. cada slot que segue soma aos vértices dele o deslocamento da saída no ponto dele (a média
+   baricêntrica de `saída - t` nos três vértices do triângulo).
+
+Conferido pelo comportamento (`npx tsx tools/nucleo-geleia.ts`, malha 5 x 5 num osso que anda
+80 px em 0,3 s e para): a fileira presa fica no rig, o topo atrasa, passa do ponto, balança e
+assenta (menos de 0,2 px em 4 s), o olho que segue anda com o ponto da malha (desvio 1e-14 px),
+e sem geleia a malha é o rig.
+
 ## Luzes
 
 O terceiro recurso além do Spine: luz dinâmica 2D sem o artista pintar nada. Cada página do
@@ -486,6 +570,7 @@ tira e avisa.
 | campo | padrão | o quê |
 |---|---|---|
 | `nome`, `slot`, `imagem` | (obrigatórios) | o slot dá o lugar na ordem de desenho (logo depois da parte dele), a cor e o blend; `imagem` é um nome de `imagens` |
+| `variacoes` | (nenhuma) | nomes de imagens que se revezam: cada partícula sorteia uma ao nascer (sorteio de campo 5) e desenha com o retângulo dela; só as da página da primeira (um lote). Sem `imagem`, a primeira vale como ela |
 | `osso` | o osso do slot | de onde nascem; `x`, `y` (0) é o ponto no osso |
 | `taxa` | 10 | partículas por segundo (animável) |
 | `vida` | `[1, 1]` | segundos, sorteado entre os dois |

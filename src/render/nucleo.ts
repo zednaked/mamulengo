@@ -33,7 +33,7 @@ const corDe = (hex: string | undefined): [number, number, number, number] => {
 
 // na ordem dos enums TipoParte e Blend do nucleo (modelo.h)
 const TIPOS: PartKind[] = ["region", "mesh", "linkedmesh", "clipping", "path", "point", "boundingbox"];
-const BLENDS: Blend[] = ["normal", "additive", "multiply", "multiply", "screen"];
+const BLENDS: Blend[] = ["normal", "additive", "multiply", "multiply", "screen", "overlay", "softLight", "darken", "lighten", "difference", "colorDodge"];
 
 // o checkpoint do poseAt: o ultimo passo inteiro (done) de uma conta (key)
 type Checkpoint = { key: string; done: number; cut: boolean };
@@ -137,6 +137,7 @@ export class NucleoCena {
     N._mm_limpar_instancias();
     this.inst = N._mm_instancia(m);
     this.fantasma = N._mm_instancia(m);
+    this.aplicaSkin();
     this.ck = null;
     this.lerInfo();
     this.ligaPaginas();
@@ -150,6 +151,26 @@ export class NucleoCena {
     this.pose = new NucleoPose(this, this.inst, json);
     this.stats.cargas++;
     this.stats.cargaMs = performance.now() - t0;
+  }
+
+  // a skin mostrada (null: a padrao); vale nas duas instancias e a cada recarga do modelo
+  skin: string | null = null;
+  usarSkin(nome: string | null) {
+    this.skin = nome;
+    this.aplicaSkin();
+    this.ck = null;
+    if (this.inst >= 0) this.N._mm_reiniciar(this.inst);
+    this.mudou();
+  }
+  private aplicaSkin() {
+    if (this.inst < 0 || !this.N._mm_skin) return;
+    const N = this.N;
+    const p = N.stringToNewUTF8(this.skin ?? "default"),
+      d = N.stringToNewUTF8("default");
+    // skin que nao existe (apagada, desfeita): a padrao
+    for (const i of [this.inst, this.fantasma]) if (i >= 0 && N._mm_skin(i, p) < 0) N._mm_skin(i, d);
+    N._free(p);
+    N._free(d);
   }
 
   temAnimacao(anim: string) {

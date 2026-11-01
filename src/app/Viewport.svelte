@@ -14,6 +14,29 @@
   import { app } from "./state.svelte.ts";
   import { ajudaFerramenta, passoSeta, beginDrag, beginStroke, cursor, drawGizmo, drawHover, drawLigacoes, drawTools, endDrag, endStroke, hover, leituraArrasto, moveDrag, moveStroke, pickBone, pickPart } from "./interact.ts";
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
+  import { drawDown, drawDragging, drawDrawEdit, drawHelp, drawKey, drawMove, drawUp, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
+  import { drawingOfSlot } from "../core/commands/desenho.ts";
+  import { Color } from "@esotericsoftware/spine-webgl";
+  import type { Viewer as V } from "../render/viewer.ts";
+
+  // os pontos clicados de uma parte especial e o trecho ate o cursor
+  function drawCaptura(v: V) {
+    const c = app.captura;
+    if (!c) return;
+    const s = v.scene;
+    const z = v.cam.zoom;
+    const fy = v.flip ? -1 : 1;
+    const cor = new Color(1, 0.82, 0.3, 1);
+    const P = c.pontos.map(([x, y]) => [x, y * fy]);
+    const cur = cursor.inside ? [cursor.x, cursor.y] : null;
+    const lista = cur && c.tipo !== "point" ? [...P, cur] : P;
+    for (let i = 0; i + 1 < lista.length; i++) s.line(lista[i][0], lista[i][1], lista[i + 1][0], lista[i + 1][1], cor);
+    if (c.tipo !== "path" && lista.length > 2) s.line(lista[lista.length - 1][0], lista[lista.length - 1][1], lista[0][0], lista[0][1], new Color(1, 0.82, 0.3, 0.4));
+    for (const p of P) {
+      s.circle(true, p[0], p[1], 5 / z, new Color(0.1, 0.08, 0.12, 1), 12);
+      s.circle(true, p[0], p[1], 3.5 / z, cor, 12);
+    }
+  }
 
   let canvas: HTMLCanvasElement;
   let panning = $state<{ x: number; y: number; cx: number; cy: number } | null>(null);
@@ -63,6 +86,8 @@
     // editando malha, os gizmos de osso saem e entra o desenho da malha
     v.overlays.push((v) => {
       if (app.meshEdit) return drawMeshEdit(v);
+      if (app.captura) return drawCaptura(v);
+      if (app.drawEdit) return drawDrawEdit(v);
       drawLigacoes(v);
       drawHover(v);
       drawGizmo(v);
@@ -91,6 +116,22 @@
       if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) space = true;
       // setas com o mouse sobre o desenho: a ferramenta em passos (fora dele, a timeline anda)
       const el = e.target as HTMLElement;
+      // clicando pontos: Enter conclui, Esc cancela, Backspace tira o ultimo
+      if (app.captura && !(el instanceof HTMLInputElement)) {
+        if (e.key === "Enter") app.concluirCaptura();
+        else if (e.key === "Escape") app.captura = null;
+        else if (e.key === "Backspace") app.captura.pontos = app.captura.pontos.slice(0, -1);
+        else return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      // desenhando: as teclas da caneta e da selecao (V, P, R, O, Esc, Enter, Delete, setas)
+      if (app.drawEdit && !(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement || el?.isContentEditable) && drawKey(e)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       if (e.key.startsWith("Arrow") && cursor.inside && !(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) && app.viewer && !app.meshEdit) {
         if (passoSeta(app.viewer, e.key, e.shiftKey, e.altKey, e.ctrlKey || e.metaKey)) {
           e.preventDefault();
@@ -114,7 +155,7 @@
   // editar malha mostra a setup pose; sai sozinho se a peca ou o modo mudarem
   $effect(() => {
     const v = app.viewer;
-    const on = !!app.meshEdit;
+    const on = !!app.meshEdit || !!app.drawEdit;
     if (v && v.setupOnly !== on) {
       v.setupOnly = on;
       v.poseAt(v.view.time);
@@ -124,6 +165,9 @@
     app.version;
     const me = app.meshEdit;
     if (me && (app.mode !== "setup" || app.selection.slot !== me.slot || !currentMesh())) stopMeshEdit();
+    // o desenho sai se a animacao abrir ou a parte deixar de mostrar o desenho (desfazer)
+    const de = app.drawEdit;
+    if (de && (app.mode !== "setup" || !app.doc || drawingOfSlot(app.doc.json, de.slot)?.image !== de.image)) stopDrawEdit();
   });
 
   function wheel(e: WheelEvent) {
@@ -151,6 +195,17 @@
     dragged = false;
     if (app.meshEdit) {
       if (!meshDown(v, v.screenToWorld(e.clientX, e.clientY), e.shiftKey)) downAt = null;
+      return;
+    }
+    if (app.drawEdit) {
+      if (!drawDown(v, w, { shift: e.shiftKey, alt: e.altKey })) downAt = null;
+      return;
+    }
+    // clicando os pontos de uma parte especial (o ponto conclui no primeiro clique)
+    if (app.captura) {
+      app.captura.pontos = [...app.captura.pontos, [w.x, w.y]];
+      if (app.captura.tipo === "point") app.concluirCaptura();
+      downAt = null;
       return;
     }
     // ferramentas de traco (pincel de deform, criar osso) trabalham em coordenadas visuais
@@ -194,6 +249,7 @@
     app.play.animation;
     const s = app.selection;
     void s.bone, s.slot;
+    if (app.drawEdit) return (app.drawEdit.tool, app.drawEdit.pen, drawHelp());
     return app.doc && app.viewer && !app.meshEdit ? ajudaFerramenta(app.viewer) : "";
   });
 
@@ -201,7 +257,7 @@
   let dica = $state<{ t: string; x: number; y: number } | null>(null);
   function mostraAlvo(e: PointerEvent) {
     const v = app.viewer;
-    if (!v || !app.doc || app.meshEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
+    if (!v || !app.doc || app.meshEdit || app.drawEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
     const w = v.screenToSkel(e.clientX, e.clientY);
     const a = alvoEm(w.x, w.y);
     const igual = a.bone === app.selection.bone && a.slot === app.selection.slot;
@@ -226,6 +282,11 @@
       meshMove(v, vis);
       return;
     }
+    if (drawDragging()) {
+      drawMove(v, v.screenToSkel(e.clientX, e.clientY), { shift: e.shiftKey, alt: e.altKey });
+      return;
+    }
+    if (downAt && app.drawEdit) return;
     if (downAt && app.meshEdit) return;
     if (downAt && (app.tool === "deform" || app.tool === "bone")) {
       moveStroke(v, vis);
@@ -248,6 +309,17 @@
     }
   }
 
+  // dois cliques numa peca desenhada abrem o Desenhar nela (dentro do Desenhar, os dois cliques
+  // sao do ponto: canto <-> curva)
+  function dblclick(e: MouseEvent) {
+    const v = app.viewer;
+    if (!v || !app.doc || app.drawEdit || app.meshEdit || app.spectator) return;
+    const w = v.screenToSkel(e.clientX, e.clientY);
+    const pose = v.pose;
+    const part = pose ? pickPart(pose, w.x, w.y, (sl) => v.isSlotHidden(sl)) : null;
+    if (part && drawingOfSlot(app.doc.json, part.slot)) startDrawEdit(part.slot);
+  }
+
   // imagem arrastada da paleta: vira uma parte nova (slot + imagem) onde caiu
   function drop(e: DragEvent) {
     const name = e.dataTransfer?.getData("text/mamulengo-image");
@@ -261,7 +333,7 @@
     const r = app.run(
       [
         { cmd: "slot.add", args: { name: slot, bone, attachment: name } },
-        { cmd: "attachment.region", args: { slot, name, world: { center: [at.x, at.y] } } },
+        { cmd: "attachment.region", args: { slot, name, skin: app.skinEdicao, world: { center: [at.x, at.y] } } },
       ],
       `nova parte ${slot}`,
     );
@@ -275,13 +347,14 @@
     endDrag();
     endStroke();
     meshUp();
+    drawUp();
   }
 </script>
 
 <div class="wrap" class:setup={app.doc && app.mode === "setup"}>
   {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animações">POSE BASE</div>
   {:else if app.doc && app.play.animation && !app.spectator}<div class="base-tag anima" title="Mexer numa parte grava uma chave no instante da régua">ANIMANDO {app.play.animation} · mexer grava chave</div>{/if}
-  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => ((cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={dblclick} onpointerleave={() => ((cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
   {#if ajuda}<div class="ajuda" role="status">{ajuda}</div>{/if}
   {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
   {#if leitura}<div class="leitura" style:left="{leitura.x + 16}px" style:top="{leitura.y + 16}px">{leitura.t}</div>{/if}
@@ -330,6 +403,29 @@
       <b>✏️ Editando a malha de {app.meshEdit.attachment}</b>
       <span class="dim">{app.meshEdit.tab === "points" ? "arraste os pontos · clique na borda ou dentro para criar · Delete apaga" : `pinte para ${app.meshEdit.paint === "add" ? "dar" : "tirar"} peso de ${app.meshEdit.bone ?? "um osso"} · Shift inverte`}</span>
       <button class="ok" onclick={stopMeshEdit}>Pronto</button>
+    </div>
+  {/if}
+  {#if app.captura}
+    {@const c = app.captura}
+    <div class="meshbar drawbar">
+      <b>{({ clipping: "✂ Recorte", boundingbox: "▢ Caixa", path: "〰 Caminho", point: "• Ponto" })[c.tipo]} em {c.bone}</b>
+      <span class="dim">{c.tipo === "point" ? "clique onde fica o ponto" : `clique os pontos (${c.pontos.length}) · Enter conclui · Backspace tira o último · Esc cancela`}</span>
+      {#if c.tipo !== "point"}<button class="ok" onclick={() => app.concluirCaptura()}>Pronto</button>{/if}
+      <button onclick={() => (app.captura = null)}>Cancelar</button>
+    </div>
+  {/if}
+  {#if app.drawEdit}
+    {@const de = app.drawEdit}
+    <div class="meshbar drawbar">
+      <b>✏️ Desenhando {de.image}</b>
+      <span class="ferr">
+        <button class:on={de.tool === "select"} onclick={() => ((de.tool = "select"), (de.pen = null))} title="Selecionar (V)">↖</button>
+        <button class:on={de.tool === "pen"} onclick={() => (de.tool = "pen")} title="Caneta (P)">✒️</button>
+        <button class:on={de.tool === "rect"} onclick={() => ((de.tool = "rect"), (de.pen = null))} title="Retângulo (R)">▭</button>
+        <button class:on={de.tool === "ellipse"} onclick={() => ((de.tool = "ellipse"), (de.pen = null))} title="Elipse (O)">◯</button>
+        <button class:on={de.hole} disabled={de.shape === null && !de.hole} onclick={() => ((de.hole = !de.hole), (de.pen = null), de.tool === "select" && (de.tool = "pen"))} title="Modo furo: a caneta, o retângulo e a elipse furam a forma escolhida (Esc sai)">⊘</button>
+      </span>
+      <button class="ok" onclick={stopDrawEdit}>Pronto</button>
     </div>
   {/if}
   {#if app.offerMesh}
@@ -559,6 +655,27 @@
     align-items: center;
     white-space: nowrap;
     font-size: 13px;
+  }
+  .drawbar {
+    background: #121c26dd;
+    border-color: #0c99ff;
+  }
+  .meshbar.drawbar .ok {
+    background: #0c99ff;
+    border-color: #0c99ff;
+    color: #fff;
+    font-weight: 600;
+  }
+  .drawbar .ferr {
+    display: flex;
+    gap: 3px;
+  }
+  .drawbar .ferr button {
+    padding: 3px 8px;
+  }
+  .drawbar .ferr button.on {
+    background: #0c99ff44;
+    border-color: #0c99ff;
   }
   .meshbar .ok {
     background: #5ee0d0;
