@@ -16,5 +16,6 @@ import "./psd.ts";
 import "./particles.ts";
 import "./lights.ts";
 import "./instances.ts";
+import "./laco.ts";
 
 export * from "./registry.ts";

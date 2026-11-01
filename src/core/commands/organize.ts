@@ -13,7 +13,7 @@ export function encodeDrawOrder(setupNames: string[], order: string[]): { slot: 
   const index = new Map(setupNames.map((n, i) => [n, i]));
   const seq = order.map((n) => {
     const i = index.get(n);
-    if (i === undefined) throw new Error(`slot nao existe: ${n}`);
+    if (i === undefined) throw new Error(`slot não existe: ${n}`);
     return i;
   });
   if (new Set(seq).size !== setupNames.length || seq.length !== setupNames.length) throw new Error(`a ordem precisa listar todos os ${setupNames.length} slots exatamente uma vez`);
@@ -122,7 +122,7 @@ defineCommand({
     requireAnimation(e.json, p.anim);
     const keys: any[] = e.json.animations[p.anim].drawOrder ?? [];
     const i = findKey(keys, p.time);
-    if (i < 0) throw new Error(`nao ha chave de ordem em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
+    if (i < 0) throw new Error(`não há chave de ordem em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
     if (keys.length === 1) e.set(["animations", p.anim, "drawOrder"], undefined);
     else e.remove(["animations", p.anim, "drawOrder"], i);
     return { deleted: i };
@@ -140,7 +140,7 @@ defineCommand({
   params: z.object({ name: z.string().min(1), ...EventProps.shape }),
   label: (p) => `evento ${p.name}`,
   run({ e }, p) {
-    if (e.json.events?.[p.name]) throw new Error(`evento ja existe: ${p.name}`);
+    if (e.json.events?.[p.name]) throw new Error(`evento já existe: ${p.name}`);
     const { name, ...props } = p;
     const ev: any = {};
     for (const [k, v] of Object.entries(props)) if (v !== undefined && v !== 0 && v !== "") ev[k] = v;
@@ -158,7 +158,7 @@ defineCommand({
   label: (p) => `evento ${p.name} @${p.time}`,
   run({ e }, p) {
     requireAnimation(e.json, p.anim);
-    if (!e.json.events?.[p.name]) throw new Error(`evento nao existe: ${p.name}. Crie com event.create. Existem: ${Object.keys(e.json.events ?? {}).join(", ") || "(nenhum)"}`);
+    if (!e.json.events?.[p.name]) throw new Error(`evento não existe: ${p.name}. Crie com event.create. Existem: ${Object.keys(e.json.events ?? {}).join(", ") || "(nenhum)"}`);
     const { anim, time, name, ...vals } = p;
     const key: any = {};
     const t = round(time);
@@ -185,7 +185,7 @@ defineCommand({
     requireAnimation(e.json, p.anim);
     const keys: any[] = e.json.animations[p.anim].events ?? [];
     const i = keys.findIndex((k) => k.name === p.name && Math.abs(timeOf(k) - p.time) < 1e-4);
-    if (i < 0) throw new Error(`evento ${p.name} nao dispara em ${p.time}s`);
+    if (i < 0) throw new Error(`evento ${p.name} não dispara em ${p.time}s`);
     if (keys.length === 1) e.set(["animations", p.anim, "events"], undefined);
     else e.remove(["animations", p.anim, "events"], i);
     return { deleted: i };
@@ -201,7 +201,7 @@ defineCommand({
   params: z.object({ name: z.string().min(1), copyFrom: z.string().optional() }),
   label: (p) => `skin ${p.name}`,
   run({ e }, p) {
-    if (skins(e.json).some((s) => s.name === p.name)) throw new Error(`skin ja existe: ${p.name}`);
+    if (skins(e.json).some((s) => s.name === p.name)) throw new Error(`skin já existe: ${p.name}`);
     const src = p.copyFrom ? skins(e.json)[requireSkin(e.json, p.copyFrom)] : null;
     const s: any = { name: p.name, attachments: src ? structuredClone(src.attachments) : {} };
     for (const k of ["bones", "ik", "transform", "path", "physics", "slider"]) if (src?.[k]) s[k] = structuredClone(src[k]);
@@ -218,7 +218,7 @@ defineCommand({
   params: z.object({ name: z.string() }),
   label: (p) => `remove skin ${p.name}`,
   run({ e }, p) {
-    if (p.name === "default") throw new Error("a skin default nao pode ser removida");
+    if (p.name === "default") throw new Error("a skin default não pode ser removida");
     const i = requireSkin(e.json, p.name);
     e.remove(["skins"], i);
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {})) if (a.attachments?.[p.name]) e.set(["animations", an, "attachments", p.name], undefined);

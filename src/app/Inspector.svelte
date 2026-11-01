@@ -36,6 +36,19 @@
     return { ...s, atts };
   });
 
+  // a imagem (regiao) que a peca mostra na Pose base, dentro do osso: posicao, giro e escala
+  const imagemNoOsso = $derived.by(() => {
+    app.version;
+    if (!slot?.attachment || !app.doc) return null;
+    const a = app.doc.json.skins?.find((s: any) => s.name === "default")?.attachments?.[slot.name]?.[slot.attachment];
+    if (!a || (a.type ?? "region") !== "region") return null;
+    return { x: a.x ?? 0, y: a.y ?? 0, rotation: a.rotation ?? 0, scaleX: a.scaleX ?? 1, scaleY: a.scaleY ?? 1 };
+  });
+  function setImagem(campo: string, valor: number) {
+    if (!slot?.attachment || !Number.isFinite(valor)) return;
+    app.run({ cmd: "attachment.region", args: { slot: slot.name, name: slot.attachment, [campo]: valor } }, `imagem de ${slot.name}`);
+  }
+
   // cor atual do slot (com a animacao aplicada, com uma animacao aberta)
   const color = $derived.by(() => {
     app.version;
@@ -62,33 +75,33 @@
   // ---- efeitos (so .boneco; docs/NUCLEO.md "Efeitos"): os ligados no setup ou animados aqui
   const EFEITOS: Record<string, { nome: string; dica: string; campos: { k: string; label: string; min?: number; max: number; step: number }[] }> = {
     outline: { nome: "contorno", dica: "linha em volta da imagem", campos: [{ k: "width", label: "largura", max: 16, step: 0.5 }] },
-    glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "forca", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
+    glow: { nome: "brilho", dica: "halo em volta da imagem", campos: [{ k: "strength", label: "força", max: 3, step: 0.05 }, { k: "radius", label: "raio", max: 40, step: 1 }] },
     dissolve: { nome: "dissolver", dica: "some em pedacos, com borda colorida", campos: [{ k: "value", label: "quanto", max: 1, step: 0.01 }, { k: "edge", label: "borda", max: 0.3, step: 0.01 }, { k: "grain", label: "pedacos", max: 64, step: 1 }] },
-    tint: { nome: "tingir", dica: "pinta a imagem com uma cor", campos: [{ k: "strength", label: "forca", max: 1, step: 0.01 }] },
+    tint: { nome: "tingir", dica: "pinta a imagem com uma cor", campos: [{ k: "strength", label: "força", max: 1, step: 0.01 }] },
     smear: {
       nome: "borrar",
-      dica: "estica a traseira da imagem quando ela anda rapido (smear de desenho animado)",
+      dica: "estica a traseira da imagem quando ela anda rápido (smear de desenho animado)",
       campos: [
-        { k: "strength", label: "forca (s)", max: 0.2, step: 0.005 },
+        { k: "strength", label: "força (s)", max: 0.2, step: 0.005 },
         { k: "limit", label: "limite", max: 200, step: 1 },
         { k: "fade", label: "esmaecer", max: 1, step: 0.05 },
       ],
     },
     trail: {
       nome: "rastro",
-      dica: "copias dos quadros anteriores por tras da imagem, mais fracas quanto mais antigas",
+      dica: "cópias dos quadros anteriores por trás da imagem, mais fracas quanto mais antigas",
       campos: [
-        { k: "copies", label: "copias", max: 16, step: 1 },
+        { k: "copies", label: "cópias", max: 16, step: 1 },
         { k: "interval", label: "intervalo (s)", max: 0.2, step: 0.005 },
         { k: "alpha", label: "alfa", max: 1, step: 0.05 },
       ],
     },
     adjust: {
       nome: "ajuste",
-      dica: "camada de ajuste: muda o que ja esta desenhado por baixo da imagem (sem imagem, a tela toda)",
+      dica: "camada de ajuste: muda o que já esta desenhado por baixo da imagem (sem imagem, a tela toda)",
       campos: [
         { k: "hue", label: "matiz", min: -180, max: 180, step: 1 },
-        { k: "saturation", label: "saturacao", max: 4, step: 0.05 },
+        { k: "saturation", label: "saturação", max: 4, step: 0.05 },
         { k: "lightness", label: "luminosidade", min: -1, max: 1, step: 0.02 },
         { k: "contrast", label: "contraste", max: 4, step: 0.05 },
         { k: "blur", label: "desfoque", max: 40, step: 0.5 },
@@ -117,7 +130,7 @@
   const LIGA: Record<string, Record<string, any>> = { outline: { width: 3, color: "ffd23cff" }, glow: { strength: 1, color: "4cc9ffff" }, dissolve: {}, tint: { color: "ff3355ff" }, smear: { strength: 0.05 }, trail: { copies: 4 }, adjust: { saturation: 0 } };
   function ligar(n: string) {
     if (!slot || !n) return;
-    app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`);
+    if (app.run({ cmd: "slot.effect", args: { slot: slot.name, effect: n, ...LIGA[n] } }, `${EFEITOS[n].nome} em ${slot.name}`)) app.avisar(`${EFEITOS[n].nome} em ${slot.name}: os controles estão logo abaixo.`);
   }
   function tirar(n: string) {
     if (!slot) return;
@@ -126,11 +139,11 @@
 
   // ---- particulas (so .boneco; docs/NUCLEO.md "Particulas"): os emissores que desenham nesta camada
   const CAMPOS_P = [
-    { k: "rate", label: "taxa", max: 100, step: 1, dica: "particulas por segundo" },
+    { k: "rate", label: "taxa", max: 100, step: 1, dica: "partículas por segundo" },
     { k: "speed", label: "velocidade", max: 600, step: 5, par: true, dica: "px/s (o maior do sorteio)" },
     { k: "life", label: "vida", max: 4, step: 0.05, par: true, dica: "segundos (a maior do sorteio)" },
     { k: "spread", label: "abertura", max: 360, step: 5, dica: "graus do leque" },
-    { k: "angle", label: "direcao", max: 360, step: 5, dica: "graus no osso (0 = ao longo do osso)" },
+    { k: "angle", label: "direção", max: 360, step: 5, dica: "graus no osso (0 = ao longo do osso)" },
     { k: "gravity", label: "gravidade", max: 1000, step: 10, dica: "px/s2 para baixo" },
   ] as const;
   const PADRAO_P: Record<string, number> = { rate: 10, speed: 100, life: 1, spread: 30, angle: 90, gravity: 0, width: 6, jitter: 0.15, segments: 10 };
@@ -167,8 +180,8 @@
 
   // ---- luzes (so .boneco; docs/NUCLEO.md "Luzes"): as presas a este osso e a ambiente
   const CAMPOS_LUZ = [
-    { k: "strength", label: "forca", min: 0, max: 4, step: 0.05, dica: "quanto a luz soma (1: a cor dela inteira)" },
-    { k: "radius", label: "raio", min: 0, max: 1500, step: 10, dica: "a luz some nessa distancia, em pixels do mundo" },
+    { k: "strength", label: "força", min: 0, max: 4, step: 0.05, dica: "quanto a luz soma (1: a cor dela inteira)" },
+    { k: "radius", label: "raio", min: 0, max: 1500, step: 10, dica: "a luz some nessa distância, em pixels do mundo" },
     { k: "height", label: "altura", min: -300, max: 500, step: 5, dica: "acima do plano; baixa ilumina rasante, negativa vira contraluz" },
   ];
   const luzesDoOsso = $derived.by(() => {
@@ -203,7 +216,8 @@
     if (!bone) return;
     let nome = "luz";
     for (let n = 2; ((app.doc?.json as any).lights ?? []).some((l: any) => l.name === nome); n++) nome = `luz_${n}`;
-    app.run({ cmd: "light.set", args: { name: nome, bone: bone.name, color: "ffeecc", strength: 1.2, radius: 400, height: 100 } }, `luz em ${bone.name}`);
+    if (app.run({ cmd: "light.set", args: { name: nome, bone: bone.name, color: "ffeecc", strength: 1.2, radius: 400, height: 100 } }, `luz em ${bone.name}`))
+      app.avisar(`${nome} presa em ${bone.name}: ela acende as partes que têm relevo.`);
   }
   function setP(nome: string, campo: string, valor: number, atual: any) {
     if (animando && campo === "rate") {
@@ -220,7 +234,7 @@
     if (!slot) return;
     let nome = `${slot.name}_particulas`;
     for (let n = 2; ((app.doc?.json as any).particles ?? []).some((p: any) => p.name === nome); n++) nome = `${slot.name}_particulas_${n}`;
-    app.run({ cmd: "particles.set", args: { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] } }, `particulas em ${slot.name}`);
+    if (app.run({ cmd: "particles.set", args: { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] } }, `particulas em ${slot.name}`)) app.avisar(`Partículas em ${slot.name}: aparecem no desenho Mamulengo; os controles estão logo abaixo.`);
   }
   function rajada(nome: string) {
     const time = +app.play.time.toFixed(4);
@@ -238,7 +252,9 @@
 
   async function makeMesh() {
     if (!slot?.attachment) return;
-    await app.runAsync([{ cmd: "mesh.create", args: { slot: slot.name, name: slot.attachment, detail: 1.8 } }], `deixar ${slot.attachment} deformavel`);
+    const att = slot.attachment;
+    if (await app.runAsync([{ cmd: "mesh.create", args: { slot: slot.name, name: att, detail: 1.8 } }], `deixar ${att} deformavel`))
+      app.avisar(`${slot.name} agora é deformável: numa animação, o pincel (4) amassa a imagem; "Dobrar com os ossos" faz ela curvar junto com o esqueleto.`);
   }
 
   // pesos automaticos: osso da peca, o pai e os filhos (o que costuma dobrar junto)
@@ -249,8 +265,9 @@
     const parent = bones.find((b: any) => b.name === own)?.parent;
     const kids = bones.filter((b: any) => b.parent === own).map((b: any) => b.name);
     const list = [own, ...kids, ...(parent && parent !== bones[0].name ? [parent] : [])];
-    if (list.length < 2) return app.toast(`${own} nao tem pai nem filhos para dobrar junto. Crie um osso filho (ferramenta Osso) dentro da imagem.`);
-    app.run({ cmd: "mesh.weights", args: { slot: slot.name, attachment: slot.attachment, bones: list } }, `${slot.attachment} dobra com ${list.join(", ")}`);
+    if (list.length < 2) return app.toast(`${own} não tem pai nem filhos para dobrar junto. Crie um osso filho dentro da imagem (ferramenta Osso, tecla 5).`);
+    if (app.run({ cmd: "mesh.weights", args: { slot: slot.name, attachment: slot.attachment, bones: list } }, `${slot.attachment} dobra com ${list.join(", ")}`))
+      app.avisar(`${slot.attachment} agora dobra com ${list.join(", ")}. Gire um deles para ver.`);
   }
 
   // ordem de desenho (o z): a logica fica no estado (Pose base muda o setup; animando vira
@@ -282,7 +299,7 @@
     if (!bone || !app.doc) return;
     const b = app.doc.json.bones.find((x: any) => x.name === bone.name);
     const parent = app.doc.json.bones.find((x: any) => x.name === b?.parent);
-    if (!parent?.parent) return app.toast("IK precisa de um osso com pai (ex: antebraco com braco).");
+    if (!parent?.parent) return app.toast("Alcançar precisa de um osso com pai (por exemplo, o antebraço preso ao braço).");
     const sk = app.viewer?.pose?.findBone(bone.name);
     if (!sk) return;
     const len = b.length || 20;
@@ -292,13 +309,14 @@
     if (app.viewer?.flip) ty = -ty;
     const target = `${bone.name}_alvo`;
     const root = app.doc.json.bones[0].name;
-    app.run(
+    const ok = app.run(
       [
         { cmd: "bone.add", args: { name: target, parent: root, at: [tx, ty], color: "ff3f00ff" } },
         { cmd: "ik.create", args: { name: `${bone.name}_ik`, bones: [parent.name, bone.name], target } },
       ],
       `IK em ${parent.name} + ${bone.name}`,
     );
+    if (ok) app.avisar(`Alcançar pronto: mova o osso ${target} (vermelho, na ponta) e ${parent.name} e ${bone.name} dobram sozinhos.`);
     app.select({ bone: target });
     app.tool = "move";
   }
@@ -310,8 +328,24 @@
     if (!b || !app.doc) return [];
     return (app.doc.json.constraints ?? [])
       .filter((c: any) => c.bone === b || c.target === b || c.source === b || c.bones?.includes(b))
-      .map((c: any) => ({ name: c.name, type: c.type, strength: c.strength ?? 100, mix: c.mix ?? 1 }));
+      .map((c: any) => ({ name: c.name, type: c.type, strength: c.strength ?? 100, mix: c.mix ?? 1, target: c.target as string | undefined, bones: (c.bones ?? []) as string[] }));
   });
+  // ossos que podem ser alvo de um IK: nenhum da cadeia nem pendurado nela (o alvo seguiria a
+  // propria cadeia que ele move)
+  function alvosPossiveis(cadeia: string[]): string[] {
+    const j = app.doc?.json;
+    if (!j) return [];
+    const fora = new Set(cadeia);
+    let cresceu = true;
+    while (cresceu) {
+      cresceu = false;
+      for (const b of j.bones) if (b.parent && fora.has(b.parent) && !fora.has(b.name)) (fora.add(b.name), (cresceu = true));
+    }
+    return j.bones.map((b: any) => b.name).filter((n: string) => !fora.has(n));
+  }
+  function trocarAlvo(ik: string, alvo: string) {
+    if (app.run({ cmd: "constraint.set", args: { name: ik, props: { target: alvo } } }, `alvo de ${ik} = ${alvo}`)) app.avisar(`${ik} agora alcança ${alvo}: mover ${alvo} dobra a cadeia. Ctrl+Z desfaz.`);
+  }
   const CTYPE: Record<string, string> = { physics: "balanco", ik: "IK (alcance)", transform: "copia", path: "caminho", slider: "slider" };
 
   let fineOpen = $state(false);
@@ -354,13 +388,13 @@
     <div class="fields">
       {#each FIELDS as f}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <label onpointerdown={(e) => labelDown(e, f.k, f.step)} onpointermove={labelMove} onpointerup={() => (scrub = null)}>{f.label}</label>
-        <input type="number" step={f.step} value={bone.values[f.k]} onchange={(e) => set(f.k, +(e.target as HTMLInputElement).value)} />
+        <label for="campo-{f.k}" title="Arraste o nome para os lados para mudar o valor" onpointerdown={(e) => labelDown(e, f.k, f.step)} onpointermove={labelMove} onpointerup={() => (scrub = null)}>{f.label}</label>
+        <input id="campo-{f.k}" type="number" step={f.step} value={bone.values[f.k]} onchange={(e) => set(f.k, +(e.target as HTMLInputElement).value)} />
       {/each}
     </div>
     </details>
     <div class="quick">
-      <button onclick={quickIk} title="O osso e o pai passam a alcancar um alvo: mova o alvo e o membro dobra sozinho">🎯 Alcancar (IK)</button>
+      <button onclick={quickIk} title="O osso e o pai passam a alcançar um alvo: mova o alvo e o membro dobra sozinho">🎯 Alcançar (IK)</button>
     </div>
     {#if cons.length}
       <div class="cons">
@@ -371,6 +405,13 @@
             {#if c.type === "physics"}
               <label class="slider" title="mole ↔ duro">mole <input type="range" min="20" max="300" value={c.strength} onchange={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { strength: +(e.target as HTMLInputElement).value } } }, `dureza ${c.name}`)} /> duro</label>
             {:else}
+              {#if c.type === "ik"}
+                <label class="alvo-ik" title="O osso que a cadeia ({c.bones.join(', ')}) alcança. Pode ser um osso que já existe, como um controle da mão">alvo
+                  <select value={c.target} onchange={(e) => trocarAlvo(c.name, (e.target as HTMLSelectElement).value)}>
+                    {#each alvosPossiveis(c.bones) as n}<option value={n}>{n}</option>{/each}
+                  </select>
+                </label>
+              {/if}
               <label class="slider" title="quanto vale (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.mix} onchange={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { mix: +(e.target as HTMLInputElement).value } } }, `mix ${c.name}`)} /></label>
             {/if}
             <button class="x" title="remover" onclick={() => app.run({ cmd: "constraint.delete", args: { name: c.name } })}>✕</button>
@@ -380,9 +421,8 @@
     {/if}
     {#if ehBoneco}
       <div class="efeitos">
-        <div class="dim small">
-          Luzes (do Mamulengo): presas a este osso, iluminam as paginas com relevo. {animando ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
-          {#if semRelevo}<br />Sem relevo nas paginas: <code>npx tsx tools/relevo.ts x.boneco --gravar</code>{/if}
+        <div class="dim small secao" title="Luzes presas a este osso: iluminam as partes que têm relevo. {animando ? 'Mexer grava chave neste instante.' : 'Na Pose base muda o valor inicial.'}">
+          Luzes{#if semRelevo}&nbsp;· <span title="As imagens deste personagem ainda não têm relevo (mapa de normais), então a luz não aparece nelas. O relevo sai da própria arte (docs/NUCLEO.md, Luzes).">sem relevo ainda</span>{/if}
         </div>
         {#each luzesDoOsso as l (l.n)}
           <div class="ef">
@@ -406,8 +446,8 @@
               <span>ambiente</span>
               <input type="color" value={"#" + ambiente.color.slice(0, 6)} title="cor" oninput={(e) => setAmbiente("color", (e.target as HTMLInputElement).value.slice(1) + ambiente!.color.slice(6, 8))} />
             </div>
-            <label class="efcampo" title="1: as cores como sao; abaixo, o que nenhuma luz alcanca escurece">
-              <span>forca</span>
+            <label class="efcampo" title="1: as cores como são; abaixo, o que nenhuma luz alcanca escurece">
+              <span>força</span>
               <input type="range" min="0" max="2" step="0.05" value={ambiente.strength} oninput={(e) => setAmbiente("strength", +(e.target as HTMLInputElement).value)} />
               <span class="num">{(+ambiente.strength).toFixed(2)}</span>
             </label>
@@ -423,17 +463,25 @@
   {#if slot}
     <div class="title slot"><span class="ico">🖼</span>{slot.name}</div>
     <div class="dim small">
-      Camada: muda qual imagem aparece, cor, transparencia, ordem e malha. Quem move esta imagem e o osso
+      Camada: muda qual imagem aparece, cor, transparência, ordem e malha. Quem move esta imagem e o osso
       <b>{app.selection.bone ?? slot.bone}</b>{(app.selection.bone ?? slot.bone) !== slot.bone ? ` (pelos pesos da malha; a camada fica presa em ${slot.bone})` : ""}: arrastar na tela move o osso.
     </div>
     <div class="fields">
-      <label>imagem</label>
-      <select value={slot.attachment ?? ""} onchange={(e) => slotSet({ attachment: (e.target as HTMLSelectElement).value || null })}>
+      <label for="slot-imagem">imagem</label>
+      <select id="slot-imagem" value={slot.attachment ?? ""} onchange={(e) => slotSet({ attachment: (e.target as HTMLSelectElement).value || null })}>
         <option value="">(nenhuma)</option>
         {#each slot.atts as a}<option value={a}>{a}</option>{/each}
       </select>
-      <label>mistura</label>
-      <select value={slot.blend ?? "normal"} onchange={(e) => slotSet({ blend: (e.target as HTMLSelectElement).value })}>
+      {#if imagemNoOsso}
+        <span class="rotulo" title="Onde a imagem fica dentro do osso da peça (vale para todas as animações). Na tela: Ctrl + arrastar, na Pose base">no osso</span>
+        <div class="imagem-osso">
+          {#each [["x", "x", 1], ["y", "y", 1], ["rotation", "giro", 1], ["scaleX", "esc x", 0.05], ["scaleY", "esc y", 0.05]] as [k, rot, passo]}
+            <label class="mini-campo">{rot}<input type="number" step={passo} value={+(imagemNoOsso as any)[k].toFixed(2)} onchange={(e) => setImagem(k as string, +(e.target as HTMLInputElement).value)} /></label>
+          {/each}
+        </div>
+      {/if}
+      <label for="slot-mistura">mistura</label>
+      <select id="slot-mistura" value={slot.blend ?? "normal"} onchange={(e) => slotSet({ blend: (e.target as HTMLSelectElement).value })}>
         <option value="normal">normal</option>
         <option value="additive">brilho (aditivo)</option>
         <option value="multiply">multiplicar</option>
@@ -443,15 +491,15 @@
         <span></span>
         <div class="dim">
           {slot.blend === "multiply"
-            ? "No jogo (spine-godot) multiplicar ignora a transparencia: a imagem inteira escurece o fundo, inclusive as bordas transparentes."
-            : "No jogo (spine-godot) tela vira subtracao: escurece em vez de clarear."}
+            ? "No jogo (spine-godot) multiplicar ignora a transparência: a imagem inteira escurece o fundo, inclusive as bordas transparentes."
+            : "No jogo (spine-godot) tela vira subtração: escurece em vez de clarear."}
         </div>
       {/if}
-      <label>camada</label>
+      <span class="rotulo">camada</span>
       <div class="order">
-        <button onclick={() => order("back")} title="Para tras de tudo">⇊</button>
-        <button onclick={() => order(-1)} title="Para tras da proxima camada que encosta nesta (PageDown)">↓</button>
-        <button onclick={() => order(1)} title="Para a frente da proxima camada que encosta nesta (PageUp)">↑</button>
+        <button onclick={() => order("back")} title="Para trás de tudo">⇊</button>
+        <button onclick={() => order(-1)} title="Para trás da próxima camada que encosta nesta (PageDown)">↓</button>
+        <button onclick={() => order(1)} title="Para a frente da próxima camada que encosta nesta (PageUp)">↑</button>
         <button onclick={() => order("front")} title="Na frente de tudo (Shift+PageUp)">⇈</button>
       </div>
       {#if neighbors.length}
@@ -462,14 +510,14 @@
             {#each neighbors as n}<option value={n}>{n}</option>{/each}
           </select>
           <button disabled={!relTo} onclick={() => relTo && slot && app.placeLayer(slot.name, relTo, "front")} title="Na frente desta camada">na frente</button>
-          <button disabled={!relTo} onclick={() => relTo && slot && app.placeLayer(slot.name, relTo, "back")} title="Atras desta camada">atras</button>
+          <button disabled={!relTo} onclick={() => relTo && slot && app.placeLayer(slot.name, relTo, "back")} title="Atrás desta camada">atrás</button>
         </div>
       {/if}
       {#if attKind}
         <span></span>
         <div class="mesh">
           {#if attKind.type === "region"}
-            <button onclick={makeMesh} title="Transforma a imagem em malha, para deformar com o pincel">🫧 Deixar deformavel</button>
+            <button onclick={makeMesh} title="Transforma a imagem em malha, para deformar com o pincel">🫧 Deixar deformável</button>
           {:else if attKind.type === "mesh" || attKind.type === "linkedmesh"}
             {#if attKind.type === "mesh"}
               <button onclick={bindToBones} title="Prende a malha aos ossos proximos, para dobrar junto">🦴 {attKind.weighted ? "Refazer dobra" : "Dobrar com os ossos"}</button>
@@ -484,18 +532,16 @@
         <div class="wide"><MeshPanel /></div>
       {/if}
       {#if color}
-        <label>cor</label>
+        <label for="slot-cor">cor</label>
         <div class="color">
-          <input type="color" value={color.rgb} oninput={(e) => setColor((e.target as HTMLInputElement).value, color.a)} />
-          <input type="range" min="0" max="1" step="0.01" value={color.a} title="transparencia" oninput={(e) => setColor(color.rgb, +(e.target as HTMLInputElement).value)} />
+          <input id="slot-cor" type="color" value={color.rgb} oninput={(e) => setColor((e.target as HTMLInputElement).value, color.a)} />
+          <input type="range" min="0" max="1" step="0.01" value={color.a} title="transparência" oninput={(e) => setColor(color.rgb, +(e.target as HTMLInputElement).value)} />
         </div>
       {/if}
     </div>
     {#if ehBoneco}
       <div class="efeitos">
-        <div class="dim small">
-          Efeitos e particulas (do Mamulengo, o Spine nao tem; aparecem no desenho do nucleo e no jogo). {app.mode === "animate" && app.play.animation ? "Mexer grava chave neste instante." : "Na Pose base muda o valor inicial."}
-        </div>
+        <div class="dim small secao" title="Contorno, brilho, dissolver, ajuste de cor e partículas desta parte. Aparecem no desenho núcleo e no jogo. {app.mode === 'animate' && app.play.animation ? 'Mexer grava chave neste instante.' : 'Na Pose base muda o valor inicial.'}">Efeitos e partículas</div>
         {#each efeitos as ef (ef.n)}
           <div class="ef">
             <div class="efnome" title={EFEITOS[ef.n].dica}>
@@ -514,7 +560,7 @@
         {/each}
         {#each emissores as em (em.p.name)}
           <div class="ef">
-            <div class="efnome" title="emissor de particulas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
+            <div class="efnome" title="emissor de partículas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
               <span>✦ {em.p.name}</span>
               {#if animando && em.p.type !== "lightning"}<button onclick={() => rajada(em.p.name)} title="rajada: 12 nascem de uma vez neste instante">rajada</button>{/if}
               {#if !animando}<button class="tira" onclick={() => app.run({ cmd: "particles.delete", args: { name: em.p.name } }, `apaga ${em.p.name}`)} title="apagar o emissor">✕</button>{/if}
@@ -528,7 +574,7 @@
             {/each}
           </div>
         {/each}
-        {#if !animando}<button onclick={novoEmissor} title="particulas que nascem do osso desta camada e desenham logo depois dela">+ particulas</button>{/if}
+        {#if !animando}<button onclick={novoEmissor} title="partículas que nascem do osso desta camada e desenham logo depois dela">+ partículas</button>{/if}
         {#if faltam.length && (app.mode !== "animate" || !app.play.animation)}
           <select value="" onchange={(e) => { ligar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="liga um efeito nesta camada">
             <option value="">+ efeito...</option>
@@ -691,7 +737,33 @@
     gap: 6px 8px;
     align-items: center;
   }
-  label {
+  .alvo-ik {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 11px;
+    cursor: default;
+  }
+  .alvo-ik select {
+    max-width: 110px;
+  }
+  .imagem-osso {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .mini-campo {
+    display: flex;
+    flex-direction: column;
+    font-size: 11px;
+    cursor: default;
+  }
+  .mini-campo input {
+    width: 100%;
+    min-width: 0;
+  }
+  label,
+  .rotulo {
     color: var(--dim);
     font-size: 12px;
     cursor: ew-resize;

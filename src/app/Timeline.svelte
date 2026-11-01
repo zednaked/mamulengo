@@ -15,6 +15,16 @@
   type Tl = { part: string; partLabel: string; partSel?: { bone?: string; slot?: string; instance?: string }; partColor: string; target?: any; timeline: string; label: string; keys: any[]; bone?: string; slot?: string };
 
   const FPS = 30;
+  // o export WebP usa o codificador do navegador (canvas.toBlob): o Safari nao tem
+  const WEBP = (() => {
+    try {
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      return c.toDataURL("image/webp").startsWith("data:image/webp");
+    } catch {
+      return false;
+    }
+  })();
   const ROW = 24;
   const PAD = 10;
   const snap = (t: number) => Math.max(0, Math.round(t * FPS) / FPS);
@@ -40,7 +50,10 @@
     let n = 2;
     while (app.doc?.json.animations?.[`${a}_${n}`]) n++;
     const to = `${a}_${n}`;
-    if (app.run({ cmd: "animation.duplicate", args: { name: a, to } })) app.viewer?.setAnimation(to);
+    if (app.run({ cmd: "animation.duplicate", args: { name: a, to } })) {
+      app.viewer?.setAnimation(to);
+      app.avisar(`Cópia de ${a} criada: ${to} (duplo clique no nome renomeia).`);
+    }
   }
   // sem dialogo do navegador: segundo clique em 3s confirma
   function remove(a: string) {
@@ -50,7 +63,7 @@
       return;
     }
     armedDelete = 0;
-    app.run({ cmd: "animation.delete", args: { name: a } });
+    if (app.run({ cmd: "animation.delete", args: { name: a } })) app.avisar(`Animação ${a} apagada. Ctrl+Z desfaz.`);
   }
 
   const anims = $derived.by(() => {
@@ -60,36 +73,44 @@
 
   // --- linhas
 
+  // nomes das linhas na interface (as timelines sao as do formato, em ingles): os da ferramenta
+  const NOME_LINHA: Record<string, string> = {
+    rotate: "girar", translate: "mover", translatex: "mover x", translatey: "mover y", scale: "esticar", scalex: "esticar x", scaley: "esticar y",
+    shear: "inclinar", shearx: "inclinar x", sheary: "inclinar y", attachment: "imagem", rgba: "cor", rgb: "cor", alpha: "transparência", rgba2: "cor e sombra",
+    deform: "deformar", sequence: "sequência", outline: "contorno", glow: "brilho", dissolve: "dissolver", tint: "tingir", smear: "borrar", trail: "rastro", adjust: "ajuste",
+    rate: "taxa", burst: "rajada", mix: "mistura", instance: "instância",
+  };
+
   // todas as timelines da animacao, com a parte (osso, slot, constraint) a que pertencem
   function collect(a: any): Tl[] {
     const out: Tl[] = [];
     const json = app.doc!.json;
     const boneOf = (s: string) => json.slots?.find((x: any) => x.name === s)?.bone;
     for (const [b, tls] of Object.entries<any>(a.bones ?? {}))
-      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `b:${b}`, partLabel: b, partSel: { bone: b }, partColor: "#cfc6e6", target: { bone: b }, timeline: tl, label: tl, keys, bone: b });
+      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `b:${b}`, partLabel: b, partSel: { bone: b }, partColor: "#cfc6e6", target: { bone: b }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys, bone: b });
     for (const [s, tls] of Object.entries<any>(a.slots ?? {}))
-      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: tl, keys, slot: s });
+      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys, slot: s });
     // efeitos do slot (so do Mamulengo): ficam em `effects`, fora de `slots`
     for (const [s, tls] of Object.entries<any>(a.effects ?? {}))
-      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: tl, keys, slot: s });
+      for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { slot: s }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys, slot: s });
     for (const [skin, sl] of Object.entries<any>(a.attachments ?? {}))
       for (const [s, atts] of Object.entries<any>(sl))
         for (const [att, tls] of Object.entries<any>(atts))
           for (const [tl, keys] of Object.entries<any>(tls))
-            out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { deform: { slot: s, attachment: att, skin } }, timeline: tl, label: `${tl} ${att}`, keys, slot: s });
+            out.push({ part: `s:${s}`, partLabel: s, partSel: { bone: boneOf(s), slot: s }, partColor: "#ff9fcf", target: { deform: { slot: s, attachment: att, skin } }, timeline: tl, label: `${NOME_LINHA[tl] ?? tl} ${att}`, keys, slot: s });
     const known = new Set(constraints(json).map((c) => c.c.name));
     for (const type of ["ik", "transform"])
       for (const [n, keys] of Object.entries<any>(a[type] ?? {}))
         if (known.has(n)) out.push({ part: `c:${n}`, partLabel: n, partColor: "#ffd166", target: { constraint: n }, timeline: type, label: type, keys });
     for (const type of ["path", "physics", "slider"])
       for (const [n, tls] of Object.entries<any>(a[type] ?? {}))
-        if (known.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `c:${n}`, partLabel: n, partColor: "#ffd166", target: { constraint: n }, timeline: tl, label: tl, keys });
+        if (known.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `c:${n}`, partLabel: n, partColor: "#ffd166", target: { constraint: n }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys });
     // particulas (so do Mamulengo): rate e burst por emissor
     const emissores = new Set(((json as any).particles ?? []).map((p: any) => p.name));
     for (const [n, tls] of Object.entries<any>(a.particles ?? {}))
-      if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: tl, keys });
+      if (emissores.has(n)) for (const [tl, keys] of Object.entries<any>(tls)) out.push({ part: `p:${n}`, partLabel: `✦ ${n}`, partColor: "#ffd23c", target: { particles: n }, timeline: tl, label: NOME_LINHA[tl] ?? tl, keys });
     // instancias (so do Mamulengo): uma linha por instancia, as chaves que trocam o que o filho toca
-    for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partSel: { instance: n }, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instancia", keys });
+    for (const [n, keys] of Object.entries<any>(a.instances ?? {})) out.push({ part: `i:${n}`, partLabel: `◆ ${n}`, partSel: { instance: n }, partColor: "#7fd8ff", target: { instance: n }, timeline: "instance", label: "instância", keys });
     if (a.events?.length) out.push({ part: "ev", partLabel: "eventos", partColor: "#ffffff", timeline: "events", label: "eventos", keys: a.events });
     if (a.drawOrder?.length) out.push({ part: "do", partLabel: "ordem", partColor: "#ff9f6c", timeline: "drawOrder", label: "ordem", keys: a.drawOrder });
     return out;
@@ -359,7 +380,43 @@
   function deleteKeys() {
     const anim = app.play.animation;
     if (!anim || !pickedRefs.length) return;
-    if (app.run({ cmd: "keys.delete", args: { anim, keys: pickedRefs } })) sel = [];
+    const n = pickedRefs.length;
+    const oque = descreveChaves(pickedRefs);
+    if (app.run({ cmd: "keys.delete", args: { anim, keys: pickedRefs } })) {
+      sel = [];
+      app.avisar(`${n === 1 ? "1 chave apagada" : `${n} chaves apagadas`}: ${oque}. Ctrl+Z desfaz.`);
+    }
+  }
+
+  // o laco em chaves (src/core/commands/laco.ts)
+  function fecharLaco() {
+    const anim = app.play.animation;
+    if (!anim) return;
+    const r = app.run({ cmd: "anim.closeLoop", args: { anim } });
+    if (!r) return;
+    if (!r[0].closed) app.avisar(`${anim} já termina como começa: nada a fechar.`);
+    else app.avisar(`Laço fechado: ${r[0].closed} ${r[0].closed === 1 ? "parte volta" : "partes voltam"} ao começo em ${r[0].at.toFixed(2)}s. Ctrl+Z desfaz.`);
+  }
+  function vaiEVolta() {
+    const anim = app.play.animation;
+    if (!anim) return;
+    const r = app.run({ cmd: "anim.pingPong", args: { anim } });
+    if (r) app.avisar(`Vai e volta: ${anim} agora tem ${r[0].duration.toFixed(2)}s (a volta espelhada). Ctrl+Z desfaz.`);
+  }
+
+  // "cabeca (girar, mover) em 0.57s": o que um losango agrupado (linha tudo ou da parte) apaga
+  function descreveChaves(refs: Ref[]): string {
+    const partes = new Map<string, Set<string>>();
+    const tempos = new Set<string>();
+    for (const r of refs) {
+      const t: any = r.target ?? {};
+      const quem = t.bone ?? t.slot ?? t.deform?.slot ?? t.constraint ?? t.particles ?? t.instance ?? (r.timeline === "events" ? "eventos" : r.timeline === "drawOrder" ? "ordem" : "?");
+      if (!partes.has(quem)) partes.set(quem, new Set());
+      partes.get(quem)!.add(NOME_LINHA[r.timeline] ?? r.timeline);
+      tempos.add(r.time.toFixed(2));
+    }
+    const lista = [...partes].slice(0, 4).map(([q, tl]) => `${q} (${[...tl].join(", ")})`).join(", ") + (partes.size > 4 ? ` e mais ${partes.size - 4}` : "");
+    return lista + (tempos.size === 1 ? ` em ${[...tempos][0]}s` : "");
   }
 
   function copyKeys() {
@@ -369,6 +426,7 @@
     if (!r) return false;
     app.keyClipboard = r[0];
     app.log({ label: `copiou ${r[0].items.length} chave(s)`, source: "ui", kind: "info", ops: 0 });
+    app.avisar(`${r[0].items.length === 1 ? "1 chave copiada" : `${r[0].items.length} chaves copiadas`}: leve a régua ao instante e Ctrl+V.`);
     return true;
   }
 
@@ -391,6 +449,7 @@
     const t = snap(app.viewer?.view.time ?? app.play.time);
     const r = app.run({ cmd: "keys.paste", args: { anim, time: t, items } });
     if (!r) return;
+    app.avisar(`${items.length === 1 ? "1 chave colada" : `${items.length} chaves coladas`} em ${t.toFixed(2)}s. Ctrl+Z desfaz.`);
     // seleciona o que foi colado (na visao de partes e na de timelines)
     const ids = new Set<string>();
     for (const it of items) {
@@ -446,7 +505,11 @@
       copyKeys();
     } else if (mod && k.toLowerCase() === "x" && pickedRefs.length) {
       e.preventDefault();
-      if (copyKeys()) deleteKeys();
+      if (copyKeys()) {
+        const n = pickedRefs.length;
+        deleteKeys();
+        app.avisar(`${n === 1 ? "1 chave recortada" : `${n} chaves recortadas`}: leve a régua ao instante e Ctrl+V.`);
+      }
     } else if (mod && k.toLowerCase() === "v" && app.keyClipboard) {
       e.preventDefault();
       pasteKeys();
@@ -507,16 +570,28 @@
 
   // --- exportar
 
-  let exporting = $state<{ open: boolean; format: "gif" | "webm" | "webp"; fps: number; dir: string; busy: boolean; progress: string; result: string; titulo: string; subtitulo: string; rodape: string; credito: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "", titulo: "", subtitulo: "", rodape: "", credito: "" });
+  let exporting = $state<{ open: boolean; format: "gif" | "webm" | "webp"; fps: number; dir: string; busy: boolean; progress: string; result: string; url: string; arquivo: string; caminho: string; titulo: string; subtitulo: string; rodape: string; credito: string }>({ open: false, format: "gif", fps: 30, dir: "", busy: false, progress: "", result: "", url: "", arquivo: "", caminho: "", titulo: "", subtitulo: "", rodape: "", credito: "" });
+  // o painel de exportar fica preso a tela, acima do botao: dentro da timeline ele seria cortado
+  let exportPos = $state({ right: 16, bottom: 16 });
+  function abrirExport(b: HTMLElement) {
+    const r = b.getBoundingClientRect();
+    exportPos = { right: Math.max(8, window.innerWidth - r.right), bottom: window.innerHeight - r.top + 6 };
+    exporting.open = !exporting.open;
+  }
+
   async function runExport() {
     const x = exporting;
     x.busy = true;
     x.result = "";
+    if (x.url) URL.revokeObjectURL(x.url);
+    x.url = "";
     try {
       // moldura: so se algum texto foi preenchido
       const m = { titulo: x.titulo.trim(), subtitulo: x.subtitulo.trim(), rodape: x.rodape.trim(), credito: x.credito.trim() };
       const moldura = Object.values(m).some(Boolean) ? Object.fromEntries(Object.entries(m).filter(([, v]) => v)) : undefined;
-      const r = await exportAnimation({ format: x.format, fps: x.fps, dir: x.dir.trim() || undefined, moldura, onProgress: (d, n) => (x.progress = `${d}/${n}`) });
+      const r = await exportAnimation({ format: x.format, fps: x.fps, dir: x.dir.trim() || undefined, moldura, onProgress: (d, n) => (x.progress = `${d}/${n}`), onBlob: (b) => (x.url = URL.createObjectURL(b)) });
+      x.arquivo = r.path.split("/").pop() ?? r.path;
+      x.caminho = r.path;
       x.result = `${r.path} (${Math.round(r.bytes / 1024)} KB, ${r.frames} quadros ${r.size[0]}x${r.size[1]})`;
     } catch (e: any) {
       app.toast(String(e?.message ?? e));
@@ -527,6 +602,28 @@
   }
 
   const frame = $derived(Math.round(app.play.time * FPS));
+
+  // nomes das curvas na interface (as chaves sao as do comando, sem acento)
+  const NOME_CURVA: Record<string, string> = { stepped: "degrau", "sai-rapido": "sai rápido", "entra-rapido": "entra rápido", elastico: "elástico" };
+  // onde a timeline comeca na tela, para o editor de curva flutuar logo acima
+  let tlEl: HTMLDivElement | undefined = $state();
+  let altJanela = $state(window.innerHeight);
+  let topoTl = $state(0);
+  // e no canto direito do desenho (main.view), nao sobre o painel da direita
+  let direitaCurva = $state(16);
+  $effect(() => {
+    if (!tlEl) return;
+    const mede = () => {
+      topoTl = tlEl!.getBoundingClientRect().top;
+      const vista = document.querySelector("main.view")?.getBoundingClientRect();
+      direitaCurva = vista ? Math.max(8, window.innerWidth - vista.right + 8) : 16;
+    };
+    const o = new ResizeObserver(mede);
+    o.observe(tlEl);
+    o.observe(document.body);
+    mede();
+    return () => o.disconnect();
+  });
 
   // --- emenda (previa de transicao): depois desta animacao, outra, com mix; ou
   // interrompida no meio. O scrub cobre a sequencia inteira; as chaves sao da primeira.
@@ -553,11 +650,14 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} bind:innerHeight={altJanela} />
 
-<div class="tl">
+<!-- clicar num botao da timeline nao deixa o foco nele: o Espaco seguinte e tocar/pausar, e o
+     anel de foco (de quem navega com Tab) nao acende num botao clicado com o mouse -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="tl" bind:this={tlEl} onpointerup={(e) => (e.target as HTMLElement).closest?.("button")?.blur()}>
   <div class="anims">
-    <button class="base" class:on={!app.play.animation} onclick={() => (app.mode = "setup")} title="Pose base: o boneco parado, de onde toda animacao parte. Mexer aqui muda todas as animacoes">Pose base</button>
+    {#if app.doc}<button class="base" class:on={!app.play.animation} onclick={() => (app.mode = "setup")} title="Pose base: o boneco parado, de onde toda animação parte. Mexer aqui muda todas as animações">Pose base</button>{/if}
     {#each anims as a}
       {#if renaming === a}
         <!-- svelte-ignore a11y_autofocus -->
@@ -566,26 +666,32 @@
         <button class:on={a === app.play.animation} onclick={() => app.viewer?.setAnimation(a)} ondblclick={() => ((renaming = a), (renameTo = a))} title="duplo clique renomeia">{a}</button>
       {/if}
       {#if a === app.play.animation && renaming !== a}
-        <button class="mini" title="Duplicar animacao" onclick={() => duplicate(a)}>⧉</button>
-        <button class="mini del" title="Apagar animacao (clique duas vezes)" onclick={() => remove(a)}>🗑</button>
+        <button class="mini" title="Duplicar animação" onclick={() => duplicate(a)}>⧉</button>
+        <button class="mini del" title="Apagar animação (clique duas vezes)" onclick={() => remove(a)}>🗑</button>
       {/if}
     {/each}
     {#if creating}
       <!-- svelte-ignore a11y_autofocus -->
-      <input placeholder="nome da animacao" bind:value={newName} onkeydown={(e) => e.key === "Enter" && createAnim()} autofocus />
+      <input placeholder="nome da animação" bind:value={newName} onkeydown={(e) => (e.key === "Enter" ? createAnim() : e.key === "Escape" && ((creating = false), (newName = "")))} onblur={() => !newName.trim() && (creating = false)} autofocus />
       <button onclick={createAnim}>criar</button>
     {:else if app.doc}
-      <button class="add" title="Nova animacao" onclick={() => (creating = true)}>+ nova</button>
+      <button class="add" title="Nova animação" onclick={() => (creating = true)}>+ nova</button>
     {/if}
   </div>
 
   {#if app.doc && !app.play.animation}
     <div class="base-note">
-      <b>Pose base</b>: o que voce mexer aqui (posicao, giro, tamanho, imagens, malhas, ossos novos) muda o boneco em <b>todas</b> as animacoes. Para animar, escolha uma animacao acima.
+      <b>Pose base</b>: o que você mexer aqui (posição, giro, tamanho, imagens, malhas, ossos novos) muda o boneco em <b>todas</b> as animações. Para animar, escolha uma animação acima.
     </div>
   {/if}
+  <!-- duas barras: tocar e tempo; e curvas (ou evento e emenda) com o zoom e o exportar. Na tela
+       larga ficam lado a lado; na pequena a segunda ocupa a largura inteira, sempre (escolher
+       chaves troca o que ela mostra sem mudar a altura) -->
+  <div class="barras">
   <div class="transport" class:hidden={!app.play.animation}>
-    <button class="play" title="Tocar / pausar (espaco, fora do viewport)" onclick={togglePlay}>{app.play.playing ? "❚❚" : "▶"}</button>
+    <button class="play" title="Tocar / pausar (espaço, fora do viewport)" onclick={togglePlay} aria-label={app.play.playing ? "pausar" : "tocar"}
+      >{#if app.play.playing}<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" rx="0.8" /><rect x="9.5" y="3" width="3" height="10" rx="0.8" /></svg>{:else}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z" /></svg>{/if}</button
+    >
     <button class:on={app.play.loop} title="Repetir" onclick={() => app.viewer && (app.viewer.view.loop = !app.viewer.view.loop)}>⟲</button>
     <select value={app.play.speed} onchange={(e) => app.viewer && (app.viewer.view.speed = +(e.target as HTMLSelectElement).value)} title="Velocidade">
       <option value={0.1}>0.1x</option>
@@ -594,23 +700,31 @@
       <option value={1}>1x</option>
       <option value={2}>2x</option>
     </select>
-    <span class="time" title="Setas: quadro anterior/proximo. Shift+setas: chave anterior/proxima. Home/End: inicio/fim">{app.play.time.toFixed(2)}s <span class="dim">q{frame} / {app.play.duration.toFixed(2)}s</span></span>
-    {#if app.play.animation && app.play.duration === 0}<span class="dim empty-hint">sem chaves ainda: escolha o instante na regua e mexa uma parte</span>{/if}
+    <span class="time" title="Instante atual, quadro (a {FPS} por segundo) e duração. Setas: quadro anterior ou próximo. Shift+setas: chave anterior ou próxima. Home/End: início ou fim">{app.play.time.toFixed(2)}s <span class="dim">quadro {frame} · de {app.play.duration.toFixed(2)}s</span></span>
+    {#if app.play.animation && app.play.duration === 0}<span class="dim empty-hint">sem chaves ainda: escolha o instante na régua e mexa uma parte</span>{/if}
+    {#if app.play.animation && app.play.duration > 0}
+      <span class="laco">
+        <button class="mini" title="Fechar o laço: copia a primeira chave de cada parte para depois da última, e a repetição emenda sem pulo" onclick={fecharLaco}>⥁<span class="rot"> fechar o laço</span></button>
+        <button class="mini" title="Vai e volta: acrescenta a volta (as chaves de trás para a frente, com as curvas espelhadas); a animação dobra de duração. Vale também no jogo" onclick={vaiEVolta}>⇄<span class="rot"> vai e volta</span></button>
+      </span>
+    {/if}
+  </div>
+  <div class="transport barra2" class:hidden={!app.play.animation}>
     {#if picked.length}
       <span class="curves">
         {#if curveRefs.length}
           <span class="dim">curva{curveRefs.length > 1 ? ` (${curveRefs.length})` : ""}:</span>
           {#each Object.keys(CURVE_PRESETS) as c}
-            <button class="curve" title={c} onclick={() => setCurve(c)}><CurveIcon preset={c} /><span>{c}</span></button>
+            <button class="curve" title="curva {NOME_CURVA[c] ?? c}" onclick={() => setCurve(c)}><CurveIcon preset={c} /><span>{NOME_CURVA[c] ?? c}</span></button>
           {/each}
         {/if}
         {#if principleRefs.length}
-          <button class="curve" title="Recuo no sentido contrario antes deste movimento" onclick={() => principle("anim.anticipate")}>↶ antecipar</button>
-          <button class="curve" title="Passa um pouco do ponto e assenta" onclick={() => principle("anim.overshoot")}>↷ passar do ponto</button>
+          <button class="curve" title="Recuo no sentido contrário antes deste movimento" onclick={() => principle("anim.anticipate")}>↶<span class="rot"> antecipar</span></button>
+          <button class="curve" title="Passa um pouco do ponto e assenta" onclick={() => principle("anim.overshoot")}>↷<span class="rot"> passar do ponto</span></button>
         {/if}
         <button class="del" title="Apagar chaves selecionadas (Del)" onclick={deleteKeys}>apagar{pickedRefs.length > 1 ? ` ${pickedRefs.length}` : ""}</button>
       </span>
-      {#if single && app.play.animation}<div class="floating"><CurveEditor anim={app.play.animation} target={single.row.target} timeline={single.row.timeline!} time={single.cell.time} keys={singleKeys} /></div>{/if}
+      {#if single && app.play.animation}<div class="floating" style:bottom="{altJanela - topoTl + 8}px" style:right="{direitaCurva}px"><CurveEditor anim={app.play.animation} target={single.row.target} timeline={single.row.timeline!} time={single.cell.time} keys={singleKeys} /></div>{/if}
     {:else if app.play.animation}
       <span class="ev">
         <input placeholder="evento (ex: som_pulo)" bind:this={eventInput} class:cheio={!!eventName} bind:value={eventName} onkeydown={(e) => e.key === "Enter" && addEvent()} />
@@ -619,16 +733,16 @@
       </span>
     {/if}
     {#if app.play.animation && others.length}
-      <span class="seqctl" title="Previa da emenda: como o jogo passa desta animacao para outra. A regua cobre tudo; a faixa rosa e a mistura.">
-        <span class="dim">depois desta:</span>
+      <span class="seqctl" class:com-chaves={picked.length > 0} title="Prévia da emenda: escolha a animação que vem depois desta para ver como o jogo passa de uma para a outra. A régua cobre as duas; a faixa rosa é a mistura.">
+        <span class="dim">em seguida:</span>
         <select value={emenda?.next ?? ""} onchange={(e) => setSeq({ next: (e.target as HTMLSelectElement).value || null })}>
-          <option value="">(nada)</option>
+          <option value="">(nenhuma)</option>
           {#each others as a}<option value={a}>{a}</option>{/each}
         </select>
         {#if emenda}
           <label title="Quanto tempo as duas se misturam{gameMix !== null ? ` (o jogo usa ${gameMix} s)` : ''}">mistura <input class="num" type="number" min="0" step="0.05" value={emenda.mix} onchange={(e) => setSeq({ mix: +(e.target as HTMLInputElement).value })} /> s</label>
           {#if gameMix !== null && Math.abs(gameMix - emenda.mix) > 1e-6}<button class="mini" title="Voltar para o mix do jogo (-data.tres)" onclick={() => setSeq({ mix: gameMix! })}>jogo: {gameMix}</button>{/if}
-          <label title="Cortar no meio: a outra entra neste instante (como um premio que interrompe). Sem marcar, ela entra quando esta termina."><input type="checkbox" checked={emenda.at !== null} onchange={(e) => toggleCut((e.target as HTMLInputElement).checked)} /> interromper em</label>
+          <label title="Cortar no meio: a outra entra neste instante (como um prêmio que interrompe). Sem marcar, ela entra quando esta termina."><input type="checkbox" checked={emenda.at !== null} onchange={(e) => toggleCut((e.target as HTMLInputElement).checked)} /> interromper em</label>
           {#if emenda.at !== null}
             <input class="num" type="number" min="0" step="0.05" value={emenda.at} onchange={(e) => setSeq({ at: Math.max(0, +(e.target as HTMLInputElement).value) })} /> s
             <button class="mini" title="Interromper no instante atual" disabled={app.play.time >= emenda.durA} onclick={() => setSeq({ at: +app.play.time.toFixed(3) })}>aqui</button>
@@ -637,38 +751,52 @@
       </span>
     {/if}
     <span class="right">
-      <span class="zoom" title="Zoom da timeline (tambem Ctrl+roda; Shift+roda ou botao do meio rola; duplo clique numa chave aproxima ali)">
+      <span class="zoom" title="Zoom da timeline (também Ctrl+roda; Shift+roda ou botão do meio rola; duplo clique numa chave aproxima ali)">
         <button class="mini" onclick={() => zoomBy(1 / 1.6)}>−</button>
         <button class="mini" onclick={() => zoomBy(1.6)}>+</button>
-        {#if selTimes.length > 1}<button class="mini" title="Enquadrar as chaves escolhidas" onclick={() => zoomTo(Math.min(...selTimes), Math.max(...selTimes))}>selecao</button>{/if}
-        <button class="mini" class:on={!zoom} title="Ajustar a regua a animacao inteira" onclick={() => (zoom = null)}>tudo</button>
+        {#if selTimes.length > 1}<button class="mini" title="Enquadrar as chaves escolhidas" onclick={() => zoomTo(Math.min(...selTimes), Math.max(...selTimes))}>seleção</button>{/if}
+        <button class="mini" class:on={!zoom} title="Ajustar a régua a animação inteira" onclick={() => (zoom = null)}>tudo</button>
       </span>
       {#if app.keyClipboard}<button class="mini" title="Colar no tempo atual (Ctrl+V)" onclick={pasteKeys}>colar {app.keyClipboard.items.length}</button>{/if}
-      <button class="mini" class:on={exporting.open} disabled={!app.doc} title="Exportar GIF ou video da animacao como esta na tela" onclick={() => (exporting.open = !exporting.open)}>⇩ exportar</button>
+      <button class="mini" class:on={exporting.open} disabled={!app.doc} title="Exportar GIF ou vídeo da animação como esta na tela" onclick={(e) => abrirExport(e.currentTarget as HTMLElement)}>⇩ exportar</button>
     </span>
     {#if exporting.open}
-      <div class="export">
+      <div class="export" style:right="{exportPos.right}px" style:bottom="{exportPos.bottom}px">
         <div class="fmt">
           <button class:on={exporting.format === "gif"} onclick={() => (exporting.format = "gif")}>GIF</button>
           <button class:on={exporting.format === "webm"} onclick={() => (exporting.format = "webm")}>WebM</button>
-          <button class:on={exporting.format === "webp"} onclick={() => (exporting.format = "webp")} title="WebP animado: bem menor que o GIF em cena com gradiente, luz e grao">WebP</button>
+          <button class:on={exporting.format === "webp"} disabled={!WEBP} onclick={() => (exporting.format = "webp")} title={WEBP ? "WebP animado: bem menor que o GIF em cena com gradiente, luz e grão" : "Este navegador não gera WebP (o Safari não gera): use GIF ou vídeo, ou exporte pelo Chrome ou Firefox"}>WebP</button>
         </div>
         <label>fps <select bind:value={exporting.fps}><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label>
-        <input placeholder="pasta (vazio: ~/.cache/mamulengo/exports)" bind:value={exporting.dir} />
-        <div class="moldura" title="moldura para mostrar: textos em faixas em volta da animacao (vazio: sem moldura)">
-          <input placeholder="titulo" bind:value={exporting.titulo} />
-          <input placeholder="subtitulo" bind:value={exporting.subtitulo} />
-          <input placeholder="rodape" bind:value={exporting.rodape} />
-          <input placeholder="credito" bind:value={exporting.credito} />
-        </div>
+        <input class="pasta" placeholder="pasta (opcional)" title="Onde gravar uma cópia. Vazio: ~/.cache/mamulengo/exports. O arquivo também fica para baixar aqui." bind:value={exporting.dir} />
+        <details class="moldura">
+          <summary title="Textos em faixas em volta da animação, para mostrar (vazio: sem moldura)">moldura com textos</summary>
+          <div class="campos">
+            <input placeholder="título" bind:value={exporting.titulo} />
+            <input placeholder="subtítulo" bind:value={exporting.subtitulo} />
+            <input placeholder="rodapé" bind:value={exporting.rodape} />
+            <input placeholder="crédito" bind:value={exporting.credito} />
+          </div>
+        </details>
+        {#if !app.play.animation}<div class="dim aviso">Escolha uma animação para exportar.</div>{/if}
         <button class="go" disabled={exporting.busy || !app.play.animation} onclick={runExport}>{exporting.busy ? `gravando ${exporting.progress}` : "exportar"}</button>
-        {#if exporting.result}<div class="done" title={exporting.result}>salvo: {exporting.result}</div>{/if}
+        {#if exporting.result}
+          <div class="done">
+            {#if exporting.url}<a class="baixar" href={exporting.url} download={exporting.arquivo}>⇩ baixar {exporting.arquivo}</a>{/if}
+            <span class="dim" title={exporting.result}>{exporting.caminho.split("/").length > 4 ? "…/" + exporting.caminho.split("/").slice(-3).join("/") : exporting.caminho}</span>
+            <span class="acoes">
+              <button class="mini" onclick={() => navigator.clipboard?.writeText(exporting.caminho).then(() => app.avisar("Caminho copiado."), () => app.toast("O navegador não deixou copiar."))}>copiar caminho</button>
+              <button class="mini" onclick={() => fetch("/api/abrir-pasta", { method: "POST", body: JSON.stringify({ p: exporting.caminho }) }).then(async (r) => !r.ok && app.toast((await r.json()).error))}>abrir pasta</button>
+            </span>
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
-
+  </div>
+  <!-- na Pose base nao ha chaves: a regua vazia so ocupava lugar -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="grid" bind:this={scroller} onwheel={wheel} onpointerdowncapture={panDown} onpointermove={pointerMove} onpointerup={pointerUp} onpointercancel={pointerUp} onauxclick={(e) => e.preventDefault()}>
+  <div class="grid" class:hidden={!app.play.animation} bind:this={scroller} onwheel={wheel} onpointerdowncapture={panDown} onpointermove={pointerMove} onpointerup={pointerUp} onpointercancel={pointerUp} onauxclick={(e) => e.preventDefault()}>
     <div class="head">
       <div class="corner">
         {#if detail}
@@ -677,7 +805,7 @@
           <span class="dim">partes</span>
         {/if}
       </div>
-      <div class="ruler" bind:this={ruler} bind:clientWidth={laneW} onpointerdown={rulerDown} title="Ctrl+roda: zoom. Shift+roda ou botao do meio: rolar">
+      <div class="ruler" bind:this={ruler} bind:clientWidth={laneW} onpointerdown={rulerDown} title="Ctrl+roda: zoom. Shift+roda ou botão do meio: rolar">
         <div class="past" style:left="{X(dur)}px"></div>
         {#if emenda}
           <div class="seq-after" style:left="{X(emenda.end)}px" style:width="{Math.max(0, (emenda.total - emenda.end) * pps)}px"><span>{emenda.next}</span></div>
@@ -709,7 +837,7 @@
         {#each rows as r}
           {#if r.kind === "part" && r.part}
             {#if r.part.instance}
-              <button class="label link" style:color={r.color} title="Entrar na instancia {r.part.instance}: abre o .boneco dela para editar (← no topo volta)" onclick={() => app.entrarInstancia(r.part!.instance!)}>{r.label} ↳</button>
+              <button class="label link" style:color={r.color} title="Entrar na instância {r.part.instance}: abre o .boneco dela para editar (← no topo volta)" onclick={() => app.entrarInstancia(r.part!.instance!)}>{r.label} ↳</button>
             {:else}
               <button class="label link" style:color={r.color} title="Ver as timelines de {r.label}" onclick={() => app.select(r.part!)}>{r.label}</button>
             {/if}
@@ -717,7 +845,7 @@
             <div class="label" style:color={r.color} title={r.label}>{r.label}</div>
           {/if}
         {/each}
-        {#if detail && rows.length === 1}<div class="hint">sem chaves: com esta animacao aberta, mexa na parte</div>{/if}
+        {#if detail && rows.length === 1}<div class="hint">sem chaves: com esta animação aberta, mexa na parte</div>{/if}
       </div>
       <div class="lanes" bind:this={lanes} style:height="{Math.max(rows.length, 1) * ROW + 8}px" onpointerdown={lanesDown}>
         <div class="past" style:left="{X(dur)}px"></div>
@@ -767,10 +895,10 @@
     min-height: 0;
     position: relative;
   }
+  /* o editor da curva fica sobre o desenho, logo acima da timeline: dentro dela cobria o zoom e
+     o exportar, e a timeline cortaria */
   .floating {
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
+    position: fixed;
     z-index: 5;
     box-shadow: 0 6px 20px #000a;
     border-radius: 8px;
@@ -860,7 +988,7 @@
     max-width: 46vw;
   }
   /* o que nao couber desce para outra linha (cortar escondia o exportar) */
-  :global(.compacto) .tl > .transport {
+  :global(.compacto) .tl .transport:not(.barra2) {
     grid-column: 2;
     grid-row: 1;
     gap: 5px 6px;
@@ -893,9 +1021,21 @@
     width: 46px;
     height: 36px;
     font-size: 16px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
     background: var(--accent);
     border-color: var(--accent);
     color: white;
+  }
+  .play svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+  :global(.compacto) .play svg {
+    width: 14px;
+    height: 14px;
   }
   .empty-hint {
     font-size: 12px;
@@ -918,6 +1058,32 @@
     display: flex;
     gap: 4px;
   }
+  .laco {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .barras {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .barra2 {
+    flex: 1 1 auto;
+  }
+  :global(.compacto) .barras {
+    display: contents;
+  }
+  :global(.compacto) .tl .barra2 {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  :global(.compacto) .transport .curves {
+    flex: 1 1 0;
+  }
+  :global(.compacto) .transport .right {
+    flex: none;
+  }
   .mini {
     padding: 4px 9px;
     font-size: 12px;
@@ -925,10 +1091,9 @@
   .mini.on {
     border-color: var(--accent);
   }
+  /* abre para cima, sobre o desenho (posicao calculada em abrirExport) */
   .export {
-    position: absolute;
-    right: 0;
-    top: 40px;
+    position: fixed;
     z-index: 6;
     background: var(--panel2);
     border: 1px solid var(--line);
@@ -938,8 +1103,36 @@
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
-    max-width: 520px;
+    width: min(420px, calc(100vw - 32px));
+    max-height: calc(100vh - 80px);
+    overflow: auto;
     box-shadow: 0 6px 20px #000a;
+  }
+  .export .moldura {
+    width: 100%;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .export .moldura summary {
+    cursor: pointer;
+  }
+  .export .moldura .campos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .export .moldura input {
+    width: 100%;
+    min-width: 0;
+  }
+  .export .aviso {
+    width: 100%;
+    font-size: 12px;
+  }
+  .export .baixar {
+    color: var(--ok);
+    font-weight: 600;
   }
   .export .fmt {
     display: flex;
@@ -963,8 +1156,9 @@
     gap: 4px;
     align-items: center;
   }
-  .export input {
-    width: 260px;
+  .export input.pasta {
+    flex: 1;
+    min-width: 0;
   }
   .export .go {
     background: var(--accent);
@@ -974,7 +1168,16 @@
   .export .done {
     width: 100%;
     font-size: 12px;
-    color: var(--ok);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .export .done .acoes {
+    display: flex;
+    gap: 6px;
+  }
+  .export .done span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -984,6 +1187,26 @@
     gap: 4px;
     align-items: center;
     flex-wrap: wrap;
+  }
+  /* tela pequena: as curvas so com o desenho (o nome fica na dica) e numa linha so, para a
+     timeline nao perder as linhas das chaves que acabaram de ser escolhidas */
+  :global(.compacto) .curves {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    min-width: 0;
+  }
+  :global(.compacto) .curve span,
+  :global(.compacto) .curves .rot {
+    display: none;
+  }
+  /* sem barra de rolagem (ela mudava a altura da linha ao escolher chaves) */
+  :global(.compacto) .curves {
+    scrollbar-width: none;
+  }
+  :global(.compacto) .curves .dim,
+  :global(.compacto) .curves button {
+    flex: none;
   }
   .curve {
     display: flex;
@@ -1193,6 +1416,10 @@
   /* interrompida: chaves depois do corte nao tocam */
   .key.late {
     opacity: 0.3;
+  }
+  /* tela pequena com chaves escolhidas: a linha fica para as curvas */
+  :global(.compacto) .seqctl.com-chaves {
+    display: none;
   }
   .seqctl {
     display: flex;

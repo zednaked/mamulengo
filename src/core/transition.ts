@@ -68,8 +68,8 @@ export interface TransitionOptions {
 
 export function measureTransition(json: SpineJson, anim: string, seq: Sequence, o: TransitionOptions = {}, m?: Medidor): TransitionReport {
   const anims = (json.animations ?? {}) as Record<string, any>;
-  if (!anims[anim]) throw new Error(`animacao nao existe: ${anim}`);
-  if (!anims[seq.next]) throw new Error(`animacao nao existe: ${seq.next}`);
+  if (!anims[anim]) throw new Error(`animação não existe: ${anim}`);
+  if (!anims[seq.next]) throw new Error(`animação não existe: ${seq.next}`);
   if (!m) {
     const own = abrirLeve(json);
     try {
@@ -88,7 +88,7 @@ export function measureTransition(json: SpineJson, anim: string, seq: Sequence, 
   const names = o.bones?.length ? o.bones : q0.bones.map((b) => b.name);
   const idx = names.map((nm) => {
     const b = q0.findBone(nm);
-    if (!b) throw new Error(`osso nao existe: ${nm}`);
+    if (!b) throw new Error(`osso não existe: ${nm}`);
     return b.index;
   });
   const acc = idx.map(() => ({ mixSpeed: 0, restSpeed: 0, mixTurn: 0, restTurn: 0, at: 0, atTurn: 0 }));

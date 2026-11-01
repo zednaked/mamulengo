@@ -12,7 +12,7 @@ const Cor = z.string().regex(/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/);
 export const emitters = (json: any): any[] => json.particles ?? [];
 export function requireEmitter(json: any, name: string): number {
   const i = emitters(json).findIndex((p) => p.name === name);
-  if (i < 0) throw new Error(`emissor de particulas nao existe: "${name}". Emissores: ${emitters(json).map((p) => p.name).join(", ") || "(nenhum)"}`);
+  if (i < 0) throw new Error(`emissor de partículas não existe: "${name}". Emissores: ${emitters(json).map((p) => p.name).join(", ") || "(nenhum)"}`);
   return i;
 }
 
@@ -85,7 +85,7 @@ defineCommand({
     if (i < 0) {
       if (!p.slot) throw new Error("emissor novo: diga o slot (lugar na ordem de desenho)");
       novo.image = p.image ?? imageOfSlot(e.json, p.slot);
-      if (!novo.image) throw new Error(`o slot ${p.slot} nao mostra imagem: diga image`);
+      if (!novo.image) throw new Error(`o slot ${p.slot} não mostra imagem: diga image`);
     }
     const num = (v: any) => (Array.isArray(v) ? v.map(round) : typeof v === "number" ? round(v) : v);
     for (const [k, v] of Object.entries(campos)) if (v !== undefined) novo[k] = num(v);
@@ -128,7 +128,7 @@ defineCommand({
   label: (p) => `renomeia particulas ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const i = requireEmitter(e.json, p.name);
-    if (emitters(e.json).some((x) => x.name === p.to)) throw new Error(`emissor ja existe: ${p.to}`);
+    if (emitters(e.json).some((x) => x.name === p.to)) throw new Error(`emissor já existe: ${p.to}`);
     e.set(["particles", i, "name"], p.to);
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
       if (a.particles?.[p.name]) e.apply({ op: "rename", path: ["animations", an, "particles"], from: p.name, to: p.to });

@@ -64,8 +64,18 @@ select {
   border-radius: 6px;
   padding: 4px 6px;
 }
+/* quem navega com Tab ve onde esta (o clique do mouse nao acende) */
+button:focus-visible,
+label.botao:focus-within,
+summary:focus-visible,
+[tabindex]:focus-visible,
+a:focus-visible {
+  outline: 2px solid #ffd16699;
+  outline-offset: 1px;
+}
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }

@@ -31,28 +31,11 @@ const b = JSON.parse(readFileSync(join(ROBO, "robo.boneco"), "utf8"));
 b.nome = "vitrine";
 delete b.ficha;
 
-// a pagina em 3x (robo-hd.webp, do vetor da Kenney por tools/atlas-hd.ts com --id "{nome}_0_Layer0_*_FILL"): o mesmo
-// layout com os retangulos em 3x; as partes guardam o tamanho delas, entao so a nitidez muda.
-// Larguras e raios dos efeitos sao em pixels da textura: tambem em 3x
+// o robo de tests/boneco/robo ja vem com a pagina em 3x (robo-hd.webp, do vetor da Kenney por
+// tools/atlas-hd.ts) e com os acertos do rig conferidos contra a pose "idle" da Kenney (os pes
+// para fora, um vao entre as pernas, as maos na ponta do braco). Larguras e raios dos efeitos
+// sao em pixels da textura: tambem em 3x
 const HD = 3;
-b.paginas[0] = { ...b.paginas[0], arquivo: "robo-hd.webp", tamanho: b.paginas[0].tamanho.map((v: number) => v * HD) };
-for (const im of b.imagens) im.ret = im.ret.map((v: number) => v * HD);
-
-// ---- acertos do rig do robo, conferidos contra a pose "idle" da Kenney: os pes para fora (a
-// perna esquerda e a espelhada, nao a direita), um vao entre as pernas e as maos centradas na
-// ponta do braco
-const parte = (s: string, n: string) => b.skins[0].partes[s][n];
-for (const n of ["leg", "legBend"]) {
-  const e = parte("perna_e", n),
-    d = parte("perna_d", n);
-  [e.rotacao, e.escala_y, d.rotacao, d.escala_y] = [d.rotacao, d.escala_y, e.rotacao, e.escala_y];
-}
-const PERNA_X = 22;
-b.ossos.find((o: any) => o.nome === "perna_e").x = -PERNA_X;
-b.ossos.find((o: any) => o.nome === "perna_d").x = PERNA_X;
-const MAO_Y = -5;
-parte("mao_e", "hand").y += MAO_Y;
-parte("mao_d", "hand").y -= MAO_Y;
 
 // ---- corpo: trechos das animacoes do robo em sequencia, com 0,3 s de emenda entre eles. O ultimo
 // idle e cortado no fim do laco, que fecha na pose do comeco (sem isso a animacao ia ate 9,8 s)

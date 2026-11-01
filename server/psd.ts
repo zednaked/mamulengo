@@ -14,6 +14,8 @@ import { parseTags, psdCalls, psdSummary, rectCenter, sameRect, type PsdBone, ty
 import { packAtlas, parseAtlas, unpackAtlas } from "./atlas.ts";
 import { createAsset, listImages } from "./assets.ts";
 import { findProjectRoot } from "./godot.ts";
+import { importarSpine } from "../src/boneco/spine.ts";
+import { gravarBonecoArquivo } from "./boneco-binario.ts";
 import { Document } from "../src/core/document.ts";
 import { executeAsync, type AssetProvider } from "../src/core/commands/index.ts";
 
@@ -601,7 +603,8 @@ export interface PsdResult {
 // Asset novo: <dir>/<name>.spine-json + atlas + paginas + -data.tres, ja montado.
 export async function createFromPsd(opts: { psd: string; dir: string; name: string; read?: ReadOptions }): Promise<PsdResult & { tres: string; skeleton: string; atlas: string; pages: string[] }> {
   if (!/^[\w.-]+$/.test(opts.name)) throw new Error(`nome invalido "${opts.name}": use letras, numeros, - e _ (sem espacos)`);
-  if (!findProjectRoot(opts.dir)) throw new Error(`${opts.dir} nao esta dentro de um projeto Godot (pasta com project.godot)`);
+  // fora de um projeto Godot o personagem nasce .boneco (o formato proprio, sem -data.tres)
+  if (!findProjectRoot(opts.dir)) return criarBonecoDePsd(opts);
   const { plan, images } = readPsdPlan(readFileSync(opts.psd), opts.psd, opts.read);
   if (!plan.pieces.length) throw new Error("nenhuma camada com desenho no PSD");
   for (const p of plan.pieces) p.status = "new";
@@ -622,6 +625,31 @@ export async function createFromPsd(opts: { psd: string; dir: string; name: stri
   writeFileSync(created.skeleton, doc.serialize());
   writeManifest(created.atlas, plan, null);
   return { ...created, plan, report, summary: psdSummary(plan, report, "create") };
+}
+
+// O mesmo de createFromPsd, gravando <dir>/<name>.boneco com as paginas ao lado e as imagens em
+// <dir>/images: o editor abre o .boneco pelos arquivos virtuais (server/boneco.ts)
+async function criarBonecoDePsd(opts: { psd: string; dir: string; name: string; read?: ReadOptions }): Promise<PsdResult & { tres: string; skeleton: string; atlas: string; pages: string[] }> {
+  const arquivo = join(opts.dir, `${opts.name}.boneco`);
+  if (existsSync(arquivo)) throw new Error(`ja existe: ${arquivo}`);
+  const { plan, images } = readPsdPlan(readFileSync(opts.psd), opts.psd, opts.read);
+  if (!plan.pieces.length) throw new Error("nenhuma camada com desenho no PSD");
+  for (const p of plan.pieces) p.status = "new";
+  const imagesDir = join(opts.dir, "images");
+  if (listImages(imagesDir).length) throw new Error(`a pasta ${imagesDir} ja tem imagens; escolha uma pasta nova para o personagem`);
+  for (const im of images) {
+    const f = join(imagesDir, im.piece.image + ".png");
+    mkdirSync(dirname(f), { recursive: true });
+    writeFileSync(f, await toPng(im.raster, im.piece.scale));
+  }
+  const packed = await packAtlas(listImages(imagesDir), { pageName: opts.name });
+  for (const p of packed.pages) writeFileSync(join(opts.dir, p.name), p.data);
+  const json = { skeleton: { spine: "4.3.23", images: "./images/", audio: "" }, bones: [{ name: "root" }], slots: [], skins: [{ name: "default", attachments: {} }], animations: {} };
+  const doc = Document.fromText(JSON.stringify(json), { text: packed.atlas, pages: {} });
+  const { calls, report } = psdCalls(doc.json, plan);
+  await executeAsync(doc, calls, "psd", `PSD ${plan.file}`, {}, fileAssets(opts.dir, packed.atlas));
+  gravarBonecoArquivo(arquivo, importarSpine(doc.json, packed.atlas, opts.name), false);
+  return { tres: arquivo, skeleton: arquivo + ".spine-json", atlas: arquivo + ".atlas", pages: packed.pages.map((p) => p.name), plan, report, summary: psdSummary(plan, report, "create") };
 }
 
 const rawEqual = (a: { width: number; height: number; data: Buffer | Uint8Array }, b: { width: number; height: number; data: Buffer | Uint8Array }) =>

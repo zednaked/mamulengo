@@ -163,7 +163,7 @@ export function psdCalls(json: SpineJson, plan: PsdPlan): { calls: Call[]; repor
   const boneNames = new Set((json.bones ?? []).map((b: any) => b.name));
   for (const b of plan.bones) {
     if (boneNames.has(b.name)) continue;
-    if (!boneNames.has(b.parent)) throw new Error(`osso pai nao existe: ${b.parent}`);
+    if (!boneNames.has(b.parent)) throw new Error(`osso pai não existe: ${b.parent}`);
     calls.push({ cmd: "bone.add", args: { name: b.name, parent: b.parent, at: world(b.at) } });
     boneNames.add(b.name);
     report.bones.push(b.name);

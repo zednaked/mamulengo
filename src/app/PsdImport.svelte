@@ -21,7 +21,7 @@
   async function choose(f: File | null | undefined) {
     if (!f) return;
     if (!/\.psd$/i.test(f.name)) {
-      app.toast("Esse arquivo nao e um .psd");
+      app.toast("Esse arquivo não é um .psd");
       return;
     }
     open = true;
@@ -106,9 +106,9 @@
       {:else if file}
         <div class="opt">
           <div class="h">Criar personagem novo</div>
-          <div class="dim small">Cada camada visivel vira uma parte, na ordem e no lugar do PSD. Camadas escondidas viram imagens de troca.</div>
+          <div class="dim small">Cada camada visível vira uma parte, na ordem e no lugar do PSD. Camadas escondidas viram imagens de troca.</div>
           <label>Nome <input bind:value={name} placeholder="nome-do-personagem" oninput={() => !dirTouched && (dir = suggestDir(name))} /></label>
-          <label>Pasta (dentro do projeto do jogo) <input bind:value={dir} list="psd-folders" placeholder="/caminho/do/projeto/personagens/nome" oninput={() => (dirTouched = true)} /></label>
+          <label title="Dentro de um projeto Godot o personagem sai no formato do spine-godot (-data.tres); fora dele, como .boneco, o formato do Mamulengo">Pasta <input bind:value={dir} list="psd-folders" placeholder="/caminho/do/projeto/personagens/nome" oninput={() => (dirTouched = true)} /></label>
           <datalist id="psd-folders">
             {#each folders as f}<option value="{f}/{name}"></option>{/each}
           </datalist>
@@ -116,9 +116,11 @@
         </div>
         <div class="opt">
           <div class="h">Atualizar o personagem aberto</div>
-          {#if app.asset}
-            <div class="dim small">Casa cada camada com a imagem de mesmo nome em <b>{app.asset.name}</b>: desenho novo entra no lugar do antigo, camada nova vira imagem nova. Animacoes e malhas continuam valendo. Salva no fim.</div>
-            <div class="row end"><button class="ok" disabled={app.doc?.dirty} title={app.doc?.dirty ? "Salve ou descarte as alteracoes antes" : ""} onclick={() => act("update")}>Atualizar {app.asset.name}</button></div>
+          {#if app.asset?.tres?.endsWith(".boneco")}
+            <div class="dim small">Atualizar pelo PSD ainda não funciona em personagem .boneco. Crie um novo ao lado e copie as animações, ou importe num projeto Godot.</div>
+          {:else if app.asset}
+            <div class="dim small">Casa cada camada com a imagem de mesmo nome em <b>{app.asset.name}</b>: desenho novo entra no lugar do antigo, camada nova vira imagem nova. Animações e malhas continuam valendo. Salva no fim.</div>
+            <div class="row end"><button class="ok" disabled={app.doc?.dirty} title={app.doc?.dirty ? "Salve ou descarte as alterações antes" : ""} onclick={() => act("update")}>Atualizar {app.asset.name}</button></div>
           {:else}
             <div class="dim small">Abra um personagem para atualizar.</div>
           {/if}

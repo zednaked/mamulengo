@@ -61,18 +61,18 @@
   {:else}
     {#if !app.author}
       <div class="row">
-        <input bind:value={name} placeholder="seu nome (aparece nas notas)" />
+        <input bind:value={name} placeholder="seu nome" title="Aparece nas notas que você deixar" />
         <button onclick={() => app.setAuthor(name || "eu")}>ok</button>
       </div>
     {/if}
-    <textarea bind:value={text} placeholder="Deixe uma nota: o que mudar, uma duvida, um aviso..." rows="3"></textarea>
+    <textarea bind:value={text} placeholder="Deixe uma nota: o que mudar, uma dúvida, um aviso..." rows="3"></textarea>
     <div class="row">
       <label class="small"><input type="checkbox" bind:checked={pin} /> prender em {anim ?? "setup"}{anim ? ` @ ${t2(app.play.time)}` : ""}{app.selection.bone ? `, ${app.selection.bone}` : ""}</label>
       <span class="spacer"></span>
       <button class="go" onclick={create} disabled={busy || !text.trim()}>Anotar</button>
     </div>
     <div class="row small">
-      <button class="mini" class:sel={only === "anim"} onclick={() => (only = "anim")}>desta animacao</button>
+      <button class="mini" class:sel={only === "anim"} onclick={() => (only = "anim")}>desta animação</button>
       <button class="mini" class:sel={only === "todas"} onclick={() => (only = "todas")}>todas</button>
       <span class="spacer"></span>
       {#if done}<label><input type="checkbox" bind:checked={showDone} /> resolvidas ({done})</label>{/if}

@@ -12,14 +12,16 @@
   import { onMount } from "svelte";
   import { Viewer } from "../render/viewer.ts";
   import { app } from "./state.svelte.ts";
-  import { beginDrag, beginStroke, cursor, drawGizmo, drawTools, endDrag, endStroke, moveDrag, moveStroke, pickBone, pickPart } from "./interact.ts";
+  import { ajudaFerramenta, passoSeta, beginDrag, beginStroke, cursor, drawGizmo, drawHover, drawLigacoes, drawTools, endDrag, endStroke, hover, leituraArrasto, moveDrag, moveStroke, pickBone, pickPart } from "./interact.ts";
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
 
   let canvas: HTMLCanvasElement;
   let panning = $state<{ x: number; y: number; cx: number; cy: number } | null>(null);
-  let space = false;
+  let space = $state(false);
   let downAt: { x: number; y: number } | null = null;
   let dragged = false;
+  // o quanto o arrasto mudou, junto do cursor
+  let leitura = $state<{ t: string; x: number; y: number } | null>(null);
 
   // a referencia acompanha a camera: recalcula o retangulo dela a cada quadro de tela
   let refBox = $state<{ left: number; top: number; width: number } | null>(null);
@@ -61,6 +63,8 @@
     // editando malha, os gizmos de osso saem e entra o desenho da malha
     v.overlays.push((v) => {
       if (app.meshEdit) return drawMeshEdit(v);
+      drawLigacoes(v);
+      drawHover(v);
       drawGizmo(v);
       drawTools(v);
     });
@@ -85,15 +89,24 @@
     else app.viewer = v;
     const keyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) space = true;
+      // setas com o mouse sobre o desenho: a ferramenta em passos (fora dele, a timeline anda)
+      const el = e.target as HTMLElement;
+      if (e.key.startsWith("Arrow") && cursor.inside && !(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) && app.viewer && !app.meshEdit) {
+        if (passoSeta(app.viewer, e.key, e.shiftKey, e.altKey, e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }
     };
     const keyUp = (e: KeyboardEvent) => {
       if (e.code === "Space") space = false;
     };
-    window.addEventListener("keydown", keyDown);
+    // na captura: antes da timeline, que usa as setas para andar no tempo
+    window.addEventListener("keydown", keyDown, true);
     window.addEventListener("keyup", keyUp);
     return () => {
       v.stop();
-      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keydown", keyDown, true);
       window.removeEventListener("keyup", keyUp);
     };
   });
@@ -151,22 +164,55 @@
     if (!near) select(w.x, w.y);
     if (app.selection.bone) {
       v.view.playing = false;
-      beginDrag(v, w, app.tool);
+      beginDrag(v, w, app.tool, e.ctrlKey || e.metaKey);
     }
   }
 
-  function select(x: number, y: number) {
+  // o que um clique em (x, y) escolheria: o osso perto (com os ossos a vista), a imagem e o osso
+  // que a move naquele ponto (numa malha com pesos, nao o dono do slot), ou o osso mais perto
+  function alvoEm(x: number, y: number): { bone?: string; slot?: string } {
     const v = app.viewer!;
     if (v.view.showBones) {
       const b = pickBone(v, x, y);
-      if (b) return app.select({ bone: b });
+      if (b) return { bone: b };
     }
-    // a imagem clicada e o osso que a move naquele ponto (numa malha com pesos, nao o dono do slot)
     const pose = v.pose;
     const part = pose ? pickPart(pose, x, y, (sl) => v.isSlotHidden(sl)) : null;
-    if (part) return app.select({ bone: part.bone, slot: part.slot });
+    if (part) return { bone: part.bone, slot: part.slot };
     const b = pickBone(v, x, y, 16);
-    app.select(b ? { bone: b } : {});
+    return b ? { bone: b } : {};
+  }
+  function select(x: number, y: number) {
+    app.select(alvoEm(x, y));
+  }
+
+  // a linha de ajuda da ferramenta (o que o arrasto vai fazer agora)
+  const ajuda = $derived.by(() => {
+    app.version;
+    app.tool;
+    app.mode;
+    app.play.animation;
+    const s = app.selection;
+    void s.bone, s.slot;
+    return app.doc && app.viewer && !app.meshEdit ? ajudaFerramenta(app.viewer) : "";
+  });
+
+  // passando o mouse: o contorno do que o clique vai pegar e o nome junto do cursor
+  let dica = $state<{ t: string; x: number; y: number } | null>(null);
+  function mostraAlvo(e: PointerEvent) {
+    const v = app.viewer;
+    if (!v || !app.doc || app.meshEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
+    const w = v.screenToSkel(e.clientX, e.clientY);
+    const a = alvoEm(w.x, w.y);
+    const igual = a.bone === app.selection.bone && a.slot === app.selection.slot;
+    hover.bone = igual ? undefined : a.bone;
+    hover.slot = igual ? undefined : a.slot;
+    const r = canvas.getBoundingClientRect();
+    dica = !igual && (a.bone || a.slot) ? { t: a.slot ? `${a.slot} · 🦴 ${a.bone}` : `🦴 ${a.bone}`, x: e.clientX - r.left, y: e.clientY - r.top } : null;
+  }
+  function limpaAlvo() {
+    hover.bone = hover.slot = undefined;
+    dica = null;
   }
 
   function move(e: PointerEvent) {
@@ -190,10 +236,15 @@
       v.cam.y = panning.cy + (e.clientY - panning.y) / v.cam.zoom;
       return;
     }
+    if (!downAt) return mostraAlvo(e);
     if (downAt && !dragged && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 3) return;
     if (downAt) {
+      limpaAlvo();
       dragged = true;
-      moveDrag(v, v.screenToSkel(e.clientX, e.clientY), e.shiftKey);
+      moveDrag(v, v.screenToSkel(e.clientX, e.clientY), e.shiftKey, e.altKey);
+      const t = leituraArrasto();
+      const r = canvas.getBoundingClientRect();
+      leitura = t ? { t: t + (e.shiftKey ? "" : " · Shift: fino"), x: e.clientX - r.left, y: e.clientY - r.top } : null;
     }
   }
 
@@ -218,6 +269,7 @@
   }
 
   function up() {
+    leitura = null;
     panning = null;
     downAt = null;
     endDrag();
@@ -227,8 +279,12 @@
 </script>
 
 <div class="wrap" class:setup={app.doc && app.mode === "setup"}>
-  {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animacoes">POSE BASE</div>{/if}
-  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (cursor.inside = false)} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animações">POSE BASE</div>
+  {:else if app.doc && app.play.animation && !app.spectator}<div class="base-tag anima" title="Mexer numa parte grava uma chave no instante da régua">ANIMANDO {app.play.animation} · mexer grava chave</div>{/if}
+  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => ((cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  {#if ajuda}<div class="ajuda" role="status">{ajuda}</div>{/if}
+  {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
+  {#if leitura}<div class="leitura" style:left="{leitura.x + 16}px" style:top="{leitura.y + 16}px">{leitura.t}</div>{/if}
   {#if app.referencia && refBox}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <img
@@ -247,23 +303,23 @@
       draggable="false"
     />
     <div class="refbar">
-      <span title="imagem de referencia por cima do personagem">referencia</span>
-      <input type="range" min="0.05" max="1" step="0.05" bind:value={app.referencia.opacidade} title="transparencia" />
+      <span title="imagem de referência por cima do personagem">referência</span>
+      <input type="range" min="0.05" max="1" step="0.05" bind:value={app.referencia.opacidade} title="transparência" />
       <button onclick={() => app.referencia && (app.referencia.largura *= 1.05)} title="maior">+</button>
       <button onclick={() => app.referencia && (app.referencia.largura /= 1.05)} title="menor">−</button>
-      <button class:on={app.referencia.mover} onclick={() => app.referencia && (app.referencia.mover = !app.referencia.mover)} title="arrastar a referencia com o mouse">mover</button>
-      <button onclick={() => (app.referencia = null)} title="tirar a referencia">✕</button>
+      <button class:on={app.referencia.mover} onclick={() => app.referencia && (app.referencia.mover = !app.referencia.mover)} title="arrastar a referência com o mouse">mover</button>
+      <button onclick={() => (app.referencia = null)} title="tirar a referência">✕</button>
     </div>
   {/if}
   {#if app.viewer?.error}
     <div class="err">O runtime recusou o documento: {app.viewer.error}</div>
   {:else if app.runtime === "nucleo" && app.viewer?.nucleoError && (app.version, true)}
-    <div class="err">O nucleo recusou o documento (desenhando pelo spine-webgl): {app.viewer.nucleoError}</div>
+    <div class="err">O núcleo recusou o documento (desenhando pelo spine-webgl): {app.viewer.nucleoError}</div>
   {/if}
   {#if app.doc && app.runtime !== "nucleo" && extras}
     <div class="aviso-nucleo">
-      Este personagem tem {extras}, que so aparecem no desenho do nucleo (o {app.runtime === "godot" ? "spine-godot" : "Spine"} nao tem).
-      <button onclick={() => app.setRuntime("nucleo")}>ver no nucleo</button>
+      Este personagem tem {extras}, que só aparecem no desenho do núcleo (o {app.runtime === "godot" ? "spine-godot" : "Spine"} não tem).
+      <button onclick={() => app.setRuntime("nucleo")}>ver no núcleo</button>
     </div>
   {/if}
   {#if app.tool === "deform" && app.doc}
@@ -278,24 +334,34 @@
   {/if}
   {#if app.offerMesh}
     <div class="offer">
-      <b>{app.offerMesh.attachment}</b> ainda nao e deformavel.
+      <b>{app.offerMesh.attachment}</b> ainda não é deformável.
       <button
         class="ok"
         onclick={async () => {
           const o = app.offerMesh!;
           const bone = app.doc?.json.slots.find((s: any) => s.name === o.slot)?.bone;
-          await app.runAsync([{ cmd: "mesh.create", args: { slot: o.slot, name: o.attachment, detail: 1.8 } }], `deixar ${o.attachment} deformavel`);
+          const ok = await app.runAsync([{ cmd: "mesh.create", args: { slot: o.slot, name: o.attachment, detail: 1.8 } }], `deixar ${o.attachment} deformavel`);
           app.offerMesh = null;
+          if (ok) app.avisar(`${o.slot} agora é deformável: passe o pincel de novo.`);
           void bone;
-        }}>Deixar deformavel</button
+        }}>Deixar deformável</button
       >
-      <button onclick={() => (app.offerMesh = null)}>Agora nao</button>
+      <button onclick={() => (app.offerMesh = null)}>Agora não</button>
     </div>
   {/if}
-  {#if !app.doc}
+  {#if app.abrindo}
+    <div class="abrindo" role="status">Abrindo {app.abrindo}…</div>
+  {/if}
+  {#if !app.doc && !app.abrindo}
     <div class="empty">
-      <div class="big">Escolha um personagem ali em cima</div>
-      <div class="dim">ou peça ao Claude: "abre o personagem do monstro"</div>
+      {#if app.assetsLidos && !app.assets.length}
+        <div class="big">Nenhum personagem encontrado</div>
+        <div class="dim">O editor procura {app.roots.length > 1 ? "nestas pastas" : "nesta pasta"}: <code>{app.roots.join(", ")}</code></div>
+        <div class="dim">Arraste um PSD em camadas para a janela para montar um, ou abra o editor com <code>MAMULENGO_ROOTS=/sua/pasta npm run dev</code>.</div>
+      {:else}
+        <div class="big">Escolha um personagem ali em cima</div>
+        <div class="dim">ou peça ao Claude: "abre o personagem do monstro"</div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -364,6 +430,52 @@
     border-radius: 4px;
     pointer-events: none;
   }
+  .abrindo {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 7;
+    background: #16141b99;
+    font-size: 15px;
+    pointer-events: none;
+  }
+  .leitura {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+    background: #1d1b22e6;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ajuda {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    right: 8px;
+    z-index: 5;
+    pointer-events: none;
+    font-size: 12px;
+    color: var(--dim);
+    background: #1a1820cc;
+    border-radius: 6px;
+    padding: 3px 8px;
+    width: fit-content;
+    max-width: calc(100% - 16px);
+  }
+  .leitura.alvo {
+    color: #9ee8ff;
+  }
+  .base-tag.anima {
+    background: #ff3d8b33;
+    color: #ffb3d1;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
   canvas.pan {
     cursor: grab;
   }
@@ -406,10 +518,11 @@
     white-space: nowrap;
     cursor: pointer;
   }
+  /* abaixo do selo do modo (POSE BASE / ANIMANDO), no mesmo canto */
   .brush {
     position: absolute;
-    left: 12px;
-    top: 12px;
+    left: 8px;
+    top: 36px;
     display: flex;
     gap: 6px;
     align-items: center;

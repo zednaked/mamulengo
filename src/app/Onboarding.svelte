@@ -1,20 +1,31 @@
 <script lang="ts">
-  // Guia de primeira vez: quatro passos, sem jargao de Spine. Reabre pelo botao "?".
+  // Guia de primeira vez: cinco passos, sem jargao de Spine. Reabre pelo botao "?".
   let { open = $bindable(false) }: { open?: boolean } = $props();
   let step = $state(0);
 
   const STEPS = [
-    { icon: "🎭", title: "Escolha um personagem", text: "Use o seletor la em cima. Aparecem todos os personagens dos seus jogos. Nada e alterado no jogo ate voce salvar." },
-    { icon: "👆", title: "Clique numa parte", text: "Clique na cabeca, no braco, no corpo. A parte fica marcada e aparecem os movimentos prontos para ela." },
-    { icon: "✨", title: "Faca ele se mexer", text: "Escolha uma animacao na linha do tempo e aperte Respirar, Balancar, Quicar... ou arraste a parte: cada movimento vira uma chave. Na aba Pose base, mexer muda o boneco em todas as animacoes. O pincel 🖌 deforma a imagem como massinha." },
-    { icon: "🎮", title: "Salve e veja no jogo", text: "Salvar grava no projeto do jogo (com copia de seguranca). 'ver no Godot' mostra o quadro renderizado pelo proprio Godot, para conferir que fica igual." },
+    { icon: "🎭", title: "Escolha um personagem", text: "No seletor lá em cima aparecem os personagens das pastas do projeto. Sem nenhum ainda? Arraste um PSD em camadas para a janela: cada camada vira uma parte. Nada é gravado até você salvar." },
+    { icon: "👆", title: "Clique numa parte", text: "Clique na cabeça, no braço, no corpo. A parte fica marcada no desenho e no Esqueleto, à esquerda, e o painel da direita mostra o que dá para fazer com ela." },
+    { icon: "🦴", title: "Pose base ou animação", text: "Embaixo, Pose base é o boneco parado: mexer ali muda todas as animações (é onde se monta o esqueleto). Escolha uma animação, ou + nova, para animar: cada coisa que você mexe vira uma chave no instante da régua." },
+    { icon: "✨", title: "Faça ele se mexer", text: "Arraste a parte com Girar (2) ou Mover (1): puxar uma junta, como a mão, dobra o braço inteiro (Alt solta). Ou aperte um movimento pronto: Respirar, Balançar, Quicar. Espaço toca e pausa, as setas andam um quadro, Ctrl+Z desfaz. O pincel 🖌 deforma a imagem como massinha." },
+    { icon: "💾", title: "Salve e exporte", text: "Salvar (Ctrl+S) grava no projeto, com cópia de segurança. Exportar, embaixo à direita, gera GIF, WebP ou vídeo. O botão ? (ou a tecla ?) mostra todos os atalhos e traz este guia de volta." },
   ];
-
   function close() {
     open = false;
     try {
       localStorage.setItem("mamulengo.onboarded", "1");
     } catch {}
+  }
+
+  // teclado: setas andam, Enter segue, Esc fecha
+  function tecla(e: KeyboardEvent) {
+    if (!open) return;
+    if (e.key === "Escape") close();
+    else if (e.key === "ArrowRight" || e.key === "Enter") step < STEPS.length - 1 ? step++ : close();
+    else if (e.key === "ArrowLeft") step = Math.max(0, step - 1);
+    else return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
   }
 
   // primeira vez: abre sozinho
@@ -25,12 +36,14 @@
   });
 </script>
 
+<svelte:window onkeydown={tecla} />
+
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="back" onclick={close}>
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="card" onclick={(e) => e.stopPropagation()}>
-      <div class="hello">Bem-vindo ao <b>Mamulengo</b></div>
+      <div class="hello">Boas-vindas ao <b>Mamulengo</b></div>
       <div class="step">
         <div class="icon">{STEPS[step].icon}</div>
         <div>
@@ -44,9 +57,9 @@
       <div class="nav">
         <button onclick={close}>pular</button>
         {#if step < STEPS.length - 1}
-          <button class="go" onclick={() => step++}>proximo</button>
+          <button class="go" onclick={() => step++}>próximo</button>
         {:else}
-          <button class="go" onclick={close}>comecar</button>
+          <button class="go" onclick={close}>começar</button>
         {/if}
       </div>
     </div>

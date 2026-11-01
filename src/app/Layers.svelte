@@ -11,8 +11,19 @@
 
   type Row = { slot: string; image: string | null; region: string | null; bone: string; hidden: boolean; glow: boolean; related: boolean; boneHidden: boolean };
 
+  // a ordem vem do desenho ja calculado (o viewer), que so pega a mudanca no quadro seguinte: a
+  // lista se refaz de novo depois dele. Sem isso, na Pose base (nada tocando) ela ficava com a
+  // ordem velha ate trocar de aba
+  let quadro = $state(0);
+  $effect(() => {
+    app.version;
+    let id = requestAnimationFrame(() => (id = requestAnimationFrame(() => quadro++)));
+    return () => cancelAnimationFrame(id);
+  });
+
   const rows = $derived.by((): Row[] => {
     app.version;
+    quadro;
     app.play.time;
     app.play.animation;
     const sk = app.viewer?.pose;
@@ -82,9 +93,9 @@
 </script>
 
 <div class="layers">
-  <input class="search" placeholder="procurar camada ou imagem" bind:value={filter} />
-  <div class="hint">De cima para baixo: da frente para tras. Arraste para mudar a ordem (numa animacao vira chave no instante atual). Quem move cada imagem e o osso ao lado.</div>
-  <label class="hint"><input type="checkbox" bind:checked={showHidden} /> mostrar as escondidas neste instante</label>
+  <input class="search" placeholder="procurar" title="Procurar camada ou imagem" bind:value={filter} />
+  <div class="hint" title="A lista vai da frente (em cima) para trás (embaixo). Arraste uma linha para mudar a ordem; numa animação isso vira chave no instante atual. Embaixo do nome: a imagem e o osso que move a peça.">↑ frente · arraste para reordenar</div>
+  <label class="hint"><input type="checkbox" bind:checked={showHidden} /> mostrar as escondidas agora</label>
   <div class="list" bind:this={listEl}>
     {#each rows as r (r.slot)}
       <div class="line" data-slot={r.slot} class:over={over === r.slot} draggable="true" role="listitem" ondragstart={() => (dragging = r.slot)} ondragover={(e) => (e.preventDefault(), (over = r.slot))} ondragleave={() => over === r.slot && (over = null)} ondrop={(e) => (e.preventDefault(), drop(r.slot))} ondragend={() => (dragging = over = null)}>
@@ -98,6 +109,7 @@
       <button class="eye" class:shut={app.hidden.slots.includes(r.slot) || r.boneHidden} onclick={() => app.toggleHidden("slots", r.slot)} title={r.boneHidden ? `escondida pelo olho do osso ${r.bone} (Esqueleto)` : app.hidden.slots.includes(r.slot) ? "mostrar esta camada" : "esconder esta camada (so na tela)"}>{app.hidden.slots.includes(r.slot) || r.boneHidden ? "◡" : "👁"}</button>
       </div>
     {/each}
+    {#if rows.length > 3}<div class="hint fundo">↓ trás</div>{/if}
   </div>
 </div>
 
@@ -115,6 +127,9 @@
   .hint {
     font-size: 11px;
     color: var(--dim);
+  }
+  .hint.fundo {
+    padding: 4px 2px;
   }
   .list {
     overflow: auto;

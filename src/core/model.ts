@@ -30,22 +30,22 @@ export function skinIndex(doc: SpineJson, name: string): number {
 
 export function requireBone(doc: SpineJson, name: string): number {
   const i = boneIndex(doc, name);
-  if (i < 0) throw new Error(`osso nao existe: "${name}". Ossos: ${listNames(bones(doc))}`);
+  if (i < 0) throw new Error(`osso não existe: "${name}". Ossos: ${listNames(bones(doc))}`);
   return i;
 }
 export function requireSlot(doc: SpineJson, name: string): number {
   const i = slotIndex(doc, name);
-  if (i < 0) throw new Error(`slot nao existe: "${name}". Slots: ${listNames(slots(doc))}`);
+  if (i < 0) throw new Error(`slot não existe: "${name}". Slots: ${listNames(slots(doc))}`);
   return i;
 }
 export function requireSkin(doc: SpineJson, name: string): number {
   const i = skinIndex(doc, name);
-  if (i < 0) throw new Error(`skin nao existe: "${name}". Skins: ${listNames(skins(doc))}`);
+  if (i < 0) throw new Error(`skin não existe: "${name}". Skins: ${listNames(skins(doc))}`);
   return i;
 }
 export function requireAnimation(doc: SpineJson, name: string): any {
   const a = animations(doc)[name];
-  if (!a) throw new Error(`animacao nao existe: "${name}". Animacoes: ${Object.keys(animations(doc)).join(", ") || "(nenhuma)"} (crie com animation.create; as receitas criam sozinhas)`);
+  if (!a) throw new Error(`animação não existe: "${name}". Animações: ${Object.keys(animations(doc)).join(", ") || "(nenhuma)"} (crie com animation.create; as receitas criam sozinhas)`);
   return a;
 }
 

@@ -154,7 +154,7 @@ defineCommand({
   run({ doc }, p) {
     const s = skins(doc.json).find((x) => x.name === p.skin);
     const a = s?.attachments?.[p.slot]?.[p.name];
-    if (!a) throw new Error(`attachment nao existe: ${p.skin}/${p.slot}/${p.name}. Disponiveis: ${attachmentsOf(doc.json, p.slot).map((x) => x.name).join(", ")}`);
+    if (!a) throw new Error(`attachment não existe: ${p.skin}/${p.slot}/${p.name}. Disponiveis: ${attachmentsOf(doc.json, p.slot).map((x) => x.name).join(", ")}`);
     const out: any = { ...a };
     if (a.type === "mesh") {
       out.vertexCount = a.uvs.length / 2;

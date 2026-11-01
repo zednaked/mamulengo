@@ -13,7 +13,7 @@
     const v = app.viewer;
     const doc = app.doc;
     if (!v || !doc?.file.tres) return;
-    if (doc.dirty) return app.toast("Salve antes de ver no Godot: ele le o arquivo do disco.");
+    if (doc.dirty) return app.toast("Salve (Ctrl+S) antes de ver no Godot: ele lê o arquivo do disco.");
     busy = true;
     open = true;
     editorImg = godotImg = null;

@@ -7,6 +7,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseAtlas } from "./atlas.ts";
+import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
+
+// o esqueleto e o atlas de um .boneco sao arquivos virtuais (server/boneco.ts): le e grava por la
+export const lerArquivo = (p: string): Buffer => (bonecoVirtual(p) ? Buffer.from(lerVirtual(p)!, "utf8") : readFileSync(p));
+const existe = (p: string) => !!bonecoVirtual(p) || existsSync(p);
+function gravar(p: string, data: Buffer, backup: (p: string) => void) {
+  const v = bonecoVirtual(p);
+  backup(v ? v.arquivo : p);
+  if (v) gravarVirtual(p, data);
+  else writeFileSync(p, data);
+}
 
 export const VERSIONS_ROOT = process.env.MAMULENGO_VERSIONS ?? join(homedir(), ".local", "share", "mamulengo", "versoes");
 
@@ -57,11 +68,11 @@ function writeIndex(skeleton: string, idx: Index) {
 export function saveVersion(o: { skeleton: string; atlas?: string | null; label?: string | null; source?: string }): { entry: VersionEntry; created: boolean } {
   const idx = readIndex(o.skeleton);
   const atlasPath = o.atlas ?? idx.atlas;
-  const skel = putBlob(readFileSync(o.skeleton));
+  const skel = putBlob(lerArquivo(o.skeleton));
   let atlas: string | null = null;
   const pages: Record<string, string> = {};
-  if (atlasPath && existsSync(atlasPath)) {
-    const text = readFileSync(atlasPath, "utf8");
+  if (atlasPath && existe(atlasPath)) {
+    const text = lerArquivo(atlasPath).toString("utf8");
     atlas = putBlob(text);
     for (const pg of parseAtlas(text).pages) {
       const f = join(dirname(atlasPath), pg.name);
@@ -72,7 +83,7 @@ export function saveVersion(o: { skeleton: string; atlas?: string | null; label?
   const same = last && last.skeleton === skel && last.atlas === atlas && JSON.stringify(last.pages) === JSON.stringify(pages);
   if (same && !o.label) return { entry: last, created: false };
   const at = new Date().toISOString();
-  const entry: VersionEntry = { id: at.replace(/[-:.TZ]/g, "").slice(0, 17) + "-" + skel.slice(0, 6), at, label: o.label?.trim() || null, source: o.source ?? "ui", skeleton: skel, atlas, pages, bytes: readFileSync(o.skeleton).length };
+  const entry: VersionEntry = { id: at.replace(/[-:.TZ]/g, "").slice(0, 17) + "-" + skel.slice(0, 6), at, label: o.label?.trim() || null, source: o.source ?? "ui", skeleton: skel, atlas, pages, bytes: lerArquivo(o.skeleton).length };
   idx.atlas = atlasPath ?? null;
   idx.versions.push(entry);
   writeIndex(o.skeleton, idx);
@@ -94,11 +105,11 @@ export function restoreVersion(o: { skeleton: string; atlas?: string | null; id:
   const v = getVersion(o.skeleton, o.id);
   const before = saveVersion({ skeleton: o.skeleton, atlas: o.atlas, label: `antes de restaurar ${v.label ?? v.id}`, source: o.source }).entry;
   const atlasPath = o.atlas ?? readIndex(o.skeleton).atlas;
-  o.backup(o.skeleton);
-  writeFileSync(o.skeleton, readBlob(v.skeleton));
+  // num .boneco cada gravacao regrava o arquivo inteiro com a outra parte atual: esqueleto e
+  // depois atlas da o par da versao
+  gravar(o.skeleton, readBlob(v.skeleton), o.backup);
   if (atlasPath && v.atlas) {
-    o.backup(atlasPath);
-    writeFileSync(atlasPath, readBlob(v.atlas));
+    gravar(atlasPath, readBlob(v.atlas), o.backup);
     for (const [name, h] of Object.entries(v.pages)) {
       const f = join(dirname(atlasPath), name);
       o.backup(f);

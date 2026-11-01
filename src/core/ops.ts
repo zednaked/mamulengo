@@ -58,21 +58,21 @@ export function applyOp(root: any, o: Op): Op {
     }
     case "insert": {
       const a = get(root, o.path) ?? (applyOp(root, { op: "set", path: o.path, value: [] }), get(root, o.path));
-      if (!Array.isArray(a)) throw new Error(`nao e array: ${o.path.join(".")}`);
+      if (!Array.isArray(a)) throw new Error(`não é array: ${o.path.join(".")}`);
       a.splice(o.index, 0, o.value);
       return { op: "remove", path: o.path, index: o.index };
     }
     case "remove": {
       const a = get(root, o.path);
-      if (!Array.isArray(a)) throw new Error(`nao e array: ${o.path.join(".")}`);
+      if (!Array.isArray(a)) throw new Error(`não é array: ${o.path.join(".")}`);
       const [v] = a.splice(o.index, 1);
       return { op: "insert", path: o.path, index: o.index, value: v };
     }
     case "rename": {
       const obj = get(root, o.path);
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) throw new Error(`nao e objeto: ${o.path.join(".")}`);
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) throw new Error(`não é objeto: ${o.path.join(".")}`);
       if (!(o.from in obj)) throw new Error(`chave inexistente: ${o.from}`);
-      if (o.to in obj) throw new Error(`chave ja existe: ${o.to}`);
+      if (o.to in obj) throw new Error(`chave já existe: ${o.to}`);
       // recria as chaves na mesma ordem, trocando so o nome (filhos mantem identidade)
       const entries = Object.entries(obj);
       for (const [k] of entries) delete obj[k];

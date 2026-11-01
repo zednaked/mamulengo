@@ -25,7 +25,7 @@ defineCommand({
   label: (p) => `renomeia osso ${p.bone} -> ${p.to}`,
   run({ e }, p) {
     const i = requireBone(e.json, p.bone);
-    if (boneIndex(e.json, p.to) >= 0) throw new Error(`osso ja existe: ${p.to}`);
+    if (boneIndex(e.json, p.to) >= 0) throw new Error(`osso já existe: ${p.to}`);
     e.set(["bones", i, "name"], p.to);
     bones(e.json).forEach((b, k) => b.parent === p.bone && e.set(["bones", k, "parent"], p.to));
     slots(e.json).forEach((s, k) => s.bone === p.bone && e.set(["slots", k, "bone"], p.to));
@@ -72,7 +72,7 @@ function remapWeights(e: Editor, removed: Set<number>, force: boolean) {
           const kept = list.filter((x) => map[x[0]] >= 0);
           if (kept.length !== list.length) {
             if (!force) throw new Error(`a malha ${slot}/${name} tem pesos em osso removido; use force=true para redistribuir`);
-            if (!kept.length) throw new Error(`um vertice de ${slot}/${name} depende so de ossos removidos`);
+            if (!kept.length) throw new Error(`um vértice de ${slot}/${name} depende só de ossos removidos`);
             const s = kept.reduce((t, x) => t + x[3], 0);
             kept.forEach((x) => (x[3] = x[3] / s));
           }
@@ -98,7 +98,7 @@ defineCommand({
   run(ctx, p) {
     const { e } = ctx;
     requireBone(e.json, p.bone);
-    if (!bones(e.json)[0] || bones(e.json)[0].name === p.bone) throw new Error("o osso raiz nao pode ser apagado");
+    if (!bones(e.json)[0] || bones(e.json)[0].name === p.bone) throw new Error("o osso raiz não pode ser apagado");
     const dead = new Set([p.bone, ...descendants(e.json, p.bone)]);
     // slots presos nos ossos que somem
     for (const s of slots(e.json).filter((x) => dead.has(x.bone))) ctx.run("slot.delete", { slot: s.name });
@@ -137,7 +137,7 @@ defineCommand({
   label: (p) => `renomeia slot ${p.slot} -> ${p.to}`,
   run({ e }, p) {
     const i = requireSlot(e.json, p.slot);
-    if (slots(e.json).some((s) => s.name === p.to)) throw new Error(`slot ja existe: ${p.to}`);
+    if (slots(e.json).some((s) => s.name === p.to)) throw new Error(`slot já existe: ${p.to}`);
     e.set(["slots", i, "name"], p.to);
     skins(e.json).forEach((s, si) => {
       renameKey(e, ["skins", si, "attachments"], p.slot, p.to);
@@ -177,7 +177,7 @@ defineCommand({
     for (const s of skins(e.json))
       for (const [slot, atts] of Object.entries<any>(s.attachments ?? {}))
         for (const [name, a] of Object.entries<any>(atts))
-          if (a.type === "clipping" && a.end === p.slot && slot !== p.slot) throw new Error(`a mascara ${slot}/${name} termina neste slot; mude o end antes`);
+          if (a.type === "clipping" && a.end === p.slot && slot !== p.slot) throw new Error(`a máscara ${slot}/${name} termina neste slot; mude o end antes`);
     for (const { c, type } of allC(e)) if (type === "path" && (c.slot ?? c.target) === p.slot) ctx.run("constraint.delete", { name: c.name });
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("particles.delete", { name: em.name });
     for (const x of ((e.json as any).instances ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("instance.delete", { name: x.name });
@@ -213,7 +213,7 @@ defineCommand({
     skins(e.json).forEach((s, si) => {
       const atts = s.attachments?.[p.slot];
       if (atts?.[p.from]) {
-        if (atts[p.to]) throw new Error(`ja existe ${p.slot}/${p.to} na skin ${s.name}`);
+        if (atts[p.to]) throw new Error(`já existe ${p.slot}/${p.to} na skin ${s.name}`);
         found = true;
         // sem "path", a imagem vinha do nome antigo: fixa o path para continuar a mesma
         if (!atts[p.from].path && (atts[p.from].type ?? "region") !== "clipping") e.set(["skins", si, "attachments", p.slot, p.from, "path"], p.from);
@@ -223,7 +223,7 @@ defineCommand({
         for (const [name, a] of Object.entries<any>(list))
           if (a.type === "linkedmesh" && a.source === p.from && (a.slot ?? slot) === p.slot) e.set(["skins", si, "attachments", slot, name, "source"], p.to);
     });
-    if (!found) throw new Error(`attachment nao existe: ${p.slot}/${p.from}`);
+    if (!found) throw new Error(`attachment não existe: ${p.slot}/${p.from}`);
     if (slots(e.json)[i].attachment === p.from) e.set(["slots", i, "attachment"], p.to);
     for (const [an, a] of anims(e)) {
       (a.slots?.[p.slot]?.attachment ?? []).forEach((k: any, ki: number) => k.name === p.from && e.set(["animations", an, "slots", p.slot, "attachment", ki, "name"], p.to));
@@ -241,8 +241,8 @@ defineCommand({
   label: (p) => `renomeia constraint ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const c = allC(e).find((x) => x.c.name === p.name);
-    if (!c) throw new Error(`constraint nao existe: ${p.name}`);
-    if (allC(e).some((x) => x.c.name === p.to)) throw new Error(`ja existe: ${p.to}`);
+    if (!c) throw new Error(`constraint não existe: ${p.name}`);
+    if (allC(e).some((x) => x.c.name === p.to)) throw new Error(`já existe: ${p.to}`);
     e.set([...c.path, "name"], p.to);
     for (const [an] of anims(e)) renameKey(e, ["animations", an, c.type], p.name, p.to);
     skins(e.json).forEach((s, si) => {
@@ -264,8 +264,8 @@ defineCommand({
   params: z.object({ name: z.string(), to: z.string().min(1) }),
   label: (p) => `renomeia evento ${p.name} -> ${p.to}`,
   run({ e }, p) {
-    if (!e.json.events?.[p.name]) throw new Error(`evento nao existe: ${p.name}`);
-    if (e.json.events[p.to]) throw new Error(`ja existe: ${p.to}`);
+    if (!e.json.events?.[p.name]) throw new Error(`evento não existe: ${p.name}`);
+    if (e.json.events[p.to]) throw new Error(`já existe: ${p.to}`);
     e.apply({ op: "rename", path: ["events"], from: p.name, to: p.to });
     for (const [an, a] of anims(e)) (a.events ?? []).forEach((k: any, ki: number) => k.name === p.name && e.set(["animations", an, "events", ki, "name"], p.to));
     return { renamed: p.to };
@@ -280,7 +280,7 @@ defineCommand({
   label: (p) => `renomeia skin ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const i = requireSkin(e.json, p.name);
-    if (skins(e.json).some((s) => s.name === p.to)) throw new Error(`skin ja existe: ${p.to}`);
+    if (skins(e.json).some((s) => s.name === p.to)) throw new Error(`skin já existe: ${p.to}`);
     e.set(["skins", i, "name"], p.to);
     for (const [an] of anims(e)) renameKey(e, ["animations", an, "attachments"], p.name, p.to);
     skins(e.json).forEach((s, si) => {

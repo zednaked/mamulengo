@@ -40,11 +40,11 @@ export function suggestDir(name: string): string {
 }
 
 export async function createFromPsd(p: { psd: string; dir: string; name: string; ignoreHidden?: boolean }): Promise<PsdImportResult> {
-  if (app.doc?.dirty) throw new Error(`o personagem aberto (${app.asset?.name}) tem alteracoes nao salvas. Salve ou descarte antes.`);
+  if (app.doc?.dirty) throw new Error(`${app.asset?.name} tem alterações não salvas. Salve (Ctrl+S) ou descarte antes de importar.`);
   const j = await post("/api/psd/create", p);
   await app.loadAssets(true);
   const a = app.assets.find((x) => x.tres === j.tres);
-  if (!a) throw new Error(`personagem criado, mas a pasta nao esta nas raizes do Mamulengo (MAMULENGO_ROOTS): ${j.tres}`);
+  if (!a) throw new Error(`Personagem criado em ${j.tres}, mas essa pasta não está entre as que o editor procura. Crie dentro de uma delas, ou acrescente a pasta em MAMULENGO_ROOTS e reinicie o editor.`);
   await app.open(a);
   app.viewer?.frameAll();
   app.log({ label: `PSD: personagem ${a.name} criado (${j.report.added.length} imagens)`, source: "ui", kind: "info", ops: 0 });
@@ -60,15 +60,15 @@ function meshImages(json: any): string[] {
 
 export async function updateFromPsd(p: { psd: string; ignoreHidden?: boolean }, source = "ui"): Promise<PsdImportResult> {
   const doc = app.doc;
-  if (!doc?.file.atlas) throw new Error("nenhum personagem aberto");
+  if (!doc?.file.atlas) throw new Error("Abra um personagem primeiro.");
   // o atlas e as imagens mudam no disco: o esqueleto e salvo junto para nao ficar desencontrado
-  if (doc.dirty) throw new Error(`o personagem aberto (${app.asset?.name}) tem alteracoes nao salvas. Salve ou descarte antes de atualizar pelo PSD.`);
+  if (doc.dirty) throw new Error(`${app.asset?.name} tem alterações não salvas. Salve (Ctrl+S) ou descarte antes de atualizar pelo PSD.`);
   const j = await post("/api/psd/update", { psd: p.psd, atlas: doc.file.atlas, meshImages: meshImages(doc.json), ignoreHidden: p.ignoreHidden });
   await app.reloadAtlas(j.atlasText);
   const { calls, report } = psdCalls(doc.json, j.plan);
   if (calls.length) {
     const r = await app.runAsync(calls, `PSD ${j.plan.file}`, source);
-    if (!r) throw new Error("nao consegui aplicar o PSD (veja a atividade)");
+    if (!r) throw new Error("Não consegui aplicar o PSD: o motivo está na Atividade, no painel da direita.");
     for (const x of r) if (x?.warnings?.length) report.warnings.push(...x.warnings);
   }
   const changed = calls.length > 0 || report.repainted.length > 0;

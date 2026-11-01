@@ -87,6 +87,9 @@ export function runtimeDe(asset: AssetInfo): Runtime {
 
 class AppState {
   assets = $state<AssetInfo[]>([]);
+  // as pastas onde o editor procura personagens (MAMULENGO_ROOTS) e se a lista ja chegou
+  roots = $state<string[]>([]);
+  assetsLidos = $state(false);
   asset = $state<AssetInfo | null>(null);
   doc = $state.raw<Document | null>(null);
   // incrementa a cada mudanca do documento: componentes derivam dele
@@ -168,12 +171,18 @@ class AppState {
   }
 
   async loadAssets(refresh = false) {
-    const r = await fetch("/api/assets" + (refresh ? "?refresh=1" : ""));
+    const [r, raizes] = await Promise.all([fetch("/api/assets" + (refresh ? "?refresh=1" : "")), fetch("/api/roots").then((x) => x.json()).catch(() => [])]);
     this.assets = await r.json();
+    this.roots = raizes;
+    this.assetsLidos = true;
   }
+
+  // o nome do personagem que esta abrindo (o desenho mostra enquanto carrega)
+  abrindo = $state<string | null>(null);
 
   async open(asset: AssetInfo) {
     this.loading = true;
+    this.abrindo = asset.name;
     this.error = null;
     // o que estava escondido era de outro personagem
     this.hidden = { bones: [], slots: [] };
@@ -198,6 +207,14 @@ class AppState {
       this.log({ label: `abriu ${asset.project} / ${asset.name}`, source: "ui", kind: "info", ops: 0 });
       const d = await getDraft(asset.id);
       this.draft = d && d.base === sk && d.text !== sk ? { ...d, id: asset.id } : null;
+      // o arquivo no disco e o mesmo de quando o rascunho comecou: volta sozinho (era o trabalho
+      // nao salvo de quem estava aqui, perdido num recarregar), desfazivel. Perguntar sem dizer o
+      // que era confundia no teste acompanhado
+      if (this.draft) {
+        const quando = new Date(this.draft.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        await this.restoreDraft();
+        this.avisar(`Recuperei as alterações não salvas de ${quando} em ${asset.name} (Ctrl+Z desfaz).`);
+      }
       if (d && d.base !== sk) dropDraft(asset.id);
       try {
         localStorage.setItem("mamulengo.last", asset.id);
@@ -206,8 +223,10 @@ class AppState {
       await this.loadNotes();
     } catch (e: any) {
       this.error = String(e?.message ?? e);
+      this.toast(`Não consegui abrir ${asset.name}: ${this.error}`);
       throw e;
     } finally {
+      this.abrindo = null;
       this.loading = false;
     }
   }
@@ -319,8 +338,8 @@ class AppState {
   async entrarInstancia(nome: string) {
     const doc = this.doc;
     const inst = ((doc?.json as any)?.instances ?? []).find((x: any) => x.name === nome);
-    if (!doc || !inst || !this.asset) return this.toast(`instancia nao existe: ${nome}`);
-    if (doc.dirty) return this.toast("salve antes de entrar na instancia (o pai le o filho do disco ao voltar)");
+    if (!doc || !inst || !this.asset) return this.toast(`A instância ${nome} não existe.`);
+    if (doc.dirty) return this.toast("Salve (Ctrl+S) antes de entrar na instância: ao voltar, o personagem relê o filho do disco.");
     const base = doc.file.tres ?? "";
     const partes: string[] = [];
     for (const x of (base.slice(0, base.lastIndexOf("/") + 1) + inst.boneco).split("/")) {
@@ -333,7 +352,7 @@ class AppState {
       await this.loadAssets(true);
       filho = this.assets.find((a) => a.tres === caminho);
     }
-    if (!filho) return this.toast(`o filho ${inst.boneco} nao esta entre os personagens abertos pelo editor (fora das raizes?)`);
+    if (!filho) return this.toast(`Não achei ${inst.boneco} entre os personagens do editor: ele está fora das pastas que o editor procura (MAMULENGO_ROOTS)?`);
     const v = this.viewer;
     this.pilhaInstancias = [...this.pilhaInstancias, { asset: this.asset, animation: v?.view.animation ?? null, time: v?.view.time ?? 0, instance: nome }];
     await this.open(filho);
@@ -343,7 +362,7 @@ class AppState {
   async voltarInstancia() {
     const topo = this.pilhaInstancias[this.pilhaInstancias.length - 1];
     if (!topo) return;
-    if (this.doc?.dirty) return this.toast("salve antes de voltar (o pai le este arquivo do disco)");
+    if (this.doc?.dirty) return this.toast("Salve (Ctrl+S) antes de voltar: o personagem de cima relê este arquivo do disco.");
     this.pilhaInstancias = this.pilhaInstancias.slice(0, -1);
     await this.open(topo.asset);
     const v = this.viewer;
@@ -359,10 +378,10 @@ class AppState {
     const dir = this.doc?.file.tres ? this.doc.file.tres.slice(0, this.doc.file.tres.lastIndexOf("/") + 1) : null;
     const novos = (results ?? []).map((r) => r?.arquivo).filter((a) => a?.caminho && typeof a.texto === "string");
     if (!novos.length) return;
-    if (!dir) throw new Error("o documento nao tem pasta (salve antes): o arquivo do filho nao foi gravado");
+    if (!dir) throw new Error("Salve o personagem antes: sem uma pasta, o arquivo do filho não tem onde ser gravado.");
     for (const a of novos) {
       const r = await fetch(fileUrl(dir + a.caminho), { method: "PUT", body: a.texto, headers: { "x-mamulengo-source": "comando" } });
-      if (!r.ok) throw new Error(`nao gravei ${a.caminho}: ${(await r.json()).error}`);
+      if (!r.ok) throw new Error(`Não consegui gravar ${a.caminho}: ${(await r.json()).error}`);
     }
     this.viewer?.recarregarInstancias();
   }
@@ -395,7 +414,7 @@ class AppState {
 
   async save(source = "ui"): Promise<{ bytes: number; version?: string }> {
     const doc = this.doc;
-    if (!doc?.file.skeleton) throw new Error("nada aberto");
+    if (!doc?.file.skeleton) throw new Error("Abra um personagem primeiro.");
     const text = doc.serialize();
     // o servidor guarda cada gravacao como versao; source diz quem gravou
     const r = await fetch(fileUrl(doc.file.skeleton), { method: "PUT", body: text, headers: { "x-mamulengo-source": source } });
@@ -443,7 +462,10 @@ class AppState {
       const next = cur.slice();
       next.splice(i, 1);
       next.splice(to, 0, slot);
-      return !!this.run({ cmd: "draworder.key", args: { anim: this.play.animation, time: +this.play.time.toFixed(4), order: next } }, `ordem de ${slot}`);
+      const t = +this.play.time.toFixed(4);
+      const ok = !!this.run({ cmd: "draworder.key", args: { anim: this.play.animation, time: t, order: next } }, `ordem de ${slot}`);
+      if (ok) this.avisar(`${slot} mudou de lugar só em ${this.play.animation}, a partir de ${t.toFixed(2)}s (uma chave de ordem). Para todas as animações, faça na Pose base.`);
+      return ok;
     }
     return !!this.run({ cmd: "slot.order", args: { slot, index: to } }, `ordem de ${slot}`);
   }
@@ -584,7 +606,7 @@ class AppState {
   }
 
   async noteAction(action: Record<string, any>) {
-    if (!this.asset) throw new Error("nenhum personagem aberto");
+    if (!this.asset) throw new Error("Abra um personagem primeiro.");
     const r = await fetch("/api/notes", { method: "POST", body: JSON.stringify({ skeleton: this.asset.skeleton, ...action }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error);
@@ -611,7 +633,7 @@ class AppState {
 
   // marca uma versao com nome; o que nao foi salvo e salvo antes (versao = o que esta no disco)
   async markVersion(label: string, source = "ui") {
-    if (!this.asset || !this.doc) throw new Error("nenhum personagem aberto");
+    if (!this.asset || !this.doc) throw new Error("Abra um personagem primeiro.");
     if (this.doc.dirty) await this.save(source);
     const r = await fetch("/api/versions", { method: "POST", body: JSON.stringify({ skeleton: this.asset.skeleton, label, source }) });
     const j = await r.json();
@@ -622,7 +644,7 @@ class AppState {
   }
 
   async diffVersion(id: string, against?: string) {
-    if (!this.asset) throw new Error("nenhum personagem aberto");
+    if (!this.asset) throw new Error("Abra um personagem primeiro.");
     const q = new URLSearchParams({ skeleton: this.asset.skeleton, id, ...(against ? { against } : {}) });
     const r = await fetch(`/api/versions/diff?${q}`);
     const j = await r.json();
@@ -632,7 +654,7 @@ class AppState {
 
   // restaura no disco (o estado atual vira versao antes) e reabre o personagem
   async restoreVersion(id: string, source = "ui") {
-    if (!this.asset || !this.doc) throw new Error("nenhum personagem aberto");
+    if (!this.asset || !this.doc) throw new Error("Abra um personagem primeiro.");
     if (this.doc.dirty) await this.save(source);
     const asset = this.asset;
     const r = await fetch("/api/versions/restore", { method: "POST", body: JSON.stringify({ skeleton: asset.skeleton, id, source }) });
@@ -667,16 +689,22 @@ class AppState {
 
   // rascunho com o contexto do jogo, do documento como esta agora
   async draftFicha(): Promise<string> {
-    if (!this.doc || !this.asset) throw new Error("nenhum personagem aberto");
+    if (!this.doc || !this.asset) throw new Error("Abra um personagem primeiro.");
     const r = await fetch("/api/ficha/draft", { method: "POST", body: JSON.stringify({ json: this.doc.json, skeleton: this.asset.skeleton, name: this.asset.name }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `nao gerou o rascunho (${r.status})`);
     return r.text();
   }
 
-  toastMsg = $state<{ text: string; at: number } | null>(null);
+  toastMsg = $state<{ text: string; at: number; ok?: boolean } | null>(null);
   toast(text: string) {
+    // as mensagens dos comandos comecam em minuscula (servem tambem ao MCP): na tela, maiuscula
+    text = text.charAt(0).toUpperCase() + text.slice(1);
     this.toastMsg = { text, at: Date.now() };
     this.log({ label: text, source: "ui", kind: "error", ops: 0 });
+  }
+  // o mesmo aviso, em verde: uma acao que deu certo e o que fazer em seguida
+  avisar(text: string) {
+    this.toastMsg = { text, at: Date.now(), ok: true };
   }
 }
 

@@ -12,7 +12,7 @@ import { parseAtlas } from "../atlas-text.ts";
 export const instances = (json: any): any[] => json.instances ?? [];
 export function requireInstance(json: any, name: string): number {
   const i = instances(json).findIndex((x) => x.name === name);
-  if (i < 0) throw new Error(`instancia nao existe: "${name}". Instancias: ${instances(json).map((x) => x.name).join(", ") || "(nenhuma)"}`);
+  if (i < 0) throw new Error(`instância não existe: "${name}". Instâncias: ${instances(json).map((x) => x.name).join(", ") || "(nenhuma)"}`);
   return i;
 }
 
@@ -42,7 +42,7 @@ defineCommand({
   run({ e }, p) {
     const lista = instances(e.json);
     const i = lista.findIndex((x) => x.name === p.name);
-    if (i < 0 && (!p.slot || !p.boneco)) throw new Error("instancia nova: diga slot e boneco");
+    if (i < 0 && (!p.slot || !p.boneco)) throw new Error("instância nova: diga slot e boneco");
     if (p.slot) requireSlot(e.json, p.slot);
     if (p.bone) requireBone(e.json, p.bone);
     const novo: Record<string, any> = { ...(i >= 0 ? lista[i] : { name: p.name }) };
@@ -89,7 +89,7 @@ defineCommand({
   label: (p) => `renomeia instancia ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const i = requireInstance(e.json, p.name);
-    if (instances(e.json).some((x) => x.name === p.to)) throw new Error(`instancia ja existe: ${p.to}`);
+    if (instances(e.json).some((x) => x.name === p.to)) throw new Error(`instância já existe: ${p.to}`);
     e.set(["instances", i, "name"], p.to);
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
       if (a.instances?.[p.name]) e.apply({ op: "rename", path: ["animations", an, "instances"], from: p.name, to: p.to });
@@ -143,23 +143,23 @@ defineCommand({
     requireBone(json, p.bone);
     const ossos: any[] = json.bones;
     const raiz = ossos.find((b) => b.name === p.bone);
-    if (!raiz.parent) throw new Error("o osso raiz nao pode ser extraido: escolha um osso abaixo dele");
+    if (!raiz.parent) throw new Error("o osso raiz não pode ser extraido: escolha um osso abaixo dele");
     const nome = p.name ?? p.bone;
-    if (instances(json).some((x) => x.name === nome)) throw new Error(`instancia ja existe: ${nome}`);
+    if (instances(json).some((x) => x.name === nome)) throw new Error(`instância já existe: ${nome}`);
     // a subarvore, na ordem do arquivo (o pai antes dos filhos)
     const dentro = new Set<string>([p.bone]);
     for (const b of ossos) if (b.parent && dentro.has(b.parent)) dentro.add(b.name);
     const slotsDentro = new Set<string>((json.slots ?? []).filter((s: any) => dentro.has(s.bone)).map((s: any) => s.name));
     const dentroOuSlot = (x: string) => dentro.has(x) || slotsDentro.has(x);
     // o slot da instancia: o nome pode ser o de um slot que sai junto
-    if ((json.slots ?? []).some((s: any) => s.name === nome && !slotsDentro.has(s.name))) throw new Error(`ja existe um slot ${nome}: de outro nome a instancia (name)`);
+    if ((json.slots ?? []).some((s: any) => s.name === nome && !slotsDentro.has(s.name))) throw new Error(`já existe um slot ${nome}: de outro nome a instância (name)`);
     // o que liga dentro e fora
     // as restricoes (no 4.3 numa lista so, `constraints`; nas antigas, uma lista por tipo)
     const movidas: { c: any; path: (string | number)[] }[] = [];
     for (const { c, path } of constraints(json)) {
       const usa = usaDe(c);
       const n = usa.filter(dentroOuSlot).length;
-      if (n && n < usa.length) throw new Error(`a restricao ${c.name} liga ossos de dentro e de fora de ${p.bone}`);
+      if (n && n < usa.length) throw new Error(`a restrição ${c.name} liga ossos de dentro e de fora de ${p.bone}`);
       if (n) movidas.push({ c, path });
     }
     const particulas = (json.particles ?? []).filter((x: any) => dentro.has(x.bone) || slotsDentro.has(x.slot));
@@ -168,7 +168,7 @@ defineCommand({
         throw new Error(`o emissor ${x.name} liga partes de dentro e de fora de ${p.bone}`);
     for (const l of json.lights ?? []) if (dentro.has(l.bone)) throw new Error(`a luz ${l.name} esta presa em ${l.bone}: mova a luz para fora antes (as luzes ficam na cena)`);
     const filhas = instances(json).filter((x) => slotsDentro.has(x.slot));
-    for (const x of filhas) if (x.bone && !dentro.has(x.bone)) throw new Error(`a instancia ${x.name} liga partes de dentro e de fora de ${p.bone}`);
+    for (const x of filhas) if (x.bone && !dentro.has(x.bone)) throw new Error(`a instância ${x.name} liga partes de dentro e de fora de ${p.bone}`);
     const indice = new Map<string, number>(ossos.map((b, i) => [b.name, i]));
     const novoIndice = new Map<number, number>();
     [...dentro].forEach((b, k) => novoIndice.set(indice.get(b)!, k));
@@ -299,13 +299,13 @@ defineCommand({
   label: (p) => `embute ${p.name}`,
   async prepare({ doc, assets }, p) {
     const inst = instances(doc.json).find((x) => x.name === p.name);
-    if (!inst) throw new Error(`instancia nao existe: "${p.name}"`);
+    if (!inst) throw new Error(`instância não existe: "${p.name}"`);
     const base = doc.file.tres ?? doc.file.skeleton;
-    if (!base) throw new Error("o documento nao tem arquivo: nao ha onde achar o filho");
-    if (!assets?.text) throw new Error("este ambiente nao le arquivos (o editor e as ferramentas leem)");
+    if (!base) throw new Error("o documento não tem arquivo: não há onde achar o filho");
+    if (!assets?.text) throw new Error("este ambiente não le arquivos (o editor e as ferramentas leem)");
     const caminho = normaliza(pasta(base) + inst.boneco);
     const texto = await assets.text(caminho);
-    if (texto === null) throw new Error(`nao achei ${caminho}`);
+    if (texto === null) throw new Error(`não achei ${caminho}`);
     return { texto };
   },
   run(ctx, p) {
@@ -320,11 +320,11 @@ defineCommand({
     const prefixo = pasta(inst.boneco);
     const nossas = parseAtlas(ctx.doc.atlas.text);
     for (const pg of parseAtlas(fAtlas).pages)
-      if (!nossas.pages.some((x) => x.name === normaliza(prefixo + pg.name))) throw new Error(`a pagina ${pg.name} do filho nao esta no atlas deste (embuta so filhos com as mesmas paginas)`);
-    for (const r of parseAtlas(fAtlas).regions) if (!nossas.regions.some((x) => x.name === r.name)) throw new Error(`a regiao ${r.name} do filho nao esta no atlas deste`);
+      if (!nossas.pages.some((x) => x.name === normaliza(prefixo + pg.name))) throw new Error(`a página ${pg.name} do filho não esta no atlas deste (embuta só filhos com as mesmas páginas)`);
+    for (const r of parseAtlas(fAtlas).regions) if (!nossas.regions.some((x) => x.name === r.name)) throw new Error(`a regiao ${r.name} do filho não esta no atlas deste`);
     // nomes que ja existem aqui (o slot da instancia sai)
     const choca = (lista: any[] | undefined, nomes: any[] | undefined, oQue: string, fora?: string) => {
-      for (const x of nomes ?? []) if ((lista ?? []).some((y: any) => y.name === x.name && y.name !== fora)) throw new Error(`${oQue} ${x.name} do filho ja existe aqui: renomeie antes de embutir`);
+      for (const x of nomes ?? []) if ((lista ?? []).some((y: any) => y.name === x.name && y.name !== fora)) throw new Error(`${oQue} ${x.name} do filho já existe aqui: renomeie antes de embutir`);
     };
     choca(json.bones, f.bones, "o osso");
     choca(json.slots, f.slots, "o slot", inst.slot);
@@ -335,23 +335,23 @@ defineCommand({
     // velocidade 1 (as chaves seguintes so podem continuar a mesma)
     const plano: [string, string][] = [];
     if (inst.animation && Object.values<any>(json.animations ?? {}).some((a) => !a.instances?.[p.name]))
-      throw new Error("a instancia toca uma animacao pelo relogio fora das chaves: nao da para copiar exato");
+      throw new Error("a instância toca uma animação pelo relogio fora das chaves: não da para copiar exato");
     for (const [an, a] of Object.entries<any>(json.animations ?? {})) {
       const ks: any[] = a.instances?.[p.name] ?? [];
       if (!ks.length) continue;
       const fa = ks[0].animation ?? inst.animation;
       const ok = (ks[0].time ?? 0) === 0 && (ks[0].start ?? inst.start ?? 0) === 0 && (ks[0].speed ?? inst.speed ?? 1) === 1 && ks.every((k) => (k.animation ?? fa) === fa && (k.speed ?? 1) === 1 && Math.abs((k.start ?? 0) - (k.time ?? 0)) < 1e-6);
-      if (!ok) throw new Error(`animacao ${an}: a instancia nao toca uma animacao do filho desde o 0 na velocidade 1`);
+      if (!ok) throw new Error(`animação ${an}: a instância não toca uma animação do filho desde o 0 na velocidade 1`);
       if (!fa) continue;
-      if (!f.animations?.[fa]) throw new Error(`animacao ${an}: o filho nao tem a animacao ${fa}`);
+      if (!f.animations?.[fa]) throw new Error(`animação ${an}: o filho não tem a animação ${fa}`);
       const repete = (ks[ks.length - 1].loop ?? inst.loop ?? true) !== false;
-      if (repete && duracao(a) > duracao(f.animations[fa]) + 1e-6) throw new Error(`animacao ${an}: a instancia repete ${fa}, mais curta que ${an}`);
+      if (repete && duracao(a) > duracao(f.animations[fa]) + 1e-6) throw new Error(`animação ${an}: a instância repete ${fa}, mais curta que ${an}`);
       plano.push([an, fa]);
     }
     // ---- os ossos: os raiz do filho sob o osso da instancia (ou sob uma ponte com a posicao dela)
     const ossoInst = inst.bone ?? json.slots.find((s: any) => s.name === inst.slot).bone;
     const ponte = ["x", "y", "rotation"].some((k) => (inst[k] ?? 0) !== 0) || (inst.scaleX ?? 1) !== 1 || (inst.scaleY ?? 1) !== 1;
-    if (ponte && json.bones.some((b: any) => b.name === p.name)) throw new Error(`a instancia tem posicao e ja existe um osso ${p.name} para a ponte`);
+    if (ponte && json.bones.some((b: any) => b.name === p.name)) throw new Error(`a instância tem posição e já existe um osso ${p.name} para a ponte`);
     const ossos = [...json.bones];
     if (ponte) ossos.push({ name: p.name, parent: ossoInst, ...Object.fromEntries(["x", "y", "rotation", "scaleX", "scaleY"].filter((k) => inst[k] !== undefined).map((k) => [k, inst[k]])) });
     const desloc = ossos.length;

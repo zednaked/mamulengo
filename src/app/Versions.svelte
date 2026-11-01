@@ -70,12 +70,12 @@
     <p class="dim">Abra um personagem.</p>
   {:else}
     <div class="mark">
-      <input bind:value={label} placeholder="nome da versao (ex: aprovado pela direcao de arte)" onkeydown={(e) => e.key === "Enter" && mark()} />
+      <input bind:value={label} placeholder="nome da versão" title="Ex: aprovado pela direção de arte" onkeydown={(e) => e.key === "Enter" && mark()} />
       <button class="go" onclick={mark} disabled={busy || !label.trim()} title="Salva e guarda o estado atual com esse nome">Marcar</button>
     </div>
-    <p class="dim small">Cada vez que salva vira uma versao. Restaurar guarda o estado atual antes, entao da para voltar.</p>
+    <p class="dim small">Cada vez que salva vira uma versão. Restaurar guarda o estado atual antes, então da para voltar.</p>
     {#if !list.length}
-      <p class="dim">Nenhuma versao ainda: a primeira aparece quando salvar.</p>
+      <p class="dim">Nenhuma versão ainda: a primeira aparece quando salvar.</p>
     {/if}
     {#each list as v (v.id)}
       <div class="v" class:named={!!v.label}>
@@ -97,7 +97,7 @@
         </div>
         {#if diff?.id === v.id}
           <div class="diff">
-            <div class="dim small">desta versao para o atual:</div>
+            <div class="dim small">desta versão para o atual:</div>
             {#each diff?.changes ?? [] as c}<div>{c}</div>{/each}
           </div>
         {/if}

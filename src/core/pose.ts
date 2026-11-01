@@ -85,7 +85,7 @@ export interface Affine {
 
 export function boneWorld(sk: Quadro, name: string): Affine {
   const b = sk.findBone(name);
-  if (!b) throw new Error(`osso nao existe: ${name}`);
+  if (!b) throw new Error(`osso não existe: ${name}`);
   return { a: b.a, b: b.b, c: b.c, d: b.d, x: b.worldX, y: b.worldY };
 }
 

@@ -66,12 +66,12 @@
         <input type="checkbox" checked={me.stretch} onchange={(e) => set("stretch", (e.target as HTMLInputElement).checked)} /> Esticar a imagem junto
       </label>
       <button class="wide" disabled={me.vertex === null} onclick={deleteVertex}>🗑 Apagar ponto</button>
-      <div class="dim small">{info.world.length} pontos · {info.hull} no contorno · {info.triangles.length / 3} triangulos</div>
+      <div class="dim small">{info.world.length} pontos · {info.hull} no contorno · {info.triangles.length / 3} triângulos</div>
     {:else}
       <div class="lbl">Qual osso puxa esta parte?</div>
       <div class="bones">
         {#each boneList.main as b (b)}
-          <button class:on={me.bone === b} onclick={() => set("bone", b)} title="peso maximo na malha: {Math.round((reach[b] ?? 0) * 100)}%">
+          <button class:on={me.bone === b} onclick={() => set("bone", b)} title="peso máximo na malha: {Math.round((reach[b] ?? 0) * 100)}%">
             <span class="dot" style="opacity: {0.25 + 0.75 * (reach[b] ?? 0)}"></span>{b}
           </button>
         {/each}
@@ -86,11 +86,11 @@
         <button class:on={me.paint === "add"} onclick={() => set("paint", "add")}>➕ Somar</button>
         <button class:on={me.paint === "sub"} onclick={() => set("paint", "sub")}>➖ Tirar</button>
       </div>
-      <label class="row">forca <input type="range" min="0.05" max="1" step="0.05" value={me.strength} oninput={(e) => set("strength", +(e.target as HTMLInputElement).value)} /></label>
+      <label class="row">força <input type="range" min="0.05" max="1" step="0.05" value={me.strength} oninput={(e) => set("strength", +(e.target as HTMLInputElement).value)} /></label>
       <label class="row">pincel <input type="range" min="15" max="250" bind:value={app.brushRadius} /></label>
       <div class="legend"><span>0%</span><div class="ramp"></div><span>100%</span></div>
       {#if !info.weighted}
-        <div class="dim small">A malha ainda segue so o osso <b>{slotBone}</b>. Pinte outro osso para ela dobrar com ele.</div>
+        <div class="dim small">A malha ainda segue só o osso <b>{slotBone}</b>. Pinte outro osso para ela dobrar com ele.</div>
       {/if}
       <div class="dim small">Segure Shift para inverter (somar/tirar).</div>
     {/if}

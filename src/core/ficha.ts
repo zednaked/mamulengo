@@ -292,7 +292,7 @@ const range = (s: string): [number, number] => {
   const m = /^(-?[\d.]+)\.\.(-?[\d.]+)$/.exec(s);
   if (m) return [+m[1], +m[2]];
   if (/^-?[\d.]+$/.test(s)) return [+s, +s];
-  throw new Error(`faixa invalida: ${s} (use a..b ou um valor)`);
+  throw new Error(`faixa inválida: ${s} (use a..b ou um valor)`);
 };
 
 export interface RuleResult {

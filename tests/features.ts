@@ -237,7 +237,7 @@ runtimeOk("animacao com deform");
   } catch (e: any) {
     clash = e.message;
   }
-  check(/ja existe chave/.test(clash) && times(peito("6.colada")) === "0.7,0.9,1.2", "keys.move recusa cair em cima de outra chave");
+  check(/já existe chave/.test(clash) && times(peito("6.colada")) === "0.7,0.9,1.2", "keys.move recusa cair em cima de outra chave");
   // eventos e ordem de desenho tambem
   await run("event.create", { name: "passo" });
   await run("event.key", { anim: "6.colada", time: 0.5, name: "passo" });
@@ -409,6 +409,66 @@ runtimeOk("constraints");
     await run("slot.effect", { slot: s0, effect: "outline", off: true });
     check(renomeou && !doc.json.animations["t.efeito"].effects[s0].dissolve && doc.json.slots[0].effects === undefined, "efeitos: renomear o slot leva as timelines; key.delete e off limpam");
     await run("animation.delete", { name: "t.efeito" });
+  }
+  // atualizar a posicao de uma imagem nao regrava o tamanho dela com o do atlas (numa pagina em
+  // alta resolucao o atlas e maior que a peca e a imagem esticava)
+  {
+    const sk = doc.json.skins[0];
+    const [sl, atts] = Object.entries<any>(sk.attachments).find(([, a]) => Object.values<any>(a).some((x) => (x.type ?? "region") === "region"))!;
+    const [nome, att] = Object.entries<any>(atts).find(([, x]) => (x.type ?? "region") === "region")!;
+    const w0 = att.width;
+    await run("attachment.region", { slot: sl, name: nome, width: w0 / 3 });
+    await run("attachment.region", { slot: sl, name: nome, x: (att.x ?? 0) + 5 });
+    const depois = doc.json.skins[0].attachments[sl][nome];
+    check(Math.abs(depois.width - w0 / 3) < 1e-3, `attachment.region ao atualizar a posição mantém o tamanho guardado (${(w0 / 3).toFixed(1)}, não o do atlas ${w0})`);
+    await run("attachment.region", { slot: sl, name: nome, x: (att.x ?? 0) - 5, width: w0 });
+  }
+  // reordenar a setup com animacao que tem chave de ordem: a animacao continua igual na tela
+  {
+    const { decodeDrawOrder: dec } = await import("../src/core/commands/organize.ts");
+    const nomes = () => doc.json.slots.map((x: any) => x.name);
+    const n0 = nomes();
+    if (n0.length >= 3) {
+      await run("animation.create", { name: "t.ordem" });
+      const trocada = [...n0];
+      [trocada[0], trocada[1]] = [trocada[1], trocada[0]];
+      await run("draworder.key", { anim: "t.ordem", time: 0.2, order: trocada });
+      // uma chave sem offsets (a ordem de setup) em 0
+      await run("draworder.key", { anim: "t.ordem", time: 0, order: n0 });
+      const ordens = () => doc.json.animations["t.ordem"].drawOrder.map((k: any) => (k.offsets?.length ? dec(nomes(), k.offsets) : nomes()).join(","));
+      const antes = ordens();
+      const r = await run("slot.order", { slot: n0[n0.length - 1], index: 0 });
+      const depois = ordens();
+      check(r.drawOrderKeys === 2 && JSON.stringify(antes) === JSON.stringify(depois) && nomes()[0] === n0[n0.length - 1], `slot.order na Pose base com chaves de ordem: as ${r.drawOrderKeys} chaves continuam com a mesma ordem na tela`);
+      await run("slot.order", { slot: n0[n0.length - 1], index: n0.length - 1 });
+      await run("animation.delete", { name: "t.ordem" });
+    }
+  }
+  // laco: fechar copia a primeira chave depois do fim; vai e volta espelha chaves e curvas
+  {
+    const b = doc.json.bones[1].name;
+    const giro = (an: string, t: number) => {
+      const w = boneWorld(skeletonAt(doc.json, an, t, false), b);
+      return (Math.atan2(w.c, w.a) * 180) / Math.PI;
+    };
+    await run("animation.create", { name: "t.laco" });
+    await run("key.set", { anim: "t.laco", target: { bone: b }, timeline: "rotate", time: 0, value: 0, curve: "sai-rapido" });
+    await run("key.set", { anim: "t.laco", target: { bone: b }, timeline: "rotate", time: 0.5, value: 30 });
+    await run("key.set", { anim: "t.laco", target: { bone: b }, timeline: "translate", time: 0.25, x: 10, y: 0 });
+    await run("event.create", { name: "t_som" });
+    await run("event.key", { anim: "t.laco", time: 0.1, name: "t_som" });
+    await run("animation.duplicate", { name: "t.laco", to: "t.vaivem" });
+    const fecha = await run("anim.closeLoop", { anim: "t.laco" });
+    const rl = doc.json.animations["t.laco"].bones[b].rotate;
+    const vv = await run("anim.pingPong", { anim: "t.vaivem" });
+    const av = doc.json.animations["t.vaivem"];
+    const simetrico = [0.05, 0.15, 0.3, 0.45].every((t) => Math.abs(giro("t.vaivem", t) - giro("t.vaivem", 1 - t)) < 1e-3);
+    check(
+      Math.abs(fecha.at - 0.7666667) < 1e-6 && rl.length === 3 && (rl[2].value ?? 0) === 0 && rl[2].time === fecha.at && vv.duration === 1 && av.bones[b].rotate.length === 3 && av.bones[b].rotate[2].time === 1 && simetrico && av.events.length === 2 && Math.abs(av.events[1].time - 0.9) < 1e-6,
+      `laco: fechar poe a primeira chave em ${fecha.at}s; vai e volta dobra para ${vv.duration}s, simetrico no tempo (curva sai-rapido espelhada) e o evento volta em 0.9s`,
+    );
+    await run("animation.delete", { name: "t.laco" });
+    await run("animation.delete", { name: "t.vaivem" });
   }
   // camada de ajuste: setup e chave (matiz negativo), vai ao .boneco como "ajuste" em portugues
   {
@@ -793,9 +853,31 @@ runtimeOk("constraints");
   const r = V.restoreVersion({ skeleton: sk, atlas: at, id: v1.id, backup: (p: string) => backups.push(p) });
   const list = V.listVersions(sk);
   check(
-    !again.created && list.length === 4 && named.label === "antes do festa" && changes.some((c: string) => c.includes("animacoes novas: pula")) && changes.some((c: string) => c.includes("ossos novos: cabeca")) && JSON.parse(rf(sk, "utf8")).animations.pula === undefined && r.before.label?.startsWith("antes de restaurar") && backups.length >= 2,
+    !again.created && list.length === 4 && named.label === "antes do festa" && changes.some((c: string) => c.includes("animações novas: pula")) && changes.some((c: string) => c.includes("ossos novos: cabeca")) && JSON.parse(rf(sk, "utf8")).animations.pula === undefined && r.before.label?.startsWith("antes de restaurar") && backups.length >= 2,
     `versoes: ${list.length} guardadas (automatica sem duplicar), marcada, diff "${changes.join("; ")}", restaurar volta e guarda o atual`,
   );
+  // .boneco: o esqueleto e o atlas sao virtuais (server/boneco.ts); guardar, mudar e restaurar
+  {
+    const { copyFileSync: cp, existsSync: ex } = await import("node:fs");
+    const { gravarVirtual, lerVirtual } = await import("../server/boneco.ts");
+    const orig = new URL("./boneco/robo/", import.meta.url).pathname;
+    cp(orig + "robo.boneco", pj(tmp, "robo.boneco"));
+    cp(orig + "robo-hd.webp", pj(tmp, "robo-hd.webp"));
+    const bsk = pj(tmp, "robo.boneco.spine-json"),
+      bat = pj(tmp, "robo.boneco.atlas");
+    const ossos = () => JSON.parse(lerVirtual(bsk)!).bones.length;
+    const n0 = ossos();
+    const b1 = V.saveVersion({ skeleton: bsk, atlas: bat }).entry;
+    const j = JSON.parse(lerVirtual(bsk)!);
+    j.bones.push({ name: "osso_novo", parent: "root" });
+    gravarVirtual(bsk, Buffer.from(JSON.stringify(j)));
+    const b2 = V.saveVersion({ skeleton: bsk, atlas: bat, label: "com osso" });
+    const guardados: string[] = [];
+    const readBlob = V.readBlob;
+    V.restoreVersion({ skeleton: bsk, atlas: bat, id: b1.id, backup: (p: string) => guardados.push(p) });
+    const comOsso = JSON.parse(readBlob(b2.entry.skeleton).toString("utf8")).bones.length;
+    check(b2.created && comOsso === n0 + 1 && ossos() === n0 && V.listVersions(bsk).length === 3 && guardados.includes(pj(tmp, "robo.boneco")) && ex(pj(tmp, "robo.boneco")), `versoes de um .boneco: guarda, marca e restaura (${n0} ossos de volta, copia de seguranca do .boneco)`);
+  }
   delete process.env.MAMULENGO_VERSIONS;
 }
 
@@ -1582,6 +1664,18 @@ runtimeOk("remocoes (slot, osso com pesos)");
     const q = worldQuad(adoc.json, r.atlasText).get("chapeu/chapeu")!;
     const c = [(q[0][0] + q[2][0]) / 2, (q[0][1] + q[2][1]) / 2];
     check(!!r.report.shift && Math.abs(r.report.shift[0] - 30) < 0.01 && Math.hypot(c[0] - want[0] - 30, c[1] - want[1]) < 0.01, `PSD sem registro: camada nova alinhada pelas imagens existentes (desvio inferido ${r.report.shift})`);
+  }
+  // fora de um projeto Godot o PSD vira um .boneco, com o mesmo esqueleto do caminho Godot
+  {
+    const { mkdtempSync: mk, rmSync: rm, existsSync: ex } = await import("node:fs");
+    const { lerVirtual } = await import("../server/boneco.ts");
+    const solta = mk(join(tmpdir(), "psd-boneco-"));
+    const b = await createFromPsd({ psd: join(PSD, "aventureiro.psd"), dir: join(solta, "heroi"), name: "heroi" });
+    const sj = JSON.parse(lerVirtual(b.skeleton)!);
+    const gj = JSON.parse(readFileSync(made.skeleton, "utf8"));
+    const nomes = (j: any) => j.bones.map((x: any) => x.name).join(",");
+    check(b.tres.endsWith("heroi.boneco") && ex(b.tres) && nomes(sj) === nomes(gj) && sj.slots.length === gj.slots.length && !ex(join(solta, "heroi", "heroi-data.tres")), `PSD fora de projeto Godot vira .boneco (${sj.bones.length} ossos, ${sj.slots.length} partes, iguais ao caminho Godot)`);
+    rm(solta, { recursive: true, force: true });
   }
   // plano so de leitura: PSD com camadas que viram a mesma imagem e recusado com explicacao
   check(readPsdPlan(readFileSync(join(PSD, "aventureiro.psd")), "x.psd").plan.pieces.length === plan1.pieces.length, "PSD: leitura sem gravar nada (readPsdPlan)");

@@ -125,6 +125,14 @@ a ribalta iluminam um pano de chita por camadas. Uns 32 µs de pose por quadro.*
 vagalume dá a volta no zumbi pela frente e por trás; a luz dele segue a
 profundidade (rosto, lado rasante, contraluz) num relevo calculado da própria arte.*
 
+![Um campo à noite: o nome e a marionete do Mamulengo abrem a cena, a vista desce para morros, árvores e uma casa; um disco voador rosa abduz um robô com um feixe, foge, e o nome e a marionete fecham o laço](exemplos/abducao/abducao.webp)
+
+*[exemplos/abducao](exemplos/abducao): uma abdução à noite entre a abertura e o
+fechamento do nome, com dois packs CC0 da Kenney. Nove camadas de paralaxe andam
+pela profundidade delas (a descida da vista, o passeio da câmera e os tremores), o
+disco é rigado a partir do SVG, o feixe acende o chão e curva as árvores, e o robô
+sobe girando para dentro dele.*
+
 ![Uma fase de plataforma: o robô pula entre plataformas, pega moedas, pisa num inimigo alado que se dissolve e voa com um propulsor](exemplos/jogo/jogo.gif)
 
 *[exemplos/jogo](exemplos/jogo): uma tela de jogo inteira num `.boneco`, com

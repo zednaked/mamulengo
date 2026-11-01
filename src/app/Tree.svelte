@@ -5,7 +5,9 @@
   let filter = $state("");
   let collapsed = $state<Record<string, boolean>>({});
 
-  type Node = { name: string; depth: number; kids: number; animated: boolean };
+  // trilhas: para cada nivel acima, se ainda vem irmao depois (linha vertical continua); ultimo:
+  // o ultimo filho do pai (o canto da linha fecha)
+  type Node = { name: string; depth: number; kids: number; animated: boolean; parent?: string; trilhas: boolean[]; ultimo: boolean };
 
   const nodes = $derived.by((): Node[] => {
     app.version;
@@ -17,12 +19,14 @@
     const animated = new Set<string>(Object.keys(anim?.bones ?? {}));
     const f = filter.trim().toLowerCase();
     const out: Node[] = [];
-    const walk = (n: string, d: number) => {
-      if (!f || n.toLowerCase().includes(f)) out.push({ name: n, depth: f ? 0 : d, kids: kids.get(n)?.length ?? 0, animated: animated.has(n) });
+    const pai = new Map<string, string>(j.bones.filter((b: any) => b.parent).map((b: any) => [b.name, b.parent]));
+    const walk = (n: string, d: number, trilhas: boolean[], ultimo: boolean) => {
+      if (!f || n.toLowerCase().includes(f)) out.push({ name: n, depth: f ? 0 : d, kids: kids.get(n)?.length ?? 0, animated: animated.has(n), parent: pai.get(n), trilhas: f ? [] : trilhas, ultimo });
       if (!f && collapsed[n]) return;
-      for (const c of kids.get(n) ?? []) walk(c, d + 1);
+      const cs = kids.get(n) ?? [];
+      cs.forEach((c, i) => walk(c, d + 1, d ? [...trilhas, !ultimo] : [], i === cs.length - 1));
     };
-    if (j.bones[0]) walk(j.bones[0].name, 0);
+    if (j.bones[0]) walk(j.bones[0].name, 0, [], true);
     return out;
   });
 
@@ -55,6 +59,21 @@
   function pick(bone: string) {
     app.select({ bone });
   }
+
+  // arrastar um osso sobre outro troca o pai (so na Pose base: muda o esqueleto de todas as
+  // animacoes); o osso fica parado na tela
+  let arrastando = $state<string | null>(null);
+  let sobre = $state<string | null>(null);
+  function soltar(alvo: string) {
+    const osso = arrastando;
+    arrastando = sobre = null;
+    if (!osso || osso === alvo) return;
+    if (app.mode !== "setup" && app.play.animation) return app.toast("Trocar o pai de um osso muda o esqueleto: faça isso na Pose base.");
+    if (app.run({ cmd: "bone.reparent", args: { bone: osso, parent: alvo, keepWorld: true } }, `pai de ${osso} = ${alvo}`)) {
+      app.select({ bone: osso });
+      app.avisar(`${osso} agora é filho de ${alvo} (ficou parado na tela). Ctrl+Z desfaz.`);
+    }
+  }
 </script>
 
 <div class="tree">
@@ -64,15 +83,35 @@
   </div>
   <div class="list" bind:this={listEl}>
     {#each nodes as n (n.name)}
-      <div class="bone" data-bone={n.name} class:sel={app.selection.bone === n.name} style:padding-left="{6 + n.depth * 12}px">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="bone"
+        data-bone={n.name}
+        class:sel={app.selection.bone === n.name}
+        class:sobre={sobre === n.name && arrastando !== n.name}
+        style:padding-left="{6 + n.depth * 14}px"
+        ondragover={(e) => arrastando && (e.preventDefault(), (sobre = n.name))}
+        ondragleave={() => sobre === n.name && (sobre = null)}
+        ondrop={(e) => (e.preventDefault(), soltar(n.name))}
+      >
+        {#each n.trilhas as t, k}{#if t}<span class="trilha" style:left="{6 + (k + 1) * 14 - 6}px"></span>{/if}{/each}
+        {#if n.depth > 0}<span class="ramo" class:ultimo={n.ultimo} style:left="{6 + n.depth * 14 - 6}px"></span>{/if}
         {#if n.kids}
           <button class="tw" onclick={() => (collapsed[n.name] = !collapsed[n.name])}>{collapsed[n.name] ? "▸" : "▾"}</button>
         {:else}
           <span class="tw"></span>
         {/if}
-        <button class="name" class:off={app.hidden.bones.includes(n.name)} onclick={() => pick(n.name)}>
+        <button
+          class="name"
+          class:off={app.hidden.bones.includes(n.name)}
+          onclick={() => pick(n.name)}
+          draggable={n.depth > 0}
+          ondragstart={(e) => ((arrastando = n.name), e.dataTransfer?.setData("text/plain", n.name))}
+          ondragend={() => (arrastando = sobre = null)}
+          title={n.parent ? `filho de ${n.parent} · arraste sobre outro osso (na Pose base) para trocar o pai` : "a raiz do esqueleto"}
+        >
           <span class="ico">🦴</span>{n.name}
-          {#if n.animated}<span class="dot" title="animado nesta animacao"></span>{/if}
+          {#if n.animated}<span class="dot" title="animado nesta animação"></span>{/if}
         </button>
         <button class="eye" class:shut={app.hidden.bones.includes(n.name)} onclick={() => app.toggleHidden("bones", n.name)} title={app.hidden.bones.includes(n.name) ? "mostrar este osso (e o que pende dele)" : "esconder este osso e o que pende dele (so na tela)"}>{app.hidden.bones.includes(n.name) ? "◡" : "👁"}</button>
       </div>
@@ -125,6 +164,33 @@
     display: flex;
     align-items: center;
     border-radius: 6px;
+    position: relative;
+  }
+  .bone.sobre {
+    outline: 1px dashed var(--accent2);
+    background: #2c2834;
+  }
+  /* linhas de quem e filho de quem: a vertical dos niveis de cima e o ramo ate este osso */
+  .trilha,
+  .ramo {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #4a4356;
+    pointer-events: none;
+  }
+  .ramo.ultimo {
+    bottom: 50%;
+  }
+  .ramo::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 8px;
+    height: 1px;
+    background: #4a4356;
   }
   .sel {
     background: #3a2433;

@@ -7,7 +7,7 @@ const names = (arr: any[] | undefined) => new Set((arr ?? []).map((x) => x.name)
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 // feminino: "animacoes novas"; masculino: "ossos novos"
-const FEM = new Set(["animacoes", "partes", "imagens das partes", "constraints", "skins", "imagens no atlas"]);
+const FEM = new Set(["animações", "partes", "imagens das partes", "constraints", "skins", "imagens no atlas"]);
 function setDiff(label: string, a: Set<string>, b: Set<string>, out: string[]) {
   const [novos, apagados] = FEM.has(label) ? ["novas", "apagadas"] : ["novos", "apagados"];
   const add = [...b].filter((x) => !a.has(x)),
@@ -35,7 +35,7 @@ export function diffSpine(a: SpineJson, b: SpineJson, atlasA?: string | null, at
   const out: string[] = [];
   const aa = a.animations ?? {},
     ab = b.animations ?? {};
-  setDiff("animacoes", new Set(Object.keys(aa)), new Set(Object.keys(ab)), out);
+  setDiff("animações", new Set(Object.keys(aa)), new Set(Object.keys(ab)), out);
   for (const n of Object.keys(ab)) {
     if (!(n in aa) || same(aa[n], ab[n])) continue;
     const ta = timelines(aa[n]),
@@ -46,7 +46,7 @@ export function diffSpine(a: SpineJson, b: SpineJson, atlasA?: string | null, at
     for (const [k, v] of tb) ta.has(k) ? ta.get(k) !== v && mud++ : nov++;
     for (const k of ta.keys()) if (!tb.has(k)) apa++;
     const parts = [mud && `${mud} alterada(s)`, nov && `${nov} nova(s)`, apa && `${apa} apagada(s)`].filter(Boolean).join(", ");
-    out.push(`animacao ${n} mudou: ${parts || "detalhes"} (timelines)`);
+    out.push(`animação ${n} mudou: ${parts || "detalhes"} (timelines)`);
   }
   setDiff("ossos", names(a.bones), names(b.bones), out);
   const ba = new Map((a.bones ?? []).map((x: any) => [x.name, x]));
@@ -62,7 +62,7 @@ export function diffSpine(a: SpineJson, b: SpineJson, atlasA?: string | null, at
     const gb = (b.skins ?? []).find((s: any) => s.name === skin)?.attachments?.[slot]?.[n];
     return ga && gb && !same(ga, gb);
   });
-  if (changedAtts.length) out.push(`imagens ajustadas (posicao, malha ou pesos): ${changedAtts.slice(0, 5).map((k) => k.split("/").slice(1).join("/")).join(", ")}${changedAtts.length > 5 ? ` (+${changedAtts.length - 5})` : ""}`);
+  if (changedAtts.length) out.push(`imagens ajustadas (posição, malha ou pesos): ${changedAtts.slice(0, 5).map((k) => k.split("/").slice(1).join("/")).join(", ")}${changedAtts.length > 5 ? ` (+${changedAtts.length - 5})` : ""}`);
   setDiff("constraints", names(a.constraints), names(b.constraints), out);
   const ca = new Map((a.constraints ?? []).map((x: any) => [x.name, x]));
   const cc = (b.constraints ?? []).filter((x: any) => ca.has(x.name) && !same(ca.get(x.name), x)).map((x: any) => x.name);
@@ -70,7 +70,7 @@ export function diffSpine(a: SpineJson, b: SpineJson, atlasA?: string | null, at
   setDiff("skins", names(a.skins), names(b.skins), out);
   setDiff("eventos", new Set(Object.keys(a.events ?? {})), new Set(Object.keys(b.events ?? {})), out);
   const box = (j: SpineJson) => ["x", "y", "width", "height"].map((k) => Math.round(j.skeleton?.[k] ?? 0));
-  if (!same(box(a), box(b))) out.push(`bounds do cabecalho mudaram (${box(a).join(",")} -> ${box(b).join(",")}): desloca o enquadramento no jogo`);
+  if (!same(box(a), box(b))) out.push(`bounds do cabeçalho mudaram (${box(a).join(",")} -> ${box(b).join(",")}): desloca o enquadramento no jogo`);
   if (atlasA != null && atlasB != null && atlasA !== atlasB) {
     const ra = new Set(parseAtlas(atlasA).regions.map((r) => r.name));
     const rb = new Set(parseAtlas(atlasB).regions.map((r) => r.name));

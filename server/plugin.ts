@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { findProjectRoot, parseSkeletonDataTres, scanSpineAssets, toRes, type SpineAsset } from "./godot.ts";
 import { gameContext, skeletonOf } from "./ficha-context.ts";
-import { getVersion, listVersions, readBlob, restoreVersion, saveVersion } from "./versions.ts";
+import { getVersion, lerArquivo, listVersions, readBlob, restoreVersion, saveVersion } from "./versions.ts";
 import { changeNotes, listNotes } from "./notes.ts";
 import { diffSpine } from "../src/core/versions.ts";
 import { draftFicha } from "../src/core/ficha.ts";
@@ -256,6 +256,16 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             writeFileSync(p, body);
             return send(200, { ok: true, path: p, bytes: body.length });
           }
+          // abrir no gerenciador de arquivos a pasta de um arquivo exportado (o editor roda na
+          // maquina de quem usa): so a pasta dos exports ou dentro das raizes
+          if (url.pathname === "/api/abrir-pasta" && req.method === "POST") {
+            const p = resolve(JSON.parse((await readBody(req)).toString("utf8")).p ?? "");
+            const pasta = dirname(p);
+            if (pasta !== EXPORTS && !inside(pasta)) return send(403, { error: `fora das raizes configuradas: ${pasta}` });
+            if (!existsSync(pasta)) return send(404, { error: `nao existe: ${pasta}` });
+            spawn(process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open", [pasta], { detached: true, stdio: "ignore" }).unref();
+            return send(200, { ok: true, pasta });
+          }
           // rascunho da ficha do personagem com o contexto do jogo (codigo Godot, mixes);
           // o documento vem do editor (pode ter mudancas nao salvas)
           if (url.pathname === "/api/ficha/draft" && req.method === "POST") {
@@ -289,7 +299,7 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
               label: v.label,
               source: v.source,
               bytes: v.bytes,
-              changes: prev ? diffSpine(JSON.parse(text(prev.skeleton)!), JSON.parse(text(v.skeleton)!), text(prev.atlas), text(v.atlas)) : ["primeira versao"],
+              changes: prev ? diffSpine(JSON.parse(text(prev.skeleton)!), JSON.parse(text(v.skeleton)!), text(prev.atlas), text(v.atlas)) : ["primeira versão"],
             });
             if (url.pathname === "/api/versions" && req.method === "GET") {
               const vs = listVersions(skel);
@@ -307,8 +317,8 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
               const v = getVersion(skel, b.id ?? url.searchParams.get("id"));
               const against = b.against ?? url.searchParams.get("against");
               const cur = against ? getVersion(skel, against) : null;
-              const curJson = cur ? JSON.parse(text(cur.skeleton)!) : JSON.parse(readFileSync(skel, "utf8"));
-              const curAtlas = cur ? text(cur.atlas) : atlas && existsSync(atlas) ? readFileSync(atlas, "utf8") : null;
+              const curJson = cur ? JSON.parse(text(cur.skeleton)!) : JSON.parse(lerArquivo(skel).toString("utf8"));
+              const curAtlas = cur ? text(cur.atlas) : atlas && (bonecoVirtual(atlas) || existsSync(atlas)) ? lerArquivo(atlas).toString("utf8") : null;
               return send(200, { id: v.id, label: v.label, against: against ?? "atual", changes: diffSpine(JSON.parse(text(v.skeleton)!), curJson, text(v.atlas), curAtlas) });
             }
             if (url.pathname === "/api/versions/restore" && req.method === "POST") {
@@ -330,7 +340,11 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
                 const body = await readBody(req);
                 gravarVirtual(p, body);
                 cache = null;
-                return send(200, { ok: true, bytes: body.length, path: p });
+                // o esqueleto de um .boneco gravado tambem vira versao automatica
+                let version: string | undefined;
+                const asset = p.endsWith(".spine-json") ? assets().find((a) => resolve(a.skeleton) === p) : undefined;
+                if (asset) version = saveVersion({ skeleton: p, atlas: asset.atlas, source: String(req.headers["x-mamulengo-source"] ?? "ui") }).entry.id;
+                return send(200, { ok: true, bytes: body.length, path: p, ...(version ? { version } : {}) });
               }
             }
             if (req.method === "GET") {

@@ -6,6 +6,7 @@ import { execute, describeCommands, type Call } from "../core/commands/index.ts"
 import { exportAnimation, type ExportOptions } from "../app/exporter.ts";
 import { applySequence, type SequenceParam } from "../app/sequence.ts";
 import { createFromPsd, updateFromPsd } from "../app/psd.ts";
+import { dropDraft } from "../app/drafts.ts";
 import type { Runtime } from "../render/viewer.ts";
 void execute;
 
@@ -56,7 +57,9 @@ const handlers: Record<string, Handler> = {
     const a = app.asset;
     if (!a) return { ok: true };
     app.doc!.markSaved();
-    return app.open(a).then(() => ({ reopened: a.name }));
+    // descartar e jogar fora tambem o rascunho (senao ele voltaria sozinho ao reabrir)
+    app.discardDraft();
+    return dropDraft(a.id).then(() => app.open(a)).then(() => ({ reopened: a.name }));
   },
 
   async exec({ calls, label }: { calls: Call | Call[]; label?: string }) {
@@ -222,7 +225,7 @@ const handlers: Record<string, Handler> = {
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
     // imagem de referencia por cima (file: caminho dentro das raizes); null tira
@@ -257,6 +260,8 @@ const handlers: Record<string, Handler> = {
       v.selection = p.select;
     }
     if (p.fit) v.frameAll();
+    // um retangulo do mundo [x, y, largura, altura] (y para cima) inteiro na tela, sem folga
+    if (Array.isArray(p.rect) && p.rect.length === 4) v.frameRect(p.rect, 1);
     return handlers.state({});
   },
 

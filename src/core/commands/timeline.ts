@@ -42,12 +42,12 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
   const base: Path = ["animations", anim];
   if ("bone" in target) {
     requireBone(doc, target.bone);
-    if (!(TIMELINE_NAMES.bone as readonly string[]).includes(timeline)) throw new Error(`timeline de osso invalida: ${timeline}. Use ${TIMELINE_NAMES.bone.join(", ")}`);
+    if (!(TIMELINE_NAMES.bone as readonly string[]).includes(timeline)) throw new Error(`timeline de osso inválida: ${timeline}. Use ${TIMELINE_NAMES.bone.join(", ")}`);
     return { path: [...base, "bones", target.bone, timeline], kind: timeline };
   }
   if ("slot" in target) {
     requireSlot(doc, target.slot);
-    if (!(TIMELINE_NAMES.slot as readonly string[]).includes(timeline)) throw new Error(`timeline de slot invalida: ${timeline}. Use ${TIMELINE_NAMES.slot.join(", ")}`);
+    if (!(TIMELINE_NAMES.slot as readonly string[]).includes(timeline)) throw new Error(`timeline de slot inválida: ${timeline}. Use ${TIMELINE_NAMES.slot.join(", ")}`);
     // efeitos (outline, glow, dissolve, tint): fora de `slots`, onde o spine-core nao le
     if (isEffect(timeline)) return { path: [...base, "effects", target.slot, timeline], kind: timeline };
     return { path: [...base, "slots", target.slot, timeline], kind: timeline };
@@ -60,7 +60,7 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
   }
   // luzes (so do Mamulengo; docs/NUCLEO.md "Luzes"): fora do que o spine-core le
   if ("light" in target) {
-    if (!(doc as any).lights?.some((l: any) => l.name === target.light)) throw new Error(`luz nao existe: "${target.light}"`);
+    if (!(doc as any).lights?.some((l: any) => l.name === target.light)) throw new Error(`luz não existe: "${target.light}"`);
     if (timeline !== "light") throw new Error(`timeline de luz: light (color, strength, radius, height)`);
     return { path: [...base, "lights", target.light], kind: "light" };
   }
@@ -70,20 +70,20 @@ export function timelinePath(doc: SpineJson, anim: string, target: Target, timel
   }
   // instancias (so do Mamulengo; docs/NUCLEO.md "Instancias"): chaves em degrau
   if ("instance" in target) {
-    if (!(doc as any).instances?.some((x: any) => x.name === target.instance)) throw new Error(`instancia nao existe: "${target.instance}"`);
-    if (timeline !== "instance") throw new Error(`timeline de instancia: instance (animation, start, speed, loop)`);
+    if (!(doc as any).instances?.some((x: any) => x.name === target.instance)) throw new Error(`instância não existe: "${target.instance}"`);
+    if (timeline !== "instance") throw new Error(`timeline de instância: instance (animation, start, speed, loop)`);
     return { path: [...base, "instances", target.instance], kind: "instance" };
   }
   if ("particles" in target) {
-    if (!(doc as any).particles?.some((p: any) => p.name === target.particles)) throw new Error(`emissor de particulas nao existe: "${target.particles}"`);
-    if (!(TIMELINE_NAMES.particles as readonly string[]).includes(timeline)) throw new Error(`timeline de particulas invalida: ${timeline}. Use rate ou burst`);
+    if (!(doc as any).particles?.some((p: any) => p.name === target.particles)) throw new Error(`emissor de partículas não existe: "${target.particles}"`);
+    if (!(TIMELINE_NAMES.particles as readonly string[]).includes(timeline)) throw new Error(`timeline de partículas inválida: ${timeline}. Use rate ou burst`);
     return { path: [...base, "particles", target.particles, timeline], kind: timeline };
   }
   const c = constraints(doc).find((x) => x.c.name === target.constraint);
-  if (!c) throw new Error(`constraint nao existe: "${target.constraint}". Constraints: ${constraints(doc).map((x) => x.c.name).join(", ") || "(nenhuma)"}`);
+  if (!c) throw new Error(`constraint não existe: "${target.constraint}". Constraints: ${constraints(doc).map((x) => x.c.name).join(", ") || "(nenhuma)"}`);
   if (c.type === "ik" || c.type === "transform") return { path: [...base, c.type, target.constraint], kind: c.type };
   const allowed = TIMELINE_NAMES[c.type] as readonly string[];
-  if (!allowed.includes(timeline)) throw new Error(`timeline de ${c.type} invalida: ${timeline}. Use ${allowed.join(", ")}`);
+  if (!allowed.includes(timeline)) throw new Error(`timeline de ${c.type} inválida: ${timeline}. Use ${allowed.join(", ")}`);
   return { path: [...base, c.type, target.constraint, timeline], kind: c.type === "path" && timeline === "mix" ? "pathmix" : timeline };
 }
 

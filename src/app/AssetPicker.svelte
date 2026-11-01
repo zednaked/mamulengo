@@ -25,7 +25,7 @@
   function confirmDiscard() {
     if (Date.now() - armed < 3000) return true;
     armed = Date.now();
-    app.toast("Ha alteracoes nao salvas. Clique de novo para trocar mesmo assim.");
+    app.toast("Há alterações não salvas. Salve (Ctrl+S), ou clique de novo para trocar e perder as alterações.");
     return false;
   }
 </script>
@@ -42,8 +42,9 @@
   {#if open}
     <div class="pop">
       <!-- svelte-ignore a11y_autofocus -->
-      <input placeholder="procurar ({app.assets.length} assets)" bind:value={q} autofocus />
+      <input placeholder="procurar ({app.assets.length} {app.assets.length === 1 ? 'personagem' : 'personagens'})" bind:value={q} autofocus />
       <div class="list">
+        {#if app.assetsLidos && !app.assets.length}<div class="dim vazio">Nenhum personagem em {app.roots.join(", ")}. Arraste um PSD para a janela, ou abra o editor com MAMULENGO_ROOTS apontando para as suas pastas.</div>{/if}
         {#each groups as [proj, list]}
           <div class="proj">{proj}</div>
           {#each list as a}
@@ -56,6 +57,11 @@
 </div>
 
 <style>
+  .vazio {
+    padding: 8px;
+    font-size: 12px;
+    white-space: normal;
+  }
   .picker {
     position: relative;
   }

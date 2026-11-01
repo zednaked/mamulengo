@@ -10,7 +10,7 @@ import type { Editor } from "../document.ts";
 const Name = z.string().min(1);
 
 function addConstraint(e: Editor, c: Record<string, any>, at?: number) {
-  if (constraints(e.json).some((x) => x.c.name === c.name)) throw new Error(`ja existe constraint com nome ${c.name}`);
+  if (constraints(e.json).some((x) => x.c.name === c.name)) throw new Error(`já existe constraint com nome ${c.name}`);
   if (!e.json.constraints) e.set(["constraints"], []);
   const n = e.json.constraints.length;
   e.insert(["constraints"], at === undefined ? n : Math.min(at, n), c);
@@ -18,7 +18,7 @@ function addConstraint(e: Editor, c: Record<string, any>, at?: number) {
 
 function findC(e: Editor, name: string) {
   const c = constraints(e.json).find((x) => x.c.name === name);
-  if (!c) throw new Error(`constraint nao existe: ${name}. Existem: ${constraints(e.json).map((x) => `${x.c.name}(${x.type})`).join(", ") || "(nenhuma)"}`);
+  if (!c) throw new Error(`constraint não existe: ${name}. Existem: ${constraints(e.json).map((x) => `${x.c.name}(${x.type})`).join(", ") || "(nenhuma)"}`);
   return c;
 }
 
@@ -52,7 +52,7 @@ defineCommand({
   run({ e }, p) {
     p.bones.forEach((b) => requireBone(e.json, b));
     requireBone(e.json, p.target);
-    if (p.bones.includes(p.target)) throw new Error("o alvo nao pode estar na cadeia");
+    if (p.bones.includes(p.target)) throw new Error("o alvo não pode estar na cadeia");
     const { name, bones, target, index, ...props } = p;
     // sem bendPositive: dobra para o lado em que o cotovelo ja esta desenhado (senao
     // metade dos bracos vira do avesso ao ligar a IK)
@@ -248,7 +248,7 @@ defineCommand({
   }),
   label: (p) => `slider ${p.name}`,
   run({ e }, p) {
-    if (!e.json.animations?.[p.animation]) throw new Error(`animacao nao existe: ${p.animation}`);
+    if (!e.json.animations?.[p.animation]) throw new Error(`animação não existe: ${p.animation}`);
     if (p.bone) requireBone(e.json, p.bone);
     const { name, index, ...props } = p;
     addConstraint(e, { type: "slider", name, ...clean(props, { from: 0, to: 0, scale: 1, max: 0, local: false, additive: false, loop: false, mix: 1, time: 0 }) }, index);
@@ -265,7 +265,7 @@ defineCommand({
   run({ e }, p) {
     const c = findC(e, p.name);
     for (const [k, v] of Object.entries(p.props)) {
-      if (k === "name" || k === "type") throw new Error("use constraint.rename para nome; tipo nao muda");
+      if (k === "name" || k === "type") throw new Error("use constraint.rename para nome; tipo não muda");
       if ((k === "bone" || k === "target" || k === "source" || k === "slot") && typeof v === "string") (c.type === "path" && (k === "target" || k === "slot") ? requireSlot : requireBone)(e.json, v);
       if (k === "bones" && Array.isArray(v)) v.forEach((b: string) => requireBone(e.json, b));
       e.set([...c.path, k], v === null ? undefined : typeof v === "number" ? round(v) : v);

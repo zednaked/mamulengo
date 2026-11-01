@@ -151,7 +151,7 @@ export const estatisticas = { spine: 0, nucleo: 0, recusas: 0, ultimaRecusa: "" 
 // carregado (carregarNucleo em src/render/desenhista.ts)
 export function usarMedidas(modo: ModoMedidas, nucleo?: any) {
   if (nucleo) moduloNucleo = nucleo;
-  if (modo === "nucleo" && !moduloNucleo) throw new Error("medidas no modo nucleo: carregue o nucleo antes (carregarNucleo)");
+  if (modo === "nucleo" && !moduloNucleo) throw new Error("medidas no modo núcleo: carregue o núcleo antes (carregarNucleo)");
   modoAtual = modo;
 }
 
@@ -170,7 +170,7 @@ export function abrirMedidor(json: SpineJson, atlas?: string | null, modo: ModoM
     atlas = null;
   }
   if (modo === "nucleo") {
-    if (!moduloNucleo) throw new Error("medidas no modo nucleo: carregue o nucleo antes (carregarNucleo)");
+    if (!moduloNucleo) throw new Error("medidas no modo núcleo: carregue o núcleo antes (carregarNucleo)");
     try {
       const m = new NucleoMedidor(moduloNucleo, json, atlas ?? "");
       estatisticas.nucleo++;
@@ -465,7 +465,7 @@ class SpineMedidor implements Medidor {
     const guardado: [any, LocalQ][] = [];
     for (const m of mudas) {
       const b = sk.findBone(m.bone);
-      if (!b) throw new Error(`osso nao existe: ${m.bone}`);
+      if (!b) throw new Error(`osso não existe: ${m.bone}`);
       const p = b.pose as any;
       guardado.push([p, { x: p.x, y: p.y, rotation: p.rotation, scaleX: p.scaleX, scaleY: p.scaleY, shearX: p.shearX, shearY: p.shearY }]);
       Object.assign(p, m.local);
@@ -617,8 +617,8 @@ class NucleoMedidor implements Medidor {
 
   sequencia(anim: string, seq: Sequence, times: number[], o: Omit<Pedido, "loop"> = {}) {
     const a = this.anims.get(anim);
-    if (a === undefined) throw new Error(`animacao nao existe: ${anim}`);
-    if (!this.anims.has(seq.next)) throw new Error(`animacao nao existe: ${seq.next}`);
+    if (a === undefined) throw new Error(`animação não existe: ${anim}`);
+    if (!this.anims.has(seq.next)) throw new Error(`animação não existe: ${seq.next}`);
     return this.medir(a, !!seq.loop, seq, times, o);
   }
 
@@ -657,7 +657,7 @@ class NucleoMedidor implements Medidor {
       const v = N.HEAPF64.subarray(p / 8, p / 8 + mudas.length * 8);
       mudas.forEach((m, k) => {
         const b = base.findBone(m.bone);
-        if (!b) throw new Error(`osso nao existe: ${m.bone}`);
+        if (!b) throw new Error(`osso não existe: ${m.bone}`);
         const l = { ...b.local, ...m.local };
         v.set([b.index, l.x, l.y, l.rotation, l.scaleX, l.scaleY, l.shearX, l.shearY], k * 8);
       });

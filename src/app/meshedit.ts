@@ -132,7 +132,7 @@ export function meshDown(v: Viewer, p: { x: number; y: number }, shift: boolean)
   v.view.playing = false;
   if (me.tab === "weights") {
     if (!me.bone) {
-      app.toast("Escolha no painel qual osso voce quer pintar.");
+      app.toast("Escolha no painel da malha qual osso você quer pintar.");
       return true;
     }
     drag = { kind: "paint", merge: `pesos${++seq}`, start: p, points: [[p.x, p.y]], sub: shift ? me.paint === "add" : me.paint === "sub" };

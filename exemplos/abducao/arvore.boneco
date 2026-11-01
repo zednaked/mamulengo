@@ -1,0 +1,321 @@
+{
+ "boneco": 0,
+ "nome": "arvore",
+ "paginas": [
+  {
+   "arquivo": "arvore.png",
+   "tamanho": [
+    1024,
+    1207
+   ],
+   "relevo": "arvore_relevo.png"
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "tree02",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    313,
+    674
+   ]
+  },
+  {
+   "nome": "tree24",
+   "pagina": 0,
+   "ret": [
+    317,
+    0,
+    136,
+    656
+   ]
+  },
+  {
+   "nome": "tree20",
+   "pagina": 0,
+   "ret": [
+    457,
+    0,
+    223,
+    598
+   ]
+  },
+  {
+   "nome": "tree10",
+   "pagina": 0,
+   "ret": [
+    684,
+    0,
+    244,
+    554
+   ]
+  },
+  {
+   "nome": "tree01",
+   "pagina": 0,
+   "ret": [
+    0,
+    678,
+    294,
+    529
+   ]
+  },
+  {
+   "nome": "tree05",
+   "pagina": 0,
+   "ret": [
+    298,
+    678,
+    297,
+    529
+   ]
+  }
+ ],
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "arvore",
+   "pai": "root",
+   "rotacao": 90
+  }
+ ],
+ "slots": [
+  {
+   "nome": "arvore",
+   "osso": "arvore",
+   "parte": "arvore"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {}
+  },
+  {
+   "nome": "tree01",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree01",
+      "largura": 147,
+      "altura": 264.5,
+      "x": 132.25,
+      "rotacao": -90
+     }
+    }
+   }
+  },
+  {
+   "nome": "tree02",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree02",
+      "largura": 156.5,
+      "altura": 337,
+      "x": 168.5,
+      "rotacao": -90
+     }
+    }
+   }
+  },
+  {
+   "nome": "tree05",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree05",
+      "largura": 148.5,
+      "altura": 264.5,
+      "x": 132.25,
+      "rotacao": -90
+     }
+    }
+   }
+  },
+  {
+   "nome": "tree10",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree10",
+      "largura": 122,
+      "altura": 277,
+      "x": 138.5,
+      "rotacao": -90
+     }
+    }
+   }
+  },
+  {
+   "nome": "tree20",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree20",
+      "largura": 111.5,
+      "altura": 299,
+      "x": 149.5,
+      "rotacao": -90
+     }
+    }
+   }
+  },
+  {
+   "nome": "tree24",
+   "partes": {
+    "arvore": {
+     "arvore": {
+      "caminho": "tree24",
+      "largura": 68,
+      "altura": 328,
+      "x": 164,
+      "rotacao": -90
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "balanca": {
+   "ossos": {
+    "arvore": {
+     "girar": [
+      {
+       "tempo": 0,
+       "valor": 0
+      },
+      {
+       "tempo": 0.15,
+       "valor": 0.612
+      },
+      {
+       "tempo": 0.3,
+       "valor": 1.131
+      },
+      {
+       "tempo": 0.45,
+       "valor": 1.478
+      },
+      {
+       "tempo": 0.6,
+       "valor": 1.6
+      },
+      {
+       "tempo": 0.75,
+       "valor": 1.478
+      },
+      {
+       "tempo": 0.9,
+       "valor": 1.131
+      },
+      {
+       "tempo": 1.05,
+       "valor": 0.612
+      },
+      {
+       "tempo": 1.2,
+       "valor": 0
+      },
+      {
+       "tempo": 1.35,
+       "valor": -0.612
+      },
+      {
+       "tempo": 1.5,
+       "valor": -1.131
+      },
+      {
+       "tempo": 1.65,
+       "valor": -1.478
+      },
+      {
+       "tempo": 1.8,
+       "valor": -1.6
+      },
+      {
+       "tempo": 1.95,
+       "valor": -1.478
+      },
+      {
+       "tempo": 2.1,
+       "valor": -1.131
+      },
+      {
+       "tempo": 2.25,
+       "valor": -0.612
+      },
+      {
+       "tempo": 2.4,
+       "valor": 0
+      }
+     ]
+    }
+   }
+  },
+  "vento": {
+   "ossos": {
+    "arvore": {
+     "girar": [
+      {
+       "tempo": 0,
+       "valor": -2.5
+      },
+      {
+       "tempo": 0.05,
+       "valor": -1.25
+      },
+      {
+       "tempo": 0.1,
+       "valor": -0.335
+      },
+      {
+       "tempo": 0.15,
+       "valor": 0
+      },
+      {
+       "tempo": 0.2,
+       "valor": -0.335
+      },
+      {
+       "tempo": 0.25,
+       "valor": -1.25
+      },
+      {
+       "tempo": 0.3,
+       "valor": -2.5
+      },
+      {
+       "tempo": 0.35,
+       "valor": -3.75
+      },
+      {
+       "tempo": 0.4,
+       "valor": -4.665
+      },
+      {
+       "tempo": 0.45,
+       "valor": -5
+      },
+      {
+       "tempo": 0.5,
+       "valor": -4.665
+      },
+      {
+       "tempo": 0.55,
+       "valor": -3.75
+      },
+      {
+       "tempo": 0.6,
+       "valor": -2.5
+      }
+     ]
+    }
+   }
+  }
+ }
+}

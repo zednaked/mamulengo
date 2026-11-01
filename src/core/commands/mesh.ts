@@ -17,7 +17,7 @@ export function attachmentAt(doc: SpineJson, skin: string, slot: string, name: s
   const a = s?.attachments?.[slot]?.[name];
   if (!a) {
     const have = Object.keys(s?.attachments?.[slot] ?? {});
-    throw new Error(`attachment nao existe: ${skin}/${slot}/${name}${have.length ? `. No slot: ${have.join(", ")}` : ""}`);
+    throw new Error(`attachment não existe: ${skin}/${slot}/${name}${have.length ? `. No slot: ${have.join(", ")}` : ""}`);
   }
   return a;
 }
@@ -29,7 +29,7 @@ function resolveMesh(doc: SpineJson, skin: string, slot: string, name: string): 
     const src = attachmentAt(doc, a.skin ?? "default", a.slot ?? slot, a.source);
     return { mesh: a, source: src };
   }
-  if (a.type !== "mesh") throw new Error(`${slot}/${name} nao e malha (e ${a.type ?? "region"}); use mesh.create para converter`);
+  if (a.type !== "mesh") throw new Error(`${slot}/${name} não é malha (é ${a.type ?? "region"}); use mesh.create para converter`);
   return { mesh: a, source: a };
 }
 
@@ -178,7 +178,7 @@ defineCommand({
     const cur = skins(ctx.doc.json).find((s) => s.name === p.skin)?.attachments?.[p.slot]?.[p.name];
     const path = p.path ?? cur?.path ?? p.name;
     const img = await ctx.assets?.image(path);
-    if (!img) throw new Error(`imagem da regiao "${path}" nao disponivel (o atlas tem essa regiao?)`);
+    if (!img) throw new Error(`imagem da regiao "${path}" não disponível (o atlas tem essa regiao?)`);
     return img;
   },
   run({ e, prepared }, p) {
@@ -189,7 +189,7 @@ defineCommand({
     let toLocal: (u: number, v: number) => Pt;
     let removedDeforms = 0;
     if (cur && cur.type === "mesh") {
-      if (!p.replace) throw new Error(`${p.slot}/${p.name} ja e malha: use replace:true para refazer (os deforms dela saem), ou mesh.vertices/addVertex para ajustar`);
+      if (!p.replace) throw new Error(`${p.slot}/${p.name} já e malha: use replace:true para refazer (os deforms dela saem), ou mesh.vertices/addVertex para ajustar`);
       if (cur.vertices.length !== cur.uvs.length) throw new Error(`${p.slot}/${p.name} tem pesos: refazer perderia os pesos; ajuste com mesh.addVertex/removeVertex`);
       // uv -> local da malha atual por minimos quadrados (afim): a nova fica no mesmo lugar
       const n = cur.uvs.length / 2;
@@ -215,7 +215,7 @@ defineCommand({
           removedDeforms++;
         }
     } else {
-      if (cur && (cur.type ?? "region") !== "region") throw new Error(`${p.slot}/${p.name} ja e ${cur.type}`);
+      if (cur && (cur.type ?? "region") !== "region") throw new Error(`${p.slot}/${p.name} já e ${cur.type}`);
       // transformacao da region (a malha herda a mesma posicao na tela)
       const r = cur ?? { width: img.width, height: img.height };
       const rw = r.width ?? img.width,
@@ -239,7 +239,7 @@ defineCommand({
       const pts = [...p.hull, ...(p.interior ?? [])] as Pt[];
       geo = { points: pts, hullCount: p.hull.length, triangles: triangulate(pts, p.hull.length) };
     } else geo = autoMesh(img.data, img.width, img.height, { detail: p.detail });
-    if (!geo.triangles.length) throw new Error("a triangulacao nao gerou triangulos (contorno degenerado)");
+    if (!geo.triangles.length) throw new Error("a triangulacao não gerou triângulos (contorno degenerado)");
     const uvs: number[] = [],
       vertices: number[] = [];
     for (const [px, py] of geo.points) {
@@ -443,7 +443,7 @@ defineCommand({
     const n = vertexCount(source);
     const deltas: Pt[] = Array.from({ length: n }, () => [0, 0]);
     for (const m of p.moves) {
-      if (m.i >= n) throw new Error(`vertice ${m.i} nao existe (malha tem ${n})`);
+      if (m.i >= n) throw new Error(`vértice ${m.i} não existe (malha tem ${n})`);
       deltas[m.i] = [m.dx, m.dy];
     }
     const add = worldToDeform(e.json, sk, p.slot, source, deltas);
@@ -536,7 +536,7 @@ defineCommand({
       const k = p.falloff === "constante" ? 1 : p.falloff === "linear" ? 1 - d : 0.5 + 0.5 * Math.cos(Math.PI * d);
       return [p.dx * k, p.dy * k];
     });
-    if (!touched) throw new Error(`nenhum vertice dentro do raio ${p.radius} em (${p.center}). Vertices vao de x ${Math.min(...world.map((q) => q[0])).toFixed(0)}..${Math.max(...world.map((q) => q[0])).toFixed(0)}, y ${Math.min(...world.map((q) => q[1])).toFixed(0)}..${Math.max(...world.map((q) => q[1])).toFixed(0)}`);
+    if (!touched) throw new Error(`nenhum vértice dentro do raio ${p.radius} em (${p.center}). Vértices vao de x ${Math.min(...world.map((q) => q[0])).toFixed(0)}..${Math.max(...world.map((q) => q[0])).toFixed(0)}, y ${Math.min(...world.map((q) => q[1])).toFixed(0)}..${Math.max(...world.map((q) => q[1])).toFixed(0)}`);
     const add = worldToDeform(e.json, sk, p.slot, source, deltas);
     writeDeform(ctx, p, cur.map((x, j) => x + add[j]));
     return { touched };
@@ -586,7 +586,7 @@ defineCommand({
     const si = requireSkin(e.json, p.skin);
     const sIdx = requireSlot(e.json, p.slot);
     const endIdx = requireSlot(e.json, p.end);
-    if (endIdx < sIdx) throw new Error("o slot end precisa estar depois do slot da mascara na ordem de desenho");
+    if (endIdx < sIdx) throw new Error("o slot end precisa estar depois do slot da máscara na ordem de desenho");
     const a: any = { type: "clipping", end: p.end, vertexCount: p.points.length, vertices: pointsToBoneLocal(e.json, p.slot, p.points as Pt[]) };
     if (p.convex) a.convex = true;
     if (p.inverse) a.inverse = true;
@@ -639,7 +639,7 @@ defineCommand({
   run({ e }, p) {
     const si = requireSkin(e.json, p.skin);
     requireSlot(e.json, p.slot);
-    if (p.points.length % 3) throw new Error("path: numero de pontos multiplo de 3 (alca, ancora, alca)");
+    if (p.points.length % 3) throw new Error("path: número de pontos multiplo de 3 (alça, ancora, alça)");
     const v = pointsToBoneLocal(e.json, p.slot, p.points as Pt[]);
     // comprimento aproximado de cada curva (o runtime usa para velocidade constante)
     const pts = p.points as Pt[];

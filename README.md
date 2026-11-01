@@ -126,6 +126,13 @@ footlights light a chita backdrop by layers. About 32 µs of pose a frame.*
 firefly circles the zombie in front and behind; its light follows the depth (face,
 grazing side, rim light) on a normal map built from the art itself.*
 
+![A night countryside: the Mamulengo name and puppet open the scene, the view tilts down to hills, trees and a house; a pink flying saucer abducts a robot with a beam, runs off, and the name and puppet close the loop](exemplos/abducao/abducao.webp)
+
+*[exemplos/abducao](exemplos/abducao): a night abduction between the opening and
+the closing of the name, from two CC0 Kenney packs. Nine layers of parallax move by
+their depth (tilt, camera drift and shakes alike), the saucer is rigged from the SVG,
+its beam lights the ground and bends the trees, and the robot spins up into it.*
+
 ![A side-scrolling platformer scene: the robot jumps over platforms, picks coins, stomps a winged enemy that dissolves and flies with a jetpack](exemplos/jogo/jogo.gif)
 
 *[exemplos/jogo](exemplos/jogo): a whole game screen in one `.boneco`, with

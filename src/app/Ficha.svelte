@@ -145,7 +145,7 @@
     {/if}
 
     {#if anim && !section}
-      <p class="dim">A ficha não descreve esta animação. Escreva a seção <code>## Animacao: {anim}</code> (para que serve, roteiro, o que não fazer).</p>
+      <p class="dim">A ficha não descreve esta animação. Escreva a seção <code>## Animação: {anim}</code> (para que serve, roteiro, o que não fazer).</p>
     {/if}
     {#if section}
       {#each section.fields as f (f.label)}

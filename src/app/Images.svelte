@@ -60,7 +60,7 @@
 
 <div class="imgs">
   <div class="bar">
-    <input placeholder="procurar imagem" bind:value={filter} />
+    <input placeholder="procurar" title="Procurar imagem" bind:value={filter} />
     <button disabled={!app.doc || busy} onclick={() => input?.click()} title="Adicionar imagens do computador">{busy ? "…" : "+ imagens"}</button>
     <input bind:this={input} type="file" accept="image/png,image/webp,image/jpeg" multiple hidden onchange={(e) => upload((e.target as HTMLInputElement).files)} />
   </div>

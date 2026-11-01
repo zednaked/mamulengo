@@ -39,7 +39,7 @@ function groups(json: SpineJson, anim: string, refs: KeyRef[]) {
     const { path, kind, id } = resolve(json, anim, r);
     const keys = getKeys(json, path);
     const hits = keys.map((_, i) => i).filter((i) => Math.abs(timeOf(keys[i]) - r.time) < EPS && (r.timeline !== "events" || !r.name || keys[i].name === r.name));
-    if (!hits.length) throw new Error(`nao ha chave ${r.timeline} em ${r.time}s. Tempos: ${keys.map(timeOf).join(", ") || "(nenhum)"}`);
+    if (!hits.length) throw new Error(`não há chave ${r.timeline} em ${r.time}s. Tempos: ${keys.map(timeOf).join(", ") || "(nenhum)"}`);
     let g = out.get(id);
     if (!g) out.set(id, (g = { path, kind, idx: new Set(), ref: r }));
     hits.forEach((i) => g!.idx.add(i));
@@ -63,7 +63,7 @@ function moveIn(e: Editor, path: Path, kind: string | null, idx: Set<number>, de
   const order = keys.map((_, i) => i).sort((a, b) => times[a] - times[b] || a - b);
   if (kind !== null || path[path.length - 1] === "drawOrder")
     for (let n = 1; n < order.length; n++)
-      if (Math.abs(times[order[n]] - times[order[n - 1]]) < EPS) throw new Error(`ja existe chave em ${times[order[n]]}s (${path.slice(2).join("/")})`);
+      if (Math.abs(times[order[n]] - times[order[n - 1]]) < EPS) throw new Error(`já existe chave em ${times[order[n]]}s (${path.slice(2).join("/")})`);
   const pos: number[] = [];
   order.forEach((old, n) => (pos[old] = n));
   const apply = () => {

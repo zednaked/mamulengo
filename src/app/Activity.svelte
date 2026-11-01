@@ -21,7 +21,7 @@
       <span class="when dim">{now && ago(a.at)}</span>
     </div>
   {:else}
-    <div class="dim">Tudo que voce e o Claude fizerem aparece aqui.</div>
+    <div class="dim">Tudo que você e o Claude fizerem aparece aqui.</div>
   {/each}
 </div>
 

@@ -15,11 +15,20 @@
   import Images from "./app/Images.svelte";
   import GodotCheck from "./app/GodotCheck.svelte";
   import Onboarding from "./app/Onboarding.svelte";
+  import Atalhos from "./app/Atalhos.svelte";
   import PsdImport from "./app/PsdImport.svelte";
   import { connectBridge } from "./bridge/client.ts";
   import { deleteVertex, stopMeshEdit } from "./app/meshedit.ts";
 
-  let showBones = $state(false);
+  // quantas malhas o personagem tem (o botao "malhas" diz, e fica desligado sem nenhuma)
+  const numMalhas = $derived.by(() => {
+    app.version;
+    let n = 0;
+    for (const sk of app.doc?.json.skins ?? []) for (const slot of Object.values<any>(sk.attachments ?? {})) for (const at of Object.values<any>(slot)) if (at?.type === "mesh" || at?.type === "linkedmesh") n++;
+    return n;
+  });
+  // ossos a vista: quem chega ve o esqueleto que vai mexer; a escolha fica nas preferencias
+  let showBones = $state(true);
   let leftTab = $state<"bones" | "layers" | "images" | "versions">("bones");
 
   // tela pequena (notebook com escala, janela dividida): a interface fica compacta, com tamanhos
@@ -43,7 +52,8 @@
   const layout = $derived(compacto ? layoutCompacto : layoutNormal);
   const padrao = () => (compacto ? LAYOUT_C0 : LAYOUT0);
   // paineis laterais recolhidos (botoes no topo; Ctrl+[ e Ctrl+])
-  let recolhe = $state({ left: false, right: false, foot: false });
+  // a Atividade comeca recolhida em tela pequena: o inspetor precisa da altura
+  let recolhe = $state({ left: false, right: false, foot: false, act: mq.matches });
   try {
     Object.assign(layoutNormal, JSON.parse(localStorage.getItem("mamulengo.layout") ?? "{}"));
     Object.assign(layoutCompacto, JSON.parse(localStorage.getItem("mamulengo.layoutCompacto") ?? "{}"));
@@ -57,12 +67,13 @@
     } catch {}
     savePrefs({ layout: { ...layoutNormal }, layoutCompacto: { ...layoutCompacto }, recolhe: { ...recolhe } });
   }
-  function alterna(lado: "left" | "right" | "foot") {
+  function alterna(lado: "left" | "right" | "foot" | "act") {
     recolhe[lado] = !recolhe[lado];
     guardaLayout();
   }
   const LIMITS: Record<keyof typeof LAYOUT0, [number, () => number]> = {
-    left: [150, () => window.innerWidth * 0.45],
+    // abaixo de 190 as abas e os nomes dos ossos ficam cortados
+    left: [190, () => window.innerWidth * 0.45],
     right: [200, () => window.innerWidth * 0.5],
     foot: [90, () => window.innerHeight * 0.7],
     act: [40, () => window.innerHeight * 0.6],
@@ -91,6 +102,7 @@
       if (p.leftTab) leftTab = p.leftTab;
       if (p.rightTab) app.rightTab = p.rightTab;
       if (typeof p.legenda === "boolean") app.showNarration = p.legenda;
+      if (typeof p.ossos === "boolean") showBones = p.ossos;
     })
     .catch(() => {})
     .finally(() => (prefsLoaded = true));
@@ -98,6 +110,10 @@
     const l = leftTab,
       r = app.rightTab;
     if (prefsLoaded) savePrefs({ leftTab: l, rightTab: r });
+  });
+  $effect(() => {
+    const o = showBones;
+    if (prefsLoaded) savePrefs({ ossos: o });
   });
 
   function resize(e: PointerEvent, key: keyof typeof LAYOUT0, dir: 1 | -1, axis: "x" | "y") {
@@ -123,6 +139,7 @@
     guardaLayout();
   }
   let guide = $state(false);
+  let atalhos = $state(false);
   let showMeshes = $state(false);
   let saving = $state(false);
 
@@ -226,7 +243,9 @@
   }
 
   function keys(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    // escrevendo (campo, lista, nota): as teclas sao do texto, nao atalhos
+    const el = e.target as HTMLElement;
+    if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement || el?.isContentEditable) return;
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.key.toLowerCase() === "z") {
       e.preventDefault();
@@ -240,7 +259,8 @@
     } else if (mod && (e.code === "BracketLeft" || e.code === "BracketRight" || e.code === "Backslash")) {
       e.preventDefault();
       alterna(e.code === "BracketLeft" ? "left" : e.code === "BracketRight" ? "right" : "foot");
-    } else if (!mod && e.key === "f") app.viewer?.frameAll();
+    } else if (!mod && e.key === "?") atalhos = !atalhos;
+    else if (!mod && e.key === "f") app.viewer?.frameAll();
     else if (!mod && (e.key === "PageUp" || e.key === "PageDown") && app.selection.slot) {
       // ordem de desenho da camada escolhida: passo inteligente; com Shift, topo ou fundo
       e.preventDefault();
@@ -286,7 +306,7 @@
   <header>
     <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
     {#if app.pilhaInstancias.length}
-      <button class="voltar-inst" onclick={() => app.voltarInstancia()} title="Voltar para {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}, de onde voce entrou na instancia {app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}">← {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}</button>
+      <button class="voltar-inst" onclick={() => app.voltarInstancia()} title="Voltar para {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}, de onde você entrou na instância {app.pilhaInstancias[app.pilhaInstancias.length - 1].instance}">← {app.pilhaInstancias[app.pilhaInstancias.length - 1].asset.name}</button>
     {/if}
     <button class="painel" class:on={!recolhe.left} onclick={() => alterna("left")} title="Mostrar ou esconder o painel da esquerda: esqueleto, ordem, imagens (Ctrl+[)">◧</button>
     <AssetPicker />
@@ -296,8 +316,8 @@
       <button class:on={app.tool === "rotate"} onclick={() => (app.tool = "rotate")} title="Girar (2)">⟳ <span class="rot">Girar</span></button>
       <button class:on={app.tool === "scale"} onclick={() => (app.tool = "scale")} title="Esticar (3)">⤢ <span class="rot">Esticar</span></button>
       <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 <span class="rot">Deformar</span></button>
-      <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animacoes">🦴 <span class="rot">Osso</span></button>
-      <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a camera arrastando (6 ou H). Tambem: botao do meio ou direito, ou segurar Espaco">✋ <span class="rot">Camera</span></button>
+      <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animações">🦴 <span class="rot">Osso</span></button>
+      <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a câmera arrastando (6 ou H). Também: botão do meio ou direito, ou segurar Espaço">✋ <span class="rot">Câmera</span></button>
 
     </div>
     <div class="seg">
@@ -306,23 +326,23 @@
     </div>
     {#snippet botoesVer()}
       <button class:on={showBones} onclick={() => (showBones = !showBones)}>ossos</button>
-      <button class:on={showMeshes} onclick={() => (showMeshes = !showMeshes)}>malhas</button>
+      <button class:on={showMeshes && numMalhas > 0} disabled={!!app.doc && numMalhas === 0} onclick={() => (showMeshes = !showMeshes)} title={app.doc && numMalhas === 0 ? "Este personagem não tem malhas: todas as peças são imagens retangulares. Para deformar uma peça, selecione e use Deixar deformável no inspetor" : "Mostra o contorno e os triângulos das malhas"}>malhas{app.doc ? ` (${numMalhas})` : ""}</button>
       <button class:on={app.onion} onclick={() => (app.onion = !app.onion)} title="Fantasmas dos quadros vizinhos (pausado)">cebola</button>
       <button onclick={() => app.viewer?.frameAll()} title="Enquadrar (F)">enquadrar</button>
-      <select class="runtime" value={app.runtime} onchange={(e) => app.setRuntime((e.currentTarget as HTMLSelectElement).value as any)} title="Quem desenha o viewport. godot: como o spine-godot dos jogos de hoje (com os defeitos medidos); spine: como o editor do Spine; nucleo: o nucleo proprio (wasm) com a semantica do jogo novo">
-        <option value="godot">desenho: godot</option>
-        <option value="spine">desenho: spine</option>
-        <option value="nucleo">desenho: nucleo</option>
+      <select class="runtime" value={app.runtime} onchange={(e) => app.setRuntime((e.currentTarget as HTMLSelectElement).value as any)} title="Quem desenha o personagem aqui. Mamulengo: o núcleo próprio, com efeitos, luzes e partículas, igual ao jogo com o addon. Como o Spine: o desenho do editor do Spine. Como o spine-godot: o plugin oficial do Spine no Godot, com as diferenças medidas (docs/PARIDADE.md)">
+        <option value="godot">desenho: como o spine-godot</option>
+        <option value="spine">desenho: como o Spine</option>
+        <option value="nucleo">desenho: Mamulengo</option>
       </select>
       <GodotCheck />
-      <label class="botao" title="por uma imagem de referencia por cima do personagem (pose, proporcao, encaixe)">
-        referencia
+      <label class="botao" title="por uma imagem de referência por cima do personagem (pose, proporção, encaixe)">
+        referência
         <input type="file" accept="image/*" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f)); (e.currentTarget as HTMLInputElement).value = ""; }} />
       </label>
     {/snippet}
     {#if compacto || menuVer}
       <div class="menu-ver">
-        <button class:on={verAberto} onclick={() => (verAberto = !verAberto)} title="Ossos, malhas, cebola, enquadrar, desenho, Godot, referencia">ver ▾</button>
+        <button class:on={verAberto} onclick={() => (verAberto = !verAberto)} title="Ossos, malhas, cebola, enquadrar, desenho, Godot, referência">ver ▾</button>
         {#if verAberto}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div class="fundo-menu" onclick={() => (verAberto = false)}></div>
@@ -333,41 +353,43 @@
       <div class="seg">{@render botoesVer()}</div>
     {/if}
     <div class="spacer"></div>
-    <button class="help" title="Como usar" onclick={() => (guide = true)}>?</button>
+    <button class="help" title="Atalhos do teclado e o guia (tecla ?)" onclick={() => (atalhos = true)}>?</button>
     <div class="agent" class:on={app.agentConnected} title={app.agentConnected ? "Claude conectado: ele esta operando este editor" : "Claude: nenhuma instancia conectada a este editor"}>🤖{#if app.agentConnected}<span class="pontinho"></span>{/if}</div>
     {#if app.narration.text}<button class="talk" class:off={!app.showNarration} onclick={toggleNarration} title="Mostrar ou esconder a legenda com o que o Claude diz">💬</button>{/if}
     {#if app.spectator}
-      <div class="spect" title="Esta aba so assiste ao editor que o Claude esta usando: navegue a vontade (animacao, instante, camera, partes); nada aqui e salvo">acompanhando o Claude</div>
+      <div class="spect" title="Esta aba só assiste ao editor que o Claude esta usando: navegue a vontade (animação, instante, câmera, partes); nada aqui e salvo">acompanhando o Claude</div>
     {/if}
-    <button class="follow" class:on={follow} onclick={toggleFollow} title={follow ? "Acompanhar o Claude: ligado. Ao abrir, se ele estiver trabalhando, o editor vai para a cena dele. Clique para desligar e trabalhar em outro lugar" : "Acompanhar o Claude: desligado. Clique para ligar"}>👁 {follow ? "✓" : "✗"}</button>
+    <!-- acompanhar so faz sentido com o Claude conectado -->
+    {#if app.agentConnected || app.spectator}
+      <button class="follow" class:on={follow} onclick={toggleFollow} title={follow ? "Acompanhar o Claude: ligado. Ao abrir, se ele estiver trabalhando, o editor vai para a cena dele. Clique para desligar e trabalhar em outro lugar" : "Acompanhar o Claude: desligado. Clique para ligar"}>👁 {follow ? "✓" : "✗"}</button>{/if}
     {#if !app.spectator}
       <button class="save" class:dirty disabled={!app.doc || saving} onclick={save} title="Salvar no projeto (Ctrl+S)">{saving ? "salvando…" : dirty ? "● Salvar" : "Salvo"}</button>
     {/if}
-    <button class="painel" class:on={!recolhe.foot} onclick={() => alterna("foot")} title="Mostrar ou esconder o painel de baixo: a timeline (Ctrl+\\). Espaco continua tocando e pausando">⬓</button>
+    <button class="painel" class:on={!recolhe.foot} onclick={() => alterna("foot")} title="Mostrar ou esconder o painel de baixo: a timeline (Ctrl+\\). Espaço continua tocando e pausando">⬓</button>
     <button class="painel" class:on={!recolhe.right} onclick={() => alterna("right")} title="Mostrar ou esconder o painel da direita: inspetor, ficha, notas (Ctrl+])">◨</button>
   </header>
 
   <aside class="left panel">
     <div class="tabs">
-      <button class:on={leftTab === "bones"} onclick={() => (leftTab = "bones")} title="Esqueleto: o que mexe o que (hierarquia dos ossos)">Esqueleto</button>
+      <button class:on={leftTab === "bones"} onclick={() => (leftTab = "bones")} title="Esqueleto: o que mexe o que (hierarquia dos ossos)">Ossos</button>
       <button class:on={leftTab === "layers"} onclick={() => (leftTab = "layers")} title="Ordem de desenho: o que fica na frente do que, e o osso que move cada imagem">Ordem</button>
       <button class:on={leftTab === "images"} onclick={() => (leftTab = "images")}>Imagens</button>
-      <button class:on={leftTab === "versions"} onclick={() => (leftTab = "versions")} title="Versoes salvas: marcar, comparar, restaurar">Versoes</button>
+      <button class:on={leftTab === "versions"} onclick={() => (leftTab = "versions")} title="Versões salvas: marcar, comparar, restaurar">Versões</button>
     </div>
     {#if leftTab === "bones"}<Tree />{:else if leftTab === "layers"}<Layers />{:else if leftTab === "images"}<Images />{:else}<Versions />{/if}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="grip col right-edge" title="Arraste para mudar a largura (clique duplo: padrao)" onpointerdown={(e) => resize(e, "left", 1, "x")} ondblclick={() => resetSize("left")}></div>
+    <div class="grip col right-edge" title="Arraste para mudar a largura (clique duplo: padrão)" onpointerdown={(e) => resize(e, "left", 1, "x")} ondblclick={() => resetSize("left")}></div>
   </aside>
   <main class="view"><Viewport /></main>
   <aside class="right panel">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="grip col left-edge" title="Arraste para mudar a largura (clique duplo: padrao)" onpointerdown={(e) => resize(e, "right", -1, "x")} ondblclick={() => resetSize("right")}></div>
+    <div class="grip col left-edge" title="Arraste para mudar a largura (clique duplo: padrão)" onpointerdown={(e) => resize(e, "right", -1, "x")} ondblclick={() => resetSize("right")}></div>
     <div class="tabs">
       <button class:on={app.rightTab === "edit"} onclick={() => (app.rightTab = "edit")}>Mexer</button>
-      <button class:on={app.rightTab === "ficha"} onclick={() => (app.rightTab = "ficha")} title="O que a animacao deve fazer, limites e regras conferidas"
+      <button class:on={app.rightTab === "ficha"} onclick={() => (app.rightTab = "ficha")} title="O que a animação deve fazer, limites e regras conferidas"
         >Ficha{#if app.fichaFails}<span class="fails">{app.fichaFails}</span>{/if}</button
       >
-      <button class:on={app.rightTab === "notas"} onclick={() => (app.rightTab = "notas")} title="Anotacoes da equipe e do Claude neste personagem"
+      <button class:on={app.rightTab === "notas"} onclick={() => (app.rightTab = "notas")} title="Anotações da equipe e do Claude neste personagem"
         >Notas{#if app.notes.some((n) => n.estado === "aberta")}<span class="fails notes">{app.notes.filter((n) => n.estado === "aberta").length}</span>{/if}</button
       >
     </div>
@@ -378,16 +400,19 @@
     <div class="scroll" class:hidden={app.rightTab !== "ficha"}><Ficha /></div>
     <div class="scroll" class:hidden={app.rightTab !== "notas"}><Notes /></div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="sep" title="Arraste para mudar a altura da Atividade (clique duplo: padrao)" onpointerdown={(e) => resize(e, "act", -1, "y")} ondblclick={() => resetSize("act")}>Atividade</div>
-    <div class="act-box" style:height="{layout.act}px"><Activity /></div>
+    <div class="sep" class:fechada={recolhe.act} title={recolhe.act ? "" : "Arraste para mudar a altura da Atividade (clique duplo: padrão)"} onpointerdown={(e) => !recolhe.act && resize(e, "act", -1, "y")} ondblclick={() => !recolhe.act && resetSize("act")}>
+      <button class="abre-act" onpointerdown={(e) => e.stopPropagation()} onclick={() => alterna("act")} aria-expanded={!recolhe.act} title={recolhe.act ? "Mostrar a Atividade: o que você e o Claude fizeram" : "Recolher a Atividade"}>{recolhe.act ? "▸" : "▾"} Atividade</button>
+    </div>
+    {#if !recolhe.act}<div class="act-box" style:height="{layout.act}px"><Activity /></div>{/if}
   </aside>
   <footer class="panel">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="grip row top-edge" title="Arraste para mudar a altura da timeline (clique duplo: padrao)" onpointerdown={(e) => resize(e, "foot", -1, "y")} ondblclick={() => resetSize("foot")}></div>
+    <div class="grip row top-edge" title="Arraste para mudar a altura da timeline (clique duplo: padrão)" onpointerdown={(e) => resize(e, "foot", -1, "y")} ondblclick={() => resetSize("foot")}></div>
     <Timeline />
   </footer>
 
   {#if !app.spectator}<Onboarding bind:open={guide} />{/if}
+  <Atalhos bind:open={atalhos} guia={() => (guide = true)} />
   {#if app.showNarration && app.narration.text && now - app.narration.at < 20000}
     <div class="caption">🤖 {app.narration.text.length > 280 ? app.narration.text.slice(0, 280) + "…" : app.narration.text}</div>
   {/if}
@@ -397,14 +422,14 @@
 
   {#if app.draft}
     <div class="draft">
-      Encontrei alteracoes nao salvas de {new Date(app.draft.at).toLocaleString("pt-BR")} neste personagem.
+      Encontrei alterações não salvas de {new Date(app.draft.at).toLocaleString("pt-BR")} neste personagem.
       <button class="ok" onclick={() => app.restoreDraft()}>Recuperar</button>
       <button onclick={() => app.discardDraft()}>Descartar</button>
     </div>
   {/if}
 
   {#if app.toastMsg}
-    <div class="toast">{app.toastMsg.text}</div>
+    <div class="toast" class:ok={app.toastMsg.ok} role="status">{app.toastMsg.text}</div>
   {/if}
 </div>
 
@@ -553,16 +578,6 @@
     font-size: 15px;
     padding: 6px 12px;
   }
-  .brush {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 6px;
-    color: var(--dim);
-  }
-  .brush input {
-    width: 80px;
-  }
   .spacer {
     flex: 1;
   }
@@ -616,6 +631,19 @@
     overflow-y: auto;
     min-height: 0;
     flex: 1 1 auto;
+  }
+  .sep.fechada {
+    cursor: default;
+  }
+  .abre-act {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
   }
   .act-box {
     flex: 0 0 auto;
@@ -739,7 +767,7 @@
     border-radius: 10px;
   }
   .tabs button {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     border: none;
     background: none;
@@ -800,5 +828,9 @@
     border-radius: 10px;
     max-width: 70vw;
     z-index: 50;
+  }
+  .toast.ok {
+    background: #15301f;
+    border-color: var(--ok);
   }
 </style>

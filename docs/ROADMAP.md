@@ -8,7 +8,12 @@ O que está aberto, em ordem de prioridade.
 2. **O addon na Godot Asset Library,** e o build de macOS conferido num Mac.
 3. **Teste com uma pessoa:** levar para o editor o que a pessoa achou.
 
-Feito há pouco: a camada de ajuste (matiz, saturação, luminosidade, contraste e desfoque animados
+Feito há pouco: o editor revisado com testes acompanhados (Mover numa junta dobra o membro, Alt
+solta, Ctrl ajusta a imagem no osso, setas em passos, linha de ajuda da ferramenta, árvore com
+linhas de ligação e arrastar para trocar o pai, alvo do IK entre os ossos existentes, fechar o
+laço e vai e volta em chaves, reordenar com chaves de ordem, versões em `.boneco`, PSD sem
+projeto Godot, atalhos, mensagens e acentos); o exemplo `exemplos/abducao` (paralaxe em nove
+camadas com dois packs CC0 da Kenney, abertura e fechamento com o nome); a camada de ajuste (matiz, saturação, luminosidade, contraste e desfoque animados
 pela timeline, sobre o que já foi desenhado; docs/NUCLEO.md "Ajuste"); o export em WebP animado
 pelo editor; a vinheta nova em `exemplos/vinheta` (teatro de mamulengo feito de instâncias); as instâncias, um `.boneco` dentro de outro, no núcleo, no editor e no Godot
 (docs/NUCLEO.md "Instâncias", `exemplos/vinheta`), com extrair ossos para um `.boneco` novo (e

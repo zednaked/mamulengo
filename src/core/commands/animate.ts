@@ -5,7 +5,7 @@ import { animations, channels, effectFields, fieldsAt, hasFields, requireAnimati
 import { boneWorld, invert, skeletonAt } from "../pose.ts";
 import { CurveArg, Target, editKeys, findKey, getKeys, keyFields, presetShape, removeEmpty, round, timeOf, timelinePath, writeShape } from "./timeline.ts";
 
-const AnimName = z.string().min(1).describe("Nome da animacao (ex: 2.idle)");
+export const AnimName = z.string().min(1).describe("Nome da animacao (ex: 2.idle)");
 
 defineCommand({
   name: "animation.create",
@@ -14,7 +14,7 @@ defineCommand({
   params: z.object({ name: AnimName }),
   label: (p) => `nova animacao ${p.name}`,
   run({ e }, p) {
-    if (animations(e.json)[p.name]) throw new Error(`animacao ja existe: ${p.name}`);
+    if (animations(e.json)[p.name]) throw new Error(`animação já existe: ${p.name}`);
     e.set(["animations", p.name], {});
     return { created: p.name };
   },
@@ -41,7 +41,7 @@ defineCommand({
   label: (p) => `renomeia ${p.name} -> ${p.to}`,
   run({ e }, p) {
     requireAnimation(e.json, p.name);
-    if (animations(e.json)[p.to]) throw new Error(`animacao ja existe: ${p.to}`);
+    if (animations(e.json)[p.to]) throw new Error(`animação já existe: ${p.to}`);
     e.apply({ op: "rename", path: ["animations"], from: p.name, to: p.to });
     return { renamed: p.to };
   },
@@ -55,7 +55,7 @@ defineCommand({
   label: (p) => `duplica ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const a = requireAnimation(e.json, p.name);
-    if (animations(e.json)[p.to]) throw new Error(`animacao ja existe: ${p.to}`);
+    if (animations(e.json)[p.to]) throw new Error(`animação já existe: ${p.to}`);
     e.set(["animations", p.to], a);
     return { created: p.to };
   },
@@ -204,7 +204,7 @@ defineCommand({
     requireAnimation(e.json, p.anim);
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);
     const i = findKey(getKeys(e.json, path), p.time);
-    if (i < 0) throw new Error(`nao ha chave em ${p.time}s nessa timeline. Tempos: ${getKeys(e.json, path).map(timeOf).join(", ")}`);
+    if (i < 0) throw new Error(`não há chave em ${p.time}s nessa timeline. Tempos: ${getKeys(e.json, path).map(timeOf).join(", ")}`);
     setCurve(e, path, kind, i, p.curve);
     return { index: i };
   },
@@ -221,7 +221,7 @@ defineCommand({
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);
     const keys = getKeys(e.json, path);
     const i = findKey(keys, p.time);
-    if (i < 0) throw new Error(`nao ha chave em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
+    if (i < 0) throw new Error(`não há chave em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
     if (keys.length === 1) {
       removeEmpty(e, path);
       return { deleted: i, timelineRemoved: true };
@@ -242,9 +242,9 @@ defineCommand({
     const { path, kind } = timelinePath(e.json, p.anim, p.target, p.timeline);
     const keys = getKeys(e.json, path);
     const i = findKey(keys, p.time);
-    if (i < 0) throw new Error(`nao ha chave em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
+    if (i < 0) throw new Error(`não há chave em ${p.time}s. Tempos: ${keys.map(timeOf).join(", ")}`);
     const to = round(p.to);
-    if (findKey(keys, to) >= 0 && findKey(keys, to) !== i) throw new Error(`ja existe chave em ${to}s`);
+    if (findKey(keys, to) >= 0 && findKey(keys, to) !== i) throw new Error(`já existe chave em ${to}s`);
     let j = keys.findIndex((k, n) => n !== i && timeOf(k) > to);
     if (j < 0) j = keys.length;
     const dest = j > i ? j - 1 : j;

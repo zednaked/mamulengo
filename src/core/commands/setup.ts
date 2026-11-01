@@ -7,6 +7,7 @@ import type { Editor } from "../document.ts";
 import { apply, applyLinear, boneWorld, invert, skeletonAt, type Affine } from "../pose.ts";
 import { withBoneOrder } from "../boneorder.ts";
 import { comMedidor } from "../instantes.ts";
+import { decodeDrawOrder, encodeDrawOrder } from "./organize.ts";
 
 const BoneProps = z.object({
   x: z.number().optional(),
@@ -47,7 +48,7 @@ defineCommand({
   }),
   label: (p) => `novo osso ${p.name}`,
   run({ e }, p) {
-    if (boneIndex(e.json, p.name) >= 0) throw new Error(`osso ja existe: ${p.name}`);
+    if (boneIndex(e.json, p.name) >= 0) throw new Error(`osso já existe: ${p.name}`);
     // coordenadas de mundo -> locais ao pai (na setup pose)
     if ((p.at || p.toward) && bones(e.json).length) {
       requireBone(e.json, p.parent);
@@ -137,7 +138,7 @@ defineCommand({
   run({ e }, p) {
     const i = requireBone(e.json, p.bone);
     requireBone(e.json, p.parent);
-    if (p.bone === p.parent || descendants(e.json, p.bone).has(p.parent)) throw new Error("o novo pai nao pode ser o proprio osso nem um descendente");
+    if (p.bone === p.parent || descendants(e.json, p.bone).has(p.parent)) throw new Error("o novo pai não pode ser o próprio osso nem um descendente");
     const list = bones(e.json);
     const moving = [p.bone, ...descendants(e.json, p.bone)];
     const movingSet = new Set(moving);
@@ -239,7 +240,7 @@ defineCommand({
   }),
   label: (p) => `novo slot ${p.name}`,
   run({ e }, p) {
-    if (slotIndex(e.json, p.name) >= 0) throw new Error(`slot ja existe: ${p.name}`);
+    if (slotIndex(e.json, p.name) >= 0) throw new Error(`slot já existe: ${p.name}`);
     requireBone(e.json, p.bone);
     let at = slots(e.json).length;
     if (p.index !== undefined) at = Math.min(p.index, at);
@@ -328,7 +329,7 @@ defineCommand({
     const campos = EFFECTS[p.effect].map(([f]) => f);
     const novo: Record<string, any> = { ...(cur[p.effect] ?? {}) };
     for (const f of campos) if ((p as any)[f] !== undefined) novo[f] = f === "color" ? (p as any)[f].toLowerCase() : round((p as any)[f]);
-    for (const k of Object.keys((p as any))) if (!campos.includes(k) && ["color", "width", "strength", "radius", "value", "edge", "grain", "limit", "fade", "copies", "interval", "alpha", "hue", "saturation", "lightness", "contrast", "blur"].includes(k)) throw new Error(`${p.effect} nao tem ${k}; campos: ${campos.join(", ")}`);
+    for (const k of Object.keys((p as any))) if (!campos.includes(k) && ["color", "width", "strength", "radius", "value", "edge", "grain", "limit", "fade", "copies", "interval", "alpha", "hue", "saturation", "lightness", "contrast", "blur"].includes(k)) throw new Error(`${p.effect} não tem ${k}; campos: ${campos.join(", ")}`);
     const tudo = { ...cur, [p.effect]: novo };
     if (JSON.stringify(cur) !== JSON.stringify(tudo)) e.set(["slots", i, "effects"], tudo);
     return { index: i, effects: tudo };
@@ -396,7 +397,7 @@ function rebaseSlot(e: Editor, slot: string, from: string, to: string) {
 defineCommand({
   name: "slot.order",
   group: "slot",
-  summary: "Move um slot na ordem de desenho da setup pose (index 0 = mais atras).",
+  summary: "Move um slot na ordem de desenho da setup pose (index 0 = mais atras). As chaves de ordem das animacoes sao reescritas contra a ordem nova e continuam iguais na tela.",
   params: z.object({ slot: z.string(), index: z.number().int().min(0) }),
   label: (p) => `ordem ${p.slot} -> ${p.index}`,
   run({ e }, p) {
@@ -404,14 +405,21 @@ defineCommand({
     const n = slots(e.json).length;
     const to = Math.min(p.index, n - 1);
     if (to === i) return { index: i };
-    // timelines de drawOrder guardam offsets relativos a ordem de setup; mudar a ordem
-    // de setup sem refazer os offsets mudaria as animacoes
-    const anims = Object.entries(e.json.animations ?? {}).filter(([, a]: any) => a.drawOrder?.length);
-    if (anims.length) throw new Error(`as animacoes ${anims.map(([n]) => n).join(", ")} tem timeline de drawOrder; reordenar a setup quebraria os offsets (ainda nao suportado)`);
+    // timelines de drawOrder guardam offsets relativos a ordem de setup: cada chave e lida como
+    // ordem absoluta antes e reescrita contra a ordem nova, e a animacao continua igual na tela
+    // (uma chave sem offsets e a ordem de setup antiga, que agora precisa deles)
+    const antes = slots(e.json).map((x: any) => x.name);
+    const absolutas = Object.entries<any>(e.json.animations ?? {}).flatMap(([an, a]) => (a.drawOrder ?? []).map((k: any, ki: number) => ({ an, ki, ordem: k.offsets?.length ? decodeDrawOrder(antes, k.offsets) : antes })));
     const s = structuredClone(slots(e.json)[i]);
     e.remove(["slots"], i);
     e.insert(["slots"], to, s);
-    return { index: to };
+    const depois = slots(e.json).map((x: any) => x.name);
+    for (const { an, ki, ordem } of absolutas) {
+      const offsets = encodeDrawOrder(depois, ordem);
+      const path = ["animations", an, "drawOrder", ki, "offsets"];
+      e.set(path, offsets.length ? offsets : undefined);
+    }
+    return { index: to, ...(absolutas.length ? { drawOrderKeys: absolutas.length } : {}) };
   },
 });
 
@@ -451,6 +459,13 @@ defineCommand({
   label: (p) => `region ${p.slot}/${p.name}`,
   run({ e, assets }, p) {
     const sIdx = requireSlot(e.json, p.slot);
+    // a imagem ja existe: atualizar so mexe no que veio (o tamanho dela e o guardado; o do atlas
+    // pode ser outro, numa pagina em alta resolucao, e regrava-lo esticava a peca)
+    const existente = skins(e.json).find((s) => s.name === p.skin)?.attachments?.[p.slot]?.[p.name];
+    if (existente) {
+      p.width ??= existente.width;
+      p.height ??= existente.height;
+    }
     // tamanho padrao (o da imagem no atlas) antes de converter size -> scale
     if (p.width === undefined || p.height === undefined) {
       const r = assets?.region(p.path ?? p.name);
@@ -497,11 +512,11 @@ defineCommand({
     }
     const path = ["skins", si, "attachments", p.slot, p.name];
     const cur = skins(e.json)[si].attachments?.[p.slot]?.[p.name];
-    if (cur && (cur.type ?? "region") !== "region") throw new Error(`${p.slot}/${p.name} ja existe e e ${cur.type}`);
+    if (cur && (cur.type ?? "region") !== "region") throw new Error(`${p.slot}/${p.name} já existe e e ${cur.type}`);
     const { slot, name, skin, world, ...props } = p;
     void world;
     if (!cur) {
-      if (props.width === undefined || props.height === undefined) throw new Error(`regiao "${p.path ?? p.name}" nao esta no atlas; passe width e height ou adicione a imagem (mamulengo_add_images)`);
+      if (props.width === undefined || props.height === undefined) throw new Error(`regiao "${p.path ?? p.name}" não esta no atlas; passe width e height ou adicione a imagem (mamulengo_add_images)`);
       const a: any = {};
       for (const k of REGION_ORDER) {
         const v = (props as any)[k];
@@ -525,7 +540,7 @@ defineCommand({
   run({ e }, p) {
     const si = requireSkin(e.json, p.skin);
     const atts = skins(e.json)[si].attachments?.[p.slot];
-    if (!atts?.[p.name]) throw new Error(`attachment nao existe: ${p.slot}/${p.name}`);
+    if (!atts?.[p.name]) throw new Error(`attachment não existe: ${p.slot}/${p.name}`);
     const linked = Object.entries(atts).filter(([, a]: any) => a.type === "linkedmesh" && a.source === p.name && !a.slot);
     if (linked.length) throw new Error(`linked meshes dependem dele: ${linked.map(([n]) => n).join(", ")}`);
     e.set(["skins", si, "attachments", p.slot, p.name], undefined);
@@ -560,7 +575,7 @@ defineCommand({
           for (let t = 0; t <= d + 1e-9; t += Math.max(d / 8, 1 / 30)) grow(m.caixa(a, t));
         }
     });
-    if (!isFinite(x0)) throw new Error("nada visivel para medir");
+    if (!isFinite(x0)) throw new Error("nada visível para medir");
     const b = { x: round(x0), y: round(y0), width: round(x1 - x0), height: round(y1 - y0) };
     for (const [k, v] of Object.entries(b)) e.set(["skeleton", k], v);
     return b;

@@ -44,10 +44,10 @@ export function locateMesh(json: SpineJson, skin: string, slot: string, name: st
     const sSkin = a.skin ?? "default",
       sSlot = a.slot ?? slot;
     const src = attachmentAt(json, sSkin, sSlot, a.source);
-    if (src.type !== "mesh") throw new Error(`fonte do linked mesh ${slot}/${name} nao e malha`);
+    if (src.type !== "mesh") throw new Error(`fonte do linked mesh ${slot}/${name} não é malha`);
     return { skin: sSkin, si: requireSkin(json, sSkin), slot: sSlot, name: a.source, mesh: src };
   }
-  if (a.type !== "mesh") throw new Error(`${slot}/${name} nao e malha (e ${a.type ?? "region"}); use mesh.create para converter`);
+  if (a.type !== "mesh") throw new Error(`${slot}/${name} não é malha (é ${a.type ?? "region"}); use mesh.create para converter`);
   return { skin, si: requireSkin(json, skin), slot, name, mesh: a };
 }
 
@@ -97,7 +97,7 @@ function space(json: SpineJson, slot: string, world?: SetupWorld): Space {
     return m;
   };
   const slotBone = slots(json).find((s) => s.name === slot)?.bone;
-  if (!slotBone) throw new Error(`slot nao existe: ${slot}`);
+  if (!slotBone) throw new Error(`slot não existe: ${slot}`);
   return { slotBone, slotW: byName(slotBone), bone: (i) => byName(names[i]), boneByName: byName };
 }
 
@@ -279,7 +279,7 @@ function commit(e: Editor, loc: Loc, c: Commit): { vertices: number; triangles: 
   const W = m.width || 100,
     H = m.height || 100;
   const tris = c.triangles ?? triangulateHull(c.verts.map((v) => [v.uv[0] * W, v.uv[1] * H] as Pt), c.hull);
-  if (!tris.length) throw new Error("a malha ficaria sem triangulos (contorno degenerado)");
+  if (!tris.length) throw new Error("a malha ficaria sem triângulos (contorno degenerado)");
   const used = new Set(tris);
   const uvs = c.verts.flatMap((v) => [round(v.uv[0]), round(v.uv[1])]);
   const vertices = c.verts[0].inf ? c.verts.flatMap((v) => [v.inf!.length, ...v.inf!.flatMap((x) => [x.bone, x.x, x.y, x.w])]) : c.verts.flatMap((v) => v.local!);
@@ -391,7 +391,7 @@ defineCommand({
     const world = V.map((v) => worldOf(S, v));
     const next = V.map((v) => ({ uv: [...v.uv] as Pt, local: v.local ? ([...v.local] as Pt) : null, inf: v.inf?.map((x) => ({ ...x })) ?? null }));
     for (const mv of p.moves) {
-      if (mv.i >= V.length) throw new Error(`vertice ${mv.i} nao existe (malha tem ${V.length})`);
+      if (mv.i >= V.length) throw new Error(`vértice ${mv.i} não existe (malha tem ${V.length})`);
       let P: Pt = [mv.x ?? world[mv.i][0] + (mv.dx ?? 0), mv.y ?? world[mv.i][1] + (mv.dy ?? 0)];
       if (!p.stretch) {
         // uv pelo mapa atual mundo -> imagem; fora da imagem, o ponto para na borda dela
@@ -475,14 +475,14 @@ defineCommand({
       index = edge.k + 1;
     } else {
       const f = findTri(world, m.triangles, at);
-      if (!f || !f.inside) throw new Error("o ponto nao cai em nenhum triangulo da malha");
+      if (!f || !f.inside) throw new Error("o ponto não cai em nenhum triângulo da malha");
       P = at;
       contrib = f.idx.map((i, k) => [i, f.b[k]] as [number, number]);
       uv = [0, 1].map((k) => f.b[0] * V[f.idx[0]].uv[k] + f.b[1] * V[f.idx[1]].uv[k] + f.b[2] * V[f.idx[2]].uv[k]) as Pt;
       index = V.length;
     }
     const near = world.findIndex((q) => Math.hypot(q[0] - P[0], q[1] - P[1]) < 0.5);
-    if (near >= 0) throw new Error(`ja existe o vertice ${near} nesse lugar`);
+    if (near >= 0) throw new Error(`já existe o vértice ${near} nesse lugar`);
     const nv = blendVertex(S, V, contrib, P, uv);
     const verts = V.slice();
     verts.splice(index, 0, nv);
@@ -514,7 +514,7 @@ defineCommand({
     const S = space(e.json, p.slot);
     const V = decode(m);
     const del = new Set(Array.isArray(p.i) ? p.i : [p.i]);
-    for (const i of del) if (i >= V.length) throw new Error(`vertice ${i} nao existe (malha tem ${V.length})`);
+    for (const i of del) if (i >= V.length) throw new Error(`vértice ${i} não existe (malha tem ${V.length})`);
     const h = m.hull ?? 0;
     const hull = h - [...del].filter((i) => i < h).length;
     if (hull < 3) throw new Error("o contorno precisa de pelo menos 3 pontos");
@@ -553,7 +553,7 @@ defineCommand({
     const world = V.map((v) => worldOf(S, v));
     const bi = requireBone(e.json, p.bone);
     const slotBi = boneIndex(e.json, S.slotBone);
-    if (!p.points?.length && !p.vertices?.length) throw new Error("passe points (pincel) ou vertices");
+    if (!p.points?.length && !p.vertices?.length) throw new Error("passe points (pincel) ou vértices");
     const W = V.map((v) => new Map<number, number>(v.inf ? v.inf.map((x) => [x.bone, x.w]) : [[slotBi, 1]]));
     // para quem vai o peso tirado de um vertice que so tinha este osso: o osso mais perto
     const cands = new Set<number>([slotBi]);
@@ -600,7 +600,7 @@ defineCommand({
     let touched = 0;
     if (p.vertices?.length) {
       for (const i of p.vertices) {
-        if (i >= V.length) throw new Error(`vertice ${i} nao existe (malha tem ${V.length})`);
+        if (i >= V.length) throw new Error(`vértice ${i} não existe (malha tem ${V.length})`);
         dab(i, strength);
         touched++;
       }
@@ -617,7 +617,7 @@ defineCommand({
     if (!touched) {
       const xs = world.map((q) => q[0]),
         ys = world.map((q) => q[1]);
-      throw new Error(`nenhum vertice dentro do raio ${p.radius}. Vertices vao de x ${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)}, y ${Math.min(...ys).toFixed(0)}..${Math.max(...ys).toFixed(0)}`);
+      throw new Error(`nenhum vértice dentro do raio ${p.radius}. Vértices vao de x ${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)}, y ${Math.min(...ys).toFixed(0)}..${Math.max(...ys).toFixed(0)}`);
     }
     const wasWeighted = !!V[0].inf;
     if (!changed.size && wasWeighted) return { touched, changed: 0 };

@@ -29,7 +29,7 @@ defineCommand({
   label: (p) => `antecipacao ${p.timeline} @${p.time}`,
   run(ctx, p) {
     requireAnimation(ctx.e.json, p.anim);
-    if (!NUMERIC.has(p.timeline)) throw new Error(`antecipacao vale para timelines numericas (rotate, translate, scale, shear), nao ${p.timeline}`);
+    if (!NUMERIC.has(p.timeline)) throw new Error(`antecipacao vale para timelines numericas (rotate, translate, scale, shear), não ${p.timeline}`);
     const { path, kind } = timelinePath(ctx.e.json, p.anim, p.target, p.timeline);
     const keys = getKeys(ctx.e.json, path);
     const i = findKey(keys, p.time);
@@ -53,7 +53,7 @@ defineCommand({
   label: (p) => `overshoot ${p.timeline} @${p.time}`,
   run(ctx, p) {
     requireAnimation(ctx.e.json, p.anim);
-    if (!NUMERIC.has(p.timeline)) throw new Error(`overshoot vale para timelines numericas, nao ${p.timeline}`);
+    if (!NUMERIC.has(p.timeline)) throw new Error(`overshoot vale para timelines numericas, não ${p.timeline}`);
     const { path, kind } = timelinePath(ctx.e.json, p.anim, p.target, p.timeline);
     const keys = getKeys(ctx.e.json, path);
     const i = findKey(keys, p.time);
@@ -63,7 +63,7 @@ defineCommand({
     const next = keys[i + 1];
     const room = next ? timeOf(next) - p.time : Infinity;
     const settle = Math.min(p.settle, room * 0.9);
-    if (settle < 0.04) throw new Error("nao ha espaco ate a proxima chave para assentar");
+    if (settle < 0.04) throw new Error("não há espaço até a próxima chave para assentar");
     const over = b.map((v, k) => v + (v - a[k]) * p.amount);
     // a chave original passa a ser o pico (passa do ponto); o assentamento vem depois
     keyAt(ctx, p, p.time, over, "suave");
@@ -90,7 +90,7 @@ defineCommand({
     requireBone(ctx.e.json, p.from);
     p.chain.forEach((b) => requireBone(ctx.e.json, b));
     const src = getKeys(ctx.e.json, ["animations", p.anim, "bones", p.from, "rotate"]);
-    if (!src.length) throw new Error(`${p.from} nao tem chaves de rotate em ${p.anim}`);
+    if (!src.length) throw new Error(`${p.from} não tem chaves de rotate em ${p.anim}`);
     const dur = Math.max(...src.map(timeOf));
     let made = 0;
     p.chain.forEach((b, n) => {

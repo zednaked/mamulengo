@@ -9,7 +9,7 @@ export type SequenceParam = { next: string; mix?: number; at?: number | null; lo
 export function applySequence(v: Viewer, s: SequenceParam) {
   if (s === undefined) return;
   if (s === null) return v.setSequence(null);
-  if (!v.view.animation) throw new Error("sequence precisa de uma animacao (animation)");
-  if (!v.hasAnimation(s.next)) throw new Error(`animacao nao existe: ${s.next}`);
+  if (!v.view.animation) throw new Error("A emenda precisa de uma animação de partida.");
+  if (!v.hasAnimation(s.next)) throw new Error(`A animação ${s.next} não existe.`);
   v.setSequence({ next: s.next, mix: s.mix ?? app.mixFor(v.view.animation, s.next), at: s.at ?? null, loop: s.loop ?? false, nextLoop: s.nextLoop ?? true });
 }

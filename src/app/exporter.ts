@@ -31,6 +31,8 @@ export interface ExportOptions {
   // (com fade) e um rodape com credito numa faixa embaixo
   moldura?: Moldura;
   onProgress?: (done: number, total: number) => void;
+  // recebe o arquivo pronto (o editor oferece baixar)
+  onBlob?: (blob: Blob) => void;
 }
 
 export interface Moldura {
@@ -128,11 +130,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
   const v = app.viewer;
   v?.sync();
-  if (!v?.pose) throw new Error("nada para exportar (abra um asset)");
+  if (!v?.pose) throw new Error("Nada para exportar: abra um personagem primeiro.");
   const saved = { view: { ...v.view }, cam: { ...v.cam }, selection: v.selection, overlays: v.overlays, onion: v.onion.enabled };
   try {
     if (o.animation !== undefined && o.animation !== v.view.animation) {
-      if (o.animation && !v.hasAnimation(o.animation)) throw new Error(`animacao nao existe: ${o.animation}`);
+      if (o.animation && !v.hasAnimation(o.animation)) throw new Error(`A animação ${o.animation} não existe.`);
       v.setAnimation(o.animation);
     }
     applySequence(v, o.sequence);
@@ -171,7 +173,7 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
           u = [x0, y0, Math.max(u[0] + u[2], b[0] + b[2]) - x0, Math.max(u[1] + u[3], b[1] + b[3]) - y0];
         }
       }
-      if (!u) throw new Error("nada visivel para enquadrar");
+      if (!u) throw new Error("Nada visível para enquadrar: o personagem está escondido ou vazio neste trecho.");
       const m = 0.06;
       rect = [u[0] - u[2] * m, u[1] - u[3] * m, u[2] * (1 + 2 * m), u[3] * (1 + 2 * m)];
       // lado maior em maxW (ou 720 se menor), proporcao do enquadramento
@@ -237,6 +239,7 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
     const base = o.name ?? `${app.asset?.name ?? "boneco"}-${anim ?? "pose"}${seq ? `-para-${seq.next}` : ""}`;
     const q = new URLSearchParams({ format: o.format, name: base });
     if (o.dir) q.set("dir", o.dir);
+    o.onBlob?.(blob);
     const r = await fetch(`/api/export?${q}`, { method: "POST", body: blob });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error);
@@ -258,7 +261,7 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
 // relogio e renderizar um quadro pode demorar mais que 1/fps: renderiza tudo antes
 // (WebP) e depois toca no ritmo certo. O primeiro quadro pode ficar um pouco mais longo.
 async function recordWebm(n: number, total: number, fps: number, size: [number, number], frameAt: (i: number) => HTMLCanvasElement, progress?: (d: number, t: number) => void): Promise<Blob> {
-  if (typeof MediaRecorder === "undefined") throw new Error("este navegador nao grava video (sem WebCodecs nem MediaRecorder)");
+  if (typeof MediaRecorder === "undefined") throw new Error("Este navegador não grava vídeo (não tem WebCodecs nem MediaRecorder). Exporte GIF, ou use o Chrome ou o Firefox.");
   const out = document.createElement("canvas");
   [out.width, out.height] = size;
   const g = out.getContext("2d")!;
@@ -271,7 +274,7 @@ async function recordWebm(n: number, total: number, fps: number, size: [number, 
   const stopped = new Promise<void>((r) => (rec.onstop = () => r()));
   const shots: Blob[] = [];
   for (let i = 0; i < n; i++) {
-    shots.push(await new Promise<Blob>((ok, fail) => frameAt(i).toBlob((b) => (b ? ok(b) : fail(new Error("quadro nao renderizou"))), "image/webp", 0.95)));
+    shots.push(await new Promise<Blob>((ok, fail) => frameAt(i).toBlob((b) => (b ? ok(b) : fail(new Error("Um quadro não foi desenhado; tente exportar de novo."))), "image/webp", 0.95)));
     progress?.(i + 1, n * 2);
   }
   // o gravador so comeca com um quadro na tela

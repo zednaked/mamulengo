@@ -12,7 +12,7 @@ const Cor = z.string().regex(/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/);
 export const lights = (json: any): any[] => json.lights ?? [];
 export function requireLight(json: any, name: string): number {
   const i = lights(json).findIndex((l) => l.name === name);
-  if (i < 0) throw new Error(`luz nao existe: "${name}". Luzes: ${lights(json).map((l) => l.name).join(", ") || "(nenhuma)"}`);
+  if (i < 0) throw new Error(`luz não existe: "${name}". Luzes: ${lights(json).map((l) => l.name).join(", ") || "(nenhuma)"}`);
   return i;
 }
 
@@ -74,7 +74,7 @@ defineCommand({
   label: (p) => `renomeia luz ${p.name} -> ${p.to}`,
   run({ e }, p) {
     const i = requireLight(e.json, p.name);
-    if (lights(e.json).some((l) => l.name === p.to)) throw new Error(`luz ja existe: ${p.to}`);
+    if (lights(e.json).some((l) => l.name === p.to)) throw new Error(`luz já existe: ${p.to}`);
     e.set(["lights", i, "name"], p.to);
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
       if (a.lights?.[p.name]) e.apply({ op: "rename", path: ["animations", an, "lights"], from: p.name, to: p.to });
