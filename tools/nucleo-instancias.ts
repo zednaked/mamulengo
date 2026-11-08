@@ -44,6 +44,7 @@ const pose = (c: string, anim: string | null, ts: number[]) => {
 let falhas = 0,
   conferidas = 0,
   misturas = 0,
+  seguidas = 0,
   maior = 0;
 const falha = (m: string) => (falhas++, console.log("FALHA " + m));
 
@@ -126,7 +127,12 @@ function confere(caminho: string, anim: string | null, tAnim: number | null, sai
     // no comeco da mistura a pose e a da anterior no tempo dela
     const [anPose, tPose] = de ? [de.an, de.t] : [an, t];
     // a base e o filho sozinho naquele tempo
-    const w = saida.ossos[inst.osso ?? b.slots.find((s: any) => s.nome === inst.slot).osso];
+    // o osso da instancia, ou o de outra instancia que ela segue (a ultima chave com segue em
+    // vigor, ou a instancia); null volta ao osso dela
+    let sg: any = inst.segue ?? null;
+    chaves.forEach((c, j) => j <= k && c.segue !== undefined && (sg = c.segue));
+    const w = sg ? saida.instancias[sg.instancia].ossos[sg.osso] : saida.ossos[inst.osso ?? b.slots.find((s: any) => s.nome === inst.slot).osso];
+    if (sg) seguidas++;
     const r = (inst.rotacao ?? 0) * GRAU,
       sx = inst.escala_x ?? 1,
       sy = inst.escala_y ?? 1;
@@ -142,11 +148,34 @@ function confere(caminho: string, anim: string | null, tAnim: number | null, sai
   }
 }
 
+// as instancias que seguem outra (tests/nucleo/instancias/segue.boneco: uma caixa na mao de um
+// robo que passa para a mao do outro por chave)
+for (const extra of ["segue.boneco"]) {
+  const c = resolve(dirname(arq), extra);
+  const bx = le(c);
+  for (const anim of Object.keys(bx.animacoes ?? {})) {
+    const ts = Array.from({ length: 13 }, (_, k) => Math.round(((duracao(bx.animacoes[anim]) * 1.25 * k) / 12) * 1e4) / 1e4);
+    pose(c, anim, ts).forEach((q: any, k: number) => confere(c, anim, ts[k], q, `${extra} ${anim}@${ts[k]}`));
+  }
+}
+
 const b = le(arq);
 for (const anim of Object.keys(b.animacoes ?? { "-": {} })) {
   const dur = duracao(b.animacoes?.[anim]);
   const ts = Array.from({ length: 13 }, (_, k) => Math.round(((Math.max(dur, 1) * 1.25 * k) / 12) * 1e4) / 1e4);
   pose(arq, anim, ts).forEach((q: any, k: number) => confere(arq, anim, ts[k], q, `${anim}@${ts[k]}`));
 }
-console.log(falhas ? `${falhas} diferencas em ${conferidas} instancias` : `instancias iguais (${conferidas} instancias x instantes, ${misturas} no meio de uma mistura, maior diferenca ${maior.toExponential(1)})`);
+// o recorte do pai corta as instancias (tests/nucleo/instancias/recorte.boneco: uma janela de
+// x -20 a 20 sobre dois robos, um passando pela borda), na CPU (o Godot) e no stencil (a web)
+{
+  const rec = resolve(dirname(arq), "recorte.boneco");
+  const linhas = (modo: string) => spawnSync(bin, [rec, "a", "0,0.5,1", "--caixa", modo], { encoding: "utf8" }).stdout.trim().split("\n");
+  const cpu = linhas("cpu").map((l) => l.match(/(\d+) triangulos, (\d+) recortes, caixa (\S+) (\S+) (\S+) (\S+)/)!.slice(1).map(Number));
+  const gpu = linhas("gpu").map((l) => l.match(/(\d+) triangulos, (\d+) recortes/)!.slice(1).map(Number));
+  if (!cpu.every((c) => c[0] > 0 && c[2] >= -20.001 && c[4] <= 20.001)) falha(`recorte na CPU nao cortou as instancias: ${JSON.stringify(cpu)}`);
+  if (!(cpu[1][0] > cpu[0][0])) falha(`recorte na CPU: o robo passando pela borda devia aparecer em parte (${cpu[1][0]} contra ${cpu[0][0]} triangulos)`);
+  if (!gpu.every((g) => g[1] === 1)) falha(`recorte no stencil: um recorte por quadro, veio ${JSON.stringify(gpu)}`);
+  conferidas++;
+}
+console.log(falhas ? `${falhas} diferencas em ${conferidas} instancias` : `instancias iguais (${conferidas} instancias x instantes, ${misturas} no meio de uma mistura, ${seguidas} seguindo outra, maior diferenca ${maior.toExponential(1)})`);
 process.exit(falhas ? 1 : 0);

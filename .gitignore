@@ -31,3 +31,4 @@ tests/assets/.godot/
 tests/assets/**/*.import
 __pycache__/
 dist-demo
+dist-navegador

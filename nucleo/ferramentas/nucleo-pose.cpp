@@ -1,5 +1,7 @@
 // nucleo-pose <x.boneco> <animacao|-> <t1,t2,...> [--repetir N]
 // Escreve em stdout o JSON do contrato (docs/NUCLEO.md "Contrato da ferramenta de teste").
+// --caixa cpu|gpu: em vez das poses, por instante, o desenho (com o recorte na CPU ou no stencil):
+//   triangulos desenhados e a caixa dos vertices que eles usam, uma linha por instante
 // --repetir N: calcula cada pose N vezes (do zero) e escreve o tempo medio em stderr.
 // --quadros N: toca a animacao N quadros seguidos a 60 por segundo, como no jogo (aplicar,
 //   relogio, mundo e vertices de todos os slots), e escreve o tempo medio por quadro; depois,
@@ -49,7 +51,9 @@ int main(int argc, char** argv) {
     return 2;
   }
   int repetir = 0, quadros = 0;
+  const char* caixa = nullptr;
   for (int i = 4; i + 1 < argc; ++i) {
+    if (!std::strcmp(argv[i], "--caixa")) caixa = argv[i + 1];
     if (!std::strcmp(argv[i], "--repetir")) repetir = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--quadros")) quadros = std::atoi(argv[i + 1]);
   }
@@ -97,6 +101,30 @@ int main(int argc, char** argv) {
 
   Esqueleto e(modelo);
   const Modelo& m = *modelo;
+
+  if (caixa) {
+    Desenho d;
+    d.recorte_cpu = !std::strcmp(caixa, "cpu");
+    for (double t : tempos) {
+      posar(e, anim, t);
+      d.limpar();
+      desenhar(e, d);
+      double x0 = 1e30, y0 = 1e30, x1 = -1e30, y1 = -1e30;
+      size_t tris = 0, recortes = 0;
+      for (const Lote& l : d.lotes) {
+        if (l.comando == Comando::ComecaRecorte) ++recortes;
+        if (l.comando != Comando::Triangulos) continue;
+        tris += l.quantos / 3;
+        for (uint32_t k = l.inicio; k < l.inicio + l.quantos; ++k) {
+          const float* v = d.vertices.data() + size_t(d.indices[k]) * 8;
+          x0 = std::min(x0, double(v[0])), x1 = std::max(x1, double(v[0]));
+          y0 = std::min(y0, double(v[1])), y1 = std::max(y1, double(v[1]));
+        }
+      }
+      std::printf("%g %zu triangulos, %zu recortes, caixa %.3f %.3f %.3f %.3f\n", t, tris, recortes, x0, y0, x1, y1);
+    }
+    return 0;
+  }
 
   if (repetir > 0) {
     auto t0 = std::chrono::steady_clock::now();

@@ -20,7 +20,7 @@ defineCommand({
   name: "instance.set",
   group: "bone",
   summary:
-    "Cria ou muda uma instancia (so do Mamulengo, para .boneco; o Spine nao tem): outro .boneco (boneco: caminho relativo a este arquivo) desenhado no lugar do slot na ordem de desenho, com a cor e os efeitos do slot, preso ao osso (padrao: o do slot) em x, y, rotation, scaleX, scaleY. animation e skin sao do filho (sem animation: a pose de setup); o tempo do filho e start + speed x relogio; loop false para no fim. Para trocar o que ele toca: key.set com target {instance: nome}, timeline instance {animation, start, speed, loop, mix} (em degrau; da chave em diante o tempo e start + speed x (t - tempo da chave); com mix, a animacao anterior continua e se mistura com a nova por mix segundos). Slot com alfa 0: a instancia nem e calculada.",
+    "Cria ou muda uma instancia (so do Mamulengo, para .boneco; o Spine nao tem): outro .boneco (boneco: caminho relativo a este arquivo) desenhado no lugar do slot na ordem de desenho, com a cor e os efeitos do slot, preso ao osso (padrao: o do slot) em x, y, rotation, scaleX, scaleY. animation e skin sao do filho (sem animation: a pose de setup); o tempo do filho e start + speed x relogio; loop false para no fim. Para trocar o que ele toca: key.set com target {instance: nome}, timeline instance {animation, start, speed, loop, mix} (em degrau; da chave em diante o tempo e start + speed x (t - tempo da chave); com mix, a animacao anterior continua e se mistura com a nova por mix segundos). Slot com alfa 0: a instancia nem e calculada. follow {instance, bone}: a instancia fica presa ao osso bone do filho de outra instancia (o objeto na mao de um personagem; a outra vem antes na lista), em x, y, rotation, scale; null volta ao osso dela. A chave instance tambem aceita follow, para o objeto trocar de mao.",
   params: z.object({
     name: z.string().min(1),
     slot: z.string().optional(),
@@ -37,6 +37,7 @@ defineCommand({
     rotation: z.number().optional(),
     scaleX: z.number().optional(),
     scaleY: z.number().optional(),
+    follow: z.object({ instance: z.string(), bone: z.string() }).nullable().optional(),
   }),
   label: (p) => `instancia ${p.name}`,
   run({ e }, p) {
@@ -56,6 +57,13 @@ defineCommand({
       if (p.loop) delete novo.loop;
       else novo.loop = false;
     }
+    if (p.follow === null) delete novo.follow;
+    else if (p.follow) {
+      const j = lista.findIndex((x) => x.name === p.follow!.instance);
+      if (j < 0) throw new Error(`follow: instância não existe: "${p.follow.instance}"`);
+      if (j >= (i < 0 ? lista.length : i)) throw new Error(`follow: "${p.follow.instance}" precisa vir antes de "${p.name}" na lista de instâncias (ela é calculada primeiro)`);
+      novo.follow = { instance: p.follow.instance, bone: p.follow.bone };
+    }
     if (i < 0) e.set(["instances"], [...lista, novo]);
     else if (JSON.stringify(novo) !== JSON.stringify(lista[i])) e.set(["instances", i], novo);
     return { index: i < 0 ? lista.length : i, instance: novo };
@@ -70,6 +78,12 @@ defineCommand({
   label: (p) => `apaga instancia ${p.name}`,
   run({ e }, p) {
     const i = requireInstance(e.json, p.name);
+    // quem segue esta (na instancia ou numa chave) ficaria sem osso: recusa e diz quem
+    const seguem = [
+      ...instances(e.json).filter((x) => x.follow?.instance === p.name).map((x) => x.name),
+      ...Object.entries<any>(e.json.animations ?? {}).flatMap(([an, a]) => Object.entries<any>(a.instances ?? {}).filter(([, ks]) => ks.some((k: any) => k.follow?.instance === p.name)).map(([n]) => `${n} (animacao ${an})`)),
+    ];
+    if (seguem.length) throw new Error(`"${p.name}" é seguida por ${seguem.join(", ")}: tire o follow antes`);
     const resto = instances(e.json).filter((_, k) => k !== i);
     e.set(["instances"], resto.length ? resto : undefined);
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
@@ -91,8 +105,12 @@ defineCommand({
     const i = requireInstance(e.json, p.name);
     if (instances(e.json).some((x) => x.name === p.to)) throw new Error(`instância já existe: ${p.to}`);
     e.set(["instances", i, "name"], p.to);
-    for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
+    // quem segue esta passa a seguir pelo nome novo
+    instances(e.json).forEach((x, k) => x.follow?.instance === p.name && e.set(["instances", k, "follow", "instance"], p.to));
+    for (const [an, a] of Object.entries<any>(e.json.animations ?? {})) {
+      for (const [n, ks] of Object.entries<any>(a.instances ?? {})) (ks as any[]).forEach((k, j) => k.follow?.instance === p.name && e.set(["animations", an, "instances", n, j, "follow", "instance"], p.to));
       if (a.instances?.[p.name]) e.apply({ op: "rename", path: ["animations", an, "instances"], from: p.name, to: p.to });
+    }
     return { renamed: p.to };
   },
 });

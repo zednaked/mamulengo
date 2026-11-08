@@ -347,3 +347,72 @@ export function exposedSeams(json: SpineJson, anim: string, times: number[], ima
   }
   return { frames, seams };
 }
+
+// Juntas: onde a peca de um osso se sobrepoe a peca do pai na pose de setup (a manga sobre
+// o antebraco), o centro dessa sobreposicao e onde a articulacao costuma estar. Compara so
+// osso com pai (sobreposicao com outra peca, como a mao na frente do corpo, nao e junta) e
+// so sugere: quem riga decide.
+export interface Junta {
+  osso: string;
+  pai: string;
+  pivo: [number, number]; // origem do osso no mundo (setup)
+  sugerido: [number, number] | null; // centro da sobreposicao (null: as pecas nao se tocam)
+  distancia_px: number | null;
+  area_px: number; // area da sobreposicao (px do mundo)
+}
+
+export function jointOverlap(json: SpineJson, image: (name: string) => Pixels | null, opts: { bone?: string; step?: number } = {}, m?: Medidor): Junta[] {
+  if (!m) {
+    const own = abrirMedidor(json);
+    try {
+      return jointOverlap(json, image, opts, own);
+    } finally {
+      own.liberar();
+    }
+  }
+  const step = opts.step ?? 2;
+  const q = m.poses(null, [0], { vertices: true })[0];
+  // imagens visiveis no setup, por osso
+  const per = new Map<string, { shape: Shape; img: Pixels }[]>();
+  for (const slot of q.drawOrder) {
+    if (slot.color.a < 0.05 || !slot.bone.active) continue;
+    const n = imageName(json, slot);
+    const shape = n ? shapeOf(json, slot) : null;
+    const img = n ? image(n) : null;
+    if (!shape || !img) continue;
+    per.set(slot.bone.name, [...(per.get(slot.bone.name) ?? []), { shape, img }]);
+  }
+  const solidAt = (list: { shape: Shape; img: Pixels }[], x: number, y: number) =>
+    list.some((e) => {
+      const uv = uvAt(e.shape, x, y);
+      return !!uv && alphaAt(e.img, uv[0], uv[1]) >= SOLID;
+    });
+  const out: Junta[] = [];
+  for (const b of q.bones) {
+    if (!b.parent || b.parent.name === "root" || (opts.bone && b.name !== opts.bone)) continue;
+    const mine = per.get(b.name),
+      theirs = per.get(b.parent.name);
+    if (!mine?.length || !theirs?.length) continue;
+    let sx = 0,
+      sy = 0,
+      n = 0;
+    for (const a of mine)
+      for (const c of theirs) {
+        const x0 = Math.max(a.shape.box[0], c.shape.box[0]),
+          y0 = Math.max(a.shape.box[1], c.shape.box[1]);
+        const x1 = Math.min(a.shape.box[2], c.shape.box[2]),
+          y1 = Math.min(a.shape.box[3], c.shape.box[3]);
+        for (let y = y0 + step / 2; y < y1; y += step)
+          for (let x = x0 + step / 2; x < x1; x += step)
+            if (solidAt([a], x, y) && solidAt([c], x, y)) {
+              sx += x;
+              sy += y;
+              n++;
+            }
+      }
+    const pivo: [number, number] = [+b.worldX.toFixed(2), +b.worldY.toFixed(2)];
+    const sug: [number, number] | null = n ? [+(sx / n).toFixed(2), +(sy / n).toFixed(2)] : null;
+    out.push({ osso: b.name, pai: b.parent.name, pivo, sugerido: sug, distancia_px: sug ? +Math.hypot(sug[0] - b.worldX, sug[1] - b.worldY).toFixed(1) : null, area_px: Math.round(n * step * step) });
+  }
+  return out;
+}

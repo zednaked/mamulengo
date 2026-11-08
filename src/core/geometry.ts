@@ -335,7 +335,9 @@ export function autoMesh(alpha: Uint8Array | Uint8ClampedArray, w: number, h: nu
   const grid = inner.slice();
   for (const q of thinMidpoints(hull, spacing)) if (!grid.some((r) => Math.hypot(r[0] - q[0], r[1] - q[1]) < spacing * 0.35)) inner.push(q);
   const points = [...hull, ...inner];
-  return { points, hullCount: hull.length, triangles: triangulate(points, hull.length) };
+  // respeitando o contorno (mesmo concavo): o Delaunay livre filtrado pelo centro deixava sem
+  // triangulo pedacos de pecas finas e curvas (a perna fina dos monstros perdia 420 px opacos)
+  return { points, hullCount: hull.length, triangles: triangulateHull(points, hull.length) };
 }
 
 // Triangulacao para malhas editadas a mao: o contorno (primeiros `hullCount` pontos,

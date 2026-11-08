@@ -151,6 +151,7 @@ interface Node {
   group: boolean;
   clean: string;
   tags: Tag[];
+  hide?: boolean; // escondida pelo mapa (mapa.esconder)
 }
 
 const tagOf = (n: Node, key: string) => n.tags.find((t) => t.key === key);
@@ -193,8 +194,9 @@ function applyNamePatterns(n: Node | null, name: string): string {
   return applyNamePatterns(g.parent, pat.slice(0, i) + name + pat.slice(i + 1));
 }
 
+const hiddenOf = (n: Node) => !!n.layer.hidden || !!n.hide;
 const visibleUp = (n: Node | null) => {
-  for (let x = n; x; x = x.parent) if (x.layer.hidden) return false;
+  for (let x = n; x; x = x.parent) if (hiddenOf(x)) return false;
   return true;
 };
 const opacityOf = (l: Layer) => (l.opacity ?? 1) * ((l as any).fillOpacity ?? 1);
@@ -204,8 +206,67 @@ export interface PsdImage {
   raster: Raster;
 }
 
+// Mapa externo (opcional): as tags e os ossos que o PSD do cliente nao traz, sem regravar
+// o arquivo. Chave de camada: o nome limpo ("antebraco") ou o caminho ("braco/antebraco",
+// nomes limpos ou como estao no PSD). Posicoes em px do PSD.
+export interface PsdMapa {
+  camadas?: Record<string, string>; // camada -> tags somadas ao nome, ex. "[bone:antebraco] [slot:x]"
+  ossos?: Record<string, { pai?: string; at?: [number, number]; ponta?: [number, number] }>;
+  esconder?: string[]; // camadas que entram escondidas (como trocas)
+}
+
 export interface ReadOptions {
   ignoreHidden?: boolean; // como a opcao "Ignore hidden layers" do script (padrao: nao)
+  mapa?: PsdMapa;
+}
+
+const isPt = (v: any) => Array.isArray(v) && v.length === 2 && v.every((x) => typeof x === "number" && Number.isFinite(x));
+
+// confere o formato do mapa (vindo de um .json escrito a mao) e devolve uma copia limpa
+export function checkMapa(m: any): PsdMapa {
+  if (m === undefined || m === null) return {};
+  if (typeof m !== "object" || Array.isArray(m)) throw new Error("mapa do PSD: esperava um objeto { camadas, ossos, esconder }");
+  const bad: string[] = [];
+  for (const k of Object.keys(m)) if (!["camadas", "ossos", "esconder"].includes(k)) bad.push(`chave desconhecida "${k}" (use camadas, ossos, esconder)`);
+  const out: PsdMapa = {};
+  if (m.camadas !== undefined) {
+    if (typeof m.camadas !== "object" || Array.isArray(m.camadas)) bad.push("camadas: esperava { camada: \"[tags]\" }");
+    else {
+      out.camadas = {};
+      for (const [k, v] of Object.entries(m.camadas)) {
+        if (typeof v !== "string") bad.push(`camadas.${k}: esperava um texto com tags, ex. "[bone:braco]"`);
+        else if (!parseTags(v).tags.length) bad.push(`camadas.${k}: "${v}" nao tem nenhuma tag entre colchetes`);
+        else out.camadas[k] = v;
+      }
+    }
+  }
+  if (m.ossos !== undefined) {
+    if (typeof m.ossos !== "object" || Array.isArray(m.ossos)) bad.push("ossos: esperava { osso: { pai, at, ponta } }");
+    else {
+      out.ossos = {};
+      for (const [k, v] of Object.entries<any>(m.ossos)) {
+        if (!k || k === "root") {
+          bad.push(`ossos: nome invalido "${k}"`);
+          continue;
+        }
+        if (!v || typeof v !== "object") {
+          bad.push(`ossos.${k}: esperava { pai, at, ponta }`);
+          continue;
+        }
+        for (const f of Object.keys(v)) if (!["pai", "at", "ponta"].includes(f)) bad.push(`ossos.${k}: campo desconhecido "${f}" (use pai, at, ponta)`);
+        if (v.pai !== undefined && typeof v.pai !== "string") bad.push(`ossos.${k}.pai: esperava o nome do osso pai`);
+        if (v.at !== undefined && !isPt(v.at)) bad.push(`ossos.${k}.at: esperava [x, y] em px do PSD`);
+        if (v.ponta !== undefined && !isPt(v.ponta)) bad.push(`ossos.${k}.ponta: esperava [x, y] em px do PSD`);
+        out.ossos[k] = { ...(v.pai !== undefined ? { pai: v.pai } : {}), ...(v.at ? { at: [v.at[0], v.at[1]] } : {}), ...(v.ponta ? { ponta: [v.ponta[0], v.ponta[1]] } : {}) };
+      }
+    }
+  }
+  if (m.esconder !== undefined) {
+    if (!Array.isArray(m.esconder) || m.esconder.some((x: any) => typeof x !== "string")) bad.push("esconder: esperava uma lista de camadas");
+    else out.esconder = [...m.esconder];
+  }
+  if (bad.length) throw new Error(`mapa do PSD com problemas:\n- ${bad.join("\n- ")}`);
+  return out;
 }
 
 // Le o PSD e devolve o plano (sem status de atualizacao) e as imagens.
@@ -236,9 +297,29 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
   const items: Item[] = [];
   const overlays: Node[] = [];
 
+  // mapa externo: tags somadas ao nome da camada e camadas escondidas, sem tocar no PSD
+  const mapa = checkMapa(opts.mapa);
+  const usedKeys = new Set<string>();
+  const cleanPath = (n: Node | null): string => (n ? (n.parent ? cleanPath(n.parent) + "/" : "") + n.clean : "");
+  const mapKey = (n: Node, keys: Set<string>): string | null => {
+    for (const k of [pathOf(n), cleanPath(n), n.layer.name ?? "", n.clean])
+      if (k && keys.has(k)) {
+        usedKeys.add(k);
+        return k;
+      }
+    return null;
+  };
+  const camadaKeys = new Set(Object.keys(mapa.camadas ?? {}));
+  const esconderKeys = new Set(mapa.esconder ?? []);
   const wrap = (l: Layer, parent: Node | null): Node => {
     const { clean, tags } = parseTags(l.name ?? "");
-    return { layer: l, parent, group: l.children !== undefined, clean, tags };
+    const n: Node = { layer: l, parent, group: l.children !== undefined, clean, tags };
+    if (camadaKeys.size) {
+      const k = mapKey(n, camadaKeys);
+      if (k) n.tags = [...tags, ...parseTags(mapa.camadas![k]).tags];
+    }
+    if (esconderKeys.size && mapKey(n, esconderKeys)) n.hide = true;
+    return n;
   };
 
   const collect = (layers: Layer[], parent: Node | null) => {
@@ -257,7 +338,7 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
         if (!n.group && GROUP_ONLY.has(t.key)) plan.warnings.push(`[${t.key}] so vale em grupo: "${where}"`);
         countTag(t);
       }
-      if (opts.ignoreHidden && l.hidden) {
+      if (opts.ignoreHidden && hiddenOf(n)) {
         plan.ignored.push({ layer: where, why: "escondida" });
         continue;
       }
@@ -328,7 +409,7 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
     warnFx(n);
     applyMask(r, n.layer);
     for (const c of clips) {
-      if (c.layer.hidden) continue;
+      if (hiddenOf(c)) continue;
       const cr = layerRaster(c.layer);
       if (!cr) continue;
       applyMask(cr, c.layer);
@@ -348,7 +429,7 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
       const seq: { n: Node; clips: Node[] }[] = [];
       for (let i = layers.length - 1; i >= 0; i--) {
         const n = wrap(layers[i], parent);
-        if (n.layer.hidden || tagOf(n, "ignore") || (n.layer as any).adjustment) continue;
+        if (hiddenOf(n) || tagOf(n, "ignore") || (n.layer as any).adjustment) continue;
         if (n.layer.clipping && !n.group) {
           pending.push(n);
           continue;
@@ -374,14 +455,14 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
     return out;
   };
 
-  const bones = new Map<string, PsdBone & { node: Node; rects: Rect[]; all: Rect[] }>();
+  const bones = new Map<string, PsdBone & { node: Node | null; rects: Rect[]; all: Rect[] }>();
   const boneOf = (n: Node): string => {
     const b = findTag(n, "bone");
     if (!b) return "root";
     const name = tagValue(b, "bone");
     const parent = b.parent ? boneOf(b.parent) : "root";
     const cur = bones.get(name);
-    if (cur && cur.node !== b && cur.parent !== parent) errors.push(`o osso ${name} aparece em dois lugares com pais diferentes: "${pathOf(cur.node)}" e "${pathOf(b)}"`);
+    if (cur && cur.node !== b && cur.parent !== parent) errors.push(`o osso ${name} aparece em dois lugares com pais diferentes: "${pathOf(cur.node!)}" e "${pathOf(b)}"`);
     if (!cur) bones.set(name, { name, parent, at: [0, 0], node: b, rects: [], all: [] });
     return name;
   };
@@ -499,6 +580,29 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
       if (!src) errors.push(`"${p.layer}": [mesh:${p.mesh}] precisa de uma camada ${p.mesh} [mesh] na mesma parte (${p.slot})`);
       else if (src.mesh !== true) errors.push(`"${p.layer}": a fonte ${p.mesh} nao tem a tag [mesh]`);
     }
+  // mapa: ossos (pai, pivo, ponta); o pai do mapa vence o dos grupos [bone]
+  const ossos = mapa.ossos ?? {};
+  for (const name of Object.keys(ossos)) if (!bones.has(name)) bones.set(name, { name, parent: "root", at: [0, 0], node: null, rects: [], all: [] });
+  for (const [name, o] of Object.entries(ossos)) {
+    if (o.pai === undefined) continue;
+    const b = bones.get(name)!;
+    if (b.node && b.parent !== "root" && b.parent !== o.pai) plan.warnings.push(`mapa: o osso ${name} esta dentro do grupo do osso ${b.parent} no PSD, mas o mapa manda o pai ser ${o.pai} (valeu o mapa)`);
+    b.parent = o.pai;
+  }
+  for (const b of bones.values())
+    if (b.parent !== "root" && !bones.has(b.parent)) errors.push(`mapa: o osso ${b.name} tem pai ${b.parent}, que nao existe (nem nas camadas nem em mapa.ossos)`);
+  for (const b of bones.values()) {
+    const seen = new Set<string>([b.name]);
+    for (let p = b.parent; p !== "root" && bones.has(p); p = bones.get(p)!.parent) {
+      if (seen.has(p)) {
+        errors.push(`mapa: ciclo nos pais do osso ${b.name} (${[...seen].join(" -> ")} -> ${p})`);
+        break;
+      }
+      seen.add(p);
+    }
+  }
+  // chaves do mapa que nao casaram com nenhuma camada
+  for (const k of [...camadaKeys, ...esconderKeys]) if (!usedKeys.has(k)) plan.warnings.push(`mapa: nenhuma camada chamada "${k}" no PSD (chave ignorada)`);
   if (errors.length) throw new Error(`O PSD tem problemas:\n- ${errors.join("\n- ")}`);
 
   // osso no centro das camadas visiveis do grupo (sem nenhuma: de todas, ou dos filhos)
@@ -515,8 +619,9 @@ export function readPsdPlan(buf: Buffer, file: string, opts: ReadOptions = {}): 
   const add = (parent: string) => {
     for (const b of bones.values())
       if (b.parent === parent) {
-        b.at = center(b.rects) ?? center(b.all) ?? center(deep(b.name)) ?? plan.origin;
-        ordered.push({ name: b.name, parent: b.parent, at: b.at });
+        const o = ossos[b.name];
+        b.at = o?.at ?? center(b.rects) ?? center(b.all) ?? center(deep(b.name)) ?? plan.origin;
+        ordered.push({ name: b.name, parent: b.parent, at: b.at, ...(o?.ponta ? { ponta: o.ponta } : {}) });
         add(b.name);
       }
   };
@@ -546,6 +651,7 @@ export interface PsdManifest {
   height: number;
   origin: [number, number];
   images: Record<string, { rect: Rect; scale: number; layer: string }>;
+  mapa?: PsdMapa; // mapa usado na importacao (a atualizacao sem mapa reaplica este)
 }
 
 export const manifestPath = (atlas: string) => join(dirname(atlas), "images", "psd-import.json");
@@ -561,8 +667,10 @@ function readManifest(atlas: string): PsdManifest | null {
   }
 }
 
-function writeManifest(atlas: string, plan: PsdPlan, prev: PsdManifest | null) {
+function writeManifest(atlas: string, plan: PsdPlan, prev: PsdManifest | null, mapa?: PsdMapa) {
   const m: PsdManifest = { version: 1, psd: plan.file, width: plan.width, height: plan.height, origin: plan.origin, images: {} };
+  const mp = mapa ?? prev?.mapa;
+  if (mp && Object.keys(mp).length) m.mapa = mp;
   // imagens que sairam do PSD continuam registradas (no referencial novo)
   if (prev) {
     const dx = plan.origin[0] - prev.origin[0],
@@ -590,6 +698,12 @@ export function fileAssets(dir: string, atlasText: string): AssetProvider {
     region(name) {
       const r = atlas.regions.find((x) => x.name === name);
       return r ? { width: r.originalWidth, height: r.originalHeight } : null;
+    },
+    async text(p) {
+      return existsSync(p) ? readFileSync(p, "utf8") : null;
+    },
+    async bytes(p) {
+      return existsSync(p) ? new Uint8Array(readFileSync(p)) : null;
     },
   };
 }
@@ -623,7 +737,7 @@ export async function createFromPsd(opts: { psd: string; dir: string; name: stri
   const { calls, report } = psdCalls(doc.json, plan);
   await executeAsync(doc, calls, "psd", `PSD ${plan.file}`, {}, fileAssets(opts.dir, atlasText));
   writeFileSync(created.skeleton, doc.serialize());
-  writeManifest(created.atlas, plan, null);
+  writeManifest(created.atlas, plan, null, opts.read?.mapa);
   return { ...created, plan, report, summary: psdSummary(plan, report, "create") };
 }
 
@@ -660,13 +774,15 @@ const rawEqual = (a: { width: number; height: number; data: Buffer | Uint8Array 
 // no documento aberto (no editor, desfaziveis). meshImages: imagens usadas por malhas no
 // documento (a imagem gravada cobre a area antiga e a nova, para as UVs nao sairem dela).
 export async function updateFromPsd(opts: { psd: string; atlas: string; meshImages?: string[]; read?: ReadOptions; backup?: (file: string) => void }): Promise<{ plan: PsdPlan; atlasText: string; pages: string[] }> {
-  const { plan, images } = readPsdPlan(readFileSync(opts.psd), opts.psd, opts.read);
+  const prev = readManifest(opts.atlas);
+  // sem mapa: reaplica o da importacao anterior (o registro guarda)
+  const read: ReadOptions = { ...opts.read, mapa: opts.read?.mapa ?? prev?.mapa };
+  const { plan, images } = readPsdPlan(readFileSync(opts.psd), opts.psd, read);
   const dir = dirname(opts.atlas);
   const imagesDir = join(dir, "images");
   const atlasText0 = readFileSync(opts.atlas, "utf8");
   if (!listImages(imagesDir).length) await unpackAtlas(opts.atlas, atlasText0, imagesDir);
   const regions = new Map(parseAtlas(atlasText0).regions.map((r) => [r.name, r]));
-  const prev = readManifest(opts.atlas);
   if (prev) {
     // origem: a do PSD ([origin]); sem ela, a da importacao anterior, se o PSD nao mudou de tamanho
     if (plan.originFrom === "padrao" && prev.width === plan.width && prev.height === plan.height) {
@@ -730,7 +846,7 @@ export async function updateFromPsd(opts: { psd: string; atlas: string; meshImag
     atlasText = packed.atlas;
     pages = packed.pages.map((p) => p.name);
   }
-  writeManifest(opts.atlas, plan, prev);
+  writeManifest(opts.atlas, plan, prev, read.mapa);
   return { plan, atlasText, pages };
 }
 

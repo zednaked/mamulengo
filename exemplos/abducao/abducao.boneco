@@ -29420,14 +29420,14 @@
       "animacao": "paira",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.4
+      "mix": 0.4
      },
      {
       "tempo": 8,
       "animacao": "foge",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      }
     ],
     "arvore_0": [
@@ -29442,14 +29442,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_1": [
@@ -29464,14 +29464,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_2": [
@@ -29486,14 +29486,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_3": [
@@ -29508,14 +29508,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_4": [
@@ -29530,14 +29530,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_5": [
@@ -29552,14 +29552,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_6": [
@@ -29574,14 +29574,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_7": [
@@ -29596,14 +29596,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_8": [
@@ -29618,14 +29618,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ],
     "arvore_9": [
@@ -29640,14 +29640,14 @@
       "animacao": "vento",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.3
+      "mix": 0.3
      },
      {
       "tempo": 8.15,
       "animacao": "balanca",
       "inicio": 0,
       "repetir": true,
-      "mistura": 0.6
+      "mix": 0.6
      }
     ]
    }

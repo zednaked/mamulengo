@@ -6,6 +6,8 @@
 
 **[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
 
+**[Open the editor](https://zednaked.github.io/mamulengo/editor/)**: the whole editor in your browser, nothing to install and no server. It works offline after the first visit, opens the example characters and, in Chrome and Edge, a folder on your computer with `.boneco` files.
+
 ![A robot, a zombie and a monster, rigged and animated by Claude Code in Mamulengo](docs/media/elenco.webp)
 
 **A 2D skeletal animation toolkit for games, run by people and Claude Code

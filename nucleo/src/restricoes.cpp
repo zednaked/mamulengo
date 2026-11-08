@@ -451,11 +451,28 @@ void Esqueleto::restricao_fisica(int ri) {
   e.relogio = relogio_;
   const double base = std::atan2(w.c, w.a);  // angulo do osso sem a fisica
   const double comp_mundo = m.ossos[size_t(d.osso)].comprimento * std::sqrt(w.a * w.a + w.c * w.c);
+  const bool posicao = d.x != 0 || d.y != 0;
+  const bool reiniciou = e.reiniciar;
   if (e.reiniciar) {
     e.reiniciar = false;
     e.rot = e.vrot = e.rot_ant = e.saida = 0;
+    e.dx = e.dy = e.vx = e.vy = e.dx_ant = e.dy_ant = 0;
     e.sobra = 0;
-  } else if (d.girar != 0 && comp_mundo > 0) {
+  } else {
+    // posicao (docs/NUCLEO.md "Fisica de posicao"): a inercia arrasta o desvio pelo quanto a
+    // origem do osso andou no rig, no maximo limite / 64 px por eixo a cada quadro (medido: o
+    // mesmo a 60 e a 64 quadros por segundo); soma tambem no desvio de antes do passo
+    // com o relogio parado (dt 0: um filho congelado) a origem que anda nao arrasta, como no giro
+    if (posicao && dt > 0) {
+      const double L = d.limite / 64;
+      const double ix = std::clamp(-(w.x - e.rx) * e.inercia, -L, L), iy = std::clamp(-(w.y - e.ry) * e.inercia, -L, L);
+      if (d.x != 0) e.dx += ix, e.dx_ant += ix;
+      if (d.y != 0) e.dy += iy, e.dy_ant += iy;
+    }
+  }
+  e.rx = w.x;
+  e.ry = w.y;
+  if (!reiniciou && d.girar != 0 && comp_mundo > 0) {
     // inercia: a ponta do osso tende a ficar onde estava no quadro anterior; o desvio entre
     // a direcao para a ponta antiga e a direcao mostrada entra direto no angulo
     // o deslocamento da origem conta no maximo `limite` px por segundo em cada eixo (no
@@ -486,6 +503,20 @@ void Esqueleto::restricao_fisica(int ri) {
       e.vrot *= fd;
       ang = base + e.rot;
     }
+    if (posicao) {
+      // a interpolacao da posicao parte do desvio de antes do ULTIMO passo do quadro (medido; no
+      // giro e o do primeiro)
+      e.dx_ant = e.dx;
+      e.dy_ant = e.dy;
+      // vento e gravidade em px/s2 vezes a escala_ref do esqueleto (medido: assenta em
+      // forca * escala_ref / rigidez)
+      e.vx += (e.vento * m.escala_ref - e.forca * e.dx) * e.massa_inv * h;
+      e.vy += (-e.gravidade * m.escala_ref - e.forca * e.dy) * e.massa_inv * h;
+      e.dx += e.vx * h;
+      e.dy += e.vy * h;
+      e.vx *= fd;
+      e.vy *= fd;
+    }
   }
   const double a = e.sobra / h;
   e.saida = e.rot_ant + (e.rot - e.rot_ant) * a;
@@ -502,6 +533,15 @@ void Esqueleto::restricao_fisica(int ri) {
   e.oy = w.y;
   e.px = w.x + std::cos(am) * comp_mundo;
   e.py = w.y + std::sin(am) * comp_mundo;
+  // o desvio de posicao, interpolado como o giro, move a origem do osso no mundo
+  if (posicao) {
+    const double sx = (e.dx_ant + (e.dx - e.dx_ant) * a) * d.x * e.mix, sy = (e.dy_ant + (e.dy - e.dy_ant) * a) * d.y * e.mix;
+    if (sx != 0 || sy != 0) {
+      w.x += sx;
+      w.y += sy;
+      mundo_para_local(d.osso);
+    }
+  }
 }
 
 void Esqueleto::restricao_transformacao(int ri) {

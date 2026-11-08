@@ -8,7 +8,7 @@ import { requireAnimation, requireBone } from "../model.ts";
 import { round } from "./timeline.ts";
 import { EMPATE, animDuration as duration, checkFicha, draftFicha, fmt, meshDistortion, relation, rigStudy, wrapDeg } from "../ficha.ts";
 import { abrirMedidor, comMedidor, modoMedidas } from "../instantes.ts";
-import { exposedSeams, seamImages, type Pixels } from "../recorte.ts";
+import { exposedSeams, jointOverlap, seamImages, type Pixels } from "../recorte.ts";
 
 const wrap = wrapDeg;
 
@@ -278,6 +278,40 @@ defineCommand({
       momentos: picks.slice(0, p.top).map((f) => ({ t: round(f.t), recorte: pct(f.len), peca: f.worst!.slot, escondida_por: f.worst!.behind, da_peca: pct(f.worst!.len) })),
       bordas_escondidas: Object.fromEntries(Object.entries(e.seams).map(([k, l]) => [k, pct(l)])),
       nota: picks.length ? "recorte em % da altura; olhe estes instantes grandes (mamulengo_zoom na peca, ou look com time): borda cortada ou toco aparecendo e arte quebrada" : "nenhuma borda escondida aparece",
+    };
+  },
+});
+
+// Juntas: o pivo de cada osso comparado com o centro da sobreposicao entre a peca dele e a
+// do pai (a manga sobre o antebraco). So le e sugere; quem riga decide.
+defineCommand({
+  name: "query.juntas",
+  group: "query",
+  readonly: true,
+  summary:
+    "Confere os pivos depois de rigar: para cada osso com pai (fora o root), o centro da sobreposicao, na pose de setup, entre as imagens presas a ele e as presas ao pai (a manga sobre o antebraco, a coxa sob o quadril) e a distancia ate a origem do osso. Alerta quando a distancia passa de tol px e a sobreposicao tem pelo menos minArea px. So sugere: sobreposicao nem sempre e articulacao. bone: so esse osso. Para mover so a origem (bone.set at leva filhos e imagens junto): passe as partes do osso para o pai (slot.set bone, keepWorld), bone.set {bone, at: sugerido} e devolva as partes.",
+  params: z.object({
+    bone: z.string().optional().describe("so este osso"),
+    tol: z.number().positive().default(10).describe("distancia (px do mundo) acima da qual alerta"),
+    minArea: z.number().nonnegative().default(40).describe("area minima da sobreposicao (px) para alertar"),
+  }),
+  async prepare({ doc, assets }) {
+    const imgs = new Map<string, Pixels | null>();
+    for (const n of seamImages(doc.json)) imgs.set(n, (await assets?.image(n).catch(() => null)) ?? null);
+    return imgs;
+  },
+  run({ doc, prepared }, p) {
+    if (p.bone) requireBone(doc.json, p.bone);
+    const imgs = prepared as Map<string, Pixels | null>;
+    if (![...imgs.values()].some(Boolean)) throw new Error("sem as imagens do atlas: query.juntas precisa dos pixels (alpha) de cada parte");
+    const js = jointOverlap(doc.json, (k) => imgs.get(k) ?? null, { bone: p.bone });
+    const alertas = js
+      .filter((j) => j.sugerido && j.distancia_px! > p.tol && j.area_px >= p.minArea)
+      .map((j) => `${j.osso}: pivo em (${j.pivo.join(", ")}), a sobreposicao com ${j.pai} tem o centro em (${j.sugerido!.join(", ")}), ${j.distancia_px} px de distancia (${j.area_px} px de area)`);
+    return {
+      juntas: js,
+      alertas,
+      nota: alertas.length ? "sugestao: confira grande (look) se a sobreposicao e mesmo a articulacao antes de mover o osso" : "todos os pivos perto da sobreposicao com o pai (ou sem sobreposicao)",
     };
   },
 });

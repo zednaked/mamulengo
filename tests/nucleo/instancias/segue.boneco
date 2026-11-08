@@ -1,0 +1,22 @@
+{
+ "boneco": 0,
+ "nome": "segue",
+ "esqueleto": { "versao_spine": "4.3.23" },
+ "ossos": [{ "nome": "root" }, { "nome": "a", "pai": "root", "x": -150 }, { "nome": "b", "pai": "root", "x": 150, "escala_x": -1 }, { "nome": "chao", "pai": "root", "y": -40 }],
+ "slots": [
+  { "nome": "robo_a", "osso": "a" },
+  { "nome": "robo_b", "osso": "b" },
+  { "nome": "caixa", "osso": "chao" }
+ ],
+ "instancias": [
+  { "nome": "robo_a", "slot": "robo_a", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle" },
+  { "nome": "robo_b", "slot": "robo_b", "boneco": "../../boneco/robo/robo.boneco", "animacao": "ganhou", "velocidade": 0.7 },
+  { "nome": "caixa", "slot": "caixa", "boneco": "../../boneco/robo/robo.boneco", "escala_x": 0.25, "escala_y": 0.25, "x": 10, "rotacao": 30, "segue": { "instancia": "robo_a", "osso": "mao_d" } }
+ ],
+ "animacoes": {
+  "passa": {
+   "ossos": { "a": { "mover": [{ "tempo": 0, "x": 0, "y": 0 }, { "tempo": 1, "x": 80, "y": 20 }] } },
+   "instancias": { "caixa": [{ "tempo": 0.5, "segue": { "instancia": "robo_b", "osso": "mao_e" } }, { "tempo": 0.8, "segue": null }] }
+  }
+ }
+}

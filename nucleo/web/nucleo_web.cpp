@@ -24,8 +24,10 @@
 #include <string>
 #include <vector>
 
+#include "mamulengo/binario.h"
 #include "mamulengo/desenho.h"
 #include "mamulengo/estado.h"
+#include "mamulengo/json.h"
 #include "mamulengo/modelo.h"
 #include "mamulengo/pose.h"
 
@@ -137,6 +139,27 @@ EMSCRIPTEN_KEEPALIVE int mm_carregar_de(const char* texto, const char* caminho) 
 }
 
 EMSCRIPTEN_KEEPALIVE const char* mm_erro() { return erro.c_str(); }
+
+// .boneco texto <-> binario no navegador (o editor sem servidor, src/navegador): o mesmo codigo
+// do nucleo-binario. mm_boneco_texto le os bytes (texto ou binario) e devolve o JSON compacto;
+// mm_boneco_binario codifica o texto e devolve o tamanho, com os bytes em mm_bytes. Em erro,
+// nulo ou -1 (mm_erro diz o motivo).
+std::string convertido;
+EMSCRIPTEN_KEEPALIVE const char* mm_boneco_texto(const char* dados, int n) {
+  erro.clear();
+  const Json j = Json::ler(std::string_view(dados, size_t(n)), &erro);
+  if (!erro.empty()) return nullptr;
+  convertido = escrever_json(j);
+  return convertido.c_str();
+}
+EMSCRIPTEN_KEEPALIVE int mm_boneco_binario(const char* texto) {
+  erro.clear();
+  const Json j = Json::ler(texto, &erro);
+  if (!erro.empty()) return -1;
+  convertido = codificar_binario(j);
+  return int(convertido.size());
+}
+EMSCRIPTEN_KEEPALIVE const char* mm_bytes() { return convertido.data(); }
 
 // solta o modelo (as instancias que ainda o usam continuam valendo); o id nao e reaproveitado
 EMSCRIPTEN_KEEPALIVE void mm_liberar_modelo(int modelo) { modelos[size_t(modelo)].reset(); }

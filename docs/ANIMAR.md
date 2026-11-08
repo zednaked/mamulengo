@@ -54,6 +54,8 @@ Escreva o roteiro **na ficha**, na seção `## Animacao: <nome>`, antes das chav
 
 Folha de contato pequena e "igual ao Godot" não validam animação. "Ver no Godot" só prova que o editor desenha como o jogo.
 
+Para olhar quadros sem exportar o vídeo: `npx tsx tools/quadro.ts x.boneco --anim a --tempos 0.2,0.6 --largura 1400` (alguns segundos; a física, as partículas e as instâncias andam do zero como no export) ou `--cada 0.1 --folha 5`.
+
 1. **`query.estilo {anim}`** (e a regra `estilo` da ficha): mede com a régua da casa e diz o que ficou ABAIXO ou ACIMA da faixa do papel. Abaixo sem motivo é animação tímida: aumente amplitude e ritmo e troque pose parada por pose que respira.
 2. **`ficha.check`** (ou `npm run ficha -- check <ficha.md> --anims <nome>`): todas as regras da ficha, as suas e as do Rig.
 3. **`query.motion`** nos ossos principais: para que lado cada um gira e anda na tela, trecho a trecho. Compare com o roteiro. Valores de chave enganam, porque rotação de setup e constraints mudam o resultado.

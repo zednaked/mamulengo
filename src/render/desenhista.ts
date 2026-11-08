@@ -15,7 +15,9 @@ let modulo: Promise<any> | null = null;
 // copiar o .mjs sozinho, sem o .wasm, no build). `url`: outro lugar do nucleo.mjs (a demo
 // estatica leva o .mjs e o .wasm junto da pagina)
 const NO_REPO = "../../nucleo/build-web/nucleo.mjs";
-export function carregarNucleo(url = new URL(NO_REPO, import.meta.url).href): Promise<any> {
+declare const __NAVEGADOR__: boolean | undefined;
+const padrao = () => (typeof __NAVEGADOR__ !== "undefined" && __NAVEGADOR__ ? new URL("nucleo/nucleo.mjs", document.baseURI).href : new URL(NO_REPO, import.meta.url).href);
+export function carregarNucleo(url = padrao()): Promise<any> {
   modulo ??= import(/* @vite-ignore */ url)
     .then((m) => m.default())
     .catch((e) => {

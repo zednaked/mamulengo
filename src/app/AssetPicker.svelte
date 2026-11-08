@@ -1,5 +1,29 @@
 <script lang="ts">
   import { app, type AssetInfo } from "./state.svelte.ts";
+  import { NAVEGADOR, darAcesso, escolherPasta, semPermissao, temEscolherPasta, tirarPasta } from "../navegador/pagina.ts";
+  import type { Raiz } from "../navegador/fs.ts";
+
+  // no editor pelo navegador: as pastas do computador que pedem a permissao de novo
+  let pedindo = $state<Raiz[]>([]);
+  const verPermissoes = async () => {
+    if (NAVEGADOR) pedindo = await semPermissao();
+  };
+  async function abrirPasta() {
+    if (!(await escolherPasta())) return;
+    await verPermissoes();
+    await app.loadAssets(true);
+  }
+  async function acesso(r: Raiz) {
+    if (await darAcesso(r)) {
+      await verPermissoes();
+      await app.loadAssets(true);
+    }
+  }
+  async function esquecer(r: Raiz) {
+    await tirarPasta(r.caminho);
+    await verPermissoes();
+    await app.loadAssets(true);
+  }
 
   let open = $state(false);
   let q = $state("");
@@ -31,7 +55,7 @@
 </script>
 
 <div class="picker">
-  <button class="current" onclick={() => (open = !open)}>
+  <button class="current" onclick={() => ((open = !open), open && verPermissoes())}>
     {#if app.asset}
       <span class="dim">{app.asset.project} /</span> <b>{app.asset.name}</b>
     {:else}
@@ -43,8 +67,21 @@
     <div class="pop">
       <!-- svelte-ignore a11y_autofocus -->
       <input placeholder="procurar ({app.assets.length} {app.assets.length === 1 ? 'personagem' : 'personagens'})" bind:value={q} autofocus />
+      {#if NAVEGADOR}
+        <div class="pastas">
+          {#if temEscolherPasta}<button onclick={abrirPasta}>Abrir pasta do computador…</button>{/if}
+          {#each pedindo as r}
+            <div class="pede">
+              <span>{r.nome}</span>
+              <button onclick={() => acesso(r)}>Dar acesso</button>
+              <button class="dim" onclick={() => esquecer(r)}>tirar</button>
+            </div>
+          {/each}
+          {#if !temEscolherPasta}<div class="dim vazio">Este navegador só guarda os personagens dentro dele (os exemplos e o que você criar). Para abrir pastas do computador, use o Chrome ou o Edge.</div>{/if}
+        </div>
+      {/if}
       <div class="list">
-        {#if app.assetsLidos && !app.assets.length}<div class="dim vazio">Nenhum personagem em {app.roots.join(", ")}. Arraste um PSD para a janela, ou abra o editor com MAMULENGO_ROOTS apontando para as suas pastas.</div>{/if}
+        {#if app.assetsLidos && !app.assets.length && NAVEGADOR}<div class="dim vazio">Nenhum personagem nas pastas abertas. Abra uma pasta com arquivos .boneco.</div>{:else if app.assetsLidos && !app.assets.length}<div class="dim vazio">Nenhum personagem em {app.roots.join(", ")}. Arraste um PSD para a janela, ou abra o editor com MAMULENGO_ROOTS apontando para as suas pastas.</div>{/if}
         {#each groups as [proj, list]}
           <div class="proj">{proj}</div>
           {#each list as a}
@@ -57,6 +94,19 @@
 </div>
 
 <style>
+  .pastas {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pede {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .pede span {
+    flex: 1;
+  }
   .vazio {
     padding: 8px;
     font-size: 12px;

@@ -229,6 +229,11 @@ struct Contexto {
   int pagina_base = 0;               // as paginas deste esqueleto na tabela do desenho
   int grupo = -1;                    // o grupo de luz do pai (-1: o deste esqueleto)
   double profundidade = 0;           // a camada do slot da instancia (soma na dos slots do filho)
+  // o recorte aberto no pai quando a instancia e desenhada: na CPU, os pedacos convexos dele (o
+  // filho corta por eles, e um recorte do filho corta pela intersecao); no stencil, o lote que o
+  // marcou (o filho que fecha um recorte proprio marca o do pai de novo)
+  const std::vector<std::vector<P2>>* recorte = nullptr;
+  int lote_recorte = -1;
 };
 
 void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx);
@@ -251,6 +256,27 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   std::vector<uint8_t> dentro_v;         // por vertice da peca: dentro do pedaco
   std::vector<P2> poli, tmp;
   int recorte_fim = -2;  // slot que acaba o recorte aberto (-1: o fim do desenho; -2: nenhum)
+  int lote_recorte = -1;  // stencil: o lote que marcou o recorte aberto (o do pai, herdado)
+  // as caixas dos pedacos (o atalho do corte por triangulo)
+  auto faz_caixas = [&]() {
+    caixas.assign(recorte.size() * 4, 0);
+    for (size_t ip = 0; ip < recorte.size(); ++ip) {
+      double* cx = &caixas[ip * 4];
+      cx[0] = cx[2] = recorte[ip][0].x;
+      cx[1] = cx[3] = recorte[ip][0].y;
+      for (const P2& q : recorte[ip]) {
+        cx[0] = std::min(cx[0], q.x), cx[2] = std::max(cx[2], q.x);
+        cx[1] = std::min(cx[1], q.y), cx[3] = std::max(cx[3], q.y);
+      }
+    }
+  };
+  // a instancia dentro de um recorte do pai fica cortada por ele ate o fim do desenho dela
+  if (ctx.recorte) {
+    recorte = *ctx.recorte;
+    faz_caixas();
+    recorte_fim = -1;
+  }
+  lote_recorte = ctx.lote_recorte;
   // `efeito` >= 0: o lote de um slot com efeitos, sempre novo (os valores sao do slot)
   // luzes (docs/NUCLEO.md "Luzes"): um grupo para este personagem se alguma pagina tem relevo e
   // a luz muda alguma coisa (alguma luz acesa, ou a ambiente diferente de branco inteiro)
@@ -304,9 +330,24 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
     return d.lotes.back();
   };
   auto fecha_recorte = [&]() {
-    if (!d.recorte_cpu) lote(Comando::AcabaRecorte, -1, Blend::Normal);
-    recorte.clear();
-    recorte_fim = -2;
+    if (!d.recorte_cpu) {
+      lote(Comando::AcabaRecorte, -1, Blend::Normal);
+      // dentro do recorte do pai: marca o do pai de novo (o mesmo lote de indices)
+      lote_recorte = -1;
+      if (ctx.lote_recorte >= 0) {
+        Lote l = d.lotes[size_t(ctx.lote_recorte)];
+        d.lotes.push_back(l);
+        lote_recorte = ctx.lote_recorte;
+      }
+    }
+    if (ctx.recorte) {
+      recorte = *ctx.recorte;
+      faz_caixas();
+      recorte_fim = -1;
+    } else {
+      recorte.clear();
+      recorte_fim = -2;
+    }
   };
   // acrescenta o triangulo (vertices ja em d.vertices: base + i, j, k) cortado pelo recorte
   auto tri_cortado = [&](uint32_t i0, uint32_t i1, uint32_t i2) {
@@ -490,6 +531,10 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       c.pagina_base = ctx.pagina_base + m.filho_pagina_base[size_t(di.filho)];
       c.grupo = grupo;
       c.profundidade = ctx.profundidade + m.slots[size_t(si)].profundidade;
+      if (recorte_fim != -2) {
+        if (d.recorte_cpu) c.recorte = &recorte;
+        else c.lote_recorte = lote_recorte;
+      }
       desenhar_em(*e.instancias()[size_t(ii)].e, d, c);
     }
   };
@@ -541,22 +586,26 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
           std::vector<P2> pol(size_t(p.num_vertices));
           for (int i = 0; i < p.num_vertices; ++i) pol[size_t(i)] = {mundo[size_t(i) * 2], mundo[size_t(i) * 2 + 1]};
           recorte = pedacos(std::move(pol));
-          caixas.assign(recorte.size() * 4, 0);
-          for (size_t ip = 0; ip < recorte.size(); ++ip) {
-            double* cx = &caixas[ip * 4];
-            cx[0] = cx[2] = recorte[ip][0].x;
-            cx[1] = cx[3] = recorte[ip][0].y;
-            for (const P2& q : recorte[ip]) {
-              cx[0] = std::min(cx[0], q.x), cx[2] = std::max(cx[2], q.x);
-              cx[1] = std::min(cx[1], q.y), cx[3] = std::max(cx[3], q.y);
-            }
+          // numa instancia dentro de um recorte do pai: a intersecao (cada pedaco deste cortado
+          // por cada pedaco do pai; convexo com convexo da convexo)
+          if (ctx.recorte) {
+            std::vector<std::vector<P2>> juntos;
+            for (const auto& a : recorte)
+              for (const auto& b : *ctx.recorte) {
+                poli = a;
+                for (size_t k = 0, n = b.size(); k < n && poli.size() >= 3; ++k) corta(poli, b[k], b[(k + 1) % n], tmp);
+                if (poli.size() >= 3) juntos.push_back(poli);
+              }
+            recorte = std::move(juntos);
           }
+          faz_caixas();
           recorte_fim = p.fim == si ? -1 : p.fim;
           continue;
         }
         const uint32_t base = uint32_t(d.vertices.size() / 8);
         for (int i = 0; i < p.num_vertices; ++i)
           d.vertices.insert(d.vertices.end(), {float(mundo[size_t(i) * 2]), float(mundo[size_t(i) * 2 + 1]), 0, 0, 1, 1, 1, 1});
+        lote_recorte = int(d.lotes.size());
         Lote& l = lote(Comando::ComecaRecorte, -1, Blend::Normal);
         for (int i = 1; i + 1 < p.num_vertices; ++i) d.indices.insert(d.indices.end(), {base, base + uint32_t(i), base + uint32_t(i) + 1});
         l.quantos = uint32_t(d.indices.size()) - l.inicio;

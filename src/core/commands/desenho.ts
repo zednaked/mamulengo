@@ -64,6 +64,7 @@ function cleanShape(s: DrawShape): DrawShape {
   if (s.closed) o.closed = true;
   if (s.holes?.length) o.holes = s.holes.map((c) => ({ points: c.points.map(cleanPoint), ...(c.closed ? { closed: true } : {}) }));
   if (s.fill) o.fill = s.fill;
+  if (s.rule === "nonzero") o.rule = "nonzero";
   if (s.stroke) {
     const st: any = { color: s.stroke.color, width: s.stroke.width };
     if (s.stroke.align && s.stroke.align !== "center") st.align = s.stroke.align;
@@ -130,7 +131,7 @@ defineCommand({
     image: Image,
     width: z.number().positive(),
     height: z.number().positive(),
-    hd: z.number().min(0.25).max(8).optional(),
+    hd: z.number().min(0.05).max(8).optional(),
     slot: z.string().optional().describe("parte que mostra o desenho (criada se nao existir, com bone)"),
     bone: z.string().optional().describe("osso da parte nova"),
     x: z.number().optional(),
@@ -198,6 +199,183 @@ defineCommand({
       at++;
     }
     return { added };
+  },
+});
+
+// ---- texto: a fonte (.ttf) vira formas (src/core/fonte.ts), uma por linha, com os furos das letras
+
+const TextParams = {
+  text: z.string().min(1).describe("o texto; \\n quebra a linha"),
+  font: z.string().describe("arquivo .ttf (caminho absoluto, ou relativo ao arquivo do personagem)"),
+  size: z.number().positive().describe("altura do corpo da letra (em), em pixels da imagem"),
+  align: z.enum(["left", "center", "right"]).optional(),
+  letterSpacing: z.number().optional().describe("pixels a mais entre as letras"),
+  lineHeight: z.number().positive().optional().describe("entrelinha em multiplos do tamanho (padrao 1.15)"),
+};
+const fontePath = (doc: any, f: string) => (f.startsWith("/") ? f : (doc.file?.skeleton ?? "").replace(/[^/]*$/, "") + f);
+async function lerFonteDe(doc: any, assets: any, f: string) {
+  const { lerFonte } = await import("../fonte.ts");
+  const p = fontePath(doc, f);
+  const b = await assets?.bytes?.(p);
+  if (!b) throw new Error(`nao li a fonte ${p}${assets?.bytes ? "" : " (este ambiente nao le arquivos)"}`);
+  return lerFonte(b);
+}
+
+defineCommand({
+  name: "draw.text",
+  group: "drawing",
+  summary:
+    "Escreve texto num desenho com uma fonte .ttf: as letras viram formas (uma por linha, com os furos das letras), nitidas em qualquer tamanho, com fill e stroke como as outras formas. x e y em pixels da imagem: a ancora do alinhamento (left, center, right) e a linha de base da primeira linha. Sem kerning nem ligaduras.",
+  params: z.object({
+    image: Image,
+    name: z.string().optional(),
+    index: z.number().int().min(0).optional(),
+    x: z.number(),
+    y: z.number(),
+    ...TextParams,
+    fill: Color.optional(),
+    stroke: Stroke.optional(),
+  }),
+  label: (p) => `texto "${p.text.slice(0, 20)}" em ${p.image}`,
+  prepare: async ({ doc, assets }, p) => {
+    textoMod = await import("../fonte.ts");
+    return { fonte: await lerFonteDe(doc, assets, p.font) };
+  },
+  run({ e, prepared }, p) {
+    return { added: escreve(e, prepared.fonte, p) };
+  },
+});
+
+// as formas do texto no desenho (devolve o que acrescentou)
+function escreve(e: Editor, fonte: any, p: { image: string; name?: string; index?: number; x: number; y: number; text: string; size: number; align?: string; letterSpacing?: number; lineHeight?: number; fill?: string; stroke?: any }) {
+  const { textoEmContornos } = textoMod!;
+  const d = requireDrawing(e.json, p.image);
+  const linhas = textoEmContornos(fonte, p.text, { x: p.x, y: p.y, tamanho: p.size, alinhar: p.align === "center" ? "centro" : p.align === "right" ? "direita" : "esquerda", espacamento: p.letterSpacing, entrelinha: p.lineHeight });
+  let at = Math.min(p.index ?? d.shapes.length, d.shapes.length);
+  const added: { index: number; name: string }[] = [];
+  for (const l of linhas) {
+    if (!l.contornos.length) continue;
+    const name = freeName(requireDrawing(e.json, p.image), p.name ?? "texto");
+    // a fonte preenche pelo sentido do contorno (letras feitas de pedacos sobrepostos)
+    const s: DrawShape = { name, points: l.contornos[0], closed: true, rule: "nonzero" };
+    if (l.contornos.length > 1) s.holes = l.contornos.slice(1).map((c: DrawPoint[]) => ({ points: c, closed: true }));
+    s.fill = p.fill ?? (p.stroke ? undefined : "000000ff");
+    if (p.stroke) s.stroke = { color: p.stroke.color ?? "000000ff", width: p.stroke.width ?? 2, align: p.stroke.align ?? "outside", join: p.stroke.join ?? "round", cap: p.stroke.cap };
+    e.insert([...path(p.image), "shapes"], at, cleanShape(s));
+    added.push({ index: at, name });
+    at++;
+  }
+  return added;
+}
+// o modulo da fonte, carregado no prepare (o run e sincrono)
+let textoMod: typeof import("../fonte.ts") | null = null;
+
+defineCommand({
+  name: "draw.balloon",
+  group: "drawing",
+  summary:
+    "Balao de fala (ou caixa de legenda) pronto: um osso e uma parte novos com um desenho do tamanho do texto, o corpo arredondado, a cauda apontando para tail (no mundo, ou omitido para sem cauda) e o texto na fonte .ttf. Com anim e from/to: entra com um pop (cresce passando do ponto) e sai encolhendo. style: fala (branco, contorno escuro), grito (pontudo, amarelo) ou legenda (faixa escura, texto claro).",
+  params: z.object({
+    name: z.string().min(1).describe("nome do osso, da parte e da imagem"),
+    bone: z.string().describe("osso pai"),
+    x: z.number().describe("centro do balao, no osso pai"),
+    y: z.number(),
+    ...TextParams,
+    padding: z.number().min(0).optional().describe("folga entre o texto e a borda (padrao 0.5 x size)"),
+    tail: Vec.optional().describe("a ponta da cauda, em coordenadas do osso pai"),
+    style: z.enum(["fala", "grito", "legenda"]).optional(),
+    fill: Color.optional(),
+    stroke: Stroke.optional(),
+    textColor: Color.optional(),
+    anim: z.string().optional(),
+    from: z.number().min(0).optional(),
+    to: z.number().min(0).optional(),
+  }),
+  label: (p) => `balao ${p.name}`,
+  prepare: async ({ doc, assets }, p) => {
+    textoMod = await import("../fonte.ts");
+    return { fonte: await lerFonteDe(doc, assets, p.font) };
+  },
+  run({ e, run, prepared }, p) {
+    const f = prepared.fonte;
+    const estilo = p.style ?? "fala";
+    const pad = p.padding ?? p.size * 0.5;
+    const linhas = p.text.split("\n");
+    const lh = (p.lineHeight ?? 1.15) * p.size;
+    const s = p.size / f.unidades;
+    const larg = Math.max(...linhas.map((l) => [...l].reduce((a, ch) => a + f.avanco(f.glifo(ch.codePointAt(0)!)) * s + (p.letterSpacing ?? 0), 0)));
+    const alt = p.size * 1.0 + (linhas.length - 1) * lh;
+    const sw = p.stroke?.width ?? (estilo === "legenda" ? 0 : Math.max(2, p.size * 0.09));
+    // a caixa do corpo e a cauda, em pixels da imagem (y para baixo, origem no canto)
+    const bw = larg + 2 * pad,
+      bh = alt + 2 * pad;
+    const cauda = p.tail ? [p.tail[0] - p.x, -(p.tail[1] - p.y)] : null; // relativa ao centro, y para baixo
+    const m = sw + 4;
+    const minX = Math.min(-bw / 2, cauda ? cauda[0] : 0) - m,
+      maxX = Math.max(bw / 2, cauda ? cauda[0] : 0) + m,
+      minY = Math.min(-bh / 2, cauda ? cauda[1] : 0) - m,
+      maxY = Math.max(bh / 2, cauda ? cauda[1] : 0) + m;
+    const W = Math.ceil(maxX - minX),
+      H = Math.ceil(maxY - minY);
+    const cx = -minX,
+      cy = -minY; // o centro do corpo na imagem
+    // o centro da imagem no osso: o centro do corpo deslocado
+    const ox = (minX + maxX) / 2,
+      oy = -(minY + maxY) / 2;
+    run("bone.add", { name: p.name, parent: p.bone, x: p.x, y: p.y });
+    run("draw.create", { image: p.name, width: W, height: H, slot: p.name, bone: p.name, x: ox, y: oy, hd: 3 });
+    const fundo = p.fill ?? (estilo === "grito" ? "ffd84aff" : estilo === "legenda" ? "101418e6" : "ffffffff");
+    const linha = { color: p.stroke?.color ?? "1d1b26ff", width: sw, align: "center" as const, join: "round" as const };
+    const corpo: DrawPoint[] =
+      estilo === "grito"
+        ? Array.from({ length: 22 }, (_, i) => {
+            const a = (i / 22) * Math.PI * 2,
+              r = i % 2 ? 0.86 : 1.12;
+            return { x: cx + Math.cos(a) * (bw / 2) * r, y: cy + Math.sin(a) * (bh / 2) * r };
+          })
+        : [
+            { x: cx - bw / 2, y: cy - bh / 2, radius: Math.min(bh / 2, p.size * 0.6) },
+            { x: cx + bw / 2, y: cy - bh / 2, radius: Math.min(bh / 2, p.size * 0.6) },
+            { x: cx + bw / 2, y: cy + bh / 2, radius: Math.min(bh / 2, p.size * 0.6) },
+            { x: cx - bw / 2, y: cy + bh / 2, radius: Math.min(bh / 2, p.size * 0.6) },
+          ];
+    // a cauda: um triangulo da borda do corpo ate a ponta, desenhado antes (o corpo cobre a base)
+    if (cauda) {
+      const tx = cx + cauda[0],
+        ty = cy + cauda[1];
+      const base = Math.min(bw * 0.18, p.size * 0.8);
+      const bx = cx + Math.max(-bw / 2 + base, Math.min(bw / 2 - base, cauda[0] * 0.5));
+      const byE = ty > cy ? cy + bh / 2 - sw : cy - bh / 2 + sw;
+      run("draw.shape", { image: p.name, name: "cauda", points: [{ x: bx - base / 2, y: byE }, { x: tx, y: ty }, { x: bx + base / 2, y: byE }], closed: true, fill: fundo, ...(sw ? { stroke: linha } : {}) });
+    }
+    run("draw.shape", { image: p.name, name: "corpo", points: corpo, closed: true, fill: fundo, ...(sw ? { stroke: linha } : {}) });
+    // a base da cauda sem o traco do corpo por cima: um remendo da cor do fundo
+    if (cauda && sw) {
+      const tx = cx + cauda[0];
+      const base = Math.min(bw * 0.18, p.size * 0.8);
+      const bx = cx + Math.max(-bw / 2 + base, Math.min(bw / 2 - base, (tx - cx) * 0.5));
+      const ty = cy + cauda[1];
+      const yb = ty > cy ? cy + bh / 2 : cy - bh / 2;
+      const dir = ty > cy ? -1 : 1;
+      run("draw.shape", { image: p.name, name: "emenda", points: [{ x: bx - base / 2 + sw * 0.6, y: yb + dir * sw * 1.2 }, { x: bx + base / 2 - sw * 0.6, y: yb + dir * sw * 1.2 }, { x: bx + base / 2 - sw * 0.9, y: yb - dir * sw * 0.9 }, { x: bx - base / 2 + sw * 0.9, y: yb - dir * sw * 0.9 }], closed: true, fill: fundo });
+    }
+    const corTexto = p.textColor ?? (estilo === "legenda" ? "f2f5f7ff" : "1d1b26ff");
+    escreve(e, f, { image: p.name, name: "texto", x: cx + (p.align === "left" ? -larg / 2 : p.align === "right" ? larg / 2 : 0), y: cy - alt / 2 + p.size * 0.78, text: p.text, size: p.size, align: p.align ?? "center", letterSpacing: p.letterSpacing, lineHeight: p.lineHeight, fill: corTexto });
+    // o pop: cresce passando do ponto e assenta; sai encolhendo
+    if (p.anim && p.from !== undefined) {
+      const a = p.anim,
+        t0 = p.from;
+      const k = (time: number, v: number) => run("key.set", { anim: a, target: { bone: p.name }, timeline: "scale", time: Math.round(time * 1000) / 1000, x: v, y: v });
+      if (t0 > 0) k(0, 0);
+      k(t0, 0);
+      k(t0 + 0.12, 1.15);
+      k(t0 + 0.22, 1);
+      if (p.to !== undefined && p.to > t0 + 0.4) {
+        k(p.to - 0.15, 1);
+        k(p.to, 0);
+      }
+    }
+    return { bone: p.name, slot: p.name, image: p.name, width: W, height: H };
   },
 });
 
@@ -487,7 +665,7 @@ defineCommand({
     colors: z.array(z.string()).optional(),
     tolerance: z.number().min(0.1).max(5).default(0.6),
     corner: z.number().min(10).max(170).default(55).describe("graus: virada a partir da qual o contorno faz canto"),
-    hd: z.number().min(0.25).max(8).default(3),
+    hd: z.number().min(0.05).max(8).default(3),
     replace: z.boolean().default(false),
   }),
   label: (p) => `vetoriza ${p.image}`,
@@ -758,7 +936,7 @@ defineCommand({
   name: "draw.resize",
   group: "drawing",
   summary: "Muda o tamanho da imagem desenhada (width, height, hd). offset [ox, oy] desloca as formas dentro dela. As partes que usam a imagem ficam no mesmo lugar e escala na tela.",
-  params: z.object({ image: Image, width: z.number().positive().optional(), height: z.number().positive().optional(), offset: Vec.default([0, 0]), hd: z.number().min(0.25).max(8).optional() }),
+  params: z.object({ image: Image, width: z.number().positive().optional(), height: z.number().positive().optional(), offset: Vec.default([0, 0]), hd: z.number().min(0.05).max(8).optional() }),
   label: (p) => `tamanho de ${p.image}`,
   run({ e, run }, p) {
     const d = requireDrawing(e.json, p.image);

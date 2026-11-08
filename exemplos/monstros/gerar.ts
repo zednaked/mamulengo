@@ -24,6 +24,25 @@ const HD = 2; // pixels da textura por pixel do mundo
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const GRAUS = 180 / Math.PI;
 
+// ---- objetos desenhados aqui (PNG em 2x em fontes/, como as pecas da Kenney)
+{
+  const camera = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="150" viewBox="0 0 110 75">
+    <rect x="22" y="4" width="26" height="12" rx="3" fill="#3a3a48"/>
+    <rect x="4" y="12" width="102" height="58" rx="10" fill="#4a4a5c"/>
+    <rect x="4" y="12" width="102" height="16" rx="8" fill="#5c5c70"/>
+    <rect x="82" y="17" width="16" height="9" rx="2" fill="#fff6c8"/>
+    <circle cx="55" cy="44" r="23" fill="#2a2a36"/><circle cx="55" cy="44" r="17" fill="#3b6ea8"/>
+    <circle cx="55" cy="44" r="9" fill="#14141c"/><circle cx="49" cy="38" r="4" fill="#ffffff" opacity="0.7"/>
+    <circle cx="14" cy="22" r="3" fill="#ff4d4d"/></svg>`;
+  const foto = `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="160" viewBox="0 0 70 80">
+    <rect x="2" y="2" width="66" height="76" rx="2" fill="#fbfaf5" stroke="#d8d4c8" stroke-width="1.5"/>
+    <rect x="7" y="7" width="56" height="46" fill="#8fd18a"/><rect x="7" y="7" width="56" height="22" fill="#9fd8f5"/>
+    <circle cx="20" cy="40" r="6" fill="#ffb400"/><circle cx="32" cy="38" r="6" fill="#ff4466"/><circle cx="44" cy="40" r="6" fill="#2ecc71"/><circle cx="55" cy="36" r="6" fill="#4a3a2c"/>
+    <path d="M12 66 h30" stroke="#8a8a96" stroke-width="2"/></svg>`;
+  await sharp(Buffer.from(camera)).png().toFile(join(FONTES, "prop_camera.png"));
+  await sharp(Buffer.from(foto)).png().toFile(join(FONTES, "prop_foto.png"));
+}
+
 // ---- pecas: o PNG (2x), espelhado ou nao, e as medidas em pixels do mundo (y para baixo)
 type Peca = { nome: string; arq: string; espelho: boolean; w: number; h: number; alfa: Uint8Array };
 const pecas = new Map<string, Peca>();
@@ -264,7 +283,7 @@ export type Rig = {
   altura: number; // do corpo
   largura: number;
   quadrilY: number;
-  slots: { boca: string; olhos: string[] };
+  slots: { boca: string; olhos: string[]; camera?: string; fotinho?: string };
   // olhos malucos: o ponto na imagem do corpo (pixels da textura, y para baixo) e o diametro
   googly: { u: number; v: number; size: number }[];
   pecas: { boca: string; olhos: string[] };
@@ -413,6 +432,25 @@ for (const m of MONSTROS) {
     rig.pecas.boca = p.nome;
   }
   void topo;
+  // objetos nas maos (so aparecem nas animacoes do VT): o Clique segura a camera na mao de fora
+  // (a esquerda da tela) e mostra a Polaroid com a do lado da turma; o Bagunca rouba a camera
+  // com a mao direita
+  const naMao = async (lado: -1 | 1, nome: string, arq: string, z: number, dy: number) => {
+    const br = rig.bracos.find((b) => b.lado === lado && !b.extra)!;
+    const c = doOsso(br.cotovelo);
+    const len = c.comprimento ?? 0;
+    const mx = c.x + Math.cos(c.giro / GRAUS) * len,
+      my = c.y + Math.sin(c.giro / GRAUS) * len;
+    const mao = osso(`${m.id}_mao_${lado < 0 ? "e" : "d"}`, br.cotovelo, mx, my);
+    prende(`${m.id}_${nome}`, mao, await peca(arq), mx, my + dy, z, 1);
+    slots[slots.length - 1].s.cor = "ffffff00";
+    return `${m.id}_${nome}`;
+  };
+  if (m.id === "azul") {
+    rig.slots.camera = await naMao(-1, "camera", "prop_camera", 230, 10);
+    rig.slots.fotinho = await naMao(1, "fotinho", "prop_foto", 231, 30);
+  }
+  if (m.id === "marrom") rig.slots.camera = await naMao(1, "camera", "prop_camera", 230, 10);
   rigs.push(rig);
 }
 
@@ -588,6 +626,9 @@ for (const ef of ["poeira", "pum", "olho_maluco"]) await porEfeito(ARQ, ef);
   rajada("verde_pum", 5.7, 9);
   // os olhos de boneco do amarelo e do vermelho viram olhos malucos, no mesmo lugar
   for (const r of rigs) for (const g of r.googly) ch.push({ cmd: "eye.googly", args: { slot: `${r.m.id}_corpo`, at: [[r3(g.u), r3(g.v)]], size: r3(g.size), name: `${r.m.id}_olho` } });
+  // a selfie do VT (vt_selfie): o Bagunca na frente de todos e o Clique logo atras (cada monstro
+  // vai para a frente na sua vez, inteiro)
+  ch.push({ cmd: "draworder.key", args: { anim: "vt_selfie", time: 0, front: ["vermelho_*", "verde_*", "amarelo_*", "azul_*", "marrom_*"] } });
   await executeAsync(doc2, ch, "gerador", "efeitos", {}, provDe(ex2.atlas));
   const comEfeitos = importarSpine(doc2.json, ex2.atlas, "monstros");
   comEfeitos.mix = final.mix;

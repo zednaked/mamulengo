@@ -6,9 +6,11 @@ import { parseAtlas } from "../core/atlas-text.ts";
 import { dropDraft, getDraft, putDraft, type Draft } from "./drafts.ts";
 import type { Runtime, Viewer } from "../render/viewer.ts";
 import type { Op } from "../core/ops.ts";
-import { fichaPath } from "../core/ficha.ts";
+import { draftFicha, fichaPath } from "../core/ficha.ts";
+import { NAVEGADOR } from "../navegador/pagina.ts";
 import { drawingsOf } from "../core/desenho.ts";
 import { Desenhos, drawingPixels } from "./desenho.ts";
+import { VideoReferencia } from "../render/videoref.ts";
 
 export interface AssetInfo {
   id: string;
@@ -159,16 +161,35 @@ class AppState {
   offerMesh = $state<{ slot: string; attachment: string } | null>(null);
   onion = $state(false);
   // imagem de referencia por cima do viewport, presa ao mundo (centro x, y e largura em
-  // unidades do mundo), semitransparente: para conferir pose, proporcao e encaixe
-  referencia = $state<{ src: string; x: number; y: number; largura: number; opacidade: number; mover: boolean } | null>(null);
-  // poe uma imagem de referencia ajustada a altura do personagem na tela
-  async porReferencia(src: string) {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
+  // unidades do mundo), semitransparente: para conferir pose, proporcao e encaixe. Com `video`
+  // (N-023, spike: .mp4), o clipe e desenhado atras do personagem pelo viewer, no quadro exato do
+  // instante da timeline (inicio + velocidade x t, repetindo), com a cebola mostrando os quadros
+  // vizinhos do video (src/render/videoref.ts)
+  referencia = $state<{ src: string; x: number; y: number; largura: number; opacidade: number; mover: boolean; video?: VideoReferencia; inicio?: number; velocidade?: number; repetir?: boolean; frente?: boolean } | null>(null);
+  // poe uma imagem (ou video) de referencia ajustada a altura do personagem na tela
+  async porReferencia(src: string, video = /\.(mp4|m4v|mov)$/i.test(decodeURIComponent(src))) {
+    let w: number, h: number;
+    let v: VideoReferencia | undefined;
+    if (video) {
+      v = await VideoReferencia.abrir(src);
+      w = v.largura;
+      h = v.altura;
+    } else {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      w = img.naturalWidth;
+      h = img.naturalHeight;
+    }
+    this.tirarReferencia();
     const b = this.viewer?.currentBounds() ?? [-100, 0, 200, 300];
     const altura = b[3] * 1.05;
-    this.referencia = { src, x: b[0] + b[2] / 2, y: b[1] + b[3] / 2, largura: (altura * img.naturalWidth) / img.naturalHeight, opacidade: 0.5, mover: false };
+    this.referencia = { src, x: b[0] + b[2] / 2, y: b[1] + b[3] / 2, largura: (altura * w) / h, opacidade: 0.5, mover: false, ...(v ? { video: v, inicio: 0, velocidade: 1, repetir: true } : {}) };
+  }
+  tirarReferencia() {
+    this.referencia?.video?.fechar();
+    if (this.viewer) this.viewer.refVideo = null;
+    this.referencia = null;
   }
   // modo de desenho do viewport (godot, spine ou nucleo): segue o personagem aberto (runtimeDe);
   // escolher no seletor vale para o projeto dele
@@ -374,6 +395,10 @@ class AppState {
     text: async (path) => {
       const r = await fetch(fileUrl(path));
       return r.ok ? await r.text() : null;
+    },
+    bytes: async (path) => {
+      const r = await fetch(fileUrl(path));
+      return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
     },
     region: (name) => {
       // imagem desenhada: o tamanho dela (a pagina guarda em alta resolucao)
@@ -924,6 +949,8 @@ class AppState {
   // rascunho com o contexto do jogo, do documento como esta agora
   async draftFicha(): Promise<string> {
     if (!this.doc || !this.asset) throw new Error("Abra um personagem primeiro.");
+    // no navegador nao ha projeto Godot para ler (de onde vinham os usos e os mixes do jogo)
+    if (NAVEGADOR) return draftFicha(this.doc.json, this.asset.name);
     const r = await fetch("/api/ficha/draft", { method: "POST", body: JSON.stringify({ json: this.doc.json, skeleton: this.asset.skeleton, name: this.asset.name }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `nao gerou o rascunho (${r.status})`);
     return r.text();

@@ -38,6 +38,9 @@ export interface DrawShape {
   // furos: contornos que tiram do preenchimento (o traco passa por eles tambem)
   holes?: Contour[];
   fill?: string;
+  // regra do preenchimento: par-impar (padrao, os furos sao furos) ou "nonzero" (pelo sentido do
+  // contorno, como nas fontes TrueType: pedacos que se sobrepoem somam em vez de furar)
+  rule?: "nonzero";
   stroke?: DrawStroke;
   hidden?: boolean;
 }

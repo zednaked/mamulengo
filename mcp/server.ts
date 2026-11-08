@@ -346,6 +346,12 @@ server.registerTool(
       dir: z.string().optional().describe("create: pasta do personagem dentro do projeto Godot (absoluta)"),
       name: z.string().optional().describe("create: nome dos arquivos (sem espacos)"),
       ignoreHidden: z.boolean().optional().describe("camadas escondidas ficam de fora (padrao: entram como trocas)"),
+      mapa: z
+        .union([z.string(), z.record(z.string(), z.any())])
+        .optional()
+        .describe(
+          'mapa externo, sem regravar o PSD: caminho absoluto de um .json ou o objeto { camadas: { "antebraco": "[bone:antebraco]" }, ossos: { "antebraco": { pai: "braco", at: [x,y], ponta: [x,y] } }, esconder: ["camada"] } (px do PSD; chave pelo nome limpo ou "grupo/camada"). A atualizacao sem mapa reaplica o da importacao anterior.',
+        ),
     },
   },
   wrap(async (a) => text(await call("psd", a, 180_000))),

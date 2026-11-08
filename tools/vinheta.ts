@@ -8,6 +8,9 @@
 //
 //   --saida  padrao: <video>-post.mp4 ao lado (H.264, o que as redes aceitam melhor); .webm e
 //            .gif tambem
+//
+// O som do video, se houver, entra atrasado pela abertura (AAC no mp4, Opus no webm; o gif nao tem
+// som). As vinhetas nao tem som proprio.
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,13 +52,21 @@ const cabe = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}
 const partes = [...(semAbertura ? [] : [abertura]), video, ...(semFechamento ? [] : [fechamento])];
 const filtro = partes.map((_, i) => `[${i}:v]${cabe}[v${i}]`).join(";") + ";" + partes.map((_, i) => `[v${i}]`).join("") + `concat=n=${partes.length}:v=1:a=0[v]`;
 const ext = saida.split(".").pop();
+
+// o som do video (as vinhetas nao tem): atrasado pela abertura, para continuar junto da imagem
+const temAudio =
+  ext !== "gif" && spawnSync("ffprobe", ["-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", video], { encoding: "utf8" }).stdout.trim() !== "";
+const duracao = (f: string) => Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f], { encoding: "utf8" }).stdout.trim());
+const atraso = semAbertura ? 0 : Math.round(duracao(abertura) * 1000);
+const filtroA = temAudio ? `${filtro};[${semAbertura ? 0 : 1}:a]adelay=${atraso}:all=1[a]` : filtro;
+const som = (c: string[]) => (temAudio ? ["-map", "[a]", ...c] : []);
 const cod =
   ext === "gif"
     ? ["-filter_complex", `${filtro};[v]split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4`, "-loop", "0"]
     : ext === "webm"
-      ? ["-filter_complex", filtro, "-map", "[v]", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-row-mt", "1"]
-      : ["-filter_complex", filtro, "-map", "[v]", "-c:v", "libx264", "-crf", "20", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
+      ? ["-filter_complex", filtroA, "-map", "[v]", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-row-mt", "1", ...som(["-c:a", "libopus"])]
+      : ["-filter_complex", filtroA, "-map", "[v]", "-c:v", "libx264", "-crf", "20", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", ...som(["-c:a", "aac", "-b:a", "192k"])];
 const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", ...partes.flatMap((f) => ["-i", f]), ...cod, saida], { encoding: "utf8", maxBuffer: 1 << 26 });
 if (r.status !== 0) throw new Error(`ffmpeg: ${r.stderr}`);
 const d = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", saida], { encoding: "utf8" }).stdout.trim();
-console.log(`${saida}: ${W}x${H}, ${Number(d).toFixed(1)} s (${partes.length === 3 ? "abertura + video + fechamento" : partes.length === 2 ? (semAbertura ? "video + fechamento" : "abertura + video") : "so o video"})`);
+console.log(`${saida}: ${W}x${H}, ${Number(d).toFixed(1)} s${temAudio ? ", com o som do video" : ""} (${partes.length === 3 ? "abertura + video + fechamento" : partes.length === 2 ? (semAbertura ? "video + fechamento" : "abertura + video") : "so o video"})`);

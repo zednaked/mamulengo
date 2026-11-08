@@ -106,6 +106,7 @@ const KeyValue = z
     start: z.number().optional().describe("instance: o tempo do filho na chave"),
     speed: z.number().optional().describe("instance: velocidade do filho"),
     loop: z.boolean().optional().describe("instance: repetir (false para no fim)"),
+    follow: z.object({ instance: z.string(), bone: z.string() }).nullable().optional().describe("instance: seguir o osso bone do filho de outra instancia (o objeto troca de mao); null volta ao osso dela"),
   })
   .partial();
 

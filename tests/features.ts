@@ -4,7 +4,7 @@
 //   npx tsx tests/features.ts
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import sharp from "sharp";
 import { AnimationState, AnimationStateData, AtlasAttachmentLoader, Physics, Skeleton, SkeletonJson, TextureAtlas } from "@esotericsoftware/spine-core";
 import { createAsset } from "../server/assets.ts";
@@ -55,6 +55,9 @@ const assets: AssetProvider = {
   region(name) {
     const r = atlas.regions.find((x) => x.name === name);
     return r ? { width: r.originalWidth, height: r.originalHeight } : null;
+  },
+  async bytes(p) {
+    return new Uint8Array(readFileSync(p));
   },
 };
 
@@ -185,6 +188,36 @@ runtimeOk("malhas com pesos");
   check(!doc.json.skins[0].attachments.braco.braco.jelly, "geleia: enabled false tira");
 }
 
+// malha automatica em peca fina e curva (a perna da Kenney nos monstros): nenhum pixel opaco fora
+// dos triangulos, em varios detalhes (o Delaunay filtrado pelo centro deixava 420 px de fora)
+{
+  const { autoMesh } = await import("../src/core/geometry.ts");
+  const { data, info } = await sharp(join(import.meta.dirname, "..", "exemplos", "monstros", "fontes", "leg_blueB.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const fora = (detail: number) => {
+    const m = autoMesh(data, info.width, info.height, { detail });
+    const P = m.points,
+      T = m.triangles;
+    let n = 0;
+    for (let y = 0; y < info.height; y += 2)
+      for (let x = 0; x < info.width; x += 2) {
+        if (data[(y * info.width + x) * 4 + 3] <= 128) continue;
+        const [px, py] = [x + 0.5, y + 0.5];
+        let ok = false;
+        for (let t = 0; t < T.length && !ok; t += 3) {
+          const [a, b, c] = [P[T[t]], P[T[t + 1]], P[T[t + 2]]];
+          const d1 = (px - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (py - b[1]),
+            d2 = (px - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (py - c[1]),
+            d3 = (px - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (py - a[1]);
+          ok = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+        }
+        if (!ok) n++;
+      }
+    return n;
+  };
+  const r = [1, 1.2, 4].map(fora);
+  check(r.every((n) => n === 0), `malha automatica cobre a peca fina inteira (pixels opacos de fora por detalhe 1, 1.2, 4: ${r.join(", ")})`);
+}
+
 // olho maluco: eye.googly cola olhos (branco, pupila no osso pendurado com fisica, brilho) em
 // lugares aleatorios da parte opaca, pede as imagens da biblioteca no atlas e desfaz inteiro
 {
@@ -258,6 +291,31 @@ check(br.touched > 0, `pincel de deform tocou ${br.touched} vertices`);
   await run("animation.delete", { name: "t.virar" });
 }
 runtimeOk("animacao com deform");
+
+// .boneco: o nome da parte dentro da animacao (animations/*/attachments/<skin>/<slot>/<parte>) e do
+// artista e nao passa pelo dicionario; uma parte chamada "glow" virava "brilho" e o deform ficava orfao
+{
+  const { importarSpine, exportarSpine } = await import("../src/boneco/spine.ts");
+  const j = structuredClone(doc.json);
+  const renomeia = (o: any) => {
+    o.glow = o.corpo;
+    delete o.corpo;
+  };
+  renomeia(j.skins[0].attachments.corpo);
+  renomeia(j.animations["1.idle"].attachments.default.corpo);
+  for (const s of j.slots) if (s.attachment === "corpo" && s.name === "corpo") s.attachment = "glow";
+  const bo = importarSpine(structuredClone(j), atlasText, "t");
+  const orfas: string[] = [];
+  for (const [an, a] of Object.entries<any>(bo.animacoes ?? {}))
+    for (const [sk, slots] of Object.entries<any>(a.partes ?? {}))
+      for (const [sl, partes] of Object.entries<any>(slots))
+        for (const pt of Object.keys(partes)) if (!bo.skins.find((x: any) => x.nome === sk)?.partes?.[sl]?.[pt]) orfas.push(`${an}/${sk}/${sl}/${pt}`);
+  const volta = exportarSpine(bo).json;
+  check(
+    !!bo.animacoes["1.idle"].partes.default.corpo.glow && !bo.animacoes["1.idle"].partes.default.corpo.brilho && !!bo.skins[0].partes.corpo.glow && orfas.length === 0 && JSON.stringify(volta.animations) === JSON.stringify(j.animations),
+    `.boneco: parte "glow" com deform segue "glow" na animacao (nao "brilho"), nenhuma parte orfa (${orfas.join(",") || "0"}), animacoes voltam iguais`,
+  );
+}
 
 // varias chaves: copiar/colar (outra animacao, outro osso), mover juntas, apagar juntas
 {
@@ -521,6 +579,19 @@ runtimeOk("constraints");
       const depois = ordens();
       check(r.drawOrderKeys === 2 && JSON.stringify(antes) === JSON.stringify(depois) && nomes()[0] === n0[n0.length - 1], `slot.order na Pose base com chaves de ordem: as ${r.drawOrderKeys} chaves continuam com a mesma ordem na tela`);
       await run("slot.order", { slot: n0[n0.length - 1], index: n0.length - 1 });
+      // por nome: below (logo atras de outro) e curinga (um grupo inteiro anda junto, na ordem dele)
+      await run("draworder.key", { anim: "t.ordem", time: 0.4, below: { [n0[n0.length - 1]]: n0[0] } });
+      const k4 = () => doc.json.animations["t.ordem"].drawOrder.find((k: any) => Math.abs((k.time ?? 0) - 0.4) < 1e-6);
+      const o4 = dec(nomes(), k4().offsets);
+      check(o4[0] === n0[n0.length - 1] && o4[1] === n0[0], `draworder.key below: ${n0[n0.length - 1]} logo atras de ${n0[0]}`);
+      const pref = n0[0].slice(0, 1);
+      const grupo = n0.filter((n: string) => n.startsWith(pref));
+      await run("draworder.key", { anim: "t.ordem", time: 0.4, front: [pref + "*"] });
+      const o5 = dec(nomes(), k4().offsets);
+      check(JSON.stringify(o5.slice(o5.length - grupo.length)) === JSON.stringify(grupo), `draworder.key front com curinga: ${pref}* (${grupo.length} slots) na frente, na ordem de setup`);
+      let semCasa = false;
+      await run("draworder.key", { anim: "t.ordem", time: 0.4, front: ["nao_existe_*"] }).catch(() => (semCasa = true));
+      check(semCasa, "draworder.key: curinga que nao casa com nada e recusado");
       await run("animation.delete", { name: "t.ordem" });
     }
   }
@@ -651,6 +722,39 @@ runtimeOk("constraints");
     while (doc.history().length > n0) doc.undo();
     check(!doc.json.drawings && !doc.json.slots.some((x: any) => x.name === "t.desenho"), "desenho: desfazer tira a imagem desenhada e a parte");
   }
+  // texto e balao (src/core/fonte.ts): a fonte .ttf (CC0, Kenney Future) vira formas com os furos
+  // das letras; o balao cria osso, parte e desenho com corpo, cauda e texto, e o pop nas chaves
+  {
+    const n0 = doc.history().length;
+    const fonte = resolve("exemplos/ui/fontes/kenney-future.ttf");
+    await run("draw.create", { image: "t.txt", width: 420, height: 120 });
+    const r = await run("draw.text", { image: "t.txt", text: "BOO 42", font: fonte, size: 64, x: 20, y: 90, fill: "202020ff" });
+    const sh = doc.json.drawings["t.txt"].shapes;
+    const xs = sh[0].points.map((q: any) => q.x).concat(...(sh[0].holes ?? []).map((h: any) => h.points.map((q: any) => q.x)));
+    const ys = sh[0].points.map((q: any) => q.y).concat(...(sh[0].holes ?? []).map((h: any) => h.points.map((q: any) => q.y)));
+    const furos = sh[0].holes?.length ?? 0;
+    // desenhado: tinta na barriga do B e vazio no meio do O (o furo)
+    const des2 = await import("../src/core/desenho.ts");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120"><path d="${des2.svgPath(sh[0])}" fill="#000" fill-rule="${sh[0].rule ?? "evenodd"}"/></svg>`;
+    const px = await sharp(Buffer.from(svg)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alfa = (x: number, y: number) => px.data[(Math.round(y) * 420 + Math.round(x)) * 4 + 3];
+    const oCentro = sh[0].holes?.find((h: any) => h.points.every((q: any) => q.x > 100))?.points;
+    const mx = oCentro ? oCentro.reduce((a: number, q: any) => a + q.x, 0) / oCentro.length : 0;
+    const my = oCentro ? oCentro.reduce((a: number, q: any) => a + q.y, 0) / oCentro.length : 0;
+    check(sh[0].rule === "nonzero" && r.added.length === 1 && furos >= 3 && Math.min(...xs) >= 18 && Math.max(...ys) <= 91 && Math.min(...ys) > 20 && alfa(mx, my) === 0, `texto: draw.text vira uma forma com ${furos} furos, na linha de base e com o miolo do O vazio`);
+    const b = await run("draw.balloon", { name: "t.balao", bone: doc.json.bones[0].name, x: 0, y: 300, text: "Oi!", font: fonte, size: 40, tail: [-60, 220], anim: "1.idle", from: 0.2, to: 0.9 });
+    const bd = doc.json.drawings["t.balao"];
+    const nomes = bd.shapes.map((x: any) => x.name).join(",");
+    const esc = doc.json.animations["1.idle"].bones?.["t.balao"]?.scale ?? [];
+    check(nomes === "cauda,corpo,emenda,texto" && b.width > 120 && doc.json.slots.some((x: any) => x.name === "t.balao") && esc.length >= 5 && Math.max(...esc.map((k: any) => k.x ?? 1)) > 1.1, `texto: draw.balloon com ${nomes}, ${b.width}x${b.height} e o pop (${esc.length} chaves)`);
+    // query.desenho: o texto encostado na borda e cortado, o balao pequeno ampliado fica borrado
+    await run("draw.shape", { image: "t.txt", name: "fora", rect: [380, 10, 60, 30], fill: "ff0000ff" });
+    const qd = await run("query.desenho", { scale: 4 });
+    const av = qd.avisos.join(" | ");
+    check(av.includes("t.txt: cortada") && av.includes("fora") && av.includes("t.balao: borrada"), `query.desenho: corte pela borda e nitidez (${av.slice(0, 200)})`);
+    while (doc.history().length > n0) doc.undo();
+    check(!doc.json.drawings?.["t.txt"] && !doc.json.drawings?.["t.balao"] && !doc.json.bones.some((x: any) => x.name === "t.balao"), "texto: desfazer tira o texto e o balao");
+  }
   // camada de ajuste: setup e chave (matiz negativo), vai ao .boneco como "ajuste" em portugues
   {
     const s0 = doc.json.slots[0].name;
@@ -764,6 +868,34 @@ runtimeOk("constraints");
       `instancias: instance.set, key.set (instance), ida e volta, slot e osso renomeados, instance.rename, instance.delete ${JSON.stringify({ inst, ki })}${erroSpine ? ` (spine-core: ${erroSpine})` : ""}`,
     );
     await run("animation.delete", { name: "t.inst" });
+  }
+  // follow: uma instancia presa ao osso do filho de outra (o objeto na mao), e a chave troca de
+  // mao ou volta ao osso dela; a seguida vem antes; renomear leva junto; apagar a seguida recusa;
+  // vai e volta pelo .boneco
+  {
+    const slot = doc.json.slots[0].name;
+    await run("instance.set", { name: "t.dono", slot, boneco: "filho.boneco" });
+    await run("instance.set", { name: "t.obj", slot, boneco: "filho.boneco", scaleX: 0.3, follow: { instance: "t.dono", bone: "mao" } });
+    let antes = false;
+    await run("instance.set", { name: "t.dono", follow: { instance: "t.obj", bone: "mao" } }).catch(() => (antes = true));
+    await run("animation.create", { name: "t.segue" });
+    await run("key.set", { anim: "t.segue", target: { instance: "t.obj" }, timeline: "instance", time: 0.4, follow: null });
+    await run("instance.rename", { name: "t.dono", to: "t.dono2" });
+    const renomeado = doc.json.instances.find((x: any) => x.name === "t.obj").follow.instance === "t.dono2";
+    let recusou = false;
+    await run("instance.delete", { name: "t.dono2" }).catch(() => (recusou = true));
+    const { exportarSpine, importarSpine } = await import("../src/boneco/spine.ts");
+    const b = importarSpine(structuredClone(doc.json), atlasText, "t");
+    const volta = exportarSpine(b).json;
+    const bo = b.instancias.find((x: any) => x.nome === "t.obj");
+    const k = b.animacoes["t.segue"].instancias["t.obj"][0];
+    check(
+      antes && renomeado && recusou && bo.segue?.instancia === "t.dono2" && bo.segue?.osso === "mao" && k.segue === null && JSON.stringify(volta.instances) === JSON.stringify(doc.json.instances),
+      `instancias: follow (objeto na mao de outra instancia), chave follow null, ordem exigida, rename leva, delete da seguida recusa, ida e volta ${JSON.stringify({ antes, renomeado, recusou, bo: bo.segue, k })}`,
+    );
+    await run("animation.delete", { name: "t.segue" });
+    await run("instance.delete", { name: "t.obj" });
+    await run("instance.delete", { name: "t.dono2" });
   }
 
   // instance.extract: a subarvore de um osso vira um .boneco (no resultado) e uma instancia no
@@ -1186,6 +1318,84 @@ await run("key.set", { anim: "6.principios", target: { bone: "peito" }, timeline
 await run("key.set", { anim: "6.principios", target: { bone: "peito" }, timeline: "rotate", time: 0.6, value: 10 });
 await run("anim.overlap", { anim: "6.principios", from: "peito", chain: ["cabeca"], delay: 0.1, damping: 0.5 });
 runtimeOk("principios");
+
+// a pagina dos desenhos fora do editor (src/core/desenho-svg.ts, server/desenhos.ts): traco por
+// fora fica so do lado de fora, por dentro so do lado de dentro, e o arranjo e o do editor
+{
+  const { desenhoEmSvg } = await import("../src/core/desenho-svg.ts");
+  const ret = (x: number, y: number, w: number, h: number) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+  const d: any = { width: 100, height: 60, shapes: [
+    { name: "fora", points: ret(10, 10, 30, 30), closed: true, fill: "0000ffff", stroke: { color: "ff0000ff", width: 6, align: "outside" } },
+    { name: "dentro", points: ret(60, 10, 30, 30), closed: true, fill: "0000ffff", stroke: { color: "00ff00ff", width: 6, align: "inside" } },
+  ] };
+  const px = await sharp(Buffer.from(desenhoEmSvg(d, 1))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const at = (x: number, y: number) => Array.from(px.data.subarray((y * 100 + x) * 4, (y * 100 + x) * 4 + 4));
+  const [foraFora, foraDentro, dentroDentro, dentroFora] = [at(7, 25), at(13, 25), at(63, 25), at(57, 25)];
+  check(foraFora[0] > 200 && foraFora[3] > 200 && foraDentro[2] > 200 && foraDentro[0] < 50 && dentroDentro[1] > 200 && dentroFora[3] < 30, `desenho fora do editor: traco por fora e por dentro no SVG ${JSON.stringify({ foraFora, foraDentro, dentroDentro, dentroFora })}`);
+  const { gravarPaginaDesenhos } = await import("../server/desenhos.ts");
+  const tmp = mkdtempSync(join(tmpdir(), "desenhos-"));
+  const r = await gravarPaginaDesenhos({ a: d, b: { ...d, hd: 3 } }, "", "t.atlas", tmp);
+  const meta = await sharp(join(tmp, "t-desenhos.png")).metadata();
+  check(r.pagina === "t-desenhos.png" && r.atlas.includes("t-desenhos.png") && r.atlas.includes("bounds:") && (meta.width ?? 0) >= 300, `desenho fora do editor: a pagina ${r.pagina} ${meta.width}x${meta.height} e o atlas`);
+}
+
+// filme (docs/FILME.md): a camera, chaves com corte seco, tremor, transicoes e planos viram ossos,
+// partes e chaves comuns; a vista da camera (src/core/camera.ts) segue o osso
+{
+  const n0 = doc.history().length;
+  const { vistaDaCamera } = await import("../src/core/camera.ts");
+  const v = vistaDaCamera([0.5, 0, 0, 0.5, 100, 40], 1280, 720);
+  const vg = vistaDaCamera([0, -1, 1, 0, 0, 0], 1280, 720);
+  check(v.zoom === 2 && v.rect[2] === 640 && v.rect[0] === 100 - 320 && Math.abs(vg.giro - Math.PI / 2) < 1e-9, `filme: a vista da camera (escala 0,5 aproxima 2x, giro) ${JSON.stringify(v.rect)}`);
+  const c = await run("camera.set", { width: 1280, height: 720 });
+  await run("animation.create", { name: "t.filme" });
+  await run("camera.key", { anim: "t.filme", time: 0, x: 0, y: 0, zoom: 1 });
+  await run("camera.key", { anim: "t.filme", time: 1, x: 200, y: 0, zoom: 1.5, curve: "suave" });
+  await run("camera.key", { anim: "t.filme", time: 2, x: -300, y: 50, zoom: 2, cut: true });
+  const tr = doc.json.animations["t.filme"].bones.camera.translate;
+  const sc = doc.json.animations["t.filme"].bones.camera.scale;
+  await run("camera.shake", { anim: "t.filme", time: 1.2, duration: 0.4, strength: 12 });
+  const tremor = doc.json.animations["t.filme"].bones.camera_tremor.translate;
+  await run("shot.transition", { anim: "t.filme", time: 0.8, kind: "preto" });
+  await run("shot.transition", { anim: "t.filme", time: 2, kind: "flash" });
+  const ordem = doc.json.slots.map((x: any) => x.name);
+  const s0 = doc.json.slots[0].name;
+  await run("shot.show", { anim: "t.filme", time: 1.5, hide: [s0] });
+  const al = doc.json.animations["t.filme"].slots[s0].rgba;
+  check(
+    c.camera === "camera_tremor" && doc.json.skeleton.camera === "camera_tremor" && tr[1].curve === "stepped" && Math.abs(sc[2].x - 0.5) < 1e-6 && tremor.length >= 8 && (tremor[tremor.length - 1].x ?? 0) === 0 && ordem.slice(-2).join() === "filme_preto,filme_branco" && al.some((k: any) => k.color?.endsWith("00")),
+    `filme: camera.set, camera.key com corte, camera.shake, shot.transition (cortinas na frente), shot.show ${JSON.stringify({ tr1: tr[1], sc2: sc[2], tremor: tremor.length, ult: tremor[tremor.length - 1], al })}`,
+  );
+  const { exportarSpine, importarSpine } = await import("../src/boneco/spine.ts");
+  const b = importarSpine(structuredClone(doc.json), atlasText, "t");
+  check(b.esqueleto.camera === "camera_tremor" && exportarSpine(b).json.skeleton.camera === "camera_tremor", "filme: a camera vai e volta pelo .boneco");
+  while (doc.history().length > n0) doc.undo();
+}
+
+// som (src/core/som.ts): os eventos com audio da animacao e das instancias, no relogio de cima;
+// a instancia escondida (alfa 0) cala; a chave da instancia muda o tempo do filho
+{
+  const { trilhaDeSom } = await import("../src/core/som.ts");
+  const filho = { eventos: { bip: { audio: "bip.ogg", volume: 0.8 } }, animacoes: { pulo: { ossos: { root: { girar: [{ tempo: 0, valor: 0 }, { tempo: 0.5, valor: 0 }] } }, eventos: [{ tempo: 0.25, nome: "bip" }] } } };
+  const pai = {
+    esqueleto: { audio: "sons" },
+    slots: [{ nome: "s", osso: "root" }, { nome: "s2", osso: "root" }],
+    eventos: { uau: { audio: "uau.ogg" } },
+    instancias: [{ nome: "f", slot: "s", boneco: "f.boneco", animacao: "pulo" }, { nome: "g", slot: "s2", boneco: "f.boneco" }],
+    animacoes: {
+      a: {
+        slots: { s: { rgba: [{ tempo: 0, cor: "ffffffff", curva: "degrau" }, { tempo: 1, cor: "ffffff00" }] } },
+        instancias: { g: [{ tempo: 0.6, animacao: "pulo", inicio: 0, velocidade: 2 }] },
+        eventos: [{ tempo: 1.5, nome: "uau", balanco: -0.5 }],
+        ossos: { root: { girar: [{ tempo: 2, valor: 0 }] } },
+      },
+    },
+  };
+  const sons = trilhaDeSom(pai, "/x/pai.boneco", "a", 2, () => ({ b: filho, caminho: "/x/f.boneco" }));
+  const lista = sons.map((x) => `${x.tempo.toFixed(3)}${x.onde ? ":" + x.onde : ""}`).join(" ");
+  const esperado = "0.250:f 0.725:g 0.750:f 0.975:g 1.225:g 1.475:g 1.500 1.725:g 1.975:g";
+  check(lista === esperado && sons.find((x) => x.evento === "uau")!.pasta === "/x/sons/" && sons[0].volume === 0.8, `som: trilha com instancias, laco, chave de velocidade e instancia escondida (${lista})`);
+}
 
 // mascara, ordem de desenho, eventos, skin
 await run("slot.add", { name: "mascara", bone: "cabeca", below: "olho" });
@@ -1877,6 +2087,146 @@ runtimeOk("remocoes (slot, osso com pesos)");
   }
   // plano so de leitura: PSD com camadas que viram a mesma imagem e recusado com explicacao
   check(readPsdPlan(readFileSync(join(PSD, "aventureiro.psd")), "x.psd").plan.pieces.length === plan1.pieces.length, "PSD: leitura sem gravar nada (readPsdPlan)");
+  // mapa externo (N-020): PSD chato, sem grupos nem tags; o mapa da os ossos, o pai, o pivo
+  // e as camadas escondidas sem regravar o arquivo do cliente
+  {
+    const { writePsdBuffer } = await import("ag-psd");
+    const { writeFileSync: wf, mkdtempSync: mk } = await import("node:fs");
+    const ret = (x: number, y: number, w: number, h: number, c: number[]) => {
+      const d = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) d.set([...c, 255], i * 4);
+      return { left: x, top: y, imageData: { width: w, height: h, data: d } };
+    };
+    const chato: any = {
+      width: 400,
+      height: 400,
+      children: [
+        { name: "tronco", ...ret(150, 100, 100, 200, [200, 0, 0]) },
+        { name: "manga", ...ret(250, 100, 40, 100, [0, 200, 0]) },
+        { name: "antebraco", ...ret(255, 180, 30, 100, [0, 0, 200]) },
+        { name: "mao_alt", hidden: true, ...ret(255, 270, 30, 30, [200, 200, 0]) },
+      ],
+    };
+    const buf = Buffer.from(writePsdBuffer(chato));
+    const mapa = { camadas: { manga: "[bone:braco]", antebraco: "[bone:antebraco]" }, ossos: { antebraco: { pai: "braco", at: [270, 190] as [number, number] } }, esconder: ["tronco"] };
+    const sem = readPsdPlan(buf, "f.psd").plan;
+    check(sem.bones.length === 0 && sem.pieces.every((p) => p.bone === "root") && sem.pieces.find((p) => p.slot === "tronco")!.visible, "PSD sem mapa: igual a antes (sem ossos, tudo no root)");
+    const { plan: mp } = readPsdPlan(buf, "f.psd", { mapa });
+    const ab = mp.bones.find((b) => b.name === "antebraco"),
+      pc = (s: string) => mp.pieces.find((p) => p.slot === s)!;
+    check(
+      !!ab && ab.parent === "braco" && ab.at[0] === 270 && ab.at[1] === 190 && mp.bones.findIndex((b) => b.name === "braco") < mp.bones.indexOf(ab) && pc("manga").bone === "braco" && pc("antebraco").bone === "antebraco" && !pc("tronco").visible,
+      `PSD com mapa: ossos, pai e pivo pelo mapa, tronco escondido (${mp.bones.map((b) => `${b.name}<${b.parent}@${b.at}`).join(" ")})`,
+    );
+    const pdir2 = mk(join(dir, "psd-mapa-"));
+    const pf = join(pdir2, "chato.psd");
+    wf(pf, buf);
+    const cm = await createFromPsd({ psd: pf, dir: join(pdir2, "boneco"), name: "chato", read: { mapa: { ...mapa, ossos: { ...mapa.ossos, mao: { pai: "antebraco", at: [270, 280], ponta: [270, 300] } } } } });
+    const cj = JSON.parse(readFileSync(cm.skeleton, "utf8"));
+    const cdoc = Document.fromText(readFileSync(cm.skeleton, "utf8"), { text: readFileSync(cm.atlas, "utf8"), pages: {} });
+    const { skeletonAt: skAt, boneWorld: bw } = await import("../src/core/pose.ts");
+    const sk = skAt(cdoc.json, null, 0);
+    const wa = bw(sk, "antebraco"),
+      wm = bw(sk, "mao");
+    const ob = (n: string) => cj.bones.find((b: any) => b.name === n);
+    check(
+      ob("antebraco")?.parent === "braco" && Math.hypot(wa.x - 70, wa.y - 210) < 1e-3 && cj.slots.find((s: any) => s.name === "antebraco").bone === "antebraco" && ob("mao")?.parent === "antebraco" && Math.abs((ob("mao").length ?? 0) - 20) < 1e-3 && Math.hypot(wm.x - 70, wm.y - 120) < 1e-3,
+      `PSD com mapa: no .spine-json o antebraco e filho do braco em (70,210) no mundo, com a parte nele; osso so do mapa com ponta (mao, comprimento ${ob("mao")?.length})`,
+    );
+    const { updateDocFromPsd: upd } = await import("../server/psd.ts");
+    const re = await upd(cdoc, { psd: pf, atlas: cm.atlas });
+    check(!!re.plan.bones.find((b) => b.name === "antebraco" && b.parent === "braco") && !re.report.added.length && !re.report.refit.length && !re.report.bones.length, "PSD com mapa: atualizar sem passar o mapa reaplica o da importacao (nada muda)");
+    let erro = "";
+    try {
+      readPsdPlan(buf, "f.psd", { mapa: { camadas: { antebraco: "[bone:antebraco]" }, ossos: { antebraco: { pai: "nao_existe" } } } });
+    } catch (e: any) {
+      erro = e.message;
+    }
+    check(erro.includes("O PSD tem problemas") && erro.includes("nao_existe"), "PSD com mapa: pai inexistente e recusado");
+    erro = "";
+    try {
+      readPsdPlan(buf, "f.psd", { mapa: { ossos: { a: { pai: "b" }, b: { pai: "a" } } } });
+    } catch (e: any) {
+      erro = e.message;
+    }
+    check(erro.includes("ciclo"), "PSD com mapa: ciclo de pais e recusado");
+    const av = readPsdPlan(buf, "f.psd", { mapa: { camadas: { perna: "[bone:perna]" }, esconder: ["chapeu"] } }).plan.warnings;
+    check(av.some((w) => w.includes('"perna"')) && av.some((w) => w.includes('"chapeu"')), "PSD com mapa: chave sem camada vira aviso");
+    // query.juntas (N-021): o pivo do antebraco 50 px acima do centro da sobreposicao com a
+    // manga (que fica em (70,210) no mundo) e apontado; no lugar certo, nao
+    const { fileAssets } = await import("../server/psd.ts");
+    const juntas = async (nome: string, cotovelo: [number, number]) => {
+      const c = await createFromPsd({ psd: pf, dir: join(pdir2, nome), name: nome });
+      const at = readFileSync(c.atlas, "utf8");
+      const d = Document.fromText(readFileSync(c.skeleton, "utf8"), { text: at, pages: {} });
+      const fa = fileAssets(join(pdir2, nome), at);
+      await executeAsync(
+        d,
+        [
+          { cmd: "bone.add", args: { name: "ombro", parent: "root", at: [70, 300], toward: [70, 210] } },
+          { cmd: "bone.add", args: { name: "antebraco", parent: "ombro", at: cotovelo, toward: [70, 120] } },
+          { cmd: "slot.set", args: { slot: "manga", bone: "ombro" } },
+          { cmd: "slot.set", args: { slot: "antebraco", bone: "antebraco" } },
+        ],
+        "teste",
+        undefined,
+        {},
+        fa,
+      );
+      return (await executeAsync(d, { cmd: "query.juntas", args: {} }, "teste", undefined, {}, fa))[0];
+    };
+    const j1 = await juntas("juntas1", [70, 260]);
+    const a1 = j1.juntas.find((j: any) => j.osso === "antebraco");
+    check(
+      !!a1 && a1.pai === "ombro" && Math.hypot(a1.sugerido[0] - 70, a1.sugerido[1] - 210) < 2 && Math.abs(a1.distancia_px - 50) < 2 && j1.alertas.length === 1 && j1.alertas[0].startsWith("antebraco") && !j1.juntas.some((j: any) => j.osso === "ombro"),
+      `query.juntas: pivo do antebraco longe da sobreposicao com a manga (sugere ${a1?.sugerido}, ${a1?.distancia_px} px, ${a1?.area_px} px de area); ombro (pai root) fica de fora`,
+    );
+    const j2 = await juntas("juntas2", [70, 210]);
+    check(!j2.alertas.length && j2.juntas.find((j: any) => j.osso === "antebraco")?.distancia_px < 2, `query.juntas: pivo no centro da sobreposicao nao alerta (${JSON.stringify(j2.juntas)})`);
+  }
+}
+
+// exemplos: as chaves de instancia nas animacoes so usam os campos que o leitor conhece (o leitor nao
+// avisa campo desconhecido; "mistura" no lugar de "mix" fazia a troca saltar no abducao)
+{
+  const { readdirSync, statSync } = await import("node:fs");
+  const RAIZ = join(import.meta.dirname, "..", "exemplos");
+  const CAMPOS = new Set(["tempo", "animacao", "inicio", "velocidade", "repetir", "mix", "segue"]);
+  const ruins: string[] = [];
+  let n = 0;
+  for (const ex of readdirSync(RAIZ)) {
+    const d = join(RAIZ, ex);
+    if (!statSync(d).isDirectory()) continue;
+    for (const f of readdirSync(d).filter((x) => x.endsWith(".boneco"))) {
+      const b = JSON.parse(readFileSync(join(d, f), "utf8"));
+      for (const [an, a] of Object.entries<any>(b.animacoes ?? {}))
+        for (const [inst, chaves] of Object.entries<any>(a.instancias ?? {}))
+          for (const k of chaves) {
+            n++;
+            for (const c of Object.keys(k)) if (!CAMPOS.has(c)) ruins.push(`${ex}/${f} ${an}/${inst}: ${c}`);
+          }
+    }
+  }
+  check(n > 0 && ruins.length === 0, `exemplos: ${n} chaves de instancia, todas com campos conhecidos${ruins.length ? ` (desconhecidos: ${[...new Set(ruins)].slice(0, 5).join("; ")})` : ""}`);
+}
+
+// tools/vinheta.ts: o som do video sai no post, atrasado pela abertura (so com ffmpeg na maquina)
+{
+  const { spawnSync } = await import("node:child_process");
+  if (spawnSync("ffmpeg", ["-version"]).status !== 0) console.log("pulado: vinheta com som (sem ffmpeg)");
+  else {
+    const vd = mkdtempSync(join(tmpdir(), "vinheta-"));
+    const ent = join(vd, "x.mp4"),
+      sai = join(vd, "x-post.mp4");
+    spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=1", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", ent]);
+    const r = spawnSync("npx", ["tsx", join(import.meta.dirname, "..", "tools", "vinheta.ts"), ent, "--saida", sai], { encoding: "utf8" });
+    const faixas = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", sai], { encoding: "utf8" }).stdout.trim().split("\n");
+    const ab = Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", join(import.meta.dirname, "..", "exemplos", "vinheta", "curta-abertura.webm")], { encoding: "utf8" }).stdout.trim());
+    const sd = spawnSync("ffmpeg", ["-hide_banner", "-i", sai, "-map", "0:a?", "-af", "silencedetect=noise=-40dB:d=0.3", "-f", "null", "-"], { encoding: "utf8" }).stderr;
+    const fim = Number(/silence_end: ([\d.]+)/.exec(sd)?.[1] ?? NaN);
+    check(r.status === 0 && faixas.includes("audio") && Math.abs(fim - ab) < 0.05, `vinheta: o post leva o som do video (${faixas.join("+")}), comecando no fim da abertura (${fim.toFixed(3)} s, abertura ${ab.toFixed(3)} s)`);
+    rmSync(vd, { recursive: true, force: true });
+  }
 }
 
 // formato: salva e relê; desfazer tudo volta ao inicio

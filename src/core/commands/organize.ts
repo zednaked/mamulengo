@@ -61,7 +61,7 @@ defineCommand({
   name: "draworder.key",
   group: "key",
   summary:
-    "Chave de ordem de desenho num instante. Passe a ordem completa (order, de tras para frente) ou so movimentos (front: slots que vao para a frente de tudo; above: {slot: outro} poe slot logo na frente de outro). reset=true volta a ordem de setup.",
+    "Chave de ordem de desenho num instante. Passe a ordem completa (order, de tras para frente) ou so movimentos (front: slots que vao para a frente de tudo; back: para tras de tudo; above: {slot: outro} poe slot logo na frente de outro; below: {slot: outro} logo atras). Nomes aceitam * (marrom_* move um personagem inteiro, na ordem dele). reset=true volta a ordem de setup.",
   params: z.object({
     anim: z.string(),
     time: z.number().min(0),
@@ -69,6 +69,7 @@ defineCommand({
     front: z.array(z.string()).optional(),
     back: z.array(z.string()).optional(),
     above: z.record(z.string(), z.string()).optional(),
+    below: z.record(z.string(), z.string()).optional(),
     reset: z.boolean().optional(),
   }),
   label: (p) => `ordem de desenho @${p.time}`,
@@ -78,18 +79,35 @@ defineCommand({
     let order = p.order;
     if (!order && !p.reset) {
       order = [...setup];
-      const move = (n: string, to: number) => {
-        requireSlot(e.json, n);
-        order!.splice(order!.indexOf(n), 1);
-        order!.splice(to, 0, n);
+      // um nome com * vira os slots que casam, na ordem de setup (o grupo anda junto)
+      const casa = (n: string): string[] => {
+        if (!n.includes("*")) return (requireSlot(e.json, n), [n]);
+        const re = new RegExp("^" + n.split("*").map((x) => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$");
+        const l = setup.filter((s) => re.test(s));
+        if (!l.length) throw new Error(`nenhum slot casa com ${n}`);
+        return l;
       };
-      for (const n of p.back ?? []) move(n, 0);
-      for (const n of p.front ?? []) move(n, order.length - 1);
-      for (const [n, ref] of Object.entries(p.above ?? {})) {
-        requireSlot(e.json, ref);
-        order.splice(order.indexOf(n), 1);
-        order.splice(order.indexOf(ref) + 1, 0, n);
+      const tira = (l: string[]) => l.forEach((n) => order!.splice(order!.indexOf(n), 1));
+      for (const n of p.back ?? []) {
+        const l = casa(n);
+        tira(l);
+        order.splice(0, 0, ...l);
       }
+      for (const n of p.front ?? []) {
+        const l = casa(n);
+        tira(l);
+        order.push(...l);
+      }
+      for (const [rel, lado] of [[p.above, 1], [p.below, 0]] as const)
+        for (const [n, ref] of Object.entries(rel ?? {})) {
+          const l = casa(n),
+            r = casa(ref).filter((x) => !l.includes(x));
+          if (!r.length) throw new Error(`${n} e ${ref} sao os mesmos slots`);
+          tira(l);
+          // na frente: logo depois do ultimo do grupo de referencia; atras: antes do primeiro
+          const at = lado ? Math.max(...r.map((x) => order!.indexOf(x))) + 1 : Math.min(...r.map((x) => order!.indexOf(x)));
+          order.splice(at, 0, ...l);
+        }
     }
     const key: any = {};
     const t = round(p.time);

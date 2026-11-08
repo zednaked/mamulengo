@@ -156,6 +156,9 @@ export const CAMPOS: Record<string, string> = {
   // instancias (so do Mamulengo; docs/NUCLEO.md "Instancias"): o arquivo do filho fica "boneco"
   // nos dois lados; inicio, velocidade, repetir e animacao ja estao no dicionario
   instances: "instancias",
+  // uma instancia que segue o osso de outra (o objeto na mao): {instance, bone}
+  follow: "segue",
+  instance: "instancia",
   // luzes (so do Mamulengo; docs/NUCLEO.md "Luzes"); altura, raio, forca, cor e osso ja estao acima
   lights: "luzes",
   ambient: "ambiente",
@@ -200,6 +203,7 @@ export const CAMPOS: Record<string, string> = {
   cap: "ponta",
   hidden: "escondida",
   holes: "furos",
+  rule: "regra",
   // geleia (so do Mamulengo; docs/NUCLEO.md "Geleia"): a malha mole; amortecimento, gravidade e
   // massa ja estao acima
   jelly: "geleia",

@@ -6,6 +6,8 @@
 
 **[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
 
+**[Abra o editor](https://zednaked.github.io/mamulengo/editor/)**: o editor inteiro pelo navegador, sem instalar nada e sem servidor. Funciona sem internet depois da primeira visita, abre os personagens de exemplo e, no Chrome e no Edge, uma pasta do seu computador com arquivos `.boneco`.
+
 ![Um robô, um zumbi e um monstro, rigados e animados pelo Claude Code no Mamulengo](docs/media/elenco.webp)
 
 **Um kit de animação 2D por esqueleto para jogos, operado por gente e pelo Claude

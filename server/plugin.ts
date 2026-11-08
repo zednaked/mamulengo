@@ -29,7 +29,7 @@ import { textureFor } from "./texture.ts";
 import { addImages, createAsset, imageInfo, listImages } from "./assets.ts";
 import { ensureImported, renderInGodot } from "./godot-run.ts";
 import { extractRegion, parseAtlas, unpackAtlas } from "./atlas.ts";
-import { createFromPsd, updateFromPsd } from "./psd.ts";
+import { checkMapa, createFromPsd, updateFromPsd, type PsdMapa } from "./psd.ts";
 import sharp from "sharp";
 import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
 import { arquivoBinario, gravarBonecoArquivo, lerBonecoArquivo } from "./boneco-binario.ts";
@@ -190,11 +190,26 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             if (!existsSync(r)) throw new Error(`PSD nao encontrado: ${r}`);
             return r;
           };
+          // mapa do PSD (tags e ossos de fora): caminho de um .json dentro das raizes, ou o objeto
+          const mapaOf = (m: any): PsdMapa | undefined => {
+            if (m === undefined || m === null || m === "") return undefined;
+            if (typeof m === "string") {
+              const r = resolve(m);
+              guard(r);
+              if (!existsSync(r)) throw new Error(`mapa do PSD nao encontrado: ${r}`);
+              try {
+                return checkMapa(JSON.parse(readFileSync(r, "utf8")));
+              } catch (e: any) {
+                throw new Error(`${r}: ${e.message}`);
+              }
+            }
+            return checkMapa(m);
+          };
           // personagem novo montado a partir de um PSD
           if (url.pathname === "/api/psd/create" && req.method === "POST") {
             const b = await json();
             guard(b.dir);
-            const r = await createFromPsd({ psd: guardPsd(b.psd), dir: resolve(b.dir), name: String(b.name ?? "").trim(), read: { ignoreHidden: !!b.ignoreHidden } });
+            const r = await createFromPsd({ psd: guardPsd(b.psd), dir: resolve(b.dir), name: String(b.name ?? "").trim(), read: { ignoreHidden: !!b.ignoreHidden, mapa: mapaOf(b.mapa) } });
             cache = null;
             return send(200, { tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan });
           }
@@ -202,7 +217,7 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
           if (url.pathname === "/api/psd/update" && req.method === "POST") {
             const b = await json();
             guard(b.atlas);
-            const r = await updateFromPsd({ psd: guardPsd(b.psd), atlas: resolve(b.atlas), meshImages: b.meshImages ?? [], read: { ignoreHidden: !!b.ignoreHidden }, backup });
+            const r = await updateFromPsd({ psd: guardPsd(b.psd), atlas: resolve(b.atlas), meshImages: b.meshImages ?? [], read: { ignoreHidden: !!b.ignoreHidden, mapa: mapaOf(b.mapa) }, backup });
             return send(200, r);
           }
           // imagem enviada pelo navegador: grava em <pasta do atlas>/images/<nome>.png
@@ -509,7 +524,7 @@ export const live = { lastCallAt: 0, asset: null as null | { id: string; name: s
 // sessoes de agente em outros servidores (a bancada se anuncia aqui ao comecar)
 export const SESSOES = join(homedir(), ".cache", "mamulengo", "sessoes");
 
-function bridge(server: { httpServer: any }) {
+export function bridge(server: { httpServer: any }) {
   const wss = new WebSocketServer({ noServer: true });
   const editors: { ws: WebSocket; name: string; focusedAt: number }[] = [];
   const agents = new Set<WebSocket>();

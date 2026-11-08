@@ -34,6 +34,7 @@ import { usarMedidas } from "../core/instantes.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
 import { NucleoCena, diretorio, normalizarCaminho } from "./nucleo.ts";
 import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
+import { DesenhoVideo, desenharRefVideo, type RefVideo } from "./videoref.ts";
 
 export type Runtime = "godot" | "spine" | "nucleo";
 
@@ -63,6 +64,11 @@ export class Viewer {
   // esqueleto separado para o onion skin (fantasmas dos quadros vizinhos)
   ghost: Skeleton | null = null;
   onion = { enabled: false, count: 2, step: 1 / 10 };
+  // video de referencia atras do personagem (N-023, spike; src/render/videoref.ts): preso ao
+  // mundo e ao tempo da timeline; refQuadro e o quadro do video desenhado por ultimo
+  refVideo: RefVideo | null = null;
+  refQuadro = -1;
+  private desenhoVideo: DesenhoVideo | null = null;
   state: AnimationState | null = null;
   sim: PoseSim | null = null;
   error: string | null = null;
@@ -469,15 +475,23 @@ export class Viewer {
       } catch {}
     }
   }
-  // as paginas dos filhos (relativas ao pai, como as dele)
+  // as paginas dos filhos (relativas ao pai, como as dele). Cada recarga do modelo pede de novo
+  // as que faltam: a que ja esta a caminho nao e buscada outra vez (num arrasto, cada passo
+  // baixava e subia para a placa todas as paginas dos filhos ate a primeira chegar)
+  private texturasACaminho = new Set<string>();
   private async texturasInstancias() {
     const N = this.nucleo;
     if (!N || !this.urlFor) return;
     for (const arq of N.paginasSemTextura()) {
+      if (this.texturasACaminho.has(arq)) continue;
+      this.texturasACaminho.add(arq);
       try {
         const r = await fetch(this.urlFor(arq));
         if (r.ok) N.poeTextura(arq, await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" }));
-      } catch {}
+      } catch {
+      } finally {
+        this.texturasACaminho.delete(arq);
+      }
     }
   }
 
@@ -699,6 +713,7 @@ export class Viewer {
     scene.camera.viewportWidth = w;
     scene.camera.viewportHeight = h;
     scene.camera.zoom = 1 / (this.cam.zoom * dpr);
+    if (this.refVideo && !this.refVideo.frente) this.drawRefVideo();
     scene.begin();
     const pose = this.pose;
     if (pose) {
@@ -712,6 +727,12 @@ export class Viewer {
       } else {
         this.drawOnion();
         this.drawMain(this.skeleton!);
+      }
+      // o video de referencia na frente: por cima do personagem, antes dos ossos e gizmos
+      if (this.refVideo?.frente) {
+        scene.end();
+        this.drawRefVideo();
+        scene.begin();
       }
       const dbg = scene.skeletonDebugRenderer;
       if (this.view.showBones || this.view.showMeshes || this.view.showBounds) {
@@ -860,6 +881,19 @@ export class Viewer {
       out.push({ t, color: k < 0 ? [1, 0.45, 0.45, fade] : [0.4, 1, 0.55, fade] });
     }
     return out;
+  }
+
+  // o video de referencia: antes do personagem, com a camera dele (sem a inversao do modo godot:
+  // o retangulo da referencia e do mundo, y para cima, como a referencia em imagem)
+  private drawRefVideo() {
+    const r = this.refVideo!;
+    const cam = this.scene.camera;
+    cam.update();
+    const m = Float32Array.from(cam.projectionView.values);
+    if (this.flip) for (let i = 4; i < 8; i++) m[i] = -m[i];
+    this.desenhoVideo ??= new DesenhoVideo(this.ctx.gl as WebGL2RenderingContext);
+    const cebola = this.onion.enabled && !this.view.playing ? this.onion.count : 0;
+    this.refQuadro = desenharRefVideo(this.desenhoVideo, r, this.view.time, m, cebola);
   }
 
   // a cebola pelo nucleo: a mesma pose direta (sem fisica) numa instancia so dos fantasmas

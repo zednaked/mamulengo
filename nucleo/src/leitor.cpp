@@ -367,9 +367,23 @@ class Leitor {
       d.velocidade = j.num("velocidade", 1);
       d.laco = j.sim("repetir", true);
       d.mix = std::max(0.0, j.num("mix", 0));
+      if (const Json* sg = j.acha("segue")) segue(*sg, int(m.instancias.size()), "instancias: " + d.nome, d.segue_inst, d.segue_osso);
       m.instancias_do_slot[size_t(d.slot)].push_back(int(m.instancias.size()));
       m.instancias.push_back(std::move(d));
     }
+  }
+
+  // "segue": {"instancia", "osso"} (o osso do filho daquela instancia, que vem antes na lista) ou
+  // null (o osso da propria instancia)
+  void segue(const Json& sg, int eu, const std::string& onde, int& inst, int& os) {
+    inst = os = -1;
+    if (sg.nulo()) return;
+    const std::string ni = sg.str("instancia", ""), no = sg.str("osso", "");
+    inst = m.instancia(ni);
+    if (inst < 0) falha(onde + ": segue instancia desconhecida " + ni);
+    if (inst >= eu) falha(onde + ": segue " + ni + ", que precisa vir antes na lista de instancias");
+    os = m.filhos[size_t(m.instancias[size_t(inst)].filho)]->osso(no);
+    if (os < 0) falha(onde + ": segue " + ni + ": osso desconhecido " + no);
   }
 
   static int animacao_filho(const Modelo& f, const std::string& nome, const std::string& onde) {
@@ -1063,7 +1077,11 @@ class Leitor {
       int an_f = di.animacao;
       double ini = di.inicio, vel = di.velocidade, mix = di.mix;
       bool laco = di.laco;
+      int sgi = di.segue_inst, sgo = di.segue_osso;
       for (const Json& k : chaves.itens()) {
+        if (const Json* sg = k.acha("segue")) segue(*sg, ii, "animacao " + nome + ": instancia " + nome_in, sgi, sgo);
+        ti.segue_insts.push_back(sgi);
+        ti.segue_ossos.push_back(sgo);
         if (const Json* x = k.acha("animacao"); x && x->texto()) an_f = animacao_filho(f, x->str(), "animacao " + nome + ": instancia " + nome_in);
         ini = k.num("inicio", ini);
         vel = k.num("velocidade", vel);
@@ -1163,6 +1181,8 @@ class Leitor {
         int atual = 0;
         for (const Json& d : ds.itens()) {
           int si = slot(d["slot"], "ordem_desenho");
+          // os slots vem na ordem do setup (como no Spine); fora dela o laco abaixo nao para
+          if (si < atual) falha("ordem_desenho: slots fora da ordem do setup");
           while (atual != si) sobra.push_back(atual++);
           int destino = atual + int(d.num("deslocamento", 0));
           if (destino < 0 || destino >= n) falha("ordem_desenho: deslocamento fora");

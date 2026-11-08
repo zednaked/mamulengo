@@ -4,6 +4,7 @@
 
 #include "mamulengo/binario.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -103,9 +104,70 @@ class LeitorJson {
     return true;
   }
 
+  // Caminho rapido (Clinger): ate 19 digitos significativos, mantissa ate 2^53 e expoente decimal
+  // em [-22, 22]. A mantissa e 10^e sao doubles exatos, entao uma multiplicacao ou divisao da o
+  // double mais proximo, o mesmo do strtod e do from_chars. Quase todo numero de um .boneco cai
+  // aqui. Sem isso, no wasm o strtod da musl faz as contas em long double de 128 bits emulado
+  // (fmodl, __multf3): era mais da metade do tempo de ler um .boneco no editor e no navegador.
+  bool numero_rapido(double& v) {
+    static const double POT[] = {1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,  1e10, 1e11,
+                                 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
+    const char* q = p_;
+    const auto digito = [&](const char* c) { return c < fim_ && *c >= '0' && *c <= '9'; };
+    bool neg = false;
+    if (q < fim_ && *q == '-') {
+      neg = true;
+      ++q;
+    }
+    if (!digito(q)) return false;
+    uint64_t m = 0;
+    int dig = 0, e10 = 0;
+    const auto soma = [&](char c) {
+      if (!m && c == '0') return true;  // zero a esquerda nao conta como digito
+      if (dig >= 19) return false;
+      m = m * 10 + uint64_t(c - '0');
+      ++dig;
+      return true;
+    };
+    for (; digito(q); ++q)
+      if (!soma(*q)) return false;
+    if (q < fim_ && *q == '.') {
+      ++q;
+      if (!digito(q)) return false;
+      for (; digito(q); ++q, --e10)
+        if (!soma(*q)) return false;
+    }
+    if (q < fim_ && (*q == 'e' || *q == 'E')) {
+      ++q;
+      bool eneg = false;
+      if (q < fim_ && (*q == '+' || *q == '-')) eneg = *q++ == '-';
+      if (!digito(q)) return false;
+      int ex = 0;
+      for (; digito(q); ++q) {
+        if (ex > 10000) return false;
+        ex = ex * 10 + (*q - '0');
+      }
+      e10 += eneg ? -ex : ex;
+    }
+    if (m == 0)
+      v = 0.0;
+    else if (m <= (uint64_t(1) << 53) && e10 >= -22 && e10 <= 22)
+      v = e10 < 0 ? double(m) / POT[-e10] : double(m) * POT[e10];
+    else
+      return false;
+    if (neg) v = -v;
+    p_ = q;
+    return true;
+  }
+
   bool numero(Json& out) {
     // from_chars nao aceita '+' nem o zero a esquerda do JSON e tudo bem: o JSON tambem nao
     double v = 0;
+    if (numero_rapido(v)) {
+      out.tipo_ = Json::Tipo::Numero;
+      out.num_ = v;
+      return true;
+    }
 #if defined(_LIBCPP_VERSION)
     // a libc++ (a do zig, na GDExtension para Linux antigo) nao tem from_chars de double:
     // strtod numa copia do numero (o Godot nao muda o LC_NUMERIC, o ponto continua ponto)
@@ -257,6 +319,69 @@ Json Json::ler(std::string_view texto, std::string* erro) {
     return Json();
   }
   return out;
+}
+
+namespace {
+void aspas_json(std::string& o, const std::string& s) {
+  o += '"';
+  for (char c : s) {
+    if (c == '"' || c == '\\') o += '\\', o += c;
+    else if (c == '\n') o += "\\n";
+    else if (static_cast<unsigned char>(c) < 0x20) {
+      char u[8];
+      std::snprintf(u, sizeof u, "\\u%04x", c);
+      o += u;
+    } else o += c;
+  }
+  o += '"';
+}
+
+void escreve_json(std::string& o, const Json& j) {
+  switch (j.tipo()) {
+    case Json::Tipo::Nulo: o += "null"; break;
+    case Json::Tipo::Logico: o += j.sim() ? "true" : "false"; break;
+    case Json::Tipo::Numero: {
+      char b[40];
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+      // o mais curto que volta ao mesmo double, sem o strtod (no wasm ele conta em long double)
+      const auto r = std::to_chars(b, b + sizeof b, j.num());
+      o.append(b, r.ptr);
+#else
+      for (int p = 1; p <= 17; ++p) {
+        std::snprintf(b, sizeof b, "%.*g", p, j.num());
+        if (std::strtod(b, nullptr) == j.num()) break;
+      }
+      o += b;
+#endif
+      break;
+    }
+    case Json::Tipo::Texto: aspas_json(o, j.str()); break;
+    case Json::Tipo::Lista:
+      o += '[';
+      for (size_t i = 0; i < j.itens().size(); ++i) {
+        if (i) o += ',';
+        escreve_json(o, j.itens()[i]);
+      }
+      o += ']';
+      break;
+    case Json::Tipo::Objeto:
+      o += '{';
+      for (size_t i = 0; i < j.campos().size(); ++i) {
+        if (i) o += ',';
+        aspas_json(o, j.campos()[i].first);
+        o += ':';
+        escreve_json(o, j.campos()[i].second);
+      }
+      o += '}';
+      break;
+  }
+}
+}  // namespace
+
+std::string escrever_json(const Json& j) {
+  std::string o;
+  escreve_json(o, j);
+  return o;
 }
 
 }  // namespace mamulengo

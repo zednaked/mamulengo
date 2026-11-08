@@ -354,7 +354,7 @@
       <GodotCheck />
       <label class="botao" title="por uma imagem de referência por cima do personagem (pose, proporção, encaixe)">
         referência
-        <input type="file" accept="image/*" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f)); (e.currentTarget as HTMLInputElement).value = ""; }} />
+        <input type="file" accept="image/*,video/mp4,video/quicktime" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f), f.type.startsWith("video/")).catch((err) => app.toast(String(err?.message ?? err))); (e.currentTarget as HTMLInputElement).value = ""; }} />
       </label>
     {/snippet}
     {#if compacto || menuVer}

@@ -57,7 +57,8 @@ export interface PsdPiece {
 export interface PsdBone {
   name: string;
   parent: string;
-  at: [number, number]; // px do PSD (centro das camadas do grupo)
+  at: [number, number]; // px do PSD (centro das camadas do grupo, ou o at do mapa)
+  ponta?: [number, number]; // px do PSD: ponta do osso (mapa), define rotacao e comprimento
 }
 
 export interface PsdPlan {
@@ -164,7 +165,7 @@ export function psdCalls(json: SpineJson, plan: PsdPlan): { calls: Call[]; repor
   for (const b of plan.bones) {
     if (boneNames.has(b.name)) continue;
     if (!boneNames.has(b.parent)) throw new Error(`osso pai não existe: ${b.parent}`);
-    calls.push({ cmd: "bone.add", args: { name: b.name, parent: b.parent, at: world(b.at) } });
+    calls.push({ cmd: "bone.add", args: { name: b.name, parent: b.parent, at: world(b.at), ...(b.ponta ? { toward: world(b.ponta) } : {}) } });
     boneNames.add(b.name);
     report.bones.push(b.name);
   }

@@ -59,4 +59,8 @@ class Json {
   std::vector<std::pair<std::string, Json>> campos_;
 };
 
+// JSON compacto, com cada numero na forma mais curta que volta ao mesmo double (o texto de um
+// .boneco binario: nucleo-binario --texto e o editor no navegador)
+std::string escrever_json(const Json& j);
+
 }  // namespace mamulengo

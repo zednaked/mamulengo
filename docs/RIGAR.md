@@ -56,11 +56,30 @@ Diferenças e o que ficou de fora:
 - **Opções globais do script:** "ignorar camadas escondidas" existe só na ponte (`ignoreHidden`); escala e padding globais e `revealAll` (camada saindo do PSD) não: o que passa da borda do PSD é cortado.
 - **Efeitos de camada** (sombra, contorno) e **camadas de ajuste** não entram; o resumo avisa. Rasterize no Photoshop se precisar. Outros modos de mistura viram normal, com aviso.
 
+### Mapa externo (PSD do cliente sem tags)
+
+Quando o PSD vem chato, sem grupos nem tags, e não se pode regravar o arquivo do cliente, as tags e os ossos vão num mapa `.json` ao lado, passado na importação (ponte e MCP: `mapa`, caminho do `.json` ou o objeto):
+
+```json
+{
+  "camadas": { "manga": "[bone:braco]", "antebraco": "[bone:antebraco]", "maos/mao_alt": "[slot:mao]" },
+  "ossos": { "antebraco": { "pai": "braco", "at": [270, 190], "ponta": [270, 280] } },
+  "esconder": ["tronco_rascunho"]
+}
+```
+
+- **`camadas`:** as tags de cada camada, somadas às que o nome já tem. Valem todas as da tabela acima (`[bone]`, `[slot]`, `[ignore]`, `[skin]`, `[mesh]`...). A chave é o nome limpo da camada ou o caminho `grupo/camada`.
+- **`ossos`:** `pai` (vence o pai que viria dos grupos `[bone]`, com aviso quando os dois discordam), `at` (o pivô, em px do PSD; sem ele, o centro das camadas) e `ponta` (rotação e comprimento do osso). Osso que só aparece no mapa também é criado. Pai que não existe, ou ciclo de pais, recusa a importação.
+- **`esconder`:** camadas que entram escondidas, como trocas.
+- Chave que não casa com nenhuma camada vira aviso no resumo.
+
+O mapa fica guardado em `images/psd-import.json`: a atualização sem mapa reaplica o da importação anterior. Sem mapa, nada muda na leitura do PSD.
+
 Exemplo com todas as tags: `tests/assets/psd/aventureiro.psd` (arte CC0, gerado por `tools/psd-fixture.ts`; `aventureiro-v2.psd` é a mesma arte depois de retocada, para testar a atualização).
 
 ## Montar
 
-1. **Ossos:** da raiz para as pontas, com a origem do osso na articulação de verdade (ombro, cotovelo, pescoço). Use `bone.add` com `at` e `toward`, em coordenadas da tela. Comprimento ao longo da peça: IK e física dependem dele.
+1. **Ossos:** da raiz para as pontas, com a origem do osso na articulação de verdade (ombro, cotovelo, pescoço). Use `bone.add` com `at` e `toward`, em coordenadas da tela. Comprimento ao longo da peça: IK e física dependem dele. Depois de pôr as partes nos ossos, `query.juntas` compara a origem de cada osso com o centro da sobreposição entre a peça dele e a do pai na setup (a manga sobre o antebraço) e alerta acima de `tol` px (padrão 10). É sugestão: sobreposição nem sempre é articulação, por isso só compara osso com pai. Para mover só a origem (`bone.set at` leva filhos e imagens junto), passe as partes para o pai (`slot.set`, que mantém o lugar na tela), mova o osso e devolva.
 2. **Imagens:** vindas do PSD, já estão no lugar e na ordem. À mão: `attachment.region` com `world` (centro, rotação e escala na composição), slots na ordem de desenho da arte. Os ossos do PSD só têm posição (sem comprimento nem rotação, como no script oficial). Para pôr uma parte em outro osso, `slot.set {slot, bone}`: a imagem fica no mesmo lugar da tela (`keepWorld`, padrão).
 3. **Malhas e pesos:** onde a peça dobra ou amassa (braço contínuo, barriga, rosto). Use `mesh.create`, `mesh.weights` e `mesh.paintWeights`. Teste girando os ossos até os limites da ficha.
 4. **Trocas:** imagens alternativas no mesmo slot, escondidas no setup. Para gesto de mão, todas as peças da mão normal têm de poder sumir junto.

@@ -23,7 +23,7 @@ function drawShape(g: Ctx, s: DrawShape, w: number, h: number, scale: number, ox
   const path = shapePath(s);
   if (s.fill) {
     g.fillStyle = css(s.fill);
-    g.fill(path, "evenodd");
+    g.fill(path, s.rule ?? "evenodd");
   }
   const st = s.stroke;
   if (!st || st.width <= 0) return;
@@ -41,7 +41,7 @@ function drawShape(g: Ctx, s: DrawShape, w: number, h: number, scale: number, ox
     g.stroke(path);
   } else if (align === "inside") {
     g.save();
-    g.clip(path, "evenodd");
+    g.clip(path, s.rule ?? "evenodd");
     style(g, st.width * 2);
     g.stroke(path);
     g.restore();
@@ -53,7 +53,7 @@ function drawShape(g: Ctx, s: DrawShape, w: number, h: number, scale: number, ox
     style(t, st.width * 2);
     t.stroke(path);
     t.globalCompositeOperation = "destination-out";
-    t.fill(path, "evenodd");
+    t.fill(path, s.rule ?? "evenodd");
     g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.drawImage(c, ox, oy);

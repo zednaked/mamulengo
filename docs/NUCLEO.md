@@ -484,6 +484,10 @@ são desenhados (e o que lê os vértices depois: borrar, rastro, recorte por ci
 5. cada slot que segue soma aos vértices dele o deslocamento da saída no ponto dele (a média
    baricêntrica de `saída - t` nos três vértices do triângulo).
 
+Com o relógio parado (um filho congelado com velocidade 0, o editor pausado com alguém
+arrastando ossos), as massas andam com o rig, guardando o desvio: `P += T - T anterior`. Sem isso
+elas ficavam paradas no mundo e o corpo entortava quando o pai mexia o filho congelado.
+
 Conferido pelo comportamento (`npx tsx tools/nucleo-geleia.ts`, malha 5 x 5 num osso que anda
 80 px em 0,3 s e para): a fileira presa fica no rig, o topo atrasa, passa do ponto, balança e
 assenta (menos de 0,2 px em 4 s), o olho que segue anda com o ponto da malha (desvio 1e-14 px),
@@ -690,6 +694,7 @@ fora das skins (como as partículas); a exportação para o Spine as tira e avis
 | `inicio`, `velocidade` | 0, 1 | o tempo do filho: `inicio + velocidade × relógio` |
 | `repetir` | true | sem repetir, o filho para no fim (e antes do 0 fica no 0) |
 | `mix` | 0 | segundos de mistura quando uma chave troca a animação do filho |
+| `segue` | (nenhum) | `{instancia, osso}`: presa ao osso do filho de outra instância (o objeto na mão de um personagem), no lugar do `osso`; a seguida vem antes na lista (é calculada primeiro); `x`, `y`, `rotacao` e escala valem nesse osso |
 
 **Leitura.** Cada arquivo é lido uma vez e o modelo dele é dividido entre todas as instâncias
 (também entre pais diferentes). Um filho pode ter instâncias (os caminhos são sempre relativos ao
@@ -699,7 +704,7 @@ memória na web (`mm_arquivo` antes de `mm_carregar_de`), o `FileAccess` no Godo
 desenho são as do pai e depois as de cada filho (`paginas_desenho`), com o caminho relativo ao pai.
 
 **Timeline:** `animacoes.<a>.instancias.<nome>`: chaves em degrau com `tempo` e qualquer de
-`animacao`, `inicio`, `velocidade`, `repetir` (o que falta vem da chave anterior; na primeira, da
+`animacao`, `inicio`, `velocidade`, `repetir`, `segue` (`null` volta ao osso da instância: o objeto troca de mão) (o que falta vem da chave anterior; na primeira, da
 instância). Da chave `k` em diante o tempo do filho é `inicio + velocidade × (t − tempo_k)`, com
 `t` o tempo da animação do pai; antes da primeira chave vale a instância, com o relógio. A chave
 manda só na animação que entra ou toca (não na que sai num mix).
@@ -727,7 +732,13 @@ páginas dele na tabela do pai; a cor do slot multiplica todos os vértices que 
 nível pela do slot dele, então aninhar multiplica); os efeitos de shader do slot (linha, brilho,
 dissolver, tingir) valem para cada peça do filho que não tem efeitos próprios; a luz é a do pai
 (o grupo de luz do pai ilumina as páginas com relevo do filho; sem grupo no pai, o filho usa as
-luzes dele). Com o recorte na CPU, o recorte do pai não corta o filho.
+luzes dele). O recorte aberto no pai corta o filho até o fim do desenho dele: na CPU (o Godot), o
+filho corta pelos pedaços convexos do pai, e um recorte do próprio filho corta pela interseção
+(cada pedaço dele com cada pedaço do pai); no stencil (a web), o filho desenha dentro do recorte
+do pai, um recorte do filho vale sozinho enquanto está aberto e, ao fechar, o do pai é marcado de
+novo (o mesmo lote). `nucleo-pose x.boneco anim t1,t2 --caixa cpu|gpu` mostra, por instante, os
+triângulos desenhados e a caixa deles; `tools/nucleo-instancias.ts` confere com
+`tests/nucleo/instancias/recorte.boneco`.
 
 Conferência: `npx tsx tools/nucleo-instancias.ts` refaz, por instante, a animação e o tempo de
 cada instância de `tests/nucleo/instancias/instancias.boneco` (quatro instâncias do robô CC0:
@@ -902,6 +913,19 @@ com a mesma posição de caminho nos dois (a conta do caminho, não do Estado). 
 `reiniciar` da física, `escala_tempo` negativa, `inicio` e `fim` diferentes do padrão (o
 reverso usa o trecho, mas só foi medido com o padrão) e `segurar` à moda antiga
 (`holdPrevious`) não foram medidos.
+
+## Som
+
+O vídeo exportado ganha som pelos eventos com `audio` (os do Spine: `audio`, `volume`, `balanco`
+na definição e na chave; o arquivo é relativo a `esqueleto.audio`, a pasta de áudio do `.boneco`
+que define o evento). `src/core/som.ts` (`trilhaDeSom`) lista o que toca de 0 até o fim, no
+relógio da animação de cima: os eventos dela e, descendo nas instâncias, os dos filhos no tempo
+de cada um (o das chaves da instância, como na seção "Instâncias", com o laço do filho); um quadro
+em que o slot da instância está com alfa 0 cala o filho (ele nem é calculado). `tools/som.ts`
+mistura (cada som atrasado até o instante, com volume e balanço; uma trilha de fundo opcional;
+fade no fim e limitador) e põe no vídeo com o ffmpeg:
+`npx tsx tools/som.ts x.boneco --anim a --video v.webm --musica fundo.ogg [--listar]`.
+No jogo o som continua com quem recebe o evento (o sinal `animation_event` no Godot).
 
 ## No Godot (`BonecoSprite`)
 
@@ -1296,9 +1320,24 @@ nos 3 personagens CC0.
 - Gravidade positiva puxa para y negativo na saída (y para cima); vento positivo empurra para
   x positivo.
 
-Ainda não medido (nenhum asset usa): física de `x`, `y`, `escala_x`, `cisalha_x`; `passo`
-diferente de 60 (o expoente `60 h` do amortecimento é suposição); `limite` pequeno o bastante
-para cortar movimento real; timelines de física.
+**Física de posição (`x`, `y`), o que o oráculo faz.** Medido com um pai que salta, anda em
+rampa e faz um caminho, a 1/50, 1/60 e 1/64 s, com limite, mix, massa, gravidade, vento,
+`escala_ref` e giro junto; bate a 6e-14 px (`npx tsx tools/nucleo-fisica.ts`).
+- Estado por eixo: desvio `u` (px, somado à origem do osso no mundo), velocidade `v`, o desvio
+  de antes do passo e a origem do osso no rig (sem a física) no quadro anterior.
+- Inércia, a cada quadro com o relógio andando (menos o do reinício), antes dos passos: `-(origem agora - origem antes)
+  * inercia`, presa a `±limite / 64` px por eixo (medido: o mesmo corte a 60 e a 64 q/s), soma
+  em `u` e no desvio de antes do passo.
+- Passos (os mesmos do giro, `h = 1/passo` enquanto `sobra >= h`): o desvio de antes passa a
+  ser o `u` atual (aqui o de antes do **último** passo do quadro, ao contrário do giro);
+  `v += (vento * escala_ref - forca * u) * h / massa` em x e
+  `v += (-gravidade * escala_ref - forca * u) * h / massa` em y; `u += v * h`;
+  `v *= amortecimento ^ (60 h)`. Parado, o desvio assenta em `força * escala_ref / forca`.
+- Mostrado: `anterior + (u - anterior) * sobra / h`, vezes `x` (ou `y`) e `mix`, somado à
+  origem do osso no mundo, depois do giro (a inércia do giro vê a origem do rig).
+
+Ainda não medido (nenhum asset usa): física de `escala_x`, `cisalha_x`; `passo` diferente de 60
+(o expoente `60 h` do amortecimento é suposição); timelines de física.
 
 **IK (cenários sintéticos; nenhum asset usa).** Um osso: a rotação local passa a ser
 `atan2` do alvo no sistema do pai (menos `cisalha_x`), misturada por `mix` pelo menor ângulo;

@@ -11,6 +11,8 @@
     "dev:demo": "vite -c vite.demo.config.ts",
     "build:demo": "vite build -c vite.demo.config.ts",
     "preview:demo": "vite preview -c vite.demo.config.ts",
+    "build:navegador": "vite build -c vite.navegador.config.ts",
+    "preview:navegador": "vite preview -c vite.navegador.config.ts",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "mcp": "tsx mcp/server.ts",
     "cli": "tsx tools/cli.ts",
@@ -44,6 +46,7 @@
     "@esotericsoftware/spine-core": "^4.3.13",
     "@esotericsoftware/spine-webgl": "^4.3.13",
     "ag-psd": "31.0.3",
+    "mp4box": "2.4.1",
     "sharp": "^0.35.5"
   }
 }

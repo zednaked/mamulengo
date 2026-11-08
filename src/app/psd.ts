@@ -39,7 +39,8 @@ export function suggestDir(name: string): string {
   return out;
 }
 
-export async function createFromPsd(p: { psd: string; dir: string; name: string; ignoreHidden?: boolean }): Promise<PsdImportResult> {
+// mapa: caminho de um .json (ou o objeto) com tags e ossos que o PSD nao traz (docs/RIGAR.md)
+export async function createFromPsd(p: { psd: string; dir: string; name: string; ignoreHidden?: boolean; mapa?: string | object }): Promise<PsdImportResult> {
   if (app.doc?.dirty) throw new Error(`${app.asset?.name} tem alterações não salvas. Salve (Ctrl+S) ou descarte antes de importar.`);
   const j = await post("/api/psd/create", p);
   await app.loadAssets(true);
@@ -58,12 +59,12 @@ function meshImages(json: any): string[] {
   return [...out];
 }
 
-export async function updateFromPsd(p: { psd: string; ignoreHidden?: boolean }, source = "ui"): Promise<PsdImportResult> {
+export async function updateFromPsd(p: { psd: string; ignoreHidden?: boolean; mapa?: string | object }, source = "ui"): Promise<PsdImportResult> {
   const doc = app.doc;
   if (!doc?.file.atlas) throw new Error("Abra um personagem primeiro.");
   // o atlas e as imagens mudam no disco: o esqueleto e salvo junto para nao ficar desencontrado
   if (doc.dirty) throw new Error(`${app.asset?.name} tem alterações não salvas. Salve (Ctrl+S) ou descarte antes de atualizar pelo PSD.`);
-  const j = await post("/api/psd/update", { psd: p.psd, atlas: doc.file.atlas, meshImages: meshImages(doc.json), ignoreHidden: p.ignoreHidden });
+  const j = await post("/api/psd/update", { psd: p.psd, atlas: doc.file.atlas, meshImages: meshImages(doc.json), ignoreHidden: p.ignoreHidden, mapa: p.mapa });
   await app.reloadAtlas(j.atlasText);
   const { calls, report } = psdCalls(doc.json, j.plan);
   if (calls.length) {

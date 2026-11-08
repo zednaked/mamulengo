@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NAVEGADOR, baixar } from "../navegador/pagina.ts";
   // Timeline: regua em quadros (30 fps) com zoom e rolagem, uma linha por parte
   // animada (ou por timeline da parte selecionada), selecao de varias chaves,
   // mover/apagar/copiar/colar e exportar GIF/WebM. Toda edicao e comando (keys.*).
@@ -830,7 +831,7 @@
             <span class="dim" title={exporting.result}>{exporting.caminho.split("/").length > 4 ? "…/" + exporting.caminho.split("/").slice(-3).join("/") : exporting.caminho}</span>
             <span class="acoes">
               <button class="mini" onclick={() => navigator.clipboard?.writeText(exporting.caminho).then(() => app.avisar("Caminho copiado."), () => app.toast("O navegador não deixou copiar."))}>copiar caminho</button>
-              <button class="mini" onclick={() => fetch("/api/abrir-pasta", { method: "POST", body: JSON.stringify({ p: exporting.caminho }) }).then(async (r) => !r.ok && app.toast((await r.json()).error))}>abrir pasta</button>
+              {#if NAVEGADOR}<button class="mini" onclick={() => baixar(exporting.caminho).catch((e) => app.toast(String(e?.message ?? e)))}>baixar</button>{:else}<button class="mini" onclick={() => fetch("/api/abrir-pasta", { method: "POST", body: JSON.stringify({ p: exporting.caminho }) }).then(async (r) => !r.ok && app.toast((await r.json()).error))}>abrir pasta</button>{/if}
             </span>
           </div>
         {/if}

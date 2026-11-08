@@ -12,6 +12,8 @@ export interface AssetProvider {
   region(name: string): { width: number; height: number } | null;
   // texto de um arquivo (caminho absoluto, como doc.file): o .boneco filho de uma instancia
   text?(path: string): Promise<string | null>;
+  // bytes de um arquivo (caminho absoluto): a fonte do draw.text
+  bytes?(path: string): Promise<Uint8Array | null>;
 }
 
 export interface CommandCtx {

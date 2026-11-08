@@ -18,7 +18,7 @@ import { parseAtlas } from "../core/atlas-text.ts";
 export const VERSAO = 0;
 
 // caminhos (so as chaves do esquema, sem indices) cujas chaves sao nomes do artista
-const MAPA_DE_NOMES = /^(events|drawings|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*|skins\/attachments|skins\/attachments\/\*)$/;
+const MAPA_DE_NOMES = /^(events|drawings|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*(\/\*)?|skins\/attachments|skins\/attachments\/\*)$/;
 
 function traduz(n: any, campos: Record<string, string>, valores: Record<string, Record<string, string>>, eNome: (p: string) => boolean, p: string[] = []): any {
   if (Array.isArray(n)) return n.map((x) => traduz(x, campos, valores, eNome, p));

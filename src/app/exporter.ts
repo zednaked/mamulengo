@@ -6,6 +6,7 @@ import { GifEncoder, Histogram } from "../render/gif.ts";
 import { encodeWebm } from "../render/webm.ts";
 import { encodeWebpAnim } from "../render/webp.ts";
 import { applySequence, type SequenceParam } from "./sequence.ts";
+import { vistaDaCamera } from "../core/camera.ts";
 
 export interface ExportOptions {
   format: "gif" | "webm" | "webp";
@@ -27,6 +28,9 @@ export interface ExportOptions {
   // o retangulo do mundo a filmar [x, y, largura, altura] (y para cima), no lugar da tela ou do
   // fit: a tela de um jogo, um recorte fixo
   rect?: [number, number, number, number];
+  // o filme pela camera (skeleton.camera, docs/FILME.md): padrao quando ha camera e nenhum rect
+  // nem fit; false filma a tela. Posicao e zoom (o giro da camera so no tools/quadro.ts)
+  camera?: boolean;
   // acabamento para mostrar: titulo e subtitulo numa faixa em cima, legendas por trecho de tempo
   // (com fade) e um rodape com credito numa faixa embaixo
   moldura?: Moldura;
@@ -163,7 +167,16 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
     let scale = o.scale ?? 1;
     const maxW = o.maxWidth ?? 960;
     let w: number, h: number, rect: number[];
-    if (o.rect) {
+    const sk = app.doc?.json?.skeleton ?? {};
+    const camOsso: string | null = o.camera !== false && !o.rect && !o.fit && sk.camera ? sk.camera : null;
+    if (camOsso) {
+      const fw = sk.width ?? 1280,
+        fh = sk.height ?? 720;
+      const k = Math.min(maxW, fw) / fw;
+      w = Math.max(2, Math.round((fw * k) / 2) * 2);
+      h = Math.max(2, Math.round((fh * k) / 2) * 2);
+      rect = [-fw / 2, -fh / 2, fw, fh];
+    } else if (o.rect) {
       rect = [...o.rect];
       const k = Math.min(maxW, 720 * (o.scale ?? 1) * Math.max(1, rect[2] / rect[3])) / rect[2];
       w = Math.max(2, Math.round((rect[2] * k) / 2) * 2);
@@ -207,7 +220,10 @@ export async function exportAnimation(o: ExportOptions): Promise<ExportResult> {
     const moldurado = document.createElement("canvas");
     const frameAt = (i: number) => {
       v.poseAt(i / fps);
-      const c = v.renderRect(rect, [qw, qh]);
+      let r = rect;
+      const b = camOsso ? v.pose?.findBone(camOsso) : null;
+      if (b) r = vistaDaCamera([b.a, b.b, b.c, b.d, b.worldX, v.flip ? -b.worldY : b.worldY], sk.width ?? 1280, sk.height ?? 720).rect;
+      const c = v.renderRect(r, [qw, qh]);
       return o.moldura ? emoldurar(o.moldura, c, i / fps, moldurado) : c;
     };
     const pixels = (c: HTMLCanvasElement) => c.getContext("2d")!.getImageData(0, 0, w, h).data;

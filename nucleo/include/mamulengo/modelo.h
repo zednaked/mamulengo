@@ -385,6 +385,10 @@ struct DadosInstancia {
   double inicio = 0, velocidade = 1;  // tempo do filho = inicio + velocidade * relogio
   bool laco = true;      // "repetir": sem repetir, o filho para no fim
   double mix = 0;        // segundos de mistura quando uma chave troca a animacao
+  // seguir o osso de outra instancia (um objeto na mao de um personagem): a base sai do mundo
+  // daquele osso do filho dela, no lugar do osso desta; -1: o osso desta. A seguida vem antes na
+  // lista (e calculada primeiro)
+  int segue_inst = -1, segue_osso = -1;
 };
 // timeline de uma instancia: chaves em degrau que trocam animacao, inicio, velocidade e repetir; da
 // chave em diante o tempo do filho e inicio + velocidade * (tempo - tempo da chave)
@@ -394,6 +398,7 @@ struct TimelineInstancia {
   std::vector<int> animacoes;  // do filho; -1: setup
   std::vector<double> inicios, velocidades, mixes;
   std::vector<uint8_t> lacos;
+  std::vector<int> segue_insts, segue_ossos;  // por chave (-1: o osso da instancia)
 };
 struct TimelineRajada {
   int emissor;

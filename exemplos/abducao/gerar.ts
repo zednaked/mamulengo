@@ -591,8 +591,8 @@ for (const t of de(DISCO_CEU.ini - 0.05, DISCO_CEU.fim + 0.05)) {
 // as trocas com mistura: as pernas abrem e recolhem em vez de pular
 an.instancias.disco = [
   { tempo: 0, animacao: "voa", inicio: 0, repetir: true },
-  { tempo: 5.0, animacao: "paira", inicio: 0, repetir: true, mistura: 0.4 },
-  { tempo: 8.0, animacao: "foge", inicio: 0, repetir: true, mistura: 0.3 },
+  { tempo: 5.0, animacao: "paira", inicio: 0, repetir: true, mix: 0.4 },
+  { tempo: 8.0, animacao: "foge", inicio: 0, repetir: true, mix: 0.3 },
 ];
 an.slots.disco = {
   rgba: [
@@ -686,8 +686,8 @@ ARV.forEach(([x], k) => {
   const lado = x < PAIRA.x ? -1 : 1; // a copa vai para o lado do disco: gira para dentro
   an.instancias[`arvore_${k}`] = [
     { tempo: 0, animacao: "balanca", inicio: r3(-0.37 * k), repetir: true },
-    { tempo: r3(FEIXE.aceso + 0.03 * k), animacao: "vento", inicio: 0, repetir: true, mistura: 0.3 },
-    { tempo: r3(FEIXE.fim + 0.1), animacao: "balanca", inicio: 0, repetir: true, mistura: 0.6 },
+    { tempo: r3(FEIXE.aceso + 0.03 * k), animacao: "vento", inicio: 0, repetir: true, mix: 0.3 },
+    { tempo: r3(FEIXE.fim + 0.1), animacao: "balanca", inicio: 0, repetir: true, mix: 0.6 },
   ];
   const perto = Math.max(0.3, 1 - Math.abs(x - PAIRA.x) / 600);
   const giro = -lado * 9 * perto;

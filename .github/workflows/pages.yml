@@ -1,5 +1,7 @@
-# A demo ao vivo no GitHub Pages (https://zednaked.github.io/mamulengo/): compila o nucleo em
-# wasm, gera dist-demo (npm run build:demo) e publica. So no repositorio publico.
+# A demo ao vivo no GitHub Pages (https://zednaked.github.io/mamulengo/) e o editor pelo
+# navegador (https://zednaked.github.io/mamulengo/editor/): compila o nucleo em wasm, gera
+# dist-demo (npm run build:demo) e dist-navegador (npm run build:navegador), que entra em
+# dist-demo/editor, e publica. So no repositorio publico.
 name: pages
 
 on:
@@ -36,6 +38,7 @@ jobs:
           cmake --build nucleo/build-web --target nucleo
       - run: npm ci
       - run: npm run build:demo
+      - run: npm run build:navegador && cp -r dist-navegador dist-demo/editor
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

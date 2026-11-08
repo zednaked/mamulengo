@@ -46,56 +46,6 @@ bool igual(const Json& a, const Json& b) {
   return false;
 }
 
-void aspas(std::string& o, const std::string& s) {
-  o += '"';
-  for (char c : s) {
-    if (c == '"' || c == '\\') o += '\\', o += c;
-    else if (c == '\n') o += "\\n";
-    else if (static_cast<unsigned char>(c) < 0x20) {
-      char u[8];
-      std::snprintf(u, sizeof u, "\\u%04x", c);
-      o += u;
-    } else o += c;
-  }
-  o += '"';
-}
-
-// JSON compacto, com os numeros na forma mais curta que volta ao mesmo double
-void escreve(std::string& o, const Json& j) {
-  switch (j.tipo()) {
-    case Json::Tipo::Nulo: o += "null"; break;
-    case Json::Tipo::Logico: o += j.sim() ? "true" : "false"; break;
-    case Json::Tipo::Numero: {
-      char b[40];
-      for (int p = 1; p <= 17; ++p) {
-        std::snprintf(b, sizeof b, "%.*g", p, j.num());
-        if (std::strtod(b, nullptr) == j.num()) break;
-      }
-      o += b;
-      break;
-    }
-    case Json::Tipo::Texto: aspas(o, j.str()); break;
-    case Json::Tipo::Lista:
-      o += '[';
-      for (size_t i = 0; i < j.itens().size(); ++i) {
-        if (i) o += ',';
-        escreve(o, j.itens()[i]);
-      }
-      o += ']';
-      break;
-    case Json::Tipo::Objeto:
-      o += '{';
-      for (size_t i = 0; i < j.campos().size(); ++i) {
-        if (i) o += ',';
-        aspas(o, j.campos()[i].first);
-        o += ':';
-        escreve(o, j.campos()[i].second);
-      }
-      o += '}';
-      break;
-  }
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -142,7 +92,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   std::string out;
-  if (texto) escreve(out, j);
+  if (texto) out = escrever_json(j);
   else out = codificar_binario(j);
   const Json volta = Json::ler(out, &erro);
   if (!erro.empty() || !igual(j, volta)) {

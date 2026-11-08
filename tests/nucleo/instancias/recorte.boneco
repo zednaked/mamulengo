@@ -1,0 +1,17 @@
+{
+ "boneco": 0,
+ "nome": "recorte",
+ "esqueleto": { "versao_spine": "4.3.23" },
+ "ossos": [{ "nome": "root" }, { "nome": "mao", "pai": "root", "x": 120, "y": 60 }],
+ "slots": [
+  { "nome": "janela", "osso": "root", "parte": "janela" },
+  { "nome": "robo", "osso": "root" },
+  { "nome": "outro", "osso": "mao" }
+ ],
+ "skins": [{ "nome": "default", "partes": { "janela": { "janela": { "tipo": "recorte", "fim": "outro", "num_vertices": 4, "vertices": [-20, -50, 20, -50, 20, 400, -20, 400] } } } }],
+ "instancias": [
+  { "nome": "robo", "slot": "robo", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle" },
+  { "nome": "robo_mao", "slot": "outro", "boneco": "../../boneco/robo/robo.boneco", "animacao": "idle", "escala_x": 0.5, "escala_y": 0.5 }
+ ],
+ "animacoes": { "a": { "ossos": { "mao": { "mover": [{ "tempo": 0, "x": 0, "y": 0 }, { "tempo": 1, "x": -200, "y": 0 }] } } } }
+}

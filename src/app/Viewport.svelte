@@ -49,6 +49,7 @@
   // a referencia acompanha a camera: recalcula o retangulo dela a cada quadro de tela
   let refBox = $state<{ left: number; top: number; width: number } | null>(null);
   let refArrasto: { x: number; y: number; rx: number; ry: number } | null = null;
+  let refQuadro = $state(-1);
   $effect(() => {
     if (!app.referencia) return;
     let vivo = true;
@@ -60,7 +61,10 @@
         const w = canvas.clientWidth,
           h = canvas.clientHeight;
         refBox = { left: w / 2 + (r.x - r.largura / 2 - v.cam.x) * v.cam.zoom, top: h / 2 - (r.y - v.cam.y) * v.cam.zoom, width: r.largura * v.cam.zoom };
-      }
+        // video: o viewer desenha atras do personagem; aqui so passa onde e como anda
+        v.refVideo = r.video ? { video: r.video, x: r.x, y: r.y, largura: r.largura, opacidade: r.opacidade, inicio: r.inicio ?? 0, velocidade: r.velocidade ?? 1, repetir: r.repetir !== false, frente: !!r.frente } : null;
+        if (r.video && refQuadro !== v.refQuadro) refQuadro = v.refQuadro;
+      } else if (v) v.refVideo = null;
       requestAnimationFrame(passo);
     };
     passo();
@@ -359,6 +363,22 @@
   {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
   {#if leitura}<div class="leitura" style:left="{leitura.x + 16}px" style:top="{leitura.y + 16}px">{leitura.t}</div>{/if}
   {#if app.referencia && refBox}
+    {#if app.referencia.video}
+      <!-- o video e desenhado no canvas, atras do personagem; esta caixa so pega o arrasto -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="ref refvideo"
+        class:mover={app.referencia.mover}
+        style:left="{refBox.left}px"
+        style:top="{refBox.top}px"
+        style:width="{refBox.width}px"
+        style:height="{(refBox.width * app.referencia.video.altura) / app.referencia.video.largura}px"
+        style:transform="translateY(-50%)"
+        onpointerdown={refDown}
+        onpointermove={refMove}
+        onpointerup={() => (refArrasto = null)}
+      ></div>
+    {:else}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <img
       class="ref"
@@ -375,13 +395,19 @@
       onpointerup={() => (refArrasto = null)}
       draggable="false"
     />
+    {/if}
     <div class="refbar">
-      <span title="imagem de referência por cima do personagem">referência</span>
+      {#if app.referencia.video}
+        <span title="vídeo de referência atrás do personagem, no quadro exato do instante da régua; a cebola mostra os quadros vizinhos do vídeo">vídeo {refQuadro + 1}/{app.referencia.video.quadros.length}</span>
+      {:else}
+        <span title="imagem de referência por cima do personagem">referência</span>
+      {/if}
       <input type="range" min="0.05" max="1" step="0.05" bind:value={app.referencia.opacidade} title="transparência" />
       <button onclick={() => app.referencia && (app.referencia.largura *= 1.05)} title="maior">+</button>
       <button onclick={() => app.referencia && (app.referencia.largura /= 1.05)} title="menor">−</button>
+      {#if app.referencia.video}<button class:on={app.referencia.frente} onclick={() => app.referencia && (app.referencia.frente = !app.referencia.frente)} title="vídeo por cima do personagem (posar sobre ele) ou atrás">frente</button>{/if}
       <button class:on={app.referencia.mover} onclick={() => app.referencia && (app.referencia.mover = !app.referencia.mover)} title="arrastar a referência com o mouse">mover</button>
-      <button onclick={() => (app.referencia = null)} title="tirar a referência">✕</button>
+      <button onclick={() => app.tirarReferencia()} title="tirar a referência">✕</button>
     </div>
   {/if}
   {#if app.viewer?.error}

@@ -19,5 +19,6 @@ import "./instances.ts";
 import "./laco.ts";
 import "./desenho.ts";
 import "./googly.ts";
+import "./filme.ts";
 
 export * from "./registry.ts";

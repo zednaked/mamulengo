@@ -109,6 +109,8 @@ struct EstadoRestricao {
   double ox = 0, oy = 0;          // ultima posicao do osso (origem)
   double px = 0, py = 0;          // ultima posicao da ponta do osso
   double dx = 0, dy = 0, vx = 0, vy = 0;  // translacao: desvio e velocidade
+  double dx_ant = 0, dy_ant = 0;  // translacao: o desvio de antes do ultimo passo (a interpolacao)
+  double rx = 0, ry = 0;          // translacao: a origem do osso no rig (sem a fisica) no quadro anterior
   double rot = 0, vrot = 0, rot_ant = 0, saida = 0;  // rotacao (radianos), velocidade, passo anterior
   double esc = 0, vesc = 0;       // escala
   double ax = 0, ay = 0;          // deslocamento herdado pela inercia, ainda a aplicar
@@ -123,6 +125,7 @@ struct EstadoInstancia {
   int animacao = -1;
   double inicio = 0, velocidade = 1;
   bool laco = true;
+  int segue_inst = -1, segue_osso = -1;  // o osso de outra instancia que ela segue (-1: o dela)
   // a timeline da instancia pos o tempo do filho neste quadro (senao: inicio + velocidade x relogio)
   bool por_timeline = false;
   double tempo_filho = 0;

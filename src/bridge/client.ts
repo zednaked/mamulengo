@@ -1,5 +1,6 @@
 // Lado do editor na ponte: recebe chamadas do agente (MCP) e executa no documento
 // aberto, com origem "claude", para o usuario ver acontecendo.
+import { NAVEGADOR } from "../navegador/pagina.ts";
 import { estatisticas as estatisticasMedidas, modoMedidas } from "../core/instantes.ts";
 import { app, fileUrl } from "../app/state.svelte.ts";
 import { execute, describeCommands, type Call } from "../core/commands/index.ts";
@@ -156,15 +157,15 @@ const handlers: Record<string, Handler> = {
 
   // PSD em camadas: create monta um personagem novo (dir + name); update atualiza o
   // aberto (casa camada com imagem pelo nome) e salva
-  async psd(p: { file: string; mode?: "create" | "update"; dir?: string; name?: string; ignoreHidden?: boolean }) {
+  async psd(p: { file: string; mode?: "create" | "update"; dir?: string; name?: string; ignoreHidden?: boolean; mapa?: string | object }) {
     if (!p.file) throw new Error("file: caminho do .psd");
     const mode = p.mode ?? (p.dir ? "create" : "update");
     if (mode === "create") {
       if (!p.dir || !p.name) throw new Error("create precisa de dir (pasta do personagem dentro do projeto Godot) e name");
-      const r = await createFromPsd({ psd: p.file, dir: p.dir, name: p.name, ignoreHidden: p.ignoreHidden });
+      const r = await createFromPsd({ psd: p.file, dir: p.dir, name: p.name, ignoreHidden: p.ignoreHidden, mapa: p.mapa });
       return { mode, asset: r.asset, summary: r.summary, report: r.report };
     }
-    const r = await updateFromPsd({ psd: p.file, ignoreHidden: p.ignoreHidden }, "claude");
+    const r = await updateFromPsd({ psd: p.file, ignoreHidden: p.ignoreHidden, mapa: p.mapa }, "claude");
     return { mode, asset: r.asset, saved: r.saved, summary: r.summary, report: r.report };
   },
 
@@ -223,16 +224,20 @@ const handlers: Record<string, Handler> = {
       // o Desenhar aberto na tela (imagem, ferramenta, forma e ponto escolhidos, caminho da caneta)
       draw: app.drawEdit ? { ...app.drawEdit } : null,
       runtimeError: v?.error ?? null,
+      // a referencia (imagem ou video); no video, o quadro do instante da regua (0 = o primeiro) e as medidas
+      reference: app.referencia ? referenciaEstado(app.referencia, v?.view.time ?? 0) : null,
       history: app.doc?.history().slice(-15) ?? [],
     };
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; onion?: boolean; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number; start?: number; speed?: number; loop?: boolean; front?: boolean } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
     // imagem de referencia por cima (file: caminho dentro das raizes); null tira
-    if (p.reference === null) app.referencia = null;
+    // a cebola (fantasmas dos quadros vizinhos, pausado; com video de referencia, os quadros vizinhos dele tambem)
+    if (p.onion !== undefined) app.onion = p.onion;
+    if (p.reference === null) app.tirarReferencia();
     else if (p.reference) {
       const r = p.reference;
       if (r.file) await app.porReferencia(fileUrl(r.file));
@@ -241,6 +246,11 @@ const handlers: Record<string, Handler> = {
         if (r.y !== undefined) app.referencia.y = r.y;
         if (r.width !== undefined) app.referencia.largura = r.width;
         if (r.opacity !== undefined) app.referencia.opacidade = r.opacity;
+        // video (N-023): de onde comeca, a velocidade e se repete
+        if (r.start !== undefined) app.referencia.inicio = r.start;
+        if (r.speed !== undefined) app.referencia.velocidade = r.speed;
+        if (r.loop !== undefined) app.referencia.repetir = r.loop;
+        if (r.front !== undefined) app.referencia.frente = r.front;
       }
     }
     if (p.runtime !== undefined) {
@@ -582,8 +592,21 @@ export function connectBridge() {
   let mirroring = false;
   let sentVersion = -1;
   let sentAtlas = "";
+  // no editor pelo navegador, a ponte (tools/ponte-servidor.ts) roda na maquina de quem usa:
+  // ?ponte=5199 (ou o endereco inteiro) liga e fica lembrado; ?ponte=0 desliga
+  let endereco = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/__mamulengo`;
+  if (NAVEGADOR) {
+    const pedida = new URLSearchParams(location.search).get("ponte");
+    try {
+      if (pedida === "0") localStorage.removeItem("mamulengo.ponte");
+      else if (pedida) localStorage.setItem("mamulengo.ponte", pedida);
+    } catch {}
+    const p = pedida === "0" ? null : (pedida ?? localStorage.getItem("mamulengo.ponte"));
+    if (!p) return;
+    endereco = /^wss?:/.test(p) ? p : `ws://127.0.0.1:${Number(p)}/__mamulengo`;
+  }
   const open = () => {
-    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/__mamulengo`);
+    ws = new WebSocket(endereco);
     ws.onopen = () => {
       retry = 500;
       ws!.send(JSON.stringify({ t: "hello", role: spectator ? "espectador" : "editor", name: navigator.userAgent.includes("Headless") ? "headless" : "browser" }));
@@ -636,6 +659,12 @@ export function connectBridge() {
 }
 
 export { fileUrl };
+
+function referenciaEstado(r: NonNullable<typeof app.referencia>, t: number) {
+  const base = { x: r.x, y: r.y, width: r.largura, opacity: r.opacidade };
+  if (!r.video) return { kind: "image", ...base };
+  return { kind: "video", ...base, start: r.inicio ?? 0, speed: r.velocidade ?? 1, loop: r.repetir !== false, front: !!r.frente, frame: r.video.indice(t, { inicio: r.inicio, velocidade: r.velocidade, repetir: r.repetir }), height: (r.largura * r.video.altura) / r.video.largura, video: { ...r.video.medida } };
+}
 
 // estado vivo (documento, ponte, WebGL): mudanca aqui recarrega a pagina inteira
 if (import.meta.hot) import.meta.hot.accept(() => location.reload());

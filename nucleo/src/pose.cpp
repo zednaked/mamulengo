@@ -814,6 +814,7 @@ void Esqueleto::instancias_setup() {
     in.inicio = d.inicio;
     in.velocidade = d.velocidade;
     in.laco = d.laco;
+    in.segue_inst = d.segue_inst, in.segue_osso = d.segue_osso;
     in.por_timeline = false;
   }
 }
@@ -827,6 +828,7 @@ void Esqueleto::aplicar_instancia(const TimelineInstancia& ti, double t, Mistura
     if (mist == Mistura::Setup || mist == Mistura::Primeira) {
       const DadosInstancia& d = m_->instancias[size_t(ti.instancia)];
       in.animacao = d.animacao, in.inicio = d.inicio, in.velocidade = d.velocidade, in.laco = d.laco;
+      in.segue_inst = d.segue_inst, in.segue_osso = d.segue_osso;
       in.por_timeline = false;
     }
     return;
@@ -836,6 +838,7 @@ void Esqueleto::aplicar_instancia(const TimelineInstancia& ti, double t, Mistura
   in.inicio = ti.inicios[c];
   in.velocidade = ti.velocidades[c];
   in.laco = ti.lacos[c] != 0;
+  in.segue_inst = ti.segue_insts[c], in.segue_osso = ti.segue_ossos[c];
   in.tempo_filho = in.inicio + in.velocidade * (t - ti.tempos[c]);
   in.por_timeline = true;
   // mistura: a chave tem mix, comecou ha menos que ele e troca a animacao; a anterior continua no
@@ -867,7 +870,8 @@ void Esqueleto::atualizar_instancias() {
     const double alfa = por_tl ? in.mix_alfa : 1;
     in.mix_alfa = 1;
     if (slots_[size_t(d.slot)].cor.a <= 0) continue;
-    const Matriz& w = mundo_[size_t(d.osso)];
+    // o osso da instancia, ou o de outra instancia (ja calculada: vem antes na lista)
+    const Matriz& w = in.segue_inst >= 0 ? inst_[size_t(in.segue_inst)].e->mundo()[size_t(in.segue_osso)] : mundo_[size_t(d.osso)];
     const double r = d.rotacao * GRAU;
     const double la = std::cos(r) * d.escala_x, lb = -std::sin(r) * d.escala_y;
     const double lc = std::sin(r) * d.escala_x, ld = std::cos(r) * d.escala_y;
@@ -1284,6 +1288,13 @@ void Esqueleto::atualizar_geleia() {
           P[k + 1] += V[k + 1] * h;
         }
       }
+      s.geleia_alvo = alvo;
+    } else {
+      // o relogio parado (um filho congelado, o editor pausado arrastando ossos): a massa anda com
+      // o rig, guardando o desvio que tinha (sem isso ela ficava parada no mundo e o corpo
+      // entortava quando o pai mexia)
+      std::vector<double>& P = s.geleia_p;
+      for (size_t k = 0; k < n; ++k) P[k] += alvo[k] - s.geleia_alvo[k];
       s.geleia_alvo = alvo;
     }
     s.geleia_t = relogio_;
