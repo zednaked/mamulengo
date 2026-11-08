@@ -16,7 +16,7 @@ numa timeline, ou peça ao Claude pelo MCP e veja cada osso que ele mexe, ao viv
 no mesmo editor. O personagem é gravado em `.boneco`, um arquivo só e legível,
 com o atlas, as transições e uma ficha escrita. Um núcleo em C++, escrito do
 zero, toca esses arquivos no Godot (módulo do motor ou GDExtension) e no
-navegador (412 KB de WebAssembly, 158 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
+navegador (456 KB de WebAssembly, 175 KB com gzip). Abre e grava projetos do Spine 4.3, então nada
 do que já foi feito fica para trás, e soma o que o Spine não tem: efeitos por
 parte, partículas e giro em 2,5D.
 
@@ -28,6 +28,7 @@ parte, partículas e giro em 2,5D.
 102 de 102 projetos Spine 4.3 de produção vão e voltam pelo .boneco sem mudar nada
 um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
 objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
+arrastar uma chave num personagem de 8,6 s no editor: 13 ms por passo (eram 51)
 ```
 
 **Nesta página:** [o que faz](#o-que-faz) · [além do Spine](#além-do-spine) · [Claude Code](#com-o-claude-code) ·
@@ -51,7 +52,8 @@ as mesmas regras do que é uma boa animação.
 - **Do PSD ao rig.** Largue um `.psd` em camadas e ele monta o personagem na
   composição do PSD, ou atualiza o aberto camada por camada, mantendo animações,
   malhas e pesos. Entende as tags de camada de sempre (`[bone]`, `[slot]`,
-  `[skin]`, `[mesh]`...).
+  `[skin]`, `[mesh]`...), e um PSD sem tags recebe as tags, os ossos e os pivôs
+  num mapa `.json` ao lado, sem regravar o arquivo.
 - **Animar.** Ossos, timeline com chaves arrastáveis, editor de curvas, cebola,
   eventos, emendas entre animações vistas exatamente como o jogo toca, malhas com
   pesos pintados, pincel de deformar, IK, física, recorte, caminhos, skins.
@@ -65,11 +67,19 @@ as mesmas regras do que é uma boa animação.
   cada animação deve fazer, com regras que a ferramenta confere: amplitude e
   silhueta contra a mediana da casa, limite de junta depois do IK, malha que
   dobra demais, borda escondida que aparece, emenda que pula.
-- **Exportar** GIF ou WebM de qualquer animação ou emenda, como está na tela ou
+- **Desenhar.** Formas vetoriais como no Figma (caneta, retângulo, elipse, furos)
+  direto no personagem, desenhar sobre uma malha que cresce junto, vetorizar um PNG
+  em cores chapadas e texto de qualquer fonte `.ttf` virando formas, com balões de
+  fala. Guia de ilustração: [docs/DESENHAR.md](docs/DESENHAR.md).
+- **Filmes curtos.** Câmera com chaves, planos e transições, texto, som preso a
+  eventos e quadros ou vídeo em segundos sem abrir o editor (`tools/quadro.ts
+  --gpu --video`, `tools/som.ts`). Guia: [docs/FILME.md](docs/FILME.md).
+- **Exportar** GIF, WebM ou WebP animado de qualquer animação ou emenda, como está na tela ou
   num recorte fixo do mundo, com moldura para divulgar se quiser (título,
   legendas por trecho, rodapé). O GIF grava só o que muda entre quadros.
-- **Imagem de referência.** Um desenho ou a arte original por cima do personagem,
-  presa ao mundo e semitransparente, para conferir pose, proporção e encaixe.
+- **Imagem e vídeo de referência.** Um desenho ou a arte original por cima do personagem,
+  presa ao mundo e semitransparente, para conferir pose, proporção e encaixe; ou um
+  `.mp4` atrás dele, no quadro exato da timeline, para animar por cima (rotoscopia).
 - **Arte mais nítida a partir do vetor.** `tools/atlas-hd.ts` refaz uma página do
   atlas em 2x, 3x... a partir do SVG original, parte por parte, no mesmo layout.
 
@@ -102,6 +112,14 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   de cores, soma de luz e tremor (fogo, faíscas, fumaça); **raio** procedural
   entre dois ossos; um anel em **órbita** que passa por trás e pela frente do
   corpo.
+- **Geleia (jiggly):** a malha inteira mole, com massa e mola por vértice, que
+  balança e chacoalha com o movimento; a moleza é por vértice e as peças presas
+  seguem a geleia.
+- **Blends que leem a tela:** sobrepor, luz suave, escurecer, clarear, diferença e
+  subexpor, além dos quatro do Spine.
+- **Camada de ajuste:** matiz, saturação, luminosidade, contraste e desfoque sobre
+  tudo o que está atrás dela, com chaves na timeline (profundidade de campo, flash,
+  foto revelando).
 - **Giro em 2,5D:** `deform.turn` gira uma malha como um cilindro, e a cabeça olha
   para o lado com as orelhas rígidas.
 - **Instâncias, um `.boneco` dentro de outro:** o que se repete fica num arquivo
@@ -140,6 +158,15 @@ sobe girando para dentro dele.*
 *[exemplos/jogo](exemplos/jogo): uma tela de jogo inteira num `.boneco`, com
 paralaxe, plataformas, moedas, inimigo, interface e o robô como herói. Arte:
 Jumper Pack, UI Pack e Particle Pack, de Kenney (CC0).*
+
+![Pelo visor da câmera, o foco vai e volta entre a turma de monstros e um monstro na frente da lente, e a foto vira uma Polaroid](exemplos/foco/foco.gif)
+
+*[exemplos/foco](exemplos/foco): a profundidade de campo como ação. Pelo visor da
+câmera, o foco caça a turma, um monstro estraga a foto pulando na frente da lente,
+o flash dispara e a Polaroid revela na mesa. O desfoque são camadas de ajuste.
+[exemplos/vt](exemplos/vt) junta isso a [exemplos/monstros](exemplos/monstros)
+(cinco monstros de geleia do Monster Builder Pack, CC0) num comercial de 26 s com
+planos, câmera, texto e som.*
 
 As contas e os parâmetros: [docs/NUCLEO.md](docs/NUCLEO.md) ("Efeitos" e
 "Partículas").
@@ -345,6 +372,29 @@ cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
 npx tsx tools/nucleo-compara.ts tests/boneco tests/nucleo  # o núcleo contra a referência
 ```
 
+**O editor pelo navegador**, sem servidor (o mesmo do link no topo):
+
+```sh
+npm run build:navegador                       # dist-navegador/, site estático
+npm run preview:navegador                     # http://localhost:5214/
+```
+
+Um service worker faz o papel do servidor: lê e grava `.boneco` numa pasta do computador
+(Chrome e Edge, em "Abrir personagem…") ou na pasta própria do navegador, onde ficam os
+exemplos. Importar PSD, reempacotar o atlas e o Godot continuam só no `npm run dev`.
+
+**O Claude no editor pelo navegador:** suba a ponte e abra o editor com `?ponte=` no endereço
+(fica lembrado; `?ponte=0` desliga). O MCP liga nela como no `npm run dev`. Ela só aceita
+páginas do Mamulengo (a própria máquina e o GitHub Pages); se o Chrome perguntar pelo acesso à
+rede local, permita.
+
+```sh
+npx tsx tools/ponte-servidor.ts 5199
+# e abra https://zednaked.github.io/mamulengo/editor/?ponte=5199
+```
+
+Detalhes: [docs/EDITOR.md](docs/EDITOR.md) ("Pelo navegador").
+
 `tests/assets` tem três personagens CC0 de Kenney (cartoon, mascote, humano), montados
 só com comandos do Mamulengo; `tests/boneco` tem esses três mais o robô, o zumbi e o
 monstro que a bancada de agentes fez, seis ao todo (o elenco da demo ao vivo). Testes de paridade e as
@@ -356,8 +406,10 @@ Funcionando: o editor (desenho, pose e medidas pelo núcleo no modo "núcleo"), 
 servidor MCP, a bancada de agentes, o `.boneco` com efeitos e partículas, o
 núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
 o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
-Próximos: o núcleo como modo padrão do editor para todo projeto, um `.boneco`
-binário para pacotes menores e o addon na Godot Asset Library. Plano:
+O núcleo já é o modo padrão do editor para todo projeto, o `.boneco` binário
+está pronto e o editor abre por um link, sem instalar. Próximos: o addon na Godot
+Asset Library, PSD e reempacotar o atlas também no editor pelo navegador, e a
+física refeita mais rápido depois de cada edição. Plano:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licença

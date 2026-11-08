@@ -15,7 +15,7 @@ together.** Rig a character from a layered PSD, animate it on a timeline, or ask
 Claude to do it over MCP and watch every bone it moves, live, in the same editor.
 Characters are saved as `.boneco`, one readable file that carries its atlas,
 transitions and a written brief. A C++ core, written from scratch, plays them in
-Godot (engine module or GDExtension) and in the browser (412 KB of WebAssembly, 158 KB gzipped).
+Godot (engine module or GDExtension) and in the browser (456 KB of WebAssembly, 175 KB gzipped).
 It opens and writes Spine 4.3 projects, so nothing already made gets left behind,
 and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 
@@ -27,6 +27,7 @@ and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 102 of 102 production Spine 4.3 projects round-trip through .boneco unchanged
 a slot game on staging runs on the core: 1 wasm instead of 3
 GPU objects created per frame in that game: 160 before, 0.3 now
+dragging a key on an 8.6 s character in the editor: 13 ms a step (it was 51)
 ```
 
 **On this page:** [what it does](#what-it-does) ·
@@ -51,7 +52,8 @@ the same rules for what a good animation is.
 - **From PSD to rig.** Drop a layered `.psd` and it builds the character in the
   PSD's composition, or updates the open one layer by layer, keeping animations,
   meshes and weights. It understands the usual layer tags (`[bone]`, `[slot]`,
-  `[skin]`, `[mesh]`...).
+  `[skin]`, `[mesh]`...), and a PSD with no tags gets its tags, bones and pivots
+  from a `.json` map next to it, without rewriting the file.
 - **Animate.** Bones, timeline with draggable keys, curve editor, onion skin,
   events, transitions between animations previewed exactly as the game plays
   them, meshes with painted weights, deform brush, IK, physics, clipping, paths,
@@ -65,11 +67,20 @@ the same rules for what a good animation is.
   what each animation should do, with rules the tool checks: amplitude and
   silhouette against the house median, joint limits after IK, meshes that fold
   too far, hidden edges that show, transitions that jump.
-- **Export** a GIF or WebM of any animation or transition, as seen on screen or
+- **Draw.** Vector shapes as in Figma (pen, rectangle, ellipse, holes) right on
+  the character, drawing over a mesh that grows along, tracing a PNG into flat
+  colors, and text from any `.ttf` font turned into shapes, with speech balloons.
+  Illustration guide (in Portuguese): [docs/DESENHAR.md](docs/DESENHAR.md).
+- **Short films.** A keyed camera, shots and transitions, text, sound tied to
+  events, and frames or video in seconds without opening the editor
+  (`tools/quadro.ts --gpu --video`, `tools/som.ts`). Guide (in Portuguese):
+  [docs/FILME.md](docs/FILME.md).
+- **Export** a GIF, WebM or animated WebP of any animation or transition, as seen on screen or
   of a fixed crop of the world, optionally framed for sharing (title, timed
   captions, footer). GIFs store only what changed between frames.
-- **Reference image.** Lay a drawing or the original art over the character,
-  pinned to the world and semi-transparent, to check pose, proportion and fit.
+- **Reference image and video.** Lay a drawing or the original art over the character,
+  pinned to the world and semi-transparent, to check pose, proportion and fit; or an
+  `.mp4` behind it, on the timeline's exact frame, to animate over it (rotoscoping).
 - **Sharper art from vectors.** `tools/atlas-hd.ts` rebuilds an atlas page at 2x,
   3x... from the source SVG, part by part, in the same layout.
 
@@ -103,6 +114,14 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   ramps, additive blend and sway (fire, sparks, smoke); procedural **lightning**
   between two bones; a ring in **orbit** that passes behind and in front of the
   body.
+- **Jiggly bodies:** the whole mesh goes soft, with mass and spring per vertex,
+  wobbling and shaking with the motion; softness is per vertex and the attached
+  pieces follow the jiggle.
+- **Blends that read the screen:** overlay, soft light, darken, lighten,
+  difference and color dodge, besides Spine's four.
+- **Adjustment layer:** hue, saturation, lightness, contrast and blur over
+  everything behind it, keyed on the timeline (depth of field, a flash, a photo
+  developing).
 - **2.5D turns:** `deform.turn` turns a mesh like a cylinder, so a head can look
   sideways with the ears staying rigid.
 - **Instances, a `.boneco` inside another:** what repeats lives in one file and the
@@ -140,6 +159,15 @@ its beam lights the ground and bends the trees, and the robot spins up into it.*
 *[exemplos/jogo](exemplos/jogo): a whole game screen in one `.boneco`, with
 parallax, platforms, coins, an enemy, a HUD and the robot as the hero. Art: Jumper
 Pack, UI Pack and Particle Pack by Kenney (CC0).*
+
+![Through a camera's viewfinder, the focus racks between the group of monsters and a monster in front of the lens, then the photo becomes a Polaroid](exemplos/foco/foco.gif)
+
+*[exemplos/foco](exemplos/foco): depth of field as the action. Through the
+viewfinder, the focus hunts the group, a monster photobombs right in front of the
+lens, the flash fires and the Polaroid develops on a table. The blur is adjustment
+layers. [exemplos/vt](exemplos/vt) puts it together with
+[exemplos/monstros](exemplos/monstros) (five jiggly monsters from the Monster
+Builder Pack, CC0) into a 26 s spot with shots, a camera, text and sound.*
 
 The math and the parameters: [docs/NUCLEO.md](docs/NUCLEO.md) ("Efeitos" and
 "Partículas").
@@ -346,6 +374,29 @@ cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
 npx tsx tools/nucleo-compara.ts tests/boneco tests/nucleo  # the core against the reference
 ```
 
+**The editor in the browser**, with no server (the same as the link at the top):
+
+```sh
+npm run build:navegador                       # dist-navegador/, a static site
+npm run preview:navegador                     # http://localhost:5214/
+```
+
+A service worker stands in for the server: it reads and writes `.boneco` files in a folder on
+your computer (Chrome and Edge, under "Abrir personagem…") or in the browser's own folder,
+where the examples live. PSD import, atlas repacking and Godot stay with `npm run dev`.
+
+**Claude in the browser editor:** start the bridge and open the editor with `?ponte=` in the
+address (it is remembered; `?ponte=0` turns it off). The MCP connects to it as it does with
+`npm run dev`. It only accepts Mamulengo pages (this machine and GitHub Pages); if Chrome asks
+for local network access, allow it.
+
+```sh
+npx tsx tools/ponte-servidor.ts 5199
+# then open https://zednaked.github.io/mamulengo/editor/?ponte=5199
+```
+
+Details (in Portuguese): [docs/EDITOR.md](docs/EDITOR.md) ("Pelo navegador").
+
 `tests/assets` holds three CC0 characters by Kenney (cartoon, mascot, human), rigged
 with Mamulengo commands only; `tests/boneco` has them plus the robot, the zombie and the
 monster the agent bench made, six in all (the cast of the live demo). Parity tests and the engine
@@ -357,8 +408,10 @@ Working: the editor (drawing, posing and measuring through the core in the
 "nucleo" mode), the MCP server, the agent bench, `.boneco` with effects and
 particles, the core with its Godot module and GDExtension. A slot game runs on
 staging with the engine module, and its `.boneco` build, all on the core, passes
-its tests. Next: the core as the editor's default mode for every project, a
-binary `.boneco` for smaller packs, and the addon on the Godot Asset Library. Plan:
+its tests. The core is now the editor's default mode for every project, the binary
+`.boneco` is done and the editor opens from a link, nothing to install. Next: the
+addon on the Godot Asset Library, PSD import and atlas repacking in the browser
+editor too, and faster physics replay after each edit. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
