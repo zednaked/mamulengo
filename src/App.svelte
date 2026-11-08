@@ -314,7 +314,7 @@
   style:grid-template-rows="auto minmax(0, 1fr) {recolhe.foot ? 0 : layout.foot}px"
 >
   <header>
-    <div class="brand"><img src="/favicon.svg" alt="" /> <span class="nome">Mamulengo</span></div>
+    <div class="brand"><img src={import.meta.env.BASE_URL + "favicon.svg"} alt="" /> <span class="nome">Mamulengo</span></div>
     {#if app.pilhaInstancias.length}
       <!-- dentro de uma instancia: o caminho de onde se entrou; cada nome volta direto para ele -->
       <nav class="caminho-inst" aria-label="Onde você está">
