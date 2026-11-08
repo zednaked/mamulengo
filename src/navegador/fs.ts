@@ -131,6 +131,14 @@ export async function apagarArquivo(caminho: string) {
   await d?.removeEntry(nomeDe(caminho)).catch(() => {});
 }
 
+// os arquivos de uma pasta so (sem descer), em caminhos absolutos
+export async function listar(caminho: string): Promise<string[]> {
+  const d = await pasta(caminho).catch(() => null);
+  const out: string[] = [];
+  if (d) for await (const [nome, h] of (d as any).entries() as AsyncIterable<[string, FileSystemHandle]>) if (h.kind === "file") out.push(`${normalizar(caminho)}/${nome}`);
+  return out.sort();
+}
+
 // os arquivos abaixo de uma pasta (recursivo), em caminhos absolutos
 export async function percorrer(caminho: string, filtro: (nome: string) => boolean = () => true): Promise<string[]> {
   const out: string[] = [];
@@ -145,3 +153,5 @@ export async function percorrer(caminho: string, filtro: (nome: string) => boole
   if (d) await andar(d, normalizar(caminho));
   return out.sort();
 }
+
+export const existePasta = async (caminho: string) => !!(await pasta(caminho));

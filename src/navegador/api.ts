@@ -2,9 +2,10 @@
 // as mesmas rotas, com as mesmas respostas, lendo e gravando nas pastas de fs.ts. Assim o editor
 // nao muda: fetch, miniaturas (<img src="/api/region...">) e texturas passam por aqui.
 //
-// O PSD passa pela importacao comum (src/core/psd-importar.ts) com as imagens do navegador
-// (psd.ts). O que precisa de programa de fora (Godot, as ferramentas de tools/) responde 501 com o
-// motivo: arte HD, relevo, versao leve, efeitos e render no Godot.
+// As ferramentas ficam cada uma no modulo dela (ROTAS, abaixo): PSD (psd.ts, pela importacao
+// comum de src/core/psd-importar.ts), trocar imagens e efeitos (imagens-atlas.ts), relevo
+// (relevo.ts), versao leve (leve.ts), arte HD (atlas-hd.ts, o SVG rasterizado na pagina), .zip
+// (pacote.ts) e projetos Godot (godot.ts). So o render no Godot de verdade precisa do servidor.
 import { atlasTexto, exportarSpine, importarSpine, type Boneco } from "../boneco/spine.ts";
 import { parseAtlas, type AtlasRegion } from "../core/atlas-text.ts";
 import { serializeSpineJson } from "../core/format.ts";
@@ -13,16 +14,24 @@ import { checkMapa } from "../core/psd-ler.ts";
 import { atualizarDePsd, criarBonecoDePsd } from "../core/psd-importar.ts";
 import * as fs from "./fs.ts";
 import * as idb from "./idb.ts";
+import { rotaZip } from "./pacote.ts";
 import { ioNavegador } from "./psd.ts";
+import { rotasImagens } from "./imagens-atlas.ts";
+import { personagensGodot, texturaComoOJogo } from "./godot.ts";
+import { rotaRelevo } from "./relevo.ts";
+import { rotaAtlasHd } from "./atlas-hd.ts";
+import { rotaLeve } from "./leve.ts";
 
 // o nucleo em wasm (so para o .boneco binario); quem cria e o sw.ts
 let nucleo: () => Promise<any> = async () => {
   throw new Error("o nucleo nao foi ligado ao /api do navegador");
 };
 export const usarNucleo = (f: () => Promise<any>) => (nucleo = f);
+// o modulo do nucleo, para as ferramentas (relevo.ts: a pose de montagem)
+export const nucleoWasm = () => nucleo();
 
-const json = (corpo: any, status = 200, cabecalhos: Record<string, string> = {}) => new Response(JSON.stringify(corpo), { status, headers: { "content-type": "application/json", ...cabecalhos } });
-const erro = (status: number, msg: string) => json({ error: msg }, status);
+export const json = (corpo: any, status = 200, cabecalhos: Record<string, string> = {}) => new Response(JSON.stringify(corpo), { status, headers: { "content-type": "application/json", ...cabecalhos } });
+export const erro = (status: number, msg: string) => json({ error: msg }, status);
 
 const MIME: Record<string, string> = { png: "image/png", webp: "image/webp", jpg: "image/jpeg", jpeg: "image/jpeg", json: "application/json", "spine-json": "application/json", atlas: "text/plain", tres: "text/plain", gif: "image/gif", webm: "video/webm", md: "text/markdown; charset=utf-8" };
 const mimeDe = (p: string) => MIME[p.slice(p.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";
@@ -33,7 +42,7 @@ const IMAGEM = /\.(png|webp|jpe?g)$/i;
 
 const ehBinario = (b: Uint8Array) => b.length >= 5 && b[0] === 0x42 && b[1] === 0x4e && b[2] === 0x43 && b[3] === 0x42 && b[4] === 1;
 
-async function lerBoneco(arquivo: string): Promise<{ b: Boneco; binario: boolean } | null> {
+export async function lerBoneco(arquivo: string): Promise<{ b: Boneco; binario: boolean } | null> {
   const f = await fs.lerArquivo(arquivo);
   if (!f) return null;
   const bytes = new Uint8Array(await f.arrayBuffer());
@@ -50,7 +59,7 @@ async function lerBoneco(arquivo: string): Promise<{ b: Boneco; binario: boolean
   }
 }
 
-async function gravarBoneco(arquivo: string, b: Boneco, binario: boolean) {
+export async function gravarBoneco(arquivo: string, b: Boneco, binario: boolean) {
   const texto = JSON.stringify(b, null, 1) + "\n";
   if (!binario) return fs.gravarArquivo(arquivo, texto);
   const N = await nucleo();
@@ -65,12 +74,12 @@ async function gravarBoneco(arquivo: string, b: Boneco, binario: boolean) {
 }
 
 const VIRTUAIS = /\.boneco\.(spine-json|atlas|ficha\.md)$/;
-function virtual(p: string): { arquivo: string; parte: "spine-json" | "atlas" | "ficha.md" } | null {
+export function virtual(p: string): { arquivo: string; parte: "spine-json" | "atlas" | "ficha.md" } | null {
   const m = VIRTUAIS.exec(p);
   return m ? { arquivo: p.slice(0, -m[1].length - 1), parte: m[1] as any } : null;
 }
 
-async function lerVirtual(p: string): Promise<string | null> {
+export async function lerVirtual(p: string): Promise<string | null> {
   const v = virtual(p);
   const lido = v && (await lerBoneco(v.arquivo));
   if (!v || !lido) return null;
@@ -80,7 +89,7 @@ async function lerVirtual(p: string): Promise<string | null> {
 }
 
 // regrava o .boneco com a parte nova, guardando o que so ele tem (como server/boneco.ts)
-async function gravarVirtual(p: string, corpo: string) {
+export async function gravarVirtual(p: string, corpo: string) {
   const v = virtual(p)!;
   const lido = await lerBoneco(v.arquivo);
   if (!lido) throw Object.assign(new Error(`nao existe: ${v.arquivo}`), { code: 404 });
@@ -100,11 +109,11 @@ async function gravarVirtual(p: string, corpo: string) {
   await gravarBoneco(v.arquivo, novo, lido.binario);
 }
 
-const lerTextoOuVirtual = async (p: string) => (virtual(p) ? lerVirtual(p) : fs.lerTexto(p));
+export const lerTextoOuVirtual = async (p: string) => (virtual(p) ? lerVirtual(p) : fs.lerTexto(p));
 
 // ---- copias de seguranca: antes de sobrescrever, o arquivo vai para o IndexedDB (as 300 ultimas)
 
-async function copia(p: string) {
+export async function copia(p: string) {
   const f = await fs.lerArquivo(p).catch(() => null);
   if (!f) return;
   await idb.gravar("copias", `${new Date().toISOString()}|${p}`, f);
@@ -138,9 +147,15 @@ async function personagens() {
         });
       } catch {}
     }
+    // e os do spine-godot (-data.tres)
+    out.push(...(await personagensGodot(r).catch(() => [])));
   }
+  cacheAssets = { em: Date.now(), lista: out };
   return out;
 }
+// a lista guardada (para saber de quem e o esqueleto gravado, sem varrer as pastas a cada gravacao)
+let cacheAssets: { em: number; lista: any[] } | null = null;
+const assetsGuardados = async () => (cacheAssets && Date.now() - cacheAssets.em < 10_000 ? cacheAssets.lista : personagens());
 
 // ---- imagens
 
@@ -260,7 +275,7 @@ async function blobTexto(h: string | null): Promise<string | null> {
 }
 const indice = async (skel: string): Promise<Indice> => (await idb.ler<Indice>("versoes", skel)) ?? { skeleton: skel, atlas: null, versions: [] };
 
-async function guardarVersao(skel: string, atlasPath: string | null, label?: string | null, source = "ui"): Promise<{ entry: Versao; created: boolean }> {
+export async function guardarVersao(skel: string, atlasPath: string | null, label?: string | null, source = "ui"): Promise<{ entry: Versao; created: boolean }> {
   const idx = await indice(skel);
   atlasPath ??= idx.atlas;
   const texto = (await lerTextoOuVirtual(skel)) ?? "";
@@ -343,15 +358,20 @@ async function versoes(url: URL, req: Request, corpo: any): Promise<Response> {
 
 // ---- as rotas
 
+// rotas de outros modulos (src/navegador/*.ts): cada uma devolve a resposta, ou null se a rota nao e
+// dela. Um modulo por ferramenta, para nao crescer tudo aqui.
+type Rota = (rota: string, req: Request, url: URL) => Promise<Response | null>;
+const ROTAS: Rota[] = [
+  // (as ferramentas entram aqui, uma por linha)
+  rotasImagens,
+  rotaRelevo,
+  rotaZip,
+  rotaAtlasHd,
+  rotaLeve,
+];
+
 const SO_COM_SERVIDOR: Record<string, string> = {
   "/api/godot/render": "renderizar no Godot",
-  "/api/asset/create": "criar personagem de imagens soltas",
-  "/api/atlas/upload": "trocar imagens (reempacotar o atlas)",
-  "/api/atlas/add": "trocar imagens (reempacotar o atlas)",
-  "/api/atlas-hd": "arte HD",
-  "/api/efeito": "trazer efeitos",
-  "/api/boneco/leve": "versao leve",
-  "/api/relevo": "gerar o relevo",
   "/api/abrir-pasta": "abrir a pasta no computador",
   "/api/ficha/draft": "rascunho da ficha",
 };
@@ -368,7 +388,6 @@ export async function responder(req: Request): Promise<Response> {
     if (rota === "/api/assets") return json(await personagens());
     if (rota === "/api/roots") return json((await fs.raizes()).map((r) => r.caminho));
     if (rota === "/api/sessoes") return json({ local: { ativo: false, asset: null, fala: "", headless: 0 }, outras: [] });
-    if (rota === "/api/efeitos") return json([]);
     if (rota === "/api/prefs") {
       const atual = (await idb.ler("kv", "prefs")) ?? {};
       if (req.method !== "PUT") return json(atual);
@@ -379,11 +398,9 @@ export async function responder(req: Request): Promise<Response> {
     if (rota === "/api/images") return json(await imagens(url.searchParams.get("dir") ?? ""));
     if (rota === "/api/region") return await regiao(fs.normalizar(url.searchParams.get("atlas") ?? ""), url.searchParams.get("name") ?? "");
     if (rota === "/api/texture") {
+      // como o jogo ve: o .ctex do Godot quando o projeto foi importado, senao a fonte (godot.ts)
       const p = fs.normalizar(url.searchParams.get("p") ?? "");
-      const f = await fs.lerArquivo(p);
-      if (!f) return erro(404, `nao existe: ${p}`);
-      // sem projeto Godot: a fonte, com o import emulado (como o servidor fora de um projeto)
-      return new Response(f, { headers: { "content-type": mimeDe(p), "cache-control": "no-store", "x-texture-origin": "source", "x-fix-alpha-border": "true", "x-godot-filter": "linear", "x-godot-tint-black": "false" } });
+      return (await texturaComoOJogo(p)) ?? erro(404, `nao existe: ${p}`);
     }
     if (rota === "/api/boneco/info") {
       const p = fs.normalizar(url.searchParams.get("p") ?? "");
@@ -474,8 +491,16 @@ export async function responder(req: Request): Promise<Response> {
         // gravou o esqueleto de um personagem: vira versao automatica
         let version: string | undefined;
         if (p.endsWith(".boneco.spine-json")) version = (await guardarVersao(p, p.replace(/\.spine-json$/, ".atlas"), null, fonte)).entry.id;
+        else if (/\.(spine-json|json)$/.test(p)) {
+          const a = (await assetsGuardados()).find((x) => x.skeleton === p);
+          if (a) version = (await guardarVersao(p, a.atlas, null, fonte)).entry.id;
+        }
         return json({ ok: true, bytes: corpo.size, path: p, ...(version ? { version } : {}) });
       }
+    }
+    for (const r of ROTAS) {
+      const resp = await r(rota, req, url);
+      if (resp) return resp;
     }
     const so = SO_COM_SERVIDOR[rota];
     if (so) return erro(501, `No editor pelo navegador ainda não dá para ${so}: isso precisa do Mamulengo instalado (npm run dev).`);

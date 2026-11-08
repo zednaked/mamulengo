@@ -7,42 +7,10 @@ import { parseAtlas } from "../core/atlas-text.ts";
 import type { Bruto, PsdIO } from "../core/psd-importar.ts";
 import type { Raster } from "../core/psd-ler.ts";
 import * as fs from "./fs.ts";
-import { codificarPng, decodificarPng } from "./png.ts";
+import { codificarPng } from "./png.ts";
+import { bytes, decodificar, escalar } from "./imagens.ts";
 
-const IMAGEM = /\.(png|webp|jpe?g)$/i;
-
-async function bytes(p: string): Promise<Uint8Array | null> {
-  const f = await fs.lerArquivo(p);
-  return f ? new Uint8Array(await f.arrayBuffer()) : null;
-}
-
-// qualquer imagem: PNG pelo decodificador sem perda; o resto (WebP, JPEG) pelo canvas
-async function decodificar(b: Uint8Array): Promise<Bruto> {
-  const png = await decodificarPng(b).catch(() => null);
-  if (png) return png;
-  const bm = await createImageBitmap(new Blob([b as BlobPart]), { premultiplyAlpha: "none", colorSpaceConversion: "none" });
-  const c = new OffscreenCanvas(bm.width, bm.height);
-  const g = c.getContext("2d")!;
-  g.drawImage(bm, 0, 0);
-  bm.close();
-  const d = g.getImageData(0, 0, c.width, c.height);
-  return { width: d.width, height: d.height, data: new Uint8Array(d.data.buffer) };
-}
-
-// a camada em outra escala ([scale] do PSD): o canvas com a melhor suavizacao (o servidor usa lanczos)
-async function escalar(r: Raster, escala: number): Promise<Bruto> {
-  const w = Math.max(1, Math.round(r.w * escala)),
-    h = Math.max(1, Math.round(r.h * escala));
-  const bm = await createImageBitmap(new ImageData(new Uint8ClampedArray(r.d), r.w, r.h), { premultiplyAlpha: "none" });
-  const c = new OffscreenCanvas(w, h);
-  const g = c.getContext("2d")!;
-  g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = "high";
-  g.drawImage(bm, 0, 0, w, h);
-  bm.close();
-  const d = g.getImageData(0, 0, w, h);
-  return { width: w, height: h, data: new Uint8Array(d.data.buffer) };
-}
+import { IMAGEM } from "./imagens.ts";
 
 export function ioNavegador(o: { gravarBoneco: (arquivo: string, b: any, binario: boolean) => Promise<void>; copia: (p: string) => Promise<void> }): PsdIO {
   return {

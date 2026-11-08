@@ -12,12 +12,16 @@
 //   --gravar troca a pagina no .boneco (arquivo, tamanho e retangulos vezes o fator) e multiplica
 //            as medidas de efeito em pixels da textura (linha.largura, brilho.raio, dissolver.grao)
 //
+// O plano (quais objetos, os retangulos) e a troca no .boneco sao de src/core/atlas-hd.ts, os mesmos
+// do editor pelo navegador; aqui so o rasterizar.
+//
 // O transform dos grupos que contem o objeto nao entra (o objeto e desenhado sozinho); como cada
 // parte e cortada e esticada para o retangulo dela, so a proporcao importa.
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join, basename, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { arquivoHd, gravarHd, ID_PARTE, planoAtlasHd, resumoHd, svgDaParte } from "../src/core/atlas-hd.ts";
 
 const args = process.argv.slice(2);
 const opt = (n: string, d: string) => {
@@ -45,66 +49,46 @@ const roda = (cmd: string, a: string[]) => {
 };
 
 const b = JSON.parse(readFileSync(arqBoneco, "utf8"));
-const pag = b.paginas[pagina];
-if (!pag) throw new Error(`o .boneco nao tem a pagina ${pagina}`);
-const pasta = dirname(resolve(arqBoneco));
-const original = join(pasta, pag.arquivo);
-const saida = resolve(saidaOpt || join(pasta, pag.arquivo.replace(/\.[^.]+$/, "") + "-hd.webp"));
 const svg = readFileSync(arqSvg, "utf8");
-const ids = [...svg.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
-const esc = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-const fim = svg.lastIndexOf("</svg>");
+const plano = planoAtlasHd(b, svg, { fator, modelo, pagina });
+const pasta = dirname(resolve(arqBoneco));
+const original = join(pasta, plano.arquivo);
+const saida = resolve(saidaOpt || join(pasta, arquivoHd(plano.arquivo)));
 
 const tmp = mkdtempSync(join(tmpdir(), "atlas-hd-"));
 try {
   const camadas: string[] = [];
-  let doVetor = 0;
-  const daPagina: string[] = [];
-  for (const im of b.imagens.filter((im: any) => (im.pagina ?? 0) === pagina)) {
-    const [x, y, w, h] = im.ret.map((v: number) => Math.round(v * fator));
+  for (const parte of plano.partes) {
+    const [x, y, w, h] = parte.ret;
     const png = join(tmp, `${camadas.length}.png`);
-    const re = new RegExp("^" + esc(modelo.replace("{nome}", im.nome)).replace(/\*/g, ".*") + "$");
-    const casam = [...new Set(ids.filter((i) => re.test(i)))];
-    if (casam.length && !im.girada && !im.corte) {
-      // um grupo novo com os objetos, desenhado sozinho e cortado no tamanho dele; o zoom sai da
-      // primeira passada para a parte nascer pelo menos do tamanho do retangulo
+    if (parte.ids.length) {
+      // os objetos desenhados sozinhos e cortados no tamanho deles; o zoom sai da primeira passada
+      // para a parte nascer pelo menos do tamanho do retangulo
       const doc = join(tmp, "parte.svg");
-      writeFileSync(doc, svg.slice(0, fim) + `<g id="__parte_hd">${casam.map((i) => `<use xlink:href="#${i}" href="#${i}"/>`).join("")}</g>` + svg.slice(fim));
-      roda("rsvg-convert", ["-i", "__parte_hd", doc, "-o", png]);
+      writeFileSync(doc, svgDaParte(svg, parte.ids));
+      roda("rsvg-convert", ["-i", ID_PARTE, doc, "-o", png]);
       const [pw, ph] = roda("magick", [png, "-trim", "-format", "%w %h", "info:"]).split(" ").map(Number);
       const zoom = Math.max(1, (w / pw) * 1.5, (h / ph) * 1.5);
-      roda("rsvg-convert", ["-i", "__parte_hd", "-z", String(zoom), doc, "-o", png]);
+      roda("rsvg-convert", ["-i", ID_PARTE, "-z", String(zoom), doc, "-o", png]);
       // sem o transparente e no tamanho exato do retangulo (a borda suavizada pode sobrar 1 px)
       roda("magick", [png, "-trim", "+repage", "-resize", `${w}x${h}!`, png]);
-      doVetor++;
     } else {
-      const [ox, oy, ow, oh] = im.ret;
-      const [rw, rh] = im.girada ? [oh, ow] : [ow, oh];
-      roda("magick", [original, "-crop", `${rw}x${rh}+${ox}+${oy}`, "+repage", "-filter", "Lanczos", "-resize", `${Math.round(rw * fator)}x${Math.round(rh * fator)}!`, png]);
-      daPagina.push(im.nome);
+      const [ox, oy, rw, rh] = parte.recorte;
+      const [aw, ah] = parte.ampliada;
+      roda("magick", [original, "-crop", `${rw}x${rh}+${ox}+${oy}`, "+repage", "-filter", "Lanczos", "-resize", `${aw}x${ah}!`, png]);
     }
     camadas.push(png, "-geometry", `+${x}+${y}`, "-composite");
   }
-  const [lg, al] = pag.tamanho.map((v: number) => Math.round(v * fator));
+  const [lg, al] = plano.tamanho;
   roda("magick", ["-size", `${lg}x${al}`, "xc:none", ...camadas, "-define", "webp:lossless=true", saida]);
-  console.log(`${saida}: ${lg}x${al}, ${doVetor} imagens do vetor, ${daPagina.length} da pagina original${daPagina.length ? ` (${daPagina.join(", ")})` : ""}`);
+  console.log(resumoHd(saida, plano));
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }
 
 if (gravar) {
-  b.paginas[pagina] = { ...pag, arquivo: basename(saida), tamanho: pag.tamanho.map((v: number) => Math.round(v * fator)) };
-  for (const im of b.imagens) if ((im.pagina ?? 0) === pagina) im.ret = im.ret.map((v: number) => Math.round(v * fator));
-  // medidas de efeito em pixels da textura, no setup dos slots e nas chaves
-  const MEDIDAS: Record<string, string> = { linha: "largura", brilho: "raio", dissolver: "grao" };
-  const multiplica = (ef: string, o: any) => {
-    const c = MEDIDAS[ef];
-    if (c && typeof o?.[c] === "number") o[c] *= fator;
-  };
-  for (const s of b.slots ?? []) for (const [ef, o] of Object.entries<any>(s.efeitos ?? {})) multiplica(ef, o);
-  for (const a of Object.values<any>(b.animacoes ?? {}))
-    for (const efs of Object.values<any>(a.efeitos ?? {})) for (const [ef, ks] of Object.entries<any[]>(efs)) ks.forEach((k) => multiplica(ef, k));
-  if (b.paginas.length > 1) console.log("aviso: medidas de efeito multiplicadas em todos os slots, mas so a pagina " + pagina + " mudou");
+  const aviso = gravarHd(b, pagina, fator, basename(saida));
+  if (aviso) console.log(aviso);
   writeFileSync(arqBoneco, JSON.stringify(b, null, 1) + "\n");
   console.log(`${arqBoneco}: pagina ${pagina} trocada por ${basename(saida)}`);
 }

@@ -8,6 +8,7 @@ import type { Runtime, Viewer } from "../render/viewer.ts";
 import type { Op } from "../core/ops.ts";
 import { draftFicha, fichaPath } from "../core/ficha.ts";
 import { NAVEGADOR } from "../navegador/pagina.ts";
+import { contextoDoJogo } from "../navegador/godot.ts";
 import { drawingsOf } from "../core/desenho.ts";
 import { Desenhos, drawingPixels } from "./desenho.ts";
 import { VideoReferencia } from "../render/videoref.ts";
@@ -682,7 +683,8 @@ class AppState {
   arteHd(svg: Blob | null, fator: number, id: string) {
     return this.noArquivo(
       "fazer a arte HD",
-      (b) => this.postar(`/api/atlas-hd?boneco=${encodeURIComponent(b)}&fator=${fator}&id=${encodeURIComponent(id)}`, svg ?? new Blob([])),
+      // pelo navegador a pagina rasteriza o SVG (o service worker nao sabe) e o service worker grava
+      (b) => (NAVEGADOR ? import("../navegador/atlas-hd-pagina.ts").then((m) => m.arteHdNoNavegador(b, svg, fator, id)) : this.postar(`/api/atlas-hd?boneco=${encodeURIComponent(b)}&fator=${fator}&id=${encodeURIComponent(id)}`, svg ?? new Blob([]))),
       () => `A página do atlas saiu do SVG em ${fator}x (nítida de perto). Para voltar, use Versões.`,
     );
   }
@@ -949,8 +951,8 @@ class AppState {
   // rascunho com o contexto do jogo, do documento como esta agora
   async draftFicha(): Promise<string> {
     if (!this.doc || !this.asset) throw new Error("Abra um personagem primeiro.");
-    // no navegador nao ha projeto Godot para ler (de onde vinham os usos e os mixes do jogo)
-    if (NAVEGADOR) return draftFicha(this.doc.json, this.asset.name);
+    // no navegador o contexto do jogo (usos no codigo Godot, mixes) vem das pastas abertas
+    if (NAVEGADOR) return draftFicha(this.doc.json, this.asset.name, await contextoDoJogo(this.asset.skeleton, Object.keys(this.doc.json.animations ?? {})));
     const r = await fetch("/api/ficha/draft", { method: "POST", body: JSON.stringify({ json: this.doc.json, skeleton: this.asset.skeleton, name: this.asset.name }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `nao gerou o rascunho (${r.status})`);
     return r.text();

@@ -81,3 +81,32 @@ export async function baixar(caminho: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }
+
+// ---- .zip (src/navegador/pacote.ts): levar o trabalho para fora e para dentro do navegador
+
+// pede o .zip ao /api e o entrega para baixar; devolve quantos arquivos foram e os citados que
+// nao existem
+async function baixarZip(rota: string, p: string): Promise<{ arquivos: number; faltando: string[] }> {
+  const r = await fetch(`/api/zip/${rota}?p=${encodeURIComponent(p)}`);
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? `erro ${r.status}`);
+  const nome = decodeURIComponent(/filename\*=UTF-8''([^;]+)/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? "mamulengo.zip");
+  const faltando: string[] = JSON.parse(decodeURIComponent(r.headers.get("x-faltando") ?? "%5B%5D"));
+  const blob = await r.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+  return { arquivos: Number(r.headers.get("x-arquivos") ?? 0), faltando };
+}
+
+export const baixarZipPersonagem = (boneco: string) => baixarZip("personagem", boneco);
+export const baixarZipPasta = (pasta: string) => baixarZip("pasta", pasta);
+
+// abre o .zip escolhido numa pasta nova dentro de `destino` (padrao: a pasta do navegador)
+export async function importarZip(arquivo: File, destino: string = fs.OPFS): Promise<{ pasta: string; arquivos: string[]; bonecos: string[] }> {
+  const r = await fetch(`/api/zip/importar?nome=${encodeURIComponent(arquivo.name)}&destino=${encodeURIComponent(destino)}`, { method: "POST", body: arquivo });
+  const j = await r.json().catch(() => ({ error: `erro ${r.status}` }));
+  if (!r.ok) throw new Error(j.error);
+  return j;
+}

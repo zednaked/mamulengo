@@ -16,12 +16,15 @@ import { join, resolve } from "node:path";
 
 const WASM = resolve("nucleo/build-web");
 const BONECOS = resolve("tests/boneco");
+// a biblioteca de efeitos (texturas CC0 e presets), lida pelo service worker
+const EFEITOS = resolve("biblioteca/efeitos");
 const LISTA = "__LISTA_PRECACHE__";
 
 // os arquivos que vao junto, pelo caminho relativo a pagina
 function arquivos(): Map<string, string> {
   const m = new Map<string, string>();
   for (const f of ["nucleo.mjs", "nucleo.wasm"]) m.set(`nucleo/${f}`, join(WASM, f));
+  for (const f of readdirSync(EFEITOS)) m.set(`biblioteca/efeitos/${f}`, join(EFEITOS, f));
   for (const pasta of readdirSync(BONECOS)) for (const f of readdirSync(join(BONECOS, pasta))) if (/\.(boneco|webp|png|md)$/.test(f)) m.set(`exemplos/${pasta}/${f}`, join(BONECOS, pasta, f));
   return m;
 }

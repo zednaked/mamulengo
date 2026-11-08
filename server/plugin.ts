@@ -29,7 +29,8 @@ import { textureFor } from "./texture.ts";
 import { addImages, createAsset, imageInfo, listImages } from "./assets.ts";
 import { ensureImported, renderInGodot } from "./godot-run.ts";
 import { extractRegion, parseAtlas, unpackAtlas } from "./atlas.ts";
-import { checkMapa, createFromPsd, updateFromPsd, type PsdMapa } from "./psd.ts";
+import { checkMapa, createFromPsd, nodeIO, updateFromPsd, type PsdMapa } from "./psd.ts";
+import { reempacotar } from "../src/core/imagens-atlas.ts";
 import sharp from "sharp";
 import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
 import { arquivoBinario, gravarBonecoArquivo, lerBonecoArquivo } from "./boneco-binario.ts";
@@ -227,8 +228,8 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             const name = (url.searchParams.get("name") ?? "").replace(/[^\w .-]+/g, "_");
             if (!name) return send(400, { error: "nome vazio" });
             const imagesDir = join(dirname(atlasPath), "images");
-            // asset vindo do Spine sem a pasta de fontes: extrai do atlas antes
-            if (!listImages(imagesDir).length) await unpackAtlas(atlasPath, readFileSync(atlasPath, "utf8"), imagesDir);
+            // asset vindo do Spine sem a pasta de fontes: extrai do atlas antes (o de um .boneco e virtual)
+            if (!listImages(imagesDir).length) await unpackAtlas(atlasPath, bonecoVirtual(atlasPath) ? lerVirtual(atlasPath)! : readFileSync(atlasPath, "utf8"), imagesDir);
             const body = await readBody(req);
             const png = await sharp(body).png().toBuffer();
             mkdirSync(imagesDir, { recursive: true });
@@ -239,6 +240,19 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             const b = await json();
             guard(b.atlas, ...(b.files ?? []));
             for (const f of b.files ?? []) backup(f);
+            // o atlas de um .boneco e virtual: reempacota pela importacao comum e regrava o .boneco
+            const virtual = bonecoVirtual(resolve(b.atlas));
+            if (virtual) {
+              backup(virtual.arquivo);
+              const atlas = resolve(b.atlas);
+              const imagesDir = join(dirname(atlas), "images");
+              (b.files ?? []).forEach((f: string, i: number) => {
+                const to = join(imagesDir, (b.names?.[i] ?? basename(f).replace(/\.[^.]+$/, "")) + extname(f));
+                mkdirSync(dirname(to), { recursive: true });
+                copyFileSync(resolve(f), to);
+              });
+              return send(200, await reempacotar(nodeIO(backup), { atlas, atlasTexto: lerVirtual(atlas)!, gravarAtlas: async (t) => void gravarVirtual(atlas, Buffer.from(t, "utf8")) }));
+            }
             backup(b.atlas);
             return send(200, await addImages({ atlas: resolve(b.atlas), files: (b.files ?? []).map((f: string) => resolve(f)), names: b.names }));
           }

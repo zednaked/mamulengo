@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NAVEGADOR } from "./navegador/pagina.ts";
   import { onMount } from "svelte";
   import { app } from "./app/state.svelte.ts";
   import Viewport from "./app/Viewport.svelte";
@@ -351,7 +352,8 @@
         <option value="spine">desenho: como o Spine</option>
         <option value="nucleo">desenho: Mamulengo</option>
       </select>
-      <GodotCheck />
+      <!-- comparar com o Godot de verdade precisa do executavel dele: so no editor instalado -->
+      {#if !NAVEGADOR}<GodotCheck />{/if}
       <label class="botao" title="por uma imagem de referência por cima do personagem (pose, proporção, encaixe)">
         referência
         <input type="file" accept="image/*,video/mp4,video/quicktime" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f), f.type.startsWith("video/")).catch((err) => app.toast(String(err?.message ?? err))); (e.currentTarget as HTMLInputElement).value = ""; }} />

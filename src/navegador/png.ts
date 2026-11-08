@@ -3,7 +3,8 @@
 // as paginas do atlas precisam sair e voltar iguais, byte a byte nos pixels. O zlib e o do proprio
 // navegador (CompressionStream "deflate" e o formato que o PNG usa).
 //
-// codificar: RGBA 8 bits, com o filtro de cada linha escolhido pela menor soma (como o libpng).
+// codificar: RGBA (ou RGB, canais 3) 8 bits, com o filtro de cada linha escolhido pela menor soma
+// (como o libpng).
 // decodificar: 8 bits, sem entrelacamento, tons de cinza, RGB, paleta (com tRNS) e com alfa; o
 // resto devolve null (quem chama usa o canvas).
 
@@ -47,8 +48,8 @@ const paeth = (a: number, b: number, c: number) => {
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 };
 
-export async function codificarPng(rgba: Uint8Array | Uint8ClampedArray, w: number, h: number): Promise<Uint8Array> {
-  const linha = w * 4;
+export async function codificarPng(rgba: Uint8Array | Uint8ClampedArray, w: number, h: number, canais: 3 | 4 = 4): Promise<Uint8Array> {
+  const linha = w * canais;
   const cru = new Uint8Array((linha + 1) * h);
   const tentativa = new Uint8Array(linha);
   for (let y = 0; y < h; y++) {
@@ -60,9 +61,9 @@ export async function codificarPng(rgba: Uint8Array | Uint8ClampedArray, w: numb
     for (let f = 0; f < 5; f++) {
       let soma = 0;
       for (let i = 0; i < linha; i++) {
-        const a = i >= 4 ? cur[i - 4] : 0,
+        const a = i >= canais ? cur[i - canais] : 0,
           b = ant ? ant[i] : 0,
-          c = ant && i >= 4 ? ant[i - 4] : 0;
+          c = ant && i >= canais ? ant[i - canais] : 0;
         const p = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : paeth(a, b, c);
         const v = (cur[i] - p) & 0xff;
         tentativa[i] = v;
@@ -80,7 +81,7 @@ export async function codificarPng(rgba: Uint8Array | Uint8ClampedArray, w: numb
   const v = new DataView(ihdr.buffer);
   v.setUint32(0, w);
   v.setUint32(4, h);
-  ihdr.set([8, 6, 0, 0, 0], 8);
+  ihdr.set([8, canais === 4 ? 6 : 2, 0, 0, 0], 8);
   const partes = [new Uint8Array(ASSINATURA), pedaco("IHDR", ihdr), pedaco("IDAT", await passar(cru, new CompressionStream("deflate"))), pedaco("IEND", new Uint8Array())];
   const out = new Uint8Array(partes.reduce((s, p) => s + p.length, 0));
   let o = 0;

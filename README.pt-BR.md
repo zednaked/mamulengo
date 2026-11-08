@@ -381,8 +381,9 @@ npm run preview:navegador                     # http://localhost:5214/
 
 Um service worker faz o papel do servidor: lê e grava `.boneco` numa pasta do computador
 (Chrome e Edge, em "Abrir personagem…") ou na pasta própria do navegador, onde ficam os
-exemplos. Importa PSD (personagem novo ou o aberto atualizado) como o servidor; trocar imagens
-soltas, a arte HD e o Godot continuam só no `npm run dev`.
+exemplos. Faz o mesmo que o editor instalado, projetos Godot, PSD, relevo, versão leve, arte HD,
+efeitos e trocar imagens inclusive, e importa e baixa `.zip` para o Firefox e o Safari. Só comparar
+com o Godot de verdade precisa do `npm run dev`.
 
 **O Claude no editor pelo navegador:** suba a ponte e abra o editor com `?ponte=` no endereço
 (fica lembrado; `?ponte=0` desliga). O MCP liga nela como no `npm run dev`. Ela só aceita
