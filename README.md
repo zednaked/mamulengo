@@ -383,7 +383,8 @@ npm run preview:navegador                     # http://localhost:5214/
 
 A service worker stands in for the server: it reads and writes `.boneco` files in a folder on
 your computer (Chrome and Edge, under "Abrir personagem…") or in the browser's own folder,
-where the examples live. PSD import, atlas repacking and Godot stay with `npm run dev`.
+where the examples live. It imports PSDs (a new character or the open one updated) just like the
+server; swapping loose images, HD art and Godot stay with `npm run dev`.
 
 **Claude in the browser editor:** start the bridge and open the editor with `?ponte=` in the
 address (it is remembered; `?ponte=0` turns it off). The MCP connects to it as it does with

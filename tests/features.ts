@@ -2083,6 +2083,15 @@ runtimeOk("remocoes (slot, osso com pesos)");
     const gj = JSON.parse(readFileSync(made.skeleton, "utf8"));
     const nomes = (j: any) => j.bones.map((x: any) => x.name).join(",");
     check(b.tres.endsWith("heroi.boneco") && ex(b.tres) && nomes(sj) === nomes(gj) && sj.slots.length === gj.slots.length && !ex(join(solta, "heroi", "heroi-data.tres")), `PSD fora de projeto Godot vira .boneco (${sj.bones.length} ossos, ${sj.slots.length} partes, iguais ao caminho Godot)`);
+    // e o .boneco atualiza pelo PSD (o atlas virtual relido e regravado), com o registro da criacao
+    const bdoc = Document.fromText(lerVirtual(b.skeleton)!, { text: lerVirtual(b.atlas)!, pages: {} });
+    const bu = await updateDocFromPsd(bdoc, { psd: join(PSD, "aventureiro-v2.psd"), atlas: b.atlas });
+    const st = (s: string) => bu.plan.pieces.filter((p) => p.status === s).map((p) => p.image).join(",");
+    const pagina = join(solta, "heroi", "heroi.webp");
+    check(
+      ex(join(solta, "heroi", "images", "psd-import.json")) && !bu.plan.align && st("new") === "chapeu" && st("changed") === "perna_e,corpo,mao_d,cabeca" && ex(pagina) && /chapeu/.test(lerVirtual(b.atlas)!),
+      `PSD .boneco: atualizar pelo PSD (nova ${st("new")}, mudaram ${st("changed")}, com o registro da criacao)`,
+    );
     rm(solta, { recursive: true, force: true });
   }
   // plano so de leitura: PSD com camadas que viram a mesma imagem e recusado com explicacao

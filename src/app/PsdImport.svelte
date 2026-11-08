@@ -116,9 +116,7 @@
         </div>
         <div class="opt">
           <div class="h">Atualizar o personagem aberto</div>
-          {#if app.asset?.tres?.endsWith(".boneco")}
-            <div class="dim small">Atualizar pelo PSD ainda não funciona em personagem .boneco. Crie um novo ao lado e copie as animações, ou importe num projeto Godot.</div>
-          {:else if app.asset}
+          {#if app.asset}
             <div class="dim small">Casa cada camada com a imagem de mesmo nome em <b>{app.asset.name}</b>: desenho novo entra no lugar do antigo, camada nova vira imagem nova. Animações e malhas continuam valendo. Salva no fim.</div>
             <div class="row end"><button class="ok" disabled={app.doc?.dirty} title={app.doc?.dirty ? "Salve ou descarte as alterações antes" : ""} onclick={() => act("update")}>Atualizar {app.asset.name}</button></div>
           {:else}

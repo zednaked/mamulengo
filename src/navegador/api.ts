@@ -2,14 +2,18 @@
 // as mesmas rotas, com as mesmas respostas, lendo e gravando nas pastas de fs.ts. Assim o editor
 // nao muda: fetch, miniaturas (<img src="/api/region...">) e texturas passam por aqui.
 //
-// O que precisa de programa de fora (Godot, sharp, as ferramentas de tools/) responde 501 com o
-// motivo: PSD, empacotar atlas, arte HD, relevo, versao leve, efeitos e render no Godot.
+// O PSD passa pela importacao comum (src/core/psd-importar.ts) com as imagens do navegador
+// (psd.ts). O que precisa de programa de fora (Godot, as ferramentas de tools/) responde 501 com o
+// motivo: arte HD, relevo, versao leve, efeitos e render no Godot.
 import { atlasTexto, exportarSpine, importarSpine, type Boneco } from "../boneco/spine.ts";
 import { parseAtlas, type AtlasRegion } from "../core/atlas-text.ts";
 import { serializeSpineJson } from "../core/format.ts";
 import { diffSpine } from "../core/versions.ts";
+import { checkMapa } from "../core/psd-ler.ts";
+import { atualizarDePsd, criarBonecoDePsd } from "../core/psd-importar.ts";
 import * as fs from "./fs.ts";
 import * as idb from "./idb.ts";
+import { ioNavegador } from "./psd.ts";
 
 // o nucleo em wasm (so para o .boneco binario); quem cria e o sw.ts
 let nucleo: () => Promise<any> = async () => {
@@ -342,9 +346,6 @@ async function versoes(url: URL, req: Request, corpo: any): Promise<Response> {
 const SO_COM_SERVIDOR: Record<string, string> = {
   "/api/godot/render": "renderizar no Godot",
   "/api/asset/create": "criar personagem de imagens soltas",
-  "/api/psd/upload": "importar PSD",
-  "/api/psd/create": "importar PSD",
-  "/api/psd/update": "atualizar pelo PSD",
   "/api/atlas/upload": "trocar imagens (reempacotar o atlas)",
   "/api/atlas/add": "trocar imagens (reempacotar o atlas)",
   "/api/atlas-hd": "arte HD",
@@ -419,6 +420,41 @@ export async function responder(req: Request): Promise<Response> {
       const p = `${dir}/${nome}.${formato}`;
       await fs.gravarArquivo(p, corpo);
       return json({ ok: true, path: p, bytes: corpo.size });
+    }
+    if (rota === "/api/psd/upload" && req.method === "POST") {
+      // o PSD escolhido ou largado na janela: fica na pasta do navegador ate a importacao
+      const nome = (url.searchParams.get("name") ?? "arte.psd").replace(/[^\w .-]+/g, "_").replace(/^\.+/, "") || "arte.psd";
+      const corpo = await req.blob();
+      if (!corpo.size) return erro(400, "arquivo vazio");
+      const p = `${fs.OPFS}/.psd/${new Date().toISOString().replace(/[:.]/g, "-")}/${nome}`;
+      await fs.gravarArquivo(p, corpo);
+      return json({ path: p, bytes: corpo.size });
+    }
+    if ((rota === "/api/psd/create" || rota === "/api/psd/update") && req.method === "POST") {
+      const b = await corpoJson();
+      const psdPath = fs.normalizar(b.psd ?? "");
+      const psd = await fs.lerArquivo(psdPath);
+      if (!psd) return erro(404, `PSD nao encontrado: ${psdPath}`);
+      // mapa: caminho de um .json numa das pastas, ou o objeto
+      let mapa;
+      if (typeof b.mapa === "string" && b.mapa) {
+        const t = await fs.lerTexto(fs.normalizar(b.mapa));
+        if (t == null) return erro(404, `mapa do PSD nao encontrado: ${b.mapa}`);
+        mapa = checkMapa(JSON.parse(t));
+      } else if (b.mapa) mapa = checkMapa(b.mapa);
+      const read = { ignoreHidden: !!b.ignoreHidden, mapa };
+      const io = ioNavegador({ gravarBoneco, copia });
+      const bytesPsd = new Uint8Array(await psd.arrayBuffer());
+      if (rota === "/api/psd/create") {
+        const r = await criarBonecoDePsd(io, { psd: bytesPsd, arquivoPsd: psdPath, dir: fs.normalizar(b.dir ?? ""), name: String(b.name ?? "").trim(), read });
+        return json({ tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan });
+      }
+      const atlas = fs.normalizar(b.atlas ?? "");
+      if (!virtual(atlas)) return erro(400, "no editor pelo navegador, atualizar pelo PSD so vale para personagens .boneco");
+      const atlasTexto = await lerVirtual(atlas);
+      if (atlasTexto == null) return erro(404, `nao existe: ${atlas}`);
+      const r = await atualizarDePsd(io, { psd: bytesPsd, arquivoPsd: psdPath, atlas, atlasTexto, meshImages: b.meshImages ?? [], read, gravarAtlas: (t) => gravarVirtual(atlas, t) });
+      return json(r);
     }
     if (rota === "/api/file") {
       const p = fs.normalizar(url.searchParams.get("p") ?? "");
