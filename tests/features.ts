@@ -1061,6 +1061,115 @@ runtimeOk("constraints");
       `palco por comandos: stage.actor cria osso, camada, instancia e ator; stage.set; renomear e apagar a instancia acompanham; stage.remove apaga; desfazer volta (${JSON.stringify({ semTipo, foraPaleta, criou, renomeou, tirou, apagou })})`,
     );
   }
+  // pose de video (rotoscopia): um corpo sintetico de angulos conhecidos (perna balancando com
+  // ruido de 1 px, as pernas trocadas pelo detector nos quadros 10 a 12, o pe escorregando 10 px no
+  // chao nos quadros 0 a 14) vira chaves certas: a troca desfeita, os angulos de volta, o pe preso no
+  // chao por IK (e sem a trava ele escorrega), menos chaves que quadros
+  {
+    const { Document } = await import("../src/core/document.ts");
+    const { executeAsync } = await import("../src/core/commands/index.ts");
+    const rig = {
+      skeleton: { spine: "4.3.23" },
+      bones: [
+        { name: "root" },
+        { name: "quadril", parent: "root", y: 100 },
+        { name: "tronco", parent: "quadril", rotation: 90, length: 60 },
+        { name: "coxa_e", parent: "quadril", rotation: -90, length: 50 },
+        { name: "canela_e", parent: "coxa_e", x: 50, length: 45 },
+        { name: "pe_e", parent: "canela_e", x: 45, rotation: 90, length: 10 },
+        { name: "coxa_d", parent: "quadril", rotation: -90, length: 50 },
+        { name: "canela_d", parent: "coxa_d", x: 50, length: 45 },
+        { name: "pe_d", parent: "canela_d", x: 45, rotation: 90, length: 10 },
+      ],
+      slots: [],
+      skins: [{ name: "default", attachments: {} }],
+      animations: {},
+    };
+    const d = new Document(structuredClone(rig) as any, { text: "", pages: {} });
+    // a pessoa: o dobro do rig (coxa 100 px, canela 90 px), quadril parado em (300, 200) da imagem
+    const F = 30,
+      N = 45,
+      L1 = 100,
+      L2 = 90,
+      H: [number, number] = [300, -200];
+    let sem = 1;
+    const ruido = () => ((sem = (sem * 16807) % 2147483647) / 2147483647 - 0.5) * 2;
+    const rad = (g: number) => (g * Math.PI) / 180;
+    const verdade: { e: [number, number]; d: [number, number] }[] = [];
+    const frames = Array.from({ length: N }, (_, i) => {
+      const t = i / F;
+      // a esquerda: quadros 0 a 14 apoiada (o tornozelo desliza 10 px no chao, y fixo); depois balanca
+      let ce: number, ke: number;
+      if (i < 15) {
+        const ax = 300 + (10 * i) / 14,
+          ay = -200 - 186;
+        const dd = Math.hypot(ax - H[0], ay - H[1]);
+        const base = (Math.atan2(ay - H[1], ax - H[0]) * 180) / Math.PI;
+        const abre = (Math.acos((L1 * L1 + dd * dd - L2 * L2) / (2 * L1 * dd)) * 180) / Math.PI;
+        ce = base + abre;
+        const kx = H[0] + Math.cos(rad(ce)) * L1,
+          ky = H[1] + Math.sin(rad(ce)) * L1;
+        ke = (Math.atan2(ay - ky, ax - kx) * 180) / Math.PI;
+      } else {
+        ce = -90 + 25 * Math.sin(2 * Math.PI * (t - 0.5));
+        ke = ce - 20;
+      }
+      const cd = -90 - 20 * Math.sin(2 * Math.PI * t),
+        kd = cd - 10;
+      verdade.push({ e: [ce, ke], d: [cd, kd] });
+      const pernaPts = (c: number, k: number) => {
+        const j: [number, number] = [H[0] + Math.cos(rad(c)) * L1, H[1] + Math.sin(rad(c)) * L1];
+        const a: [number, number] = [j[0] + Math.cos(rad(k)) * L2, j[1] + Math.sin(rad(k)) * L2];
+        return { j, a, cal: [a[0] - 10, a[1] - 5] as [number, number], pe: [a[0] + 25, a[1] - 5] as [number, number] };
+      };
+      let pe = pernaPts(ce, ke),
+        pd = pernaPts(cd, kd);
+      if (i >= 10 && i <= 12) [pe, pd] = [pd, pe];
+      const img = (p: [number, number]) => [p[0] + ruido(), -p[1] + ruido(), 0, 1];
+      const pts = Array.from({ length: 33 }, () => img(H));
+      pts[11] = pts[12] = img([H[0], H[1] + 120]);
+      pts[7] = pts[8] = img([H[0], H[1] + 160]);
+      [pts[23], pts[24]] = [img(H), img(H)];
+      [pts[25], pts[27], pts[29], pts[31]] = [img(pe.j), img(pe.a), img(pe.cal), img(pe.pe)];
+      [pts[26], pts[28], pts[30], pts[32]] = [img(pd.j), img(pd.a), img(pd.cal), img(pd.pe)];
+      return { t, points: pts };
+    });
+    const [r] = await executeAsync(d, { cmd: "pose.fromLandmarks", args: { anim: "t.andar", frames, smooth: 0.3, translate: "none" } }, "ui");
+    const tl = (d.json as any).animations["t.andar"].bones;
+    const em = (keys: any[], t: number) => {
+      let k = keys.findIndex((x) => (x.time ?? 0) > t + 1e-9);
+      if (k < 0) return keys[keys.length - 1].value;
+      if (k === 0) return keys[0].value;
+      const a = keys[k - 1],
+        b = keys[k];
+      return a.value + ((b.value - a.value) * (t - (a.time ?? 0))) / ((b.time ?? 0) - (a.time ?? 0));
+    };
+    // os angulos de volta (fora do contato, onde a trava nao mexe): coxa = mundo + 90, canela = canela - coxa
+    let pior = 0;
+    for (let i = 18; i < N; i++) {
+      const t = i / F;
+      pior = Math.max(pior, Math.abs(em(tl.coxa_d.rotate, t) - (verdade[i].d[0] + 90)), Math.abs(em(tl.canela_d.rotate, t) - (verdade[i].d[1] - verdade[i].d[0])));
+      pior = Math.max(pior, Math.abs(em(tl.coxa_e.rotate, t) - (verdade[i].e[0] + 90)));
+    }
+    // o tornozelo esquerdo do rig no contato (coxa 50, canela 45 a partir de (0, 100))
+    const tornozelo = (keysC: any[], keysK: any[], t: number) => {
+      const c = -90 + em(keysC, t),
+        k = c + em(keysK, t);
+      return [Math.cos(rad(c)) * 50 + Math.cos(rad(k)) * 45, 100 + Math.sin(rad(c)) * 50 + Math.sin(rad(k)) * 45];
+    };
+    const deriva = (b: any) => {
+      const p = Array.from({ length: 12 }, (_, i) => tornozelo(b.coxa_e.rotate, b.canela_e.rotate, (i + 1) / F));
+      return Math.max(...p.map((x) => Math.hypot(x[0] - p[0][0], x[1] - p[0][1])));
+    };
+    const presa = deriva(tl);
+    const d2 = new Document(structuredClone(rig) as any, { text: "", pages: {} });
+    await executeAsync(d2, { cmd: "pose.fromLandmarks", args: { anim: "t.andar", frames, smooth: 0.3, translate: "none", lockFeet: false } }, "ui");
+    const solta = deriva((d2.json as any).animations["t.andar"].bones);
+    check(
+      r.trocas >= 2 && pior < 3 && r.contatos.some((c: any) => c.lado === "e") && presa < 0.3 && solta > 1.5 && r.chavesDepois < r.chavesAntes && r.escala === 0.5,
+      `pose de video: ${r.trocas} trocas de lado desfeitas, angulos de volta (pior ${pior.toFixed(2)} graus), pe preso no contato (deriva ${presa.toFixed(2)}; sem a trava ${solta.toFixed(2)}), chaves ${r.chavesAntes} -> ${r.chavesDepois}, escala ${r.escala}`,
+    );
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

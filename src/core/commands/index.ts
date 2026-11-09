@@ -17,6 +17,7 @@ import "./particles.ts";
 import "./mosaic.ts";
 import "./pixel.ts";
 import "./stage.ts";
+import "./posevideo.ts";
 import "./lights.ts";
 import "./instances.ts";
 import "./laco.ts";

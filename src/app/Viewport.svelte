@@ -75,6 +75,16 @@
     j.teclas = apertou ? j.teclas | b : j.teclas & ~b;
     return true;
   }
+  // pose de video: as opcoes e o botao
+  let poseAberta = $state(false);
+  let poseOpc = $state({ flip: false, lockFeet: true, smooth: 0.5, translate: "xy" as "xy" | "y" | "none" });
+  async function lerPose() {
+    try {
+      await app.poseDoVideo({ ...poseOpc });
+    } catch (e: any) {
+      app.toast(String(e?.message ?? e));
+    }
+  }
   function encaixarPixel() {
     const anim = app.play.animation;
     const r = app.run({ cmd: "pixel.snap", args: anim ? { anim } : { anim: "\u0000" } }, "encaixa na grade de pixel");
@@ -604,8 +614,27 @@
       <button onclick={() => app.referencia && (app.referencia.largura /= 1.05)} title="menor">−</button>
       {#if app.referencia.video}<button class:on={app.referencia.frente} onclick={() => app.referencia && (app.referencia.frente = !app.referencia.frente)} title="vídeo por cima do personagem (posar sobre ele) ou atrás">frente</button>{/if}
       <button class:on={app.referencia.mover} onclick={() => app.referencia && (app.referencia.mover = !app.referencia.mover)} title="arrastar a referência com o mouse">mover</button>
+      {#if app.referencia.video}<button class:on={poseAberta} onclick={() => (poseAberta = !poseAberta)} title="ler a pose do corpo no vídeo e fazer as chaves dos ossos (rotoscopia)">🦴 pose</button>{/if}
       <button onclick={() => app.tirarReferencia()} title="tirar a referência">✕</button>
     </div>
+    {#if poseAberta && app.referencia.video}
+      <div class="posebar">
+        {#if app.poseProgresso}
+          <span>lendo a pose… {app.poseProgresso.feito}/{app.poseProgresso.total}</span>
+        {:else}
+          <span title="a animação que recebe as chaves (sem animação aberta: uma nova, video)">em {app.play.animation ?? "video (nova)"}</span>
+          <label title="a pessoa olha para o outro lado do personagem"><input type="checkbox" bind:checked={poseOpc.flip} /> espelhar</label>
+          <label title="o pé apoiado fica preso no chão (IK)"><input type="checkbox" bind:checked={poseOpc.lockFeet} /> pé no chão</label>
+          <label title="tirar o tremido (0 nada, 1 muito)">suave <input type="range" min="0" max="1" step="0.1" bind:value={poseOpc.smooth} /></label>
+          <select bind:value={poseOpc.translate} title="o quadril anda com a pessoa">
+            <option value="xy">quadril anda</option>
+            <option value="y">só sobe e desce</option>
+            <option value="none">quadril parado</option>
+          </select>
+          <button class="ok" onclick={lerPose} title="o detector de pose roda neste navegador (na primeira vez baixa uns 30 MB e guarda)">fazer as chaves</button>
+        {/if}
+      </div>
+    {/if}
   {/if}
   {#if app.viewer?.error}
     <div class="err">O runtime recusou o documento: {app.viewer.error}</div>
@@ -820,6 +849,24 @@
     padding: 4px 14px;
     border-radius: 8px;
     pointer-events: none;
+  }
+  .posebar {
+    position: absolute;
+    right: 8px;
+    bottom: 44px;
+    z-index: 6;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: #1d1b22ee;
+    border: 1px solid #ffffff22;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .posebar .ok {
+    background: #ff3d8b;
+    color: #fff;
   }
   .pixel-tag {
     position: absolute;

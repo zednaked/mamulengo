@@ -217,6 +217,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  "mamulengo_pose_video",
+  {
+    description:
+      'Rotoscopia: le a pose do corpo no video de referencia aberto no editor (view {reference: {file}}) com o MediaPipe no navegador e faz as chaves dos ossos (pose.fromLandmarks) na animacao anim (padrao: a aberta, ou "video"). Corrige esquerda e direita trocadas, suaviza o tremor (smooth 0 a 1), trava o pe no chao (lockFeet), passa so os angulos e deixa so as batidas. flip: a pessoa olha para o outro lado; translate xy, y ou none; map: segmento -> osso (sem ele, pelos nomes). Devolve o relatorio (quadros com pessoa, trocas, apoios, chaves).',
+    inputSchema: { anim: z.string().optional(), flip: z.boolean().optional(), smooth: z.number().min(0).max(1).optional(), lockFeet: z.boolean().optional(), reduce: z.boolean().optional(), translate: z.enum(["xy", "y", "none"]).optional(), map: z.record(z.string(), z.string()).optional() },
+  },
+  wrap(async (a) => text(await call("poseFromVideo", a))),
+);
+
+server.registerTool(
   "mamulengo_play",
   {
     description:

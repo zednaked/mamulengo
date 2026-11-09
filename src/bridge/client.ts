@@ -507,6 +507,12 @@ const handlers: Record<string, Handler> = {
     }
   },
 
+  // pose de video (docs/ANIMAR.md, "Pose de video"): le os pontos do corpo no video de referencia
+  // aberto e faz as chaves (pose.fromLandmarks) na animacao anim (padrao: a aberta, ou "video")
+  async poseFromVideo(p: { anim?: string; flip?: boolean; smooth?: number; lockFeet?: boolean; reduce?: boolean; translate?: "xy" | "y" | "none"; map?: Record<string, string> }) {
+    return await app.poseDoVideo(p);
+  },
+
   // o palco (docs/PALCO.md): joga o roteiro desde o comeco; aoVivo (padrao) na tela, em tempo real
   // (a pessoa ve o agente jogar), senao de uma vez. Devolve o estado no fim de cada trecho
   async play(p: { roteiro: string; aoVivo?: boolean; parar?: boolean }) {

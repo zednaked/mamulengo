@@ -108,3 +108,32 @@ em "ver", `view {pixel: 1}` na ponte): o personagem na resolução da arte, ampl
 - **Conferir:** `query.pixel` lista o que foge da grade (posição fracionária de osso, borda de peça, mosaico e instância; deslocamento fracionário ou com curva suave; giro fora de 0°, 45°, 90°; escala fracionária) e `pixel.snap` encaixa o que tem conserto: arredonda e troca o trecho suave por degraus de 1 pixel no tempo da curva (giro e escala ficam: decisão de quem anima). Com o pixel perfeito ligado, o editor mostra a contagem no canto da tela e encaixa com um clique. Vale também para personagem só de quadros: o recorte de largura par com o pé entre dois pixels (x .5) dobra e some colunas.
 - **Arte convertida de vetor:** paleta curta tirada dos pixels opacos e redução pela cor
   predominante de cada bloco, não pela média (a média borra o olho).
+
+## 7. Pose de vídeo
+
+Uma pessoa filmada vira as chaves dos ossos (rotoscopia). No editor: ponha o vídeo como
+referência (arraste para a tela), alinhe com o personagem e, na barra da referência, "🦴 pose" →
+"fazer as chaves". Pelo MCP: `mamulengo_pose_video` (o vídeo aberto) ou `pose.fromLandmarks` (os
+pontos de qualquer detector).
+
+- **O detector** é o MediaPipe Pose Landmarker (Apache 2.0), rodando no navegador: o módulo e o wasm
+  vêm do jsDelivr e o modelo do armazenamento do Google na primeira vez (uns 30 MB, no cache depois).
+  Acha 33 pontos por quadro; quadro sem pessoa pega o vizinho.
+- **Os ossos** saem pelos nomes (quadril/hips, tronco/torso/spine, cabeca/head, braco/upper_arm,
+  antebraco/forearm, coxa/thigh, canela/shin, pe/foot, com `_e`/`_l` e `_d`/`_r`), ou por `map`.
+  Cada osso tem de apontar ao longo do membro no setup (o osso da coxa do quadril ao joelho).
+- **O que é corrigido:**
+  - **esquerda e direita trocadas:** de perfil, quando uma perna passa pela outra o detector troca
+    os rótulos; cada membro segue o mais perto do quadro anterior (a troca tem de ganhar 15% da coxa
+    por ponto, para o cruzamento não virar troca);
+  - **tremor:** filtro de um euro para a frente e para trás (sem o atraso do filtro de um lado só,
+    que num balanço de 1 Hz chegava a 3 ou 4 graus);
+  - **pé escorregando:** o tornozelo quase parado e embaixo é apoio; no apoio o pé fica preso onde
+    pousou e a perna dobra por IK de dois ossos (as chaves da perna no apoio ficam todas);
+  - **proporções:** só os ângulos passam; o quadril anda na escala da perna do rig sobre a da pessoa;
+  - **chaves demais:** Douglas-Peucker em cada canal (1 grau, meio pixel), só as batidas ficam.
+- **Limite:** o apoio é achado no quadro do vídeo; com a câmera acompanhando a pessoa (o pé no chão
+  anda para trás na imagem), o pé não é travado.
+- **Conferido:** `tests/features.ts` (um corpo sintético de ângulos conhecidos: trocas desfeitas,
+  ângulos a 2 graus, pé preso no apoio, menos chaves) e a caminhada do Muybridge no manequim de
+  madeira (a escala achada, 0,446, bate com a medida à mão, 0,45).

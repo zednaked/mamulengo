@@ -188,6 +188,32 @@ class AppState {
     const altura = b[3] * 1.05;
     this.referencia = { src, x: b[0] + b[2] / 2, y: b[1] + b[3] / 2, largura: (altura * w) / h, opacidade: 0.5, mover: false, ...(v ? { video: v, inicio: 0, velocidade: 1, repetir: true } : {}) };
   }
+  // pose de video (src/app/posevideo.ts): os pontos do corpo no video de referencia viram chaves na
+  // animacao (pose.fromLandmarks); `progresso` diz quantos quadros ja foram
+  poseProgresso = $state<{ feito: number; total: number } | null>(null);
+  async poseDoVideo(o: { anim?: string; flip?: boolean; smooth?: number; lockFeet?: boolean; reduce?: boolean; translate?: "xy" | "y" | "none"; map?: Record<string, string> } = {}) {
+    const r = this.referencia;
+    if (!r?.video) throw new Error("ponha um vídeo de referência antes (arraste o vídeo para a tela)");
+    if (this.poseProgresso) throw new Error("já está lendo a pose do vídeo");
+    const { detectarPose } = await import("./posevideo.ts");
+    const anim = o.anim ?? this.play.animation ?? "video";
+    const dur = this.viewer?.hasAnimation(anim) ? this.viewer.animDuration(anim) : undefined;
+    this.poseProgresso = { feito: 0, total: r.video.quadros.length };
+    try {
+      const frames = await detectarPose(r.video, { inicio: r.inicio, velocidade: r.velocidade, ate: dur && dur > 0 ? dur : undefined }, (feito, total) => (this.poseProgresso = { feito, total }));
+      const achou = frames.filter((f) => f.points).length;
+      if (achou < 2) throw new Error(`o detector achou uma pessoa em ${achou} de ${frames.length} quadros`);
+      const res = this.run({ cmd: "pose.fromLandmarks", args: { ...o, anim, frames } }, `pose do vídeo em ${anim}`);
+      if (!res?.[0]) return null;
+      if (this.viewer && !this.viewer.hasAnimation(anim)) this.viewer.sync();
+      this.play.animation !== anim && this.viewer?.setAnimation(anim);
+      const rel = res[0];
+      this.avisar(`Pose do vídeo em ${anim}: pessoa em ${achou} de ${frames.length} quadros, ${rel.trocas} troca(s) de lado desfeita(s), ${rel.contatos.length} apoio(s) do pé travado(s), ${rel.chavesDepois} chaves (de ${rel.chavesAntes}). Ctrl+Z desfaz.`);
+      return { ...rel, quadros: frames.length, comPessoa: achou };
+    } finally {
+      this.poseProgresso = null;
+    }
+  }
   tirarReferencia() {
     this.referencia?.video?.fechar();
     if (this.viewer) this.viewer.refVideo = null;
