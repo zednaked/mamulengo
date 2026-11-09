@@ -982,6 +982,12 @@ No jogo o som continua com quem recebe o evento (o sinal `animation_event` no Go
 (editor e CI). Os nomes de métodos e sinais são os do nó C++ antigo, para o `SpineRuntime` dos
 jogos tratar os dois igual. O que o nó acrescenta ao núcleo:
 
+- **Palco (docs/PALCO.md).** `stage_start()` liga o jogo do `.boneco` (false sem palco); com ele
+  ligado, o `update_skeleton` anda em passos de 1/60 s com a entrada de `set_stage_input(bits)`
+  (1 esquerda, 2 direita, 4 pulo), no lugar das animações; `stage_step(bits, n)` anda na mão;
+  `get_stage_state()` dá `tick`, `won`, `died`, `points` e os `actors` (`name`, `position` e
+  `velocity` no espaço do nó, `side`, `on_floor`, `alive`, `state`); `stage_stop()` volta ao setup.
+  A rota de exemplo dá o mesmo jogo que o núcleo web, quadro a quadro (`tools/boneco-godot-teste.ts`).
 - **Entradas.** `set_animation`, `add_animation` e `set_empty_animation` devolvem um
   `BonecoEntrada`, e os sinais e o `get_current` entregam o mesmo objeto para a mesma entrada.
   Enquanto a entrada vale, `set_reverse`, `set_mix_duration`, `set_mix_duration_and_delay`

@@ -4,7 +4,7 @@
 //
 //   npx tsx tools/boneco-godot-teste.ts [--godot godot] [--so nucleo/godot/bin/libboneco.linux.template_debug.x86_64.so] [--pasta dir]
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,9 @@ for (const f of ["pessoa.boneco", "pessoa.webp"]) copyFileSync(join(RAIZ, "tests
 // o mesmo personagem em binario (nucleo-binario, do build nativo)
 const bin = spawnSync(join(RAIZ, "nucleo", "build", "nucleo-binario"), [join(pasta, "pessoa", "pessoa.boneco"), join(pasta, "pessoa", "pessoa-binario.boneco")], { encoding: "utf8" });
 if (bin.status !== 0) throw new Error(`nucleo-binario: ${bin.stderr || bin.error} (compile o nucleo: cmake --build nucleo/build)`);
+// a fase do palco (exemplos/palco): o .boneco, os filhos e as paginas
+mkdirSync(join(pasta, "palco"), { recursive: true });
+for (const f of readdirSync(join(RAIZ, "exemplos", "palco"))) if (/\.(boneco|png)$/.test(f)) copyFileSync(join(RAIZ, "exemplos", "palco", f), join(pasta, "palco", f));
 copyFileSync(join(RAIZ, "nucleo", "godot", "teste", "teste_boneco.gd"), join(pasta, "teste_boneco.gd"));
 
 // a primeira abertura importa a pagina e registra a extensao

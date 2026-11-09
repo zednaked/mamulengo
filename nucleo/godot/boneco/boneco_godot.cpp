@@ -636,8 +636,64 @@ void BonecoSprite::set_to_setup_pose() {
   _desenhar();
 }
 
+// ---- palco (docs/PALCO.md)
+
+bool BonecoSprite::stage_start() {
+  if (!esq || !data.is_valid() || !data->modelo || !data->modelo->palco.existe) return false;
+  palco = std::make_unique<mamulengo::Palco>(*data->modelo);
+  palco->reiniciar(*esq);
+  palco_sobra = 0;
+  _desenhar();
+  return true;
+}
+
+void BonecoSprite::stage_stop() {
+  palco.reset();
+  if (esq) set_to_setup_pose();
+}
+
+void BonecoSprite::stage_step(int p_bits, int p_n) {
+  if (!palco || !esq) return;
+  for (int i = 0; i < p_n; ++i) palco->passo(*esq, uint32_t(p_bits), 1.0 / 60);
+  _desenhar();
+}
+
+Dictionary BonecoSprite::get_stage_state() const {
+  Dictionary d;
+  if (!palco) return d;
+  d["tick"] = palco->tick;
+  d["won"] = palco->venceu;
+  d["died"] = palco->morreu;
+  d["points"] = palco->pontos;
+  Array atores;
+  static const char *estados[] = {"idle", "walk", "jump", "dead"};
+  const auto &dados = data->modelo->palco.atores;
+  for (size_t i = 0; i < palco->atores().size(); ++i) {
+    const mamulengo::EstadoAtor &a = palco->atores()[i];
+    Dictionary x;
+    x["name"] = String::utf8(dados[i].nome.c_str());
+    x["position"] = Vector2(float(a.x), float(-a.y));
+    x["velocity"] = Vector2(float(a.vx), float(-a.vy));
+    x["side"] = a.lado;
+    x["on_floor"] = a.chao;
+    x["alive"] = a.vivo;
+    x["state"] = estados[int(a.estado)];
+    atores.push_back(x);
+  }
+  d["actors"] = atores;
+  return d;
+}
+
 void BonecoSprite::update_skeleton(float p_dt) {
   if (!esq) return;
+  if (palco) {
+    // o jogo: passos fixos de 1/60 s (no maximo 6 por quadro)
+    palco_sobra = std::min(palco_sobra + _dt(p_dt), 6.0 / 60);
+    int n = 0;
+    while (palco_sobra >= 1.0 / 60 - 1e-9) palco_sobra -= 1.0 / 60, ++n;
+    if (n) stage_step(palco_teclas, n);
+    return;
+  }
   // escondido: so o relogio das trilhas (e os avisos), como o spine-godot
   if (!pose_when_hidden && is_inside_tree() && !is_visible_in_tree()) {
     estado->avancar(_dt(p_dt));
@@ -1087,6 +1143,12 @@ void BonecoSprite::_bind_methods() {
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "float_clock"), "set_float_clock", "get_float_clock");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale"), "set_time_scale", "get_time_scale");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing", "get_playing");
+  ClassDB::bind_method(D_METHOD("stage_start"), &BonecoSprite::stage_start);
+  ClassDB::bind_method(D_METHOD("stage_stop"), &BonecoSprite::stage_stop);
+  ClassDB::bind_method(D_METHOD("set_stage_input", "bits"), &BonecoSprite::set_stage_input);
+  ClassDB::bind_method(D_METHOD("get_stage_input"), &BonecoSprite::get_stage_input);
+  ClassDB::bind_method(D_METHOD("stage_step", "bits", "passos"), &BonecoSprite::stage_step);
+  ClassDB::bind_method(D_METHOD("get_stage_state"), &BonecoSprite::get_stage_state);
   ClassDB::bind_method(D_METHOD("set_medir", "medir"), &BonecoSprite::set_medir);
   ClassDB::bind_method(D_METHOD("get_medir"), &BonecoSprite::get_medir);
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "medir"), "set_medir", "get_medir");

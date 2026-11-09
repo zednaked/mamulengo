@@ -39,6 +39,7 @@ Tipos (`type` no editor → `tipo` no `.boneco`): `player` → `jogador`, `patro
 - **Filmar:** `npx tsx tools/quadro.ts x.boneco --palco "roteiro" --video vence.mp4 --rect ...` (o roteiro e mais 1 s).
 - **No editor:** com o palco, o botão "🎮 jogar" no alto da tela: setas ou A/D andam, espaço, W ou ↑ pulam, R recomeça, Esc sai; o placar mostra as moedas e o fim.
 - **Pelo MCP:** `mamulengo_play {roteiro, aoVivo}` joga no editor da pessoa (ao vivo, em tempo real; ou de uma vez) e devolve o estado no fim de cada trecho; `{parar: true}` sai.
+- **No Godot:** o `BonecoSprite` joga o mesmo palco (`stage_start`, `set_stage_input`, `stage_step`, `get_stage_state`; docs/NUCLEO.md, "No Godot"). A rota que vence dá o mesmo jogo que o núcleo web, quadro a quadro.
 - **Conferência:** `tools/nucleo-palco.ts` joga a fase de exemplo: a rota que vence, a mesma entrada dando o mesmo jogo, cair no buraco, o pisão, encostar no inimigo e a patrulha virando nas beiras.
 
 ## O que medir revelou na primeira fase
@@ -50,7 +51,6 @@ plataforma mais baixa, o buraco embaixo de uma plataforma impedia de pular o bur
 
 ## Falta
 
-- no Godot: a simulação está no núcleo nativo, falta a ponte no `BonecoSprite`;
 - montar a fase pelos comandos (`stage.*`) e pelo editor (hoje o bloco vem do gerador ou do JSON);
 - regras "quando X, então Y", estados com mais animações (golpe, dor), som pelos eventos;
 - câmera que segue o jogador, rolagem e paralaxe; ladrilho de uma via (subir por baixo);

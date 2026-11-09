@@ -33,6 +33,7 @@ using namespace godot;
 #include "mamulengo/desenho.h"
 #include "mamulengo/estado.h"
 #include "mamulengo/modelo.h"
+#include "mamulengo/palco.h"
 #include "mamulengo/pose.h"
 
 void boneco_liberar_materiais();
@@ -171,6 +172,17 @@ class BonecoSprite : public Node2D {
   String get_slot_setup_attachment(const String &p_slot) const;
   // caixa do que esta desenhado agora, no espaco do no
   Rect2 get_skeleton_bounds() const;
+  // o palco (docs/PALCO.md): o jogo no lugar das animacoes. stage_start comeca (false se o
+  // .boneco nao tem palco); com ele ligado, o update_skeleton anda em passos de 1/60 s com a
+  // entrada de set_stage_input (bits: 1 esquerda, 2 direita, 4 pulo); stage_step anda n passos
+  // na mao; get_stage_state: tick, won, died, points e os atores (posicao no espaco do no, y para
+  // baixo)
+  bool stage_start();
+  void stage_stop();
+  void set_stage_input(int p_bits) { palco_teclas = p_bits; }
+  int get_stage_input() const { return palco_teclas; }
+  void stage_step(int p_bits, int p_n);
+  Dictionary get_stage_state() const;
   int64_t get_last_update_usec() const { return last_update_usec; }
   int64_t get_last_draw_usec() const { return last_draw_usec; }
 
@@ -181,6 +193,9 @@ class BonecoSprite : public Node2D {
  private:
   Ref<BonecoData> data;
   std::unique_ptr<mamulengo::Esqueleto> esq;
+  std::unique_ptr<mamulengo::Palco> palco;
+  int palco_teclas = 0;
+  double palco_sobra = 0;
   mamulengo::Desenho desenho;
   float time_scale = 1;
   bool playing = true;

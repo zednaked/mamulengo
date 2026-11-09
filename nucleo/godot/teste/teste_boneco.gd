@@ -174,5 +174,24 @@ func _rodar() -> void:
 			dbin = maxf(dbin, absf(wt[nome][i] - wb[nome][i]))
 	_confere(wt.size() == wb.size() and dbin == 0.0, "binario e texto: os mesmos ossos depois de 1,5 s com fila e mix (dif %s)" % str(dbin))
 
+	_palco()
 	print("\n%d ok, FAILURES: %d" % [oks, falhas])
 	quit(1 if falhas else 0)
+
+
+# o palco (docs/PALCO.md): a rota que vence a fase de exemplos/palco da o mesmo jogo que o nucleo
+# web (tools/palco.ts): o coelho em 1021, 564 (y para baixo no no), duas moedas, venceu, tick 222
+func _palco() -> void:
+	var s := _novo("res://palco/palco.boneco")
+	_confere(s.stage_start(), "stage_start com o palco do .boneco")
+	var antes := 0
+	for t in [[6, 50], [4, 2], [2, 20], [0, 40], [2, 30], [6, 50], [2, 30]]:
+		var bits: int = t[0]
+		s.stage_step(bits & ~4 if (bits & antes & 4) else bits, 1)
+		s.stage_step(bits, t[1] - 1)
+		antes = bits
+	var e: Dictionary = s.get_stage_state()
+	var c: Dictionary = e["actors"][0]
+	_confere(e["won"] and not e["died"] and e["points"] == 2 and e["tick"] == 222 and is_equal_approx(c["position"].x, 1021.0) and is_equal_approx(c["position"].y, -564.0), "palco: a rota vence igual ao nucleo web (%s)" % [str(c["position"])])
+	var p := _novo()
+	_confere(not p.stage_start(), "stage_start sem palco devolve false")

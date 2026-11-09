@@ -7,6 +7,11 @@
 
 namespace mamulengo {
 
+// pi com todos os algarismos (o M_PI nao existe no mingw estrito; o PI do modelo e o do Spine, em
+// float, e mudaria o slider)
+constexpr double PI_EXATO = 3.14159265358979323846;
+
+
 EstadoInstancia::EstadoInstancia(const EstadoInstancia& o)
     : e(o.e ? std::make_unique<Esqueleto>(*o.e) : nullptr), animacao(o.animacao), inicio(o.inicio), velocidade(o.velocidade), laco(o.laco),
       por_timeline(o.por_timeline), tempo_filho(o.tempo_filho), mix_animacao(o.mix_animacao), mix_tempo(o.mix_tempo), mix_alfa(o.mix_alfa), mix_laco(o.mix_laco),
@@ -80,7 +85,7 @@ void Esqueleto::restricao_slider(int ri) {
         // como a fonte da transformacao: a rotacao de mundo em [0, 360)
         if (d.local) v = l.rotacao;
         else {
-          v = std::fmod(std::atan2(w.c, w.a) * 180 / M_PI, 360.0);
+          v = std::fmod(std::atan2(w.c, w.a) * 180 / PI_EXATO, 360.0);
           if (v < 0) v += 360;
         }
         break;
@@ -89,7 +94,7 @@ void Esqueleto::restricao_slider(int ri) {
       case PropSlider::Y: v = d.local ? l.y : w.y; break;
       case PropSlider::EscalaX: v = d.local ? l.escala_x : std::sqrt(w.a * w.a + w.c * w.c); break;
       case PropSlider::EscalaY: v = d.local ? l.escala_y : std::sqrt(w.b * w.b + w.d * w.d); break;
-      case PropSlider::CisalhaY: v = d.local ? l.cisalha_y : (std::atan2(w.d, w.b) - std::atan2(w.c, w.a)) * 180 / M_PI - 90; break;
+      case PropSlider::CisalhaY: v = d.local ? l.cisalha_y : (std::atan2(w.d, w.b) - std::atan2(w.c, w.a)) * 180 / PI_EXATO - 90; break;
     }
     t = (v - d.de) * d.escala + d.para;
   } else {
