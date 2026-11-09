@@ -127,6 +127,22 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   timeline de poucas chaves. O filho é lido uma vez e dividido, a instância
   escondida nem é calculada, e os filhos desenham no mesmo desenho do pai, com a
   cor e os efeitos do slot e as luzes do pai. Aninham.
+- **Mosaico (mapas de ladrilhos):** uma grade de imagens do atlas presa a um slot,
+  pintada no editor com pincel, borracha, retângulo e balde: vista de cima,
+  isométrica (de trás para a frente, com altura por célula) ou um chão em
+  perspectiva forçada pelos quatro cantos. Cada célula pode ter cor, altura, quarto
+  de volta, espelho e efeitos próprios; os ladrilhos emendam sem costura. Uma fase
+  inteira de `TileMapLayer` do Godot vira mosaico.
+- **Pixel art perfeita:** com páginas Nearest, o editor e o vídeo exportado desenham
+  na resolução da arte e ampliam sem suavizar; `query.pixel` e um aviso no editor
+  apontam o que sai da grade de pixel inteiro (posição fracionária, deslocamento
+  suave, giro pequeno) e `pixel.snap` conserta num passo de desfazer.
+- **Palco, um jogo que o agente monta e joga:** um bloco `palco` transforma
+  instâncias em atores (jogador, patrulha, coletável, porta) que colidem com um
+  mosaico, simulados pelo núcleo em passos fixos e determinísticos. O agente joga
+  com entrada roteirizada e mede (o pulo alcança a plataforma? o inimigo vira na
+  beira?), você joga no editor com o teclado, e o MCP joga ao vivo na sua tela.
+  [docs/PALCO.md](docs/PALCO.md).
 
 ![O robô olhando em 2,5D, voando com jatos, brilho e um anel de estrelas, dissolvendo os braços e soltando um raio entre as mãos](exemplos/vitrine/vitrine.gif)
 
@@ -158,6 +174,14 @@ sobe girando para dentro dele.*
 *[exemplos/jogo](exemplos/jogo): uma tela de jogo inteira num `.boneco`, com
 paralaxe, plataformas, moedas, inimigo, interface e o robô como herói. Arte:
 Jumper Pack, UI Pack e Particle Pack, de Kenney (CC0).*
+
+![Uma fase de plataforma: o coelho sobe três plataformas pegando moedas enquanto um espinho patrulha o chão, e chega à cenoura](exemplos/palco/vence.gif)
+
+*[exemplos/palco](exemplos/palco): a primeira fase do palco, jogada pelo agente com
+entrada roteirizada. Medir achou três erros de fase em segundos (o coelho batia a
+cabeça embaixo da plataforma mais baixa, o buraco ficava embaixo de uma plataforma e
+o pulo segurado voava por cima de duas plataformas até o inimigo). Arte: Jumper Pack
+da Kenney (CC0); [exemplos/mosaico](exemplos/mosaico) tem as três formas do mosaico.*
 
 ![Pelo visor da câmera, o foco vai e volta entre a turma de monstros e um monstro na frente da lente, e a foto vira uma Polaroid](exemplos/foco/foco.gif)
 

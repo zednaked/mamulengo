@@ -915,6 +915,120 @@ runtimeOk("constraints");
     doc.undo();
     check(ok && doc.serialize() === antes, `instance.extract: ${b.name} vira ${filho.ossos.length} osso(s) e ${filho.slots.length} slot(s) no filho, a instancia no lugar, desfazer volta`);
   }
+  // mosaico: mosaic.set cria (tamanho da celula pela imagem) e muda a grade sem perder o que
+  // cabe; mosaic.paint pinta celula, retangulo, balde e apaga; mosaic.cell guarda cor, altura,
+  // giro, espelho e efeitos; tudo chega ao .boneco com os nomes certos; renomear o slot
+  // acompanha e apagar o slot leva o mosaico; o spine-core le o documento; desfazer volta
+  {
+    const antes = doc.serialize();
+    const h0 = doc.history().length;
+    const s0 = doc.json.slots.find((s: any) => s.attachment)!;
+    const img = s0.attachment as string;
+    let semSlot = false;
+    await run("mosaic.set", { name: "t.mapa" }).catch(() => (semSlot = true));
+    await run("mosaic.set", { name: "t.mapa", slot: s0.name, columns: 4, rows: 3, palette: [img] });
+    const m0 = (doc.json as any).mosaics[0];
+    await run("mosaic.paint", { name: "t.mapa", image: img, at: [0, 0], to: [1, 1] });
+    await run("mosaic.paint", { name: "t.mapa", image: null, at: [1, 1] });
+    await run("mosaic.paint", { name: "t.mapa", image: 0, at: [3, 2], flood: true });
+    const balde = (doc.json as any).mosaics[0].cells.filter((v: number) => v === 0).length;
+    await run("mosaic.cell", { name: "t.mapa", at: [0, 0], color: "ff0000ff", height: 6, spin: 5, flip: true, effects: { glow: { color: "ffff00ff", strength: 1 } } });
+    let efeitoRuim = false;
+    await run("mosaic.cell", { name: "t.mapa", at: [0, 0], effects: { smear: { strength: 1 } } }).catch(() => (efeitoRuim = true));
+    await run("mosaic.set", { name: "t.mapa", columns: 2 });
+    const m = (doc.json as any).mosaics[0];
+    let erroSpine = "";
+    try {
+      const { SkeletonJson, AtlasAttachmentLoader, TextureAtlas } = await import("@esotericsoftware/spine-core");
+      new SkeletonJson(new AtlasAttachmentLoader(new TextureAtlas(atlasText))).readSkeletonData(structuredClone(doc.json));
+    } catch (e: any) {
+      erroSpine = String(e?.message ?? e);
+    }
+    const { importarSpine } = await import("../src/boneco/spine.ts");
+    const bm = importarSpine(doc.json, atlasText, "t").mosaicos?.[0];
+    const regiao = parseAtlas(atlasText).regions.find((r: any) => r.name === img);
+    check(
+      semSlot &&
+        m0.cell[0] === (regiao?.originalWidth ?? regiao?.width) &&
+        balde === 12 &&
+        efeitoRuim &&
+        m.columns === 2 &&
+        m.cells.length === 6 &&
+        m.cells.every((v: number) => v === 0) &&
+        m.extras?.["0"]?.spin === 1 &&
+        bm?.forma === "grade" &&
+        bm?.paleta?.[0] === img &&
+        bm?.extras?.["0"]?.giro === 1 &&
+        bm?.extras?.["0"]?.espelho === true &&
+        bm?.extras?.["0"]?.efeitos?.brilho?.forca === 1 &&
+        !erroSpine,
+      `mosaico: mosaic.set, paint (retangulo, apagar, balde ${balde}), cell e a grade menor chegam ao .boneco; spine-core le${erroSpine ? ` (erro: ${erroSpine})` : ""} (${JSON.stringify(bm)?.slice(0, 200)})`,
+    );
+    let renomeou = false,
+      levou = false;
+    const h1 = doc.history().length;
+    try {
+      await run("slot.rename", { slot: s0.name, to: "t.chao" });
+      renomeou = (doc.json as any).mosaics[0].slot === "t.chao";
+      await run("slot.delete", { slot: "t.chao" });
+      levou = !(doc.json as any).mosaics;
+    } catch (e) {
+      console.log("mosaico:", e);
+    }
+    // (o desfazer do slot.rename pode mudar a ordem das chaves: a comparacao exata e so do mosaico)
+    while (doc.history().length > h1) doc.undo();
+    const comMosaico = JSON.stringify((doc.json as any).mosaics) === JSON.stringify([m]);
+    while (doc.history().length > h0) doc.undo();
+    const canon = (x: any): any => (Array.isArray(x) ? x.map(canon) : x && typeof x === "object" ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, canon(x[k])])) : x);
+    const igual = JSON.stringify(canon(JSON.parse(doc.serialize()))) === JSON.stringify(canon(JSON.parse(antes)));
+    if (!(renomeou && levou && comMosaico && igual)) console.log("mosaico:", { renomeou, levou, comMosaico, igual });
+    check(renomeou && levou && comMosaico && igual, "mosaico: renomear o slot acompanha, apagar o slot leva o mosaico, desfazer volta");
+  }
+  // pixel art: query.pixel acha osso fracionario, deslocamento suave e giro fora de 45; pixel.snap
+  // arredonda e troca o trecho linear 0 -> 5 px em 1 s por degraus de 1 px no tempo da reta (a
+  // troca do valor arredondado: 0.1, 0.3, 0.5, 0.7, 0.9 s); giro so avisa; desfazer volta
+  {
+    const antes = doc.serialize();
+    const h0 = doc.history().length;
+    const b0 = doc.json.bones[1].name;
+    await run("bone.set", { bone: b0, x: 3.5 });
+    await run("animation.create", { name: "t.pixel" });
+    await run("key.set", { anim: "t.pixel", target: { bone: b0 }, timeline: "translate", time: 0, x: 0, y: 0 });
+    await run("key.set", { anim: "t.pixel", target: { bone: b0 }, timeline: "translate", time: 1, x: 5, y: 0 });
+    await run("key.set", { anim: "t.pixel", target: { bone: b0 }, timeline: "rotate", time: 0.5, value: 12 });
+    const q = await run("query.pixel", { anim: "t.pixel" });
+    const acha = (t: string) => q.avisos.some((a: string) => a.includes(t));
+    const r = await run("pixel.snap", { anim: "t.pixel" });
+    const keys = doc.json.animations["t.pixel"].bones[b0].translate;
+    const tempos = keys.map((k: any) => k.time ?? 0);
+    const xs = keys.map((k: any) => k.x ?? 0);
+    const ok =
+      acha(`osso ${b0}`) &&
+      acha("curva suave") &&
+      acha("giro em 12") &&
+      doc.json.bones[1].x === 4 &&
+      JSON.stringify(xs) === JSON.stringify([0, 1, 2, 3, 4, 5, 5]) &&
+      JSON.stringify(tempos) === JSON.stringify([0, 0.1, 0.3, 0.5, 0.7, 0.9, 1]) &&
+      keys.slice(0, -1).every((k: any) => k.curve === "stepped") &&
+      r.avisosRestantes.some((a: string) => a.includes("t.pixel") && a.includes("giro em 12")) &&
+      !r.avisosRestantes.some((a: string) => a.includes("t.pixel") && a.includes("translate"));
+    if (!ok) console.log("pixel dbg", q.avisos.slice(0, 8), r.avisosRestantes.slice(0, 8), doc.json.bones[1].x);
+    while (doc.history().length > h0) doc.undo();
+    check(ok && doc.serialize() === antes, `pixel: query.pixel acha osso, curva suave e giro; pixel.snap encaixa (x ${JSON.stringify(xs)} em ${JSON.stringify(tempos)}); desfazer volta`);
+  }
+  // palco (docs/PALCO.md): o bloco stage do editor vai e volta do .boneco com os nomes certos
+  {
+    const { importarSpine, exportarSpine } = await import("../src/boneco/spine.ts");
+    const stage = { gravity: 2400, solid: { mosaic: "mapa", palette: ["chao"] }, actors: [{ name: "heroi", instance: "heroi", type: "player", box: [70, 180], speed: 360, jump: 1350, animations: { idle: "parado", walk: "anda", jump: "pula", dead: "cai" } }, { name: "bicho", instance: "bicho", type: "patrol", side: -1 }] };
+    const j = { skeleton: { spine: "4.3.23" }, bones: [{ name: "root" }], slots: [], skins: [{ name: "default", attachments: {} }], animations: {}, stage };
+    const b = importarSpine(j, "", "t");
+    const p = (b as any).palco;
+    const volta = exportarSpine(b).json as any;
+    check(
+      p?.gravidade === 2400 && p?.solido?.mosaico === "mapa" && p?.solido?.paleta?.[0] === "chao" && p?.atores?.[0]?.tipo === "jogador" && p?.atores?.[0]?.caixa?.[1] === 180 && p?.atores?.[0]?.pulo === 1350 && p?.atores?.[0]?.animacoes?.andando === "anda" && p?.atores?.[1]?.tipo === "patrulha" && p?.atores?.[1]?.lado === -1 && JSON.stringify(volta.stage) === JSON.stringify(stage),
+      `palco: stage chega ao .boneco como palco (${JSON.stringify(p?.atores?.[0])}) e volta igual`,
+    );
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

@@ -308,6 +308,67 @@ struct TimelineEfeito {
   Timeline tl;  // EFEITO_CANAIS[tipo] canais
 };
 
+// ---- mosaico (docs/NUCLEO.md "Mosaico"): uma grade de imagens do atlas presa ao osso de um
+// slot, desenhada logo depois da parte dele (mapas, chao, paredes)
+
+enum class FormaMosaico : uint8_t { Grade, Iso };
+
+struct DadosMosaico {
+  std::string nome;
+  int slot = -1, osso = -1;
+  double x = 0, y = 0;            // grade: canto de cima e da esquerda; iso: centro da celula (0, 0)
+  FormaMosaico forma = FormaMosaico::Grade;
+  double cw = 32, ch = 32;        // celula (iso: largura e altura do losango)
+  int colunas = 0, linhas = 0;
+  struct Imagem {
+    int pagina = -1;
+    float uvs[8] = {0};           // baixo-esquerda, cima-esquerda, cima-direita, baixo-direita
+    double ow = 0, oh = 0;        // tamanho original (antes do corte no atlas)
+    double l = 0, b = 0, r = 1, t = 1;  // o retangulo com pixels, em fracao do original
+  };
+  std::vector<Imagem> imagens;    // a paleta
+  std::vector<int> celulas;       // colunas * linhas, linha 0 em cima; -1: vazia
+  double escala = 1;              // iso: a imagem no tamanho dela vezes a escala
+  double ancora[2] = {0.5, 0.5};  // iso: o ponto da imagem (fracao, de cima e da esquerda) no centro
+  bool cantos = false;            // grade em perspectiva forcada: a grade vai para o quadrilatero
+  double h[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};  // homografia do quadrado 0..1 (u para a direita, v para cima)
+  struct Extra {
+    Cor cor;
+    double altura = 0;
+    int giro = 0;                 // vezes 90 graus, anti-horario
+    bool espelho = false;
+    bool efeitos = false;
+    Efeitos ef;
+  };
+  std::vector<Extra> extras;
+  std::vector<int> extra_da_celula;  // celula -> extra (-1: nenhum)
+  std::vector<int> ordem;            // as celulas na ordem de desenho
+};
+
+// ---- palco (docs/PALCO.md): o jogo; cada ator e uma instancia, movida pela simulacao
+
+enum class TipoAtor : uint8_t { Jogador, Patrulha, Coletavel, Porta, Enfeite };
+
+struct DadosAtor {
+  std::string nome;
+  TipoAtor tipo = TipoAtor::Enfeite;
+  int instancia = -1;              // em Modelo::instancias (o osso dela e o que anda)
+  double largura = 16, altura = 16;  // a caixa, com o meio de baixo no osso (os pes)
+  double velocidade = 100, pulo = 300;
+  // as animacoes do filho por estado (-1: a que a instancia ja toca)
+  int anim_parado = -1, anim_andando = -1, anim_pulo = -1, anim_morto = -1;
+  int lado = 1;                    // para onde olha no comeco (1 direita, -1 esquerda)
+};
+
+struct DadosPalco {
+  bool existe = false;
+  double gravidade = 900;
+  int mosaico = -1;                // o mosaico com os ladrilhos solidos
+  std::vector<uint8_t> solido;     // por imagem da paleta dele (vazio: todas)
+  bool pixel = false;              // desenha os atores em pixel inteiro (a simulacao segue fracionaria)
+  std::vector<DadosAtor> atores;
+};
+
 // ---- particulas (docs/NUCLEO.md "Particulas")
 
 struct DadosEmissor {
@@ -493,6 +554,7 @@ struct Pagina {
   std::string arquivo;
   int largura = 0, altura = 0;
   bool pma = false;  // cores ja multiplicadas pelo alfa
+  bool perto = false;  // filtro Nearest (pixel art): sem suavizar entre texels
   std::string relevo;  // o mapa de normais ao lado (docs/NUCLEO.md "Luzes"); vazio: sem relevo
 };
 
@@ -510,6 +572,9 @@ struct Modelo {
   float ambiente[CANAIS_AMBIENTE] = {1, 1, 1, 1, 1};
   std::vector<std::vector<int>> emissores_do_slot;  // por slot, os emissores que desenham nele
   std::vector<std::vector<int>> orbitas_atras;      // por slot, as orbitas cujas de tras desenham nele
+  std::vector<DadosMosaico> mosaicos;
+  DadosPalco palco;
+  std::vector<std::vector<int>> mosaicos_do_slot;  // por slot, os mosaicos que desenham nele
   std::vector<Animacao> animacoes;
   // instancias: os modelos filhos (um por arquivo, divididos), as instancias e, por slot, as que
   // desenham nele
@@ -556,5 +621,8 @@ std::string diretorio(std::string_view c);
 // ou acrescenta no fim. Em erro devolve false, preenche `erro` e nao muda o modelo. Quem usa o
 // modelo com um Estado precisa criar outro (o Estado prepara as timelines de cada animacao).
 bool ler_animacao(Modelo& m, std::string_view nome, std::string_view texto, std::string* erro);
+// troca so uma timeline de osso que ja existe (chaves em JSON, no formato do .boneco); devolve o
+// instante a partir do qual a pose pode ter mudado, ou -1: troque a animacao
+double trocar_timeline_osso(Modelo& m, std::string_view anim, std::string_view osso, std::string_view tipo, std::string_view texto, std::string* erro);
 
 }  // namespace mamulengo

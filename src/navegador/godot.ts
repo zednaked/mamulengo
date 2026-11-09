@@ -5,6 +5,7 @@
 // o two-color tint do binario do spine-godot. Roda no service worker (lista e texturas) e na pagina
 // (o contexto do jogo para a ficha).
 import * as fs from "./fs.ts";
+import * as idb from "./idb.ts";
 import { md5 } from "./md5.ts";
 
 export type AssetGodot = { tres: string; skeleton: string; atlas: string; defaultMix: number; mixes: { from: string; to: string; mix: number }[]; raiz: string };
@@ -62,11 +63,29 @@ export async function lerTres(arquivo: string): Promise<AssetGodot | null> {
   return { tres: arquivo, skeleton, atlas, defaultMix: mix ? Number(mix) : 0, mixes: mixes(texto), raiz };
 }
 
+// o .tres lido, guardado pelo tamanho e pela data (um projeto grande tem centenas de .tres que nao
+// sao personagem; relidos so quando mudam). No IndexedDB, como a lista dos .boneco (api.ts)
+type MemoTres = { chave: string; a: AssetGodot | null };
+let memoTres: Map<string, MemoTres> | null = null;
+async function tresGuardado(tres: string, h?: FileSystemFileHandle): Promise<AssetGodot | null> {
+  memoTres ??= new Map(Object.entries((await idb.ler<Record<string, MemoTres>>("kv", "lista-godot").catch(() => undefined)) ?? {}));
+  const f = h ? await h.getFile() : await fs.lerArquivo(tres);
+  if (!f) return null;
+  const chave = `${f.size}|${f.lastModified}`;
+  const visto = memoTres.get(tres);
+  if (visto?.chave === chave) return visto.a;
+  const a = await lerTres(tres).catch(() => null);
+  memoTres.set(tres, { chave, a });
+  tresMudou = true;
+  return a;
+}
+let tresMudou = false;
+
 // os personagens do spine-godot numa raiz, no formato da lista de personagens
-export async function personagensGodot(raiz: fs.Raiz): Promise<any[]> {
+export async function personagensGodot(raiz: fs.Raiz, achados?: { caminho: string; h: FileSystemFileHandle }[]): Promise<any[]> {
   const out: any[] = [];
-  for (const tres of await fs.percorrer(raiz.caminho, (n) => n.endsWith(".tres"))) {
-    const a = await lerTres(tres).catch(() => null);
+  for (const { caminho: tres, h } of achados ?? (await fs.percorrerComArquivo(raiz.caminho, (n) => n.endsWith(".tres")))) {
+    const a = await tresGuardado(tres, h);
     if (!a) continue;
     const rel = tres.slice(raiz.caminho.length + 1);
     const faltando = !(await fs.existe(a.skeleton)) ? a.skeleton : !(await fs.existe(a.atlas)) ? a.atlas : null;
@@ -82,6 +101,10 @@ export async function personagensGodot(raiz: fs.Raiz): Promise<any[]> {
       mixes: a.mixes,
       ...(faltando ? { broken: `o ${fs.nomeDe(tres)} aponta para ${paraRes(a.raiz, faltando)}, que nao existe neste projeto Godot (res:// e relativo ao project.godot)` } : {}),
     });
+  }
+  if (tresMudou && memoTres) {
+    tresMudou = false;
+    await idb.gravar("kv", "lista-godot", Object.fromEntries(memoTres)).catch(() => {});
   }
   return out;
 }

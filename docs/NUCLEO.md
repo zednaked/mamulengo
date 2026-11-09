@@ -679,6 +679,55 @@ a cor do slot e a intensidade; o giro, `giro[0] + (giro[1] - giro[0]) s2` graus 
 o relógio. Com `z < 0` desenha logo depois do slot `atras`; senão, logo depois do `slot`.
 `posicoes_orbita` (`desenho.h`) dá as posições, que o desenho usa.
 
+## Mosaico
+
+Uma grade de imagens do atlas presa ao osso de um slot, para mapas, chão e paredes (`mosaicos`
+no `.boneco`, `mosaics` no JSON do editor; o Spine não tem, e a exportação para ele os tira e
+avisa). Desenha logo depois da parte do slot, antes das instâncias e das partículas dele, com a
+cor e o blend do slot; slot sem parte desenha só o mosaico.
+
+| campo | o quê |
+|---|---|
+| `slot` | o slot (lugar na ordem de desenho); o osso é o dele |
+| `forma` | `grade` (padrão) ou `iso` |
+| `celula` | `[largura, altura]`: na grade, o retângulo de cada célula; no iso, o losango |
+| `colunas`, `linhas` | o tamanho da grade |
+| `paleta` | nomes de imagens do atlas; imagem que não está no atlas fica na paleta e não desenha |
+| `celulas` | `colunas × linhas` índices da paleta, linha a linha, a linha 0 em cima; `-1` vazia |
+| `x`, `y` | grade: o canto de cima e da esquerda; iso: o centro da célula (0, 0) |
+| `escala`, `ancora` | iso: a imagem no tamanho dela vezes `escala`, com o ponto `ancora` (fração, de cima e da esquerda; padrão `[0.5, 0.5]`) no centro do losango |
+| `cantos` | grade em perspectiva forçada: os 4 cantos da grade no espaço do osso (baixo-esquerda, cima-esquerda, cima-direita, baixo-direita); substitui `x`, `y` |
+| `extras` | por índice de célula (texto): `cor` (multiplica a do slot), `altura` (sobe na tela), `giro` (quartos de volta anti-horário), `espelho` (horizontal) e `efeitos` (linha, brilho, dissolver, tingir, com os campos dos do slot) |
+
+**Grade.** A célula (c, r) vai de `x + c·w` a `x + (c+1)·w` e de `y − (r+1)·h` a `y − r·h`. A
+imagem é esticada na célula; a cortada no atlas ocupa a parte dela com pixels (o corte, em fração
+do original). Com `cantos`, o ponto local (lx, ly) da grade vai a (u, v) = (lx / (colunas·w),
+1 + ly / (linhas·h)) e daí ao quadrilátero pela homografia do quadrado unitário (Heckbert,
+"Fundamentals of Texture Mapping"): cada célula vira um quadrilátero de dois triângulos com a
+textura afim (com células pequenas, a distorção dentro de cada uma não aparece).
+
+**Iso.** O centro da célula (c, r) é `((c − r)·w/2 + x, −(c + r)·h/2 + y)`; a imagem fica em pé
+(não deforma) e as células desenham da de trás para a da frente, pela soma `c + r` (empate: a
+ordem do arquivo).
+
+**Por célula.** Espelho e giro mexem nos cantos da imagem dentro da célula (o espelho primeiro);
+o giro troca qual canto da imagem vai em qual canto da célula. `altura` soma em y no espaço do
+osso. Célula com efeito tem um lote só dela (os efeitos do shader precisam da caixa da imagem);
+as outras se juntam no lote da página. Os efeitos de linha e brilho crescem os cantos para fora,
+como na região. Os efeitos do slot não valem no mosaico (a linha seria em volta de cada
+ladrilho).
+
+**Costura.** Com filtro linear, as UVs de cada célula entram meio texel (no máximo um quarto da
+imagem), para o filtro não puxar a sangria transparente do atlas entre ladrilhos vizinhos. Com
+página Nearest (pixel art) não há costura, e as UVs vão até a borda.
+
+**A caixa** (`mm_caixa`, o enquadrar do editor) inclui os mosaicos pelo desenho deles.
+
+Conferência própria: `tools/nucleo-mosaico.ts` monta mosaicos de grade (imagem cortada e girada
+no atlas, célula com cor, altura, giro, espelho e linha), iso (escala, âncora, ordem e altura) e
+perspectiva, desenha pelo núcleo em wasm e compara cada vértice, as UVs, as cores e os lotes com
+a conta refeita pela especificação, e a página Nearest sem o recuo. Exemplo: `exemplos/mosaico`.
+
 ## Instâncias
 
 Um `.boneco` dentro de outro: o que se repete (uma letra, um vagalume, uma multidão) fica num

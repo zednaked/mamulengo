@@ -7,6 +7,8 @@
   import { startMeshEdit } from "./meshedit.ts";
   import MeshPanel from "./MeshPanel.svelte";
   import DrawPanel from "./DrawPanel.svelte";
+  import MosaicPanel from "./MosaicPanel.svelte";
+  import { startMosaicEdit } from "./mosaicedit.ts";
   import { abrirDesenhar, newDrawnPart, startDrawEdit } from "./drawedit.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
   import { EFFECT_NAMES, effectAt, effectFields, fieldsAt } from "../core/model.ts";
@@ -275,6 +277,24 @@
           : { name: nome, slot: slot.name, rate: 12, life: [0.6, 1.2], speed: [60, 140], spread: 50, scale: [0.4, 0.1], spin: [-120, 120], color: ["ffffffff", "ffffff00"] };
     const nomeT = tipo === "lightning" ? "Raio" : tipo === "orbit" ? "Órbita" : "Partículas";
     if (app.run({ cmd: "particles.set", args }, `${base} em ${slot.name}`)) app.avisar(`${nomeT} em ${slot.name}: aparece no desenho do núcleo; os controles estão logo abaixo.`);
+  }
+  // ---- mosaicos (so .boneco; docs/NUCLEO.md "Mosaico"): os que desenham no lugar desta camada
+  const mosaicosDoSlot = $derived.by(() => {
+    app.version;
+    return slot ? ((app.doc?.json as any)?.mosaics ?? []).filter((m: any) => m.slot === slot.name) : [];
+  });
+  function novoMosaico() {
+    if (!slot) return;
+    let nome = `${slot.name}_mosaico`;
+    for (let n = 2; ((app.doc?.json as any).mosaics ?? []).some((m: any) => m.name === nome); n++) nome = `${slot.name}_mosaico_${n}`;
+    // a paleta comeca com a imagem da camada (se ela mostra uma)
+    const att = slot.attachment ? app.doc!.json.skins?.find((s: any) => s.attachments?.[slot.name]?.[slot.attachment])?.attachments[slot.name][slot.attachment] : null;
+    const img = att && (!att.type || att.type === "region" || att.type === "mesh") ? (att.path ?? slot.attachment) : null;
+    const args: any = { name: nome, slot: slot.name, columns: 8, rows: 6, palette: img ? [img] : [] };
+    if (app.run({ cmd: "mosaic.set", args }, `mosaico em ${slot.name}`)) {
+      startMosaicEdit(nome);
+      app.avisar(`Mosaico ${nome} em ${slot.name}: pinte na tela com a imagem da paleta (o + acrescenta outras do atlas). Aparece no desenho do núcleo.`);
+    }
   }
   function rajada(nome: string) {
     const time = +app.play.time.toFixed(4);
@@ -1206,6 +1226,16 @@
             {/each}
           </div>
         {/each}
+        {#each mosaicosDoSlot as mo (mo.name)}
+          <div class="ef">
+            <div class="efnome" title="mosaico: {mo.columns} × {mo.rows} células de {mo.cell[0]} × {mo.cell[1]}, {mo.palette?.length ?? 0} imagens na paleta">
+              <span class="nome-t">🧩 {mo.name}</span>
+              {#if app.mosaicEdit?.name !== mo.name}<button onclick={() => startMosaicEdit(mo.name)} title="pintar este mosaico na tela">🖌️ pintar</button>{/if}
+              <button class="tira" onclick={() => app.run({ cmd: "mosaic.delete", args: { name: mo.name } }, `apaga ${mo.name}`)} title="apagar o mosaico">✕</button>
+            </div>
+            {#if app.mosaicEdit?.name === mo.name}<MosaicPanel />{/if}
+          </div>
+        {/each}
         {#each emissores as em (em.p.name)}
           <div class="ef">
             <div class="efnome" title="emissor de partículas: nasce do osso {em.p.bone ?? slot.bone}, imagem {em.p.image}">
@@ -1232,6 +1262,7 @@
             <button onclick={() => novoEmissor("particles")} title="partículas que nascem do osso desta camada e desenham logo depois dela">+ partículas</button>
             <button onclick={() => novoEmissor("lightning")} title="um raio: linha quebrada que sai do osso desta camada, refeita a cada instante">+ raio</button>
             <button onclick={() => novoEmissor("orbit")} title="partículas girando em volta do osso desta camada, passando atrás e na frente">+ órbita</button>
+            <button onclick={novoMosaico} title="mosaico: uma grade de imagens do atlas presa a esta camada (mapa, chão, parede), pintada na tela; grade, isométrica ou em perspectiva">+ mosaico</button>
             {#if app.asset?.tres?.endsWith(".boneco")}
               <select value="" onfocus={() => app.carregarEfeitos()} onchange={(e) => { const v = (e.target as HTMLSelectElement).value; (e.target as HTMLSelectElement).value = ""; if (v && slot) app.efeitoDaBiblioteca(v, slot.name); }} title="um efeito pronto da biblioteca (fumaça, puff, poeira, explosão...): as imagens entram no personagem e o emissor nasce nesta camada">
                 <option value="">+ efeito…</option>

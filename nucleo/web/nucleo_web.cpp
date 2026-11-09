@@ -29,6 +29,7 @@
 #include "mamulengo/estado.h"
 #include "mamulengo/json.h"
 #include "mamulengo/modelo.h"
+#include "mamulengo/palco.h"
 #include "mamulengo/pose.h"
 
 using namespace mamulengo;
@@ -68,7 +69,11 @@ struct Instancia {
     double tempo = 0, posto_x = 0, posto_y = 0, posto_r = 0;
     explicit Guardado(const Esqueleto& x) : e(x) {}
   };
+  // o checkpoint do quadro atual (mm_guardar) e os da grade do editor (mm_guardar_em, por vaga)
   std::unique_ptr<Guardado> guardado;
+  std::vector<std::unique_ptr<Guardado>> vagas;
+  // o palco (docs/PALCO.md): o jogo, quando o modelo tem um
+  std::unique_ptr<Palco> palco;
   explicit Instancia(std::shared_ptr<const Modelo> m) : modelo(m), e(std::move(m)) {}
 };
 
@@ -204,6 +209,12 @@ EMSCRIPTEN_KEEPALIVE int mm_trocar_animacao(int modelo, const char* nome, const 
   return ler_animacao(mutavel(modelo), nome, json, &erro) ? 1 : 0;
 }
 
+// so uma timeline de osso (o arrasto de uma chave): o instante a partir do qual a pose mudou
+// (infinito: nada), ou -1: troque a animacao inteira
+EMSCRIPTEN_KEEPALIVE double mm_trocar_timeline_osso(int modelo, const char* anim, const char* osso, const char* tipo, const char* json) {
+  return trocar_timeline_osso(mutavel(modelo), anim, osso, tipo, json, &erro);
+}
+
 // JSON: { nome, paginas: [{arquivo, largura, altura, pma}], animacoes: [{nome, duracao}] }. As
 // paginas sao as do desenho: as do modelo e depois as dos filhos das instancias (caminho relativo
 // ao pai)
@@ -228,6 +239,11 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
   // "fisica": a pose depende do caminho ate o instante (o editor simula em passos desde o 0); as
   // particulas tambem
   fisica = fisica || !m.emissores.empty();
+  // borrar e rastro tambem lembram os quadros anteriores: num passo so ate o instante, o rastro
+  // guardava so o quadro 0 (a peca parada ficava desenhada o tempo todo)
+  for (const DadosSlot& d : m.slots) fisica = fisica || d.efeitos.borrar() || d.efeitos.rastro();
+  for (const Animacao& an : m.animacoes)
+    for (const TimelineEfeito& te : an.efeitos) fisica = fisica || te.tipo == TipoEfeito::Borrar || te.tipo == TipoEfeito::Rastro;
   // e as dos filhos das instancias (com memoria: fisica, particulas, borrar ou rastro)
   for (const auto& f : m.filhos) fisica = fisica || !f->sem_memoria;
   info += std::string("],\"fisica\":") + (fisica ? "true" : "false") + ",\"ossos\":[";
@@ -532,6 +548,17 @@ EMSCRIPTEN_KEEPALIVE int mm_caixa(int inst) {
       y1 = std::max(y1, v[k + 1]);
     }
   }
+  // os mosaicos nao sao partes: entram pelo desenho deles (docs/NUCLEO.md "Mosaico")
+  if (!i.modelo->mosaicos.empty()) {
+    Desenho d;
+    desenhar(i.e, d);
+    for (size_t k = 0; k + 1 < d.vertices.size(); k += 8) {
+      x0 = std::min(x0, double(d.vertices[k]));
+      x1 = std::max(x1, double(d.vertices[k]));
+      y0 = std::min(y0, double(d.vertices[k + 1]));
+      y1 = std::max(y1, double(d.vertices[k + 1]));
+    }
+  }
   saida.assign({x0, y0, x1, y1});
   return x0 <= x1 ? 1 : 0;
 }
@@ -575,11 +602,11 @@ EMSCRIPTEN_KEEPALIVE void mm_pose_direta(int inst, int anim, double t, int loop)
 // ---- checkpoint: guarda o quadro atual da instancia (esqueleto com a fisica, Estado, relogio)
 // e volta a ele. O modelo nao pode mudar no meio (quem remenda esquece o checkpoint).
 
-EMSCRIPTEN_KEEPALIVE void mm_guardar(int inst) {
-  Instancia& i = *instancias[size_t(inst)];
-  if (!i.guardado) i.guardado = std::make_unique<Instancia::Guardado>(i.e);
-  else i.guardado->e = i.e;
-  Instancia::Guardado& g = *i.guardado;
+namespace {
+void guardar(Instancia& i, std::unique_ptr<Instancia::Guardado>& slot) {
+  if (!slot) slot = std::make_unique<Instancia::Guardado>(i.e);
+  else slot->e = i.e;
+  Instancia::Guardado& g = *slot;
   if (i.estado) {
     if (!g.estado) g.estado = std::make_unique<Estado>(i.modelo);
     g.estado->copiar_de(*i.estado);
@@ -588,11 +615,9 @@ EMSCRIPTEN_KEEPALIVE void mm_guardar(int inst) {
   g.posto_x = i.posto_x, g.posto_y = i.posto_y, g.posto_r = i.posto_r;
 }
 
-// devolve 0 se nao ha checkpoint
-EMSCRIPTEN_KEEPALIVE int mm_restaurar(int inst) {
-  Instancia& i = *instancias[size_t(inst)];
-  if (!i.guardado) return 0;
-  const Instancia::Guardado& g = *i.guardado;
+int restaurar(Instancia& i, const std::unique_ptr<Instancia::Guardado>& slot) {
+  if (!slot) return 0;
+  const Instancia::Guardado& g = *slot;
   i.e = g.e;
   if (g.estado) {
     if (!i.estado) i.estado = std::make_unique<Estado>(i.modelo);
@@ -601,6 +626,58 @@ EMSCRIPTEN_KEEPALIVE int mm_restaurar(int inst) {
   i.tempo = g.tempo;
   i.posto_x = g.posto_x, i.posto_y = g.posto_y, i.posto_r = g.posto_r;
   return 1;
+}
+}  // namespace
+
+EMSCRIPTEN_KEEPALIVE void mm_guardar(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  guardar(i, i.guardado);
+}
+
+// devolve 0 se nao ha checkpoint
+EMSCRIPTEN_KEEPALIVE int mm_restaurar(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  return restaurar(i, i.guardado);
+}
+
+// a grade de checkpoints do editor: depois de editar uma animacao, a pose antes do trecho mexido
+// nao muda, e a fisica continua da vaga mais perto em vez de refazer desde 0
+EMSCRIPTEN_KEEPALIVE void mm_guardar_em(int inst, int vaga) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (vaga < 0) return;
+  if (size_t(vaga) >= i.vagas.size()) i.vagas.resize(size_t(vaga) + 1);
+  guardar(i, i.vagas[size_t(vaga)]);
+}
+
+EMSCRIPTEN_KEEPALIVE int mm_restaurar_de(int inst, int vaga) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (vaga < 0 || size_t(vaga) >= i.vagas.size()) return 0;
+  return restaurar(i, i.vagas[size_t(vaga)]);
+}
+
+// ---- palco (docs/PALCO.md): o jogo dentro do .boneco. mm_palco comeca (ou recomeca) e devolve 0
+// se o modelo nao tem palco; mm_palco_passo anda n passos de dt com a entrada (bits: 1 esquerda,
+// 2 direita, 4 pulo); mm_palco_estado o estado em JSON (tick, venceu, morreu, pontos, atores)
+
+EMSCRIPTEN_KEEPALIVE int mm_palco(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (!i.modelo->palco.existe) return 0;
+  i.estado.reset();
+  i.palco = std::make_unique<Palco>(*i.modelo);
+  i.palco->reiniciar(i.e);
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE void mm_palco_passo(int inst, int entrada, int n, double dt) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (!i.palco) return;
+  for (int k = 0; k < n; ++k) i.palco->passo(i.e, uint32_t(entrada), dt);
+}
+
+EMSCRIPTEN_KEEPALIVE const char* mm_palco_estado(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  info = i.palco ? i.palco->json() : "null";
+  return info.c_str();
 }
 
 EMSCRIPTEN_KEEPALIVE void mm_esquecer(int inst) { instancias[size_t(inst)]->guardado.reset(); }

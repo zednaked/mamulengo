@@ -94,10 +94,10 @@ async function referencia(caminho: string, o: { x?: number; y?: number; largura?
   return v.medida;
 }
 
-type Pedido = { anim: string | null; tempos: number[]; rect?: [number, number, number, number]; largura?: number; fps?: number; fundo?: string | null; modo?: "normal" | "cinza" | "silhueta"; repetir?: boolean; camera?: boolean; formato?: "png" | "jpeg" };
+type Pedido = { palco?: number[]; anim: string | null; tempos: number[]; rect?: [number, number, number, number]; largura?: number; fps?: number; fundo?: string | null; modo?: "normal" | "cinza" | "silhueta"; repetir?: boolean; camera?: boolean; formato?: "png" | "jpeg" };
 
 // o filme continua de onde parou (quadros pedidos em lotes, em ordem): a instancia e o tempo
-let corrente: { chave: string; inst: number; agora: number } | null = null;
+let corrente: { chave: string; inst: number; agora: number; passos: number } | null = null;
 
 // os quadros pedidos, em PNG (data URL), na ordem dos tempos
 function fotos(p: Pedido): string[] {
@@ -122,13 +122,15 @@ function fotos(p: Pedido): string[] {
   const anim = p.anim ? info.animacoes.findIndex((a) => a.nome === p.anim) : -1;
   if (p.anim && anim < 0) throw new Error(`animacao desconhecida: ${p.anim}. Ha: ${info.animacoes.map((a) => a.nome).join(", ")}`);
   // o mesmo pedido em lotes seguidos continua a simulacao (o video inteiro em partes)
-  const chave = JSON.stringify([p.anim, p.repetir, p.fps]);
+  const chave = JSON.stringify([p.anim, p.repetir, p.fps, p.palco?.length ?? -1]);
   const continua = corrente && corrente.chave === chave && p.tempos.length && Math.min(...p.tempos) >= corrente.agora - 1e-9;
   if (!continua) {
     N._mm_limpar_instancias();
     const i0 = N._mm_instancia(modelo);
-    N._mm_tocar(i0, anim, p.repetir ? 1 : 0);
-    corrente = { chave, inst: i0, agora: 0 };
+    // o palco (docs/PALCO.md): o jogo com a entrada de cada passo de 1/60 s, em vez da animacao
+    if (p.palco && !N._mm_palco(i0)) throw new Error("este .boneco nao tem palco");
+    if (!p.palco) N._mm_tocar(i0, anim, p.repetir ? 1 : 0);
+    corrente = { chave, inst: i0, agora: 0, passos: 0 };
   }
   const inst = corrente!.inst;
   const passo = 1 / (p.fps ?? 30);
@@ -137,11 +139,16 @@ function fotos(p: Pedido): string[] {
   const out: string[] = new Array(p.tempos.length);
   const cor = p.fundo ? [parseInt(p.fundo.slice(0, 2), 16) / 255, parseInt(p.fundo.slice(2, 4), 16) / 255, parseInt(p.fundo.slice(4, 6), 16) / 255] : null;
   for (const [t, i] of ordem) {
-    while (agora + passo <= t + 1e-9) {
+    if (p.palco) {
+      // o jogo anda em passos de 1/60 s ate o instante do quadro (depois do roteiro, sem teclas)
+      while ((corrente!.passos + 1) / 60 <= t + 1e-9) N._mm_palco_passo(inst, p.palco[corrente!.passos++] ?? 0, 1, 1 / 60);
+      agora = t;
+    }
+    while (!p.palco && agora + passo <= t + 1e-9) {
       N._mm_avancar(inst, passo);
       agora += passo;
     }
-    if (t - agora > 1e-9) {
+    if (!p.palco && t - agora > 1e-9) {
       N._mm_avancar(inst, t - agora);
       agora = t;
     }

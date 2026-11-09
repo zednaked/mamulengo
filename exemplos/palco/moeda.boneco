@@ -1,0 +1,148 @@
+{
+ "boneco": 0,
+ "nome": "moeda",
+ "paginas": [
+  {
+   "arquivo": "moeda.png",
+   "tamanho": [
+    120,
+    172
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "gold_1",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    84,
+    84
+   ]
+  },
+  {
+   "nome": "gold_2",
+   "pagina": 0,
+   "ret": [
+    0,
+    86,
+    66,
+    84
+   ]
+  },
+  {
+   "nome": "gold_3",
+   "pagina": 0,
+   "ret": [
+    68,
+    86,
+    50,
+    84
+   ]
+  },
+  {
+   "nome": "gold_4",
+   "pagina": 0,
+   "ret": [
+    86,
+    0,
+    15,
+    84
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./kenney/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "corpo",
+   "osso": "root",
+   "parte": "gold_1"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "corpo": {
+     "gold_1": {
+      "x": 0,
+      "y": 42,
+      "largura": 84,
+      "altura": 84
+     },
+     "gold_2": {
+      "x": 0,
+      "y": 42,
+      "largura": 66,
+      "altura": 84
+     },
+     "gold_3": {
+      "x": 0,
+      "y": 42,
+      "largura": 50,
+      "altura": 84
+     },
+     "gold_4": {
+      "x": 0,
+      "y": 42,
+      "largura": 15,
+      "altura": 84
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "parado": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "gold_1"
+      },
+      {
+       "tempo": 0.08,
+       "nome": "gold_2"
+      },
+      {
+       "tempo": 0.16,
+       "nome": "gold_3"
+      },
+      {
+       "tempo": 0.24,
+       "nome": "gold_4"
+      },
+      {
+       "tempo": 0.32,
+       "nome": "gold_3"
+      },
+      {
+       "tempo": 0.4,
+       "nome": "gold_2"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 0.48
+      }
+     ]
+    }
+   }
+  }
+ }
+}

@@ -123,32 +123,74 @@ export async function copia(p: string) {
 
 // ---- personagens nas pastas (como scanSpineAssets, so .boneco: o formato do navegador)
 
+// O que cada .boneco da para a lista (mixes), guardado pelo tamanho e pela data do arquivo: numa
+// pasta grande, reler e decodificar todos a cada atualizacao levava segundos. O guardado vai para o
+// IndexedDB (vale depois que o navegador para o service worker ocioso) e so o arquivo que mudou e
+// relido.
+type Memo = { chave: string; mix: any | null; ok: boolean };
+let memoLista: Map<string, Memo> | null = null;
+let memoMudou = false;
+async function memoDaLista() {
+  memoLista ??= new Map(Object.entries((await idb.ler<Record<string, Memo>>("kv", "lista-personagens").catch(() => undefined)) ?? {}));
+  return memoLista;
+}
+
+async function dadosDoBoneco(tres: string, h?: FileSystemFileHandle): Promise<Memo | null> {
+  const f = h ? await h.getFile() : await fs.lerArquivo(tres);
+  if (!f) return null;
+  const memo = await memoDaLista();
+  const chave = `${f.size}|${f.lastModified}`;
+  const visto = memo.get(tres);
+  if (visto?.chave === chave) return visto;
+  let novo: Memo = { chave, mix: null, ok: false };
+  try {
+    const lido = await lerBoneco(tres);
+    if (lido && typeof lido.b.boneco === "number") novo = { chave, mix: lido.b.mix ?? null, ok: true };
+  } catch {}
+  memo.set(tres, novo);
+  memoMudou = true;
+  return novo;
+}
+
 async function personagens() {
   const out: any[] = [];
+  const vistos = new Set<string>();
   for (const r of await fs.raizes()) {
     if (!(await fs.permissao(r))) continue;
-    for (const tres of await fs.percorrer(r.caminho, (n) => n.endsWith(".boneco"))) {
-      try {
-        const lido = await lerBoneco(tres);
-        if (!lido || typeof lido.b.boneco !== "number") continue;
-        const b = lido.b;
-        const rel = tres.slice(r.caminho.length + 1);
-        out.push({
-          id: tres,
-          name: fs.nomeDe(tres).replace(/\.boneco$/, ""),
-          formato: "boneco",
-          project: rel.includes("/") ? rel.split("/")[0] : r.nome,
-          res: rel,
-          skeleton: tres + ".spine-json",
-          atlas: tres + ".atlas",
-          tres,
-          defaultMix: b.mix?.padrao ?? 0,
-          mixes: (b.mix?.pares ?? []).map((m: any) => ({ from: m.de, to: m.para, mix: m.tempo })),
-        });
-      } catch {}
+    // uma varredura so: os .boneco e os .tres (do spine-godot)
+    const achados = await fs.percorrerComArquivo(r.caminho, (n) => n.endsWith(".boneco") || n.endsWith(".tres"));
+    for (const { caminho: tres, h } of achados) {
+      if (!tres.endsWith(".boneco")) continue;
+      vistos.add(tres);
+      const d = await dadosDoBoneco(tres, h);
+      if (!d?.ok) continue;
+      const rel = tres.slice(r.caminho.length + 1);
+      out.push({
+        id: tres,
+        name: fs.nomeDe(tres).replace(/\.boneco$/, ""),
+        formato: "boneco",
+        project: rel.includes("/") ? rel.split("/")[0] : r.nome,
+        res: rel,
+        skeleton: tres + ".spine-json",
+        atlas: tres + ".atlas",
+        tres,
+        defaultMix: d.mix?.padrao ?? 0,
+        mixes: (d.mix?.pares ?? []).map((m: any) => ({ from: m.de, to: m.para, mix: m.tempo })),
+      });
     }
     // e os do spine-godot (-data.tres)
-    out.push(...(await personagensGodot(r).catch(() => [])));
+    out.push(...(await personagensGodot(r, achados.filter((x) => x.caminho.endsWith(".tres"))).catch(() => [])));
+  }
+  // o que saiu das pastas sai do guardado
+  const memo = await memoDaLista();
+  for (const k of memo.keys())
+    if (!vistos.has(k)) {
+      memo.delete(k);
+      memoMudou = true;
+    }
+  if (memoMudou) {
+    memoMudou = false;
+    await idb.gravar("kv", "lista-personagens", Object.fromEntries(memo)).catch(() => {});
   }
   cacheAssets = { em: Date.now(), lista: out };
   return out;

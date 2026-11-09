@@ -86,3 +86,25 @@ Ao apresentar: o que fez, o que conferiu e como, e o que não conferiu.
 - **Peça que a próxima anima só depois:** no spine-godot, enquanto a animação seguinte não chega na primeira chave de uma peça, a peça fica inteira com o valor da anterior durante o mix (o editor reproduz).
 - **O spine-godot** inverte a gravidade da física (scaleY -1), ignora pma e desenha screen como subtração: o editor já reproduz, então confie no que o editor mostra no modo godot. As medidas (`query.motion`, `ficha.check`, `query.transition`) também usam a física do jogo.
 - **Gravidade em física de rotação:** no jogo ela puxa para o lado contrário do editor do Spine. Um pingente com gravity 40 que balança forte termina torto (num teste, 60° no fim da animação) e salta na emenda. A casa usa gravity 0 e só a mola; `query.rig` avisa. Em toda animação que mexe numa peça com física, ponha `termina_como` na ficha: é ela que pega a peça que não voltou.
+
+## 6. Pixel art com ossos
+
+Visto rigando um esqueleto de 16 px de um jogo e os personagens da Kenney convertidos para pixel
+(exemplos/pixel). O editor desenha em **pixel perfeito** quando as páginas são Nearest (botão "pixel"
+em "ver", `view {pixel: 1}` na ponte): o personagem na resolução da arte, ampliado sem suavizar.
+
+- **Não gire peça pequena em ângulo pequeno.** Inclinar 5° a 20° serrilha a peça em degrau (a lâmina
+  longa parecia quebrada no meio). Inclinação vira deslocamento de 1 pixel; giro só grande (a espada
+  varrendo), e pose segurada em 0°, 45° ou 90°, onde a linha de pixel é limpa.
+- **Deslocamento em pixel inteiro, em degrau** (curva `stepped`, valores inteiros). Com curva suave
+  o osso passa por posições fracionárias, e peças de largura par e ímpar arredondam para lados
+  diferentes: a cabeça escorrega 1 pixel do tronco. O tempo do movimento vem das chaves.
+- **Peças que se tocam andam juntas.** Com 12 px de cabeça, 1 pixel entre cabeça e tronco já
+  desmonta o desenho (a mandíbula vira barras soltas). O quique e a inclinação vão no quadril, que
+  leva corpo e pernas; perna de 2 pixels só levanta, não anda de lado (sai de baixo do tronco).
+- **Membro de 2 ou 3 pixels não segura ossos.** Em sprite pequeno, o osso rende na peça grande
+  (arma, capa, cabelo) e no corpo inteiro; o efeito desenhado do próprio jogo (arco do golpe, poeira)
+  entra como troca de imagem num slot de efeito, na hora certa. Rastro (`trail`) só ligado no golpe.
+- **Conferir:** `query.pixel` lista o que foge da grade (posição fracionária de osso, borda de peça, mosaico e instância; deslocamento fracionário ou com curva suave; giro fora de 0°, 45°, 90°; escala fracionária) e `pixel.snap` encaixa o que tem conserto: arredonda e troca o trecho suave por degraus de 1 pixel no tempo da curva (giro e escala ficam: decisão de quem anima). Com o pixel perfeito ligado, o editor mostra a contagem no canto da tela e encaixa com um clique. Vale também para personagem só de quadros: o recorte de largura par com o pé entre dois pixels (x .5) dobra e some colunas.
+- **Arte convertida de vetor:** paleta curta tirada dos pixels opacos e redução pela cor
+  predominante de cada bloco, não pela média (a média borra o olho).

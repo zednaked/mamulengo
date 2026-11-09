@@ -38,6 +38,50 @@ const BLENDS: Blend[] = ["normal", "additive", "multiply", "multiply", "screen",
 // o checkpoint do poseAt: o ultimo passo inteiro (done) de uma conta (key)
 type Checkpoint = { key: string; done: number; cut: boolean };
 
+// a grade de checkpoints (com fisica, sem sequencia): um a cada GRADE passos (0,25 s) da conta
+// atual. Editar uma animacao so muda a pose depois da chave anterior a mexida: a fisica continua
+// da vaga mais perto antes dela, em vez de refazer desde 0
+const GRADE = 16;
+type Grade = { key: string; vagas: Set<number> };
+
+// as timelines de osso tocadas numa animacao, se todos os caminhos sao dentro delas
+// (["animations", anim, "bones", osso, timeline, ...]: uma chave, ou a timeline inteira, como ao
+// inserir uma chave) e elas existem com chaves; senao null
+function timelinesDeOsso(an: any, paths: (string | number)[][], anim: string): [string, string][] | null {
+  const out = new Map<string, [string, string]>();
+  for (const p of paths) {
+    if (p[1] !== anim) continue;
+    if (p[2] !== "bones" || typeof p[3] !== "string" || typeof p[4] !== "string" || (p.length > 5 && typeof p[5] !== "number")) return null;
+    const keys = an.bones?.[p[3]]?.[p[4]];
+    if (!Array.isArray(keys) || !keys.length) return null;
+    out.set(`${p[3]}\u0000${p[4]}`, [p[3], p[4]]);
+  }
+  return out.size ? [...out.values()] : null;
+}
+
+// o instante a partir do qual a pose de uma animacao pode ter mudado, pelos caminhos tocados
+// (["animations", nome, ..., indice da chave, ...]): a chave antes da primeira mexida (as chaves
+// antes dela, e a curva entre elas, ficam iguais). Sem chave no caminho, desde 0
+function inicioDaMudanca(anim: any, paths: (string | number)[][]): number {
+  let ini = Infinity;
+  for (const p of paths) {
+    let no = anim,
+      t = 0;
+    for (let j = 2; j < p.length; j++) {
+      const k = p[j];
+      if (typeof k === "number") {
+        // no Spine, a chave em 0 nao escreve o time
+        if (Array.isArray(no) && k > 0) t = typeof no[k - 1]?.time === "number" ? no[k - 1].time : 0;
+        break;
+      }
+      no = no?.[k];
+    }
+    ini = Math.min(ini, t);
+    if (ini === 0) break;
+  }
+  return ini === Infinity ? 0 : ini;
+}
+
 export class NucleoCena {
   readonly N: any;
   readonly desenhista: Desenhista;
@@ -54,13 +98,15 @@ export class NucleoCena {
   private mascara = 0;
   private nMascara = 0;
   private ck: Checkpoint | null = null;
+  private grade: Grade | null = null;
   // a pose para ler (refeita a cada carga do modelo)
   pose: NucleoPose | null = null;
   // desliga o atalho do checkpoint (para medir e conferir que da o mesmo)
   atalhos = true;
-  // contadores (tools/bench.ts): recargas do modelo inteiro, remendos diretos e quantos
-  // poseAt continuaram do checkpoint
-  stats = { cargas: 0, remendos: 0, cargaMs: 0, checkpoints: 0 };
+  // contadores (tools/bench.ts): recargas do modelo inteiro, remendos diretos, quantos poseAt
+  // continuaram de um checkpoint, e nos remendos de animacao, as timelines de osso trocadas
+  // sozinhas e as animacoes relidas inteiras
+  stats = { cargas: 0, remendos: 0, cargaMs: 0, checkpoints: 0, timelines: 0, animacoes: 0 };
 
   private constructor(N: any, gl: WebGL2RenderingContext) {
     this.N = N;
@@ -139,6 +185,7 @@ export class NucleoCena {
     this.fantasma = N._mm_instancia(m);
     this.aplicaSkin();
     this.ck = null;
+    this.grade = null;
     this.lerInfo();
     this.ligaPaginas();
     const n = this.info!.slots.length;
@@ -159,6 +206,7 @@ export class NucleoCena {
     this.skin = nome;
     this.aplicaSkin();
     this.ck = null;
+    this.grade = null;
     if (this.inst >= 0) this.N._mm_reiniciar(this.inst);
     this.mudou();
   }
@@ -182,9 +230,38 @@ export class NucleoCena {
     return i === undefined ? 0 : this.info!.animacoes[i].duracao;
   }
 
-  // o estado mudou por fora (tocando com passo livre, o modelo remendado): esquece o checkpoint
+  // o estado mudou por fora: esquece os checkpoints (o atual e a grade)
   invalidar() {
     this.ck = null;
+    this.grade = null;
+  }
+
+  // so o checkpoint do quadro atual (o remendo ja tirou da grade o que a edicao mudou)
+  invalidarAtual() {
+    this.ck = null;
+  }
+
+  // a vaga valida mais perto antes de t (instante < t, como o retoma), restaurada; ou null
+  private daGrade(key: string, t: number): number | null {
+    const g = this.grade;
+    if (!this.atalhos || !g || g.key !== key) return null;
+    let melhor = -1;
+    for (const v of g.vagas) if (v * GRADE * STEP < t - 1e-9 && v > melhor) melhor = v;
+    if (melhor < 0 || !this.N._mm_restaurar_de(this.inst, melhor)) return null;
+    this.stats.checkpoints++;
+    return melhor * GRADE * STEP;
+  }
+
+  // depois de um passo inteiro: guarda a vaga se o instante cai na grade e ela falta
+  private naGrade(key: string, done: number) {
+    if (!this.atalhos) return;
+    const n = Math.round(done / STEP);
+    if (n % GRADE) return;
+    if (!this.grade || this.grade.key !== key) this.grade = { key, vagas: new Set() };
+    const v = n / GRADE;
+    if (this.grade.vagas.has(v)) return;
+    this.N._mm_guardar_em(this.inst, v);
+    this.grade.vagas.add(v);
   }
 
   private mudou() {
@@ -236,7 +313,9 @@ export class NucleoCena {
     const key = `${a}|${loop}`;
     let done = 0;
     const ck = fisica ? this.retoma(key, t) : ((this.ck = null), null);
+    const vaga = fisica && !ck ? this.daGrade(key, t) : null;
     if (ck) done = ck.done;
+    else if (vaga !== null) done = vaga;
     else {
       this.comecar(a, loop);
       this.passoN(0);
@@ -248,6 +327,7 @@ export class NucleoCena {
     while (done + STEP <= t + 1e-9) {
       this.passoN(STEP);
       done += STEP;
+      if (fisica) this.naGrade(key, done);
     }
     if (fisica) this.guarda(key, done, false);
     if (t - done > 0) this.passoN(t - done);
@@ -300,6 +380,25 @@ export class NucleoCena {
     if (t - done > 0) this.passoN(t - done);
   }
 
+  // ---- o palco (docs/PALCO.md): o jogo no lugar da animacao, em passos de 1/60 s
+  temPalco = false;
+  palcoComecar(): boolean {
+    if (this.inst < 0 || !this.N._mm_palco) return false;
+    this.ck = null;
+    this.grade = null;
+    this.temPalco = !!this.N._mm_palco(this.inst);
+    this.mudou();
+    return this.temPalco;
+  }
+  palcoPasso(teclas: number, n = 1) {
+    if (this.inst < 0) return;
+    this.N._mm_palco_passo(this.inst, teclas, n, 1 / 60);
+    this.mudou();
+  }
+  palcoEstado(): any {
+    return this.inst < 0 ? null : JSON.parse(this.N.UTF8ToString(this.N._mm_palco_estado(this.inst)));
+  }
+
   // um quadro de tamanho livre (tocando), como o viewer faz com o AnimationState
   passo(d: number) {
     if (this.inst < 0) return;
@@ -349,16 +448,76 @@ export class NucleoCena {
       const [r, g, b, a] = corDe(s.color);
       if (!comNome(s.attachment ?? "", (p) => N._mm_slot_setup(m, k, r, g, b, a, p))) return false;
     }
+    const durAntes = new Map([...anims].map((a) => [a, this.duracao(a)]));
+    // o instante a partir do qual cada animacao mudou, quando o nucleo comparou as chaves
+    const inicios = new Map<string, number>();
     for (const a of anims) {
       const an = json.animations?.[a];
       if (!an) return false;
+      // so chaves de timelines de osso que ja existem: troca cada uma, sem reler a animacao
+      const tls = timelinesDeOsso(an, paths, a);
+      if (tls) {
+        let ini = Infinity;
+        for (const [osso, tl] of tls) {
+          const t = this.trocaTimelineOsso(json, a, osso, tl);
+          if (t < 0) {
+            ini = -1;
+            break;
+          }
+          ini = Math.min(ini, t);
+        }
+        if (ini >= 0) {
+          this.stats.timelines += tls.length;
+          inicios.set(a, ini);
+          continue;
+        }
+      }
+      this.stats.animacoes++;
       const texto = JSON.stringify(importarAnimacao(json, a));
       const ok = comNome(a, (pn) => comNome(texto, (pt) => N._mm_trocar_animacao(m, pn, pt)));
       if (!ok) return false;
     }
     if (anims.size) this.lerInfo();
+    // a grade: setup de osso ou slot muda tudo; animacao, so depois da chave anterior a mexida
+    if (ossos.size || slots.size || !this.grade) this.grade = null;
+    else {
+      const g = this.grade;
+      for (const a of anims) {
+        if (g.key.startsWith("seq|") || g.key.split("|")[0] !== String(this.anims.get(a))) continue;
+        let ini =
+          inicios.get(a) ??
+          inicioDaMudanca(
+            json.animations[a],
+            paths.filter((p) => p[1] === a),
+          );
+        // a duracao mudou: o laco (e o fim) mudam dali em diante
+        const d0 = durAntes.get(a)!,
+          d1 = this.duracao(a);
+        if (Math.abs(d1 - d0) > 1e-9) ini = Math.min(ini, d0, d1);
+        for (const v of [...g.vagas]) if (v * GRADE * STEP > ini + 1e-9) g.vagas.delete(v);
+      }
+    }
     this.stats.remendos++;
     return true;
+  }
+
+  // uma timeline de osso do Spine levada ao .boneco e trocada no nucleo: o instante a partir do
+  // qual a pose mudou (o nucleo compara as chaves velhas e novas), ou -1: nao deu (quem chama
+  // troca a animacao inteira, que tambem desfaz uma troca que tenha dado pela metade)
+  private trocaTimelineOsso(json: any, anim: string, osso: string, tl: string): number {
+    const N = this.N;
+    if (!N._mm_trocar_timeline_osso) return -1;
+    const chaves = json.animations[anim].bones[osso][tl];
+    const mini = { bones: [], constraints: json.constraints, physics: json.physics, animations: { [anim]: { bones: { [osso]: { [tl]: chaves } } } } };
+    const ossos = importarSpine(mini, "", "").animacoes[anim]?.ossos?.[osso] ?? {};
+    const nomes = Object.keys(ossos);
+    if (nomes.length !== 1) return -1;
+    const ps = [anim, osso, nomes[0], JSON.stringify(ossos[nomes[0]])].map((x) => N.stringToNewUTF8(x));
+    try {
+      return N._mm_trocar_timeline_osso(this.modelo, ...ps);
+    } finally {
+      for (const p of ps) N._free(p);
+    }
   }
 
   // desenha a pose atual; `esconder(i)` diz se o slot i esta escondido (olho)

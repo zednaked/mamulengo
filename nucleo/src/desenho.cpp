@@ -463,6 +463,119 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       quad(q, de.uvs, cr, cg, cb, ca);
     }
   };
+  // os mosaicos do slot (docs/NUCLEO.md "Mosaico"), logo depois da parte dele: cada celula um
+  // quadrilatero com a imagem da paleta, pelo osso do slot, com a cor e o blend dele
+  auto mosaicos = [&](int si) {
+    if (m.mosaicos_do_slot.empty() || m.mosaicos_do_slot[size_t(si)].empty()) return;
+    const EstadoSlot& s = e.slots()[size_t(si)];
+    if (s.cor.a <= 0) return;
+    const Blend blend = m.slots[size_t(si)].blend;
+    for (int im : m.mosaicos_do_slot[size_t(si)]) {
+      const DadosMosaico& dm = m.mosaicos[size_t(im)];
+      const Matriz& w = e.mundo()[size_t(dm.osso)];
+      const double gw = dm.colunas * dm.cw, gh = dm.linhas * dm.ch;
+      // ponto local do mosaico (grade: a partir do canto de cima e da esquerda) para o mundo
+      auto ponto = [&](double lx, double ly, double sobe, float* o) {
+        if (dm.cantos && gw > 0 && gh > 0) {
+          const double u = lx / gw, v = 1 + ly / gh;
+          const double z = dm.h[6] * u + dm.h[7] * v + dm.h[8];
+          const double zz = std::fabs(z) < 1e-12 ? 1e-12 : z;
+          lx = (dm.h[0] * u + dm.h[1] * v + dm.h[2]) / zz;
+          ly = (dm.h[3] * u + dm.h[4] * v + dm.h[5]) / zz;
+        } else {
+          lx += dm.x;
+          ly += dm.y;
+        }
+        ly += sobe;
+        o[0] = float(w.a * lx + w.b * ly + w.x);
+        o[1] = float(w.c * lx + w.d * ly + w.y);
+      };
+      for (int ci : dm.ordem) {
+        const int ii = dm.celulas[size_t(ci)];
+        if (ii < 0) continue;
+        const DadosMosaico::Imagem& img = dm.imagens[size_t(ii)];
+        if (img.pagina < 0) continue;
+        const int ix = dm.extra_da_celula[size_t(ci)];
+        const DadosMosaico::Extra* x = ix >= 0 ? &dm.extras[size_t(ix)] : nullptr;
+        const Cor cc = x ? x->cor : Cor{};
+        const float cr = s.cor.r * cc.r, cg = s.cor.g * cc.g, cb = s.cor.b * cc.b, ca = s.cor.a * cc.a;
+        if (ca <= 0) continue;
+        const int col = ci % dm.colunas, lin = ci / dm.colunas;
+        // o retalho da imagem com pixels: os cantos (fracao do original, de baixo e da esquerda)
+        // espelhados e girados com a celula
+        double fx[4] = {img.l, img.l, img.r, img.r}, fy[4] = {img.b, img.t, img.t, img.b};
+        for (int k = 0; k < 4; ++k) {
+          if (x && x->espelho) fx[k] = 1 - fx[k];
+          for (int g = 0; x && g < x->giro; ++g) {
+            const double tx = 1 - fy[k];
+            fy[k] = fx[k];
+            fx[k] = tx;
+          }
+        }
+        // o retangulo da celula (ou da imagem, no iso) no espaco local
+        double x0, y0, lw, lh;
+        if (dm.forma == FormaMosaico::Iso) {
+          lw = img.ow * dm.escala, lh = img.oh * dm.escala;
+          const double cx = (col - lin) * dm.cw / 2 + dm.x, cy = -(col + lin) * dm.ch / 2 + dm.y;
+          x0 = cx - dm.ancora[0] * lw;
+          y0 = cy + dm.ancora[1] * lh - lh;
+        } else {
+          lw = dm.cw, lh = dm.ch;
+          x0 = col * dm.cw;
+          y0 = -(lin + 1) * dm.ch;
+        }
+        const double sobe = x ? x->altura : 0;
+        const uint32_t base = uint32_t(d.vertices.size() / 8);
+        for (int k = 0; k < 4; ++k) {
+          float o[2];
+          if (dm.forma == FormaMosaico::Iso) {
+            o[0] = float(w.a * (x0 + fx[k] * lw) + w.b * (y0 + fy[k] * lh + sobe) + w.x);
+            o[1] = float(w.c * (x0 + fx[k] * lw) + w.d * (y0 + fy[k] * lh + sobe) + w.y);
+          } else
+            ponto(x0 + fx[k] * lw, y0 + fy[k] * lh, sobe, o);
+          d.vertices.insert(d.vertices.end(), {o[0], o[1], img.uvs[k * 2], img.uvs[k * 2 + 1], cr, cg, cb, ca});
+        }
+        int efeito = -1;
+        if (x && x->efeitos) {
+          EfeitosLote el;
+          el.valores = x->ef;
+          el.caixa[0] = el.caixa[2] = img.uvs[0];
+          el.caixa[1] = el.caixa[3] = img.uvs[1];
+          for (int k = 1; k < 4; ++k) {
+            el.caixa[0] = std::min(el.caixa[0], img.uvs[k * 2]), el.caixa[2] = std::max(el.caixa[2], img.uvs[k * 2]);
+            el.caixa[1] = std::min(el.caixa[1], img.uvs[k * 2 + 1]), el.caixa[3] = std::max(el.caixa[3], img.uvs[k * 2 + 1]);
+          }
+          const Pagina& pg = m.paginas[size_t(img.pagina)];
+          const float margem = x->ef.margem();
+          if (margem > 0 && pg.largura > 0 && pg.altura > 0) {
+            // os cantos para fora pela margem, como na regiao (posicao e uv juntos)
+            float* q = d.vertices.data() + size_t(base) * 8;
+            float ex[4], ey[4];
+            for (int c = 0; c < 4; ++c) ex[c] = q[24 + c] - q[c], ey[c] = q[8 + c] - q[c];
+            const double lx = std::hypot(ex[2] * pg.largura, ex[3] * pg.altura);
+            const double ly = std::hypot(ey[2] * pg.largura, ey[3] * pg.altura);
+            const float ffx = lx > 0 ? float(margem / lx) : 0, ffy = ly > 0 ? float(margem / ly) : 0;
+            static const float sx[4] = {-1, -1, 1, 1}, sy[4] = {-1, 1, 1, -1};
+            for (int k = 0; k < 4; ++k)
+              for (int c = 0; c < 4; ++c) q[k * 8 + c] += sx[k] * ex[c] * ffx + sy[k] * ey[c] * ffy;
+          }
+          el.pagina[0] = float(std::max(pg.largura, 1));
+          el.pagina[1] = float(std::max(pg.altura, 1));
+          efeito = int(d.efeitos.size());
+          d.efeitos.push_back(el);
+        }
+        Lote& l = lote(Comando::Triangulos, img.pagina, blend, efeito, iluminado(img.pagina, blend));
+        const size_t li = size_t(&l - d.lotes.data());
+        if (recorte_fim != -2 && d.recorte_cpu) {
+          tri_cortado(base, base + 1, base + 2);
+          tri_cortado(base + 2, base + 3, base);
+        } else {
+          d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+        }
+        d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
+      }
+    }
+  };
   auto particulas = [&](int si) {
     if (m.emissores_do_slot.empty()) return;
     // as de tras das orbitas que passam atras deste slot
@@ -618,6 +731,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
       // invisivel ou sem imagem: nem calcula os vertices (os brilhos apagados sao muitos)
       if (a <= 0 || p.pagina < 0 || p.uvs.empty()) {
+        mosaicos(si);
         instancias(si);
         particulas(si);
         if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
@@ -771,6 +885,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
         geometria(mundo.data(), a, true);
       }
     }
+    mosaicos(si);
     instancias(si);
     particulas(si);
     if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();

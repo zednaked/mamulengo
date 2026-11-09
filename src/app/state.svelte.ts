@@ -1,4 +1,5 @@
 // Estado do app (Svelte 5 runes). Um unico documento aberto por vez.
+import type { MosaicEdit } from "./mosaicedit.ts";
 import { slotWorldBox } from "./interact.ts";
 import { Document, type ChangeEvent } from "../core/document.ts";
 import { execute, executeAsync, type AssetProvider, type Call } from "../core/commands/index.ts";
@@ -202,10 +203,32 @@ class AppState {
     } catch {}
     await this.viewer?.setRuntime(r);
   }
+  // pixel perfeito (Viewer.view.pixel): pixels da textura por unidade do mundo, 0 desliga. Liga
+  // sozinho no personagem com todas as paginas em Nearest; a escolha fica por personagem
+  pixel = $state(0);
+  usarPixel(n: number) {
+    this.pixel = Math.max(0, Number(n) || 0);
+    if (this.viewer) this.viewer.view.pixel = this.pixel;
+    try {
+      if (this.asset) localStorage.setItem(`mamulengo.pixel.${this.asset.id}`, String(this.pixel));
+    } catch {}
+  }
+  private pixelDoPersonagem(atlasTexto: string) {
+    try {
+      const s = this.asset ? localStorage.getItem(`mamulengo.pixel.${this.asset.id}`) : null;
+      if (s !== null) return Number(s) || 0;
+    } catch {}
+    const paginas = parseAtlas(atlasTexto).pages;
+    return paginas.length && paginas.every((p) => /^nearest/i.test(p.filter)) ? 1 : 0;
+  }
   // editar malha (na Pose base): pontos ou pintura de pesos do slot escolhido
   meshEdit = $state<MeshEdit | null>(null);
   // desenhar uma imagem vetorial (na Pose base)
   drawEdit = $state<DrawEdit | null>(null);
+  // pintar um mosaico (src/app/mosaicedit.ts)
+  mosaicEdit = $state<MosaicEdit | null>(null);
+  // jogando o palco (docs/PALCO.md): pelo botao, pelo teclado ou pela ponte (play)
+  jogando = $state(false);
   // clicar pontos na tela para uma parte especial (recorte, caixa, caminho, ponto): os pontos em
   // pixels do mundo (espaco do esqueleto), na Pose base
   captura = $state<{ tipo: "clipping" | "boundingbox" | "path" | "point"; bone: string; slot: string | null; pontos: [number, number][] } | null>(null);
@@ -214,6 +237,7 @@ class AppState {
     if (this.viewer) this.viewer.view.playing = false;
     this.drawEdit = null;
     this.meshEdit = null;
+    this.mosaicEdit = null;
     this.captura = { tipo, bone, slot, pontos: [] };
   }
   // conclui: cria a camada nova no osso e a parte com os pontos
@@ -318,6 +342,7 @@ class AppState {
       this.selection = {};
       this.meshEdit = null;
       this.drawEdit = null;
+      this.mosaicEdit = null;
       this.skin = null;
       if (this.viewer) this.viewer.skin = null;
       this.version++;
@@ -326,6 +351,8 @@ class AppState {
       this.runtime = runtimeDe(asset);
       if (this.viewer) (this.viewer.runtime = this.runtime), (this.viewer.paginaPropria = (p) => this.desenhos.bitmap(p));
       await this.viewer?.setDocument(doc, (page) => `/api/texture?p=${encodeURIComponent(dir + page)}`);
+      this.pixel = this.pixelDoPersonagem(at);
+      if (this.viewer) this.viewer.view.pixel = this.pixel;
       this.log({ label: `abriu ${asset.project} / ${asset.name}`, source: "ui", kind: "info", ops: 0 });
       const d = await getDraft(asset.id);
       this.draft = d && d.base === sk && d.text !== sk ? { ...d, id: asset.id } : null;

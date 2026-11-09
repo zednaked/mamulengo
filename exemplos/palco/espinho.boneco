@@ -1,0 +1,137 @@
+{
+ "boneco": 0,
+ "nome": "espinho",
+ "paginas": [
+  {
+   "arquivo": "espinho.png",
+   "tamanho": [
+    122,
+    475
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "spikeMan_stand",
+   "pagina": 0,
+   "ret": [
+    0,
+    318,
+    90,
+    155
+   ]
+  },
+  {
+   "nome": "spikeMan_walk1",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    120,
+    159
+   ]
+  },
+  {
+   "nome": "spikeMan_walk2",
+   "pagina": 0,
+   "ret": [
+    0,
+    161,
+    90,
+    155
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./kenney/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "corpo",
+   "osso": "root",
+   "parte": "spikeMan_walk1"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "corpo": {
+     "spikeMan_walk1": {
+      "x": 0,
+      "y": 79.5,
+      "largura": 120,
+      "altura": 159
+     },
+     "spikeMan_walk2": {
+      "x": 0,
+      "y": 77.5,
+      "largura": 90,
+      "altura": 155
+     },
+     "spikeMan_stand": {
+      "x": 0,
+      "y": 77.5,
+      "largura": 90,
+      "altura": 155
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "andando": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "spikeMan_walk1"
+      },
+      {
+       "tempo": 0.2,
+       "nome": "spikeMan_walk2"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 0.4
+      }
+     ]
+    }
+   }
+  },
+  "parado": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "spikeMan_stand"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 1
+      }
+     ]
+    }
+   }
+  }
+ }
+}

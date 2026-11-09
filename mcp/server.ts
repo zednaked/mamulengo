@@ -217,6 +217,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  "mamulengo_play",
+  {
+    description:
+      'Joga o palco do personagem aberto (docs/PALCO.md) desde o comeco, com um roteiro de entrada: trechos "teclas quadros" separados por virgula (teclas: esquerda, direita, pulo, juntas com +, ou nada; 60 quadros por segundo; cada trecho com pulo aperta de novo). aoVivo (padrao true): na tela, em tempo real, para a pessoa ver; false: de uma vez. Devolve o estado no fim de cada trecho: tick, venceu, morreu, pontos e os atores (x, y, vx, vy, lado, chao, vivo, estado). parar: true sai do jogo. Ex: {"roteiro":"direita+pulo 50, direita 30"}',
+    inputSchema: { roteiro: z.string().optional(), aoVivo: z.boolean().optional(), parar: z.boolean().optional() },
+  },
+  wrap(async (a) => text(await call("play", a))),
+);
+
+server.registerTool(
   "mamulengo_look",
   {
     description:

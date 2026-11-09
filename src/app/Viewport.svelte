@@ -16,6 +16,70 @@
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
   import { drawDown, drawDragging, drawDrawEdit, drawHelp, drawKey, drawMove, drawUp, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
+  import { drawMosaicEdit, mosaicDown, mosaicDragging, mosaicMove, mosaicUp, stopMosaicEdit } from "./mosaicedit.ts";
+  import { mosaics } from "../core/commands/mosaic.ts";
+  import { auditoriaPixel } from "../core/commands/pixel.ts";
+
+  // pixel perfeito ligado: o que foge da grade de pixel inteiro (docs/ANIMAR.md, secao 6), no
+  // setup e na animacao aberta; o botao encaixa (pixel.snap, um passo de desfazer)
+  const pixelAvisos = $derived.by(() => {
+    app.version;
+    const anim = app.play.animation;
+    if (!app.doc || !(app.pixel > 0) || app.spectator) return null;
+    const r = auditoriaPixel(app.doc.json, anim ?? "\u0000");
+    return r.avisos.length ? { total: r.avisos.length, consertaveis: r.avisos.filter((a) => a.conserto).length, lista: r.avisos.map((a) => `${a.onde}: ${a.problema}${a.conserto ? "" : " (só aviso)"}`) } : null;
+  });
+  // o palco (docs/PALCO.md): jogar a fase no editor, com o teclado
+  const temPalco = $derived.by(() => {
+    app.version;
+    return !!(app.doc?.json as any)?.stage?.actors?.length;
+  });
+  const jogando = $derived(app.jogando);
+  let placar = $state<{ pontos: number; venceu: boolean; morreu: boolean } | null>(null);
+  let placarTimer = 0;
+  function jogar() {
+    const v = app.viewer;
+    if (!v) return;
+    if (jogando) return pararJogo();
+    if (app.runtime !== "nucleo") return app.toast("O palco roda no modo núcleo (ver → núcleo).");
+    if (!v.comecarJogo()) return app.toast("Este personagem não tem palco (docs/PALCO.md).");
+    app.jogando = true;
+  }
+  function pararJogo() {
+    app.jogando = false;
+    app.viewer?.pararJogo();
+  }
+  // o placar acompanha o jogo, quem quer que jogue (o botao ou a ponte)
+  $effect(() => {
+    if (!app.jogando) {
+      placar = null;
+      return;
+    }
+    const lerPlacar = () => {
+      const e = app.viewer?.jogo?.estado;
+      placar = e ? { pontos: e.pontos, venceu: e.venceu, morreu: e.morreu } : null;
+      placarTimer = requestAnimationFrame(lerPlacar);
+    };
+    lerPlacar();
+    return () => cancelAnimationFrame(placarTimer);
+  });
+  // as teclas do jogo: setas ou A/D andam, espaco, W ou seta para cima pulam; R recomeca; Esc sai
+  const TECLAS: Record<string, number> = { ArrowLeft: 1, KeyA: 1, ArrowRight: 2, KeyD: 2, Space: 4, KeyW: 4, ArrowUp: 4 };
+  function teclaJogo(e: KeyboardEvent, apertou: boolean): boolean {
+    const j = app.viewer?.jogo;
+    if (!jogando || !j) return false;
+    if (apertou && e.code === "Escape") return (pararJogo(), true);
+    if (apertou && e.code === "KeyR") return (app.viewer!.comecarJogo(), true);
+    const b = TECLAS[e.code];
+    if (!b) return false;
+    j.teclas = apertou ? j.teclas | b : j.teclas & ~b;
+    return true;
+  }
+  function encaixarPixel() {
+    const anim = app.play.animation;
+    const r = app.run({ cmd: "pixel.snap", args: anim ? { anim } : { anim: "\u0000" } }, "encaixa na grade de pixel");
+    if (r?.[0]) app.avisar(`${r[0].encaixados} valor(es) encaixado(s) no pixel inteiro${r[0].avisosRestantes.length ? `; ficam ${r[0].avisosRestantes.length} aviso(s) de giro ou escala (decisão de quem anima)` : ""}. Ctrl+Z desfaz.`);
+  }
   import { Color } from "@esotericsoftware/spine-webgl";
   import type { Viewer as V } from "../render/viewer.ts";
 
@@ -92,6 +156,7 @@
       if (app.meshEdit) return drawMeshEdit(v);
       if (app.captura) return drawCaptura(v);
       if (app.drawEdit) return drawDrawEdit(v);
+      if (app.mosaicEdit) return drawMosaicEdit(v);
       drawLigacoes(v);
       drawHover(v);
       drawGizmo(v);
@@ -117,6 +182,11 @@
     if (app.doc) app.attachViewer(v);
     else app.viewer = v;
     const keyDown = (e: KeyboardEvent) => {
+      if (!(e.target instanceof HTMLInputElement) && teclaJogo(e, true)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) space = true;
       // setas com o mouse sobre o desenho: a ferramenta em passos (fora dele, a timeline anda)
       const el = e.target as HTMLElement;
@@ -136,6 +206,11 @@
         e.stopImmediatePropagation();
         return;
       }
+      if (app.mosaicEdit && e.key === "Escape" && !(el instanceof HTMLInputElement)) {
+        stopMosaicEdit();
+        e.preventDefault();
+        return;
+      }
       if (e.key.startsWith("Arrow") && cursor.inside && !(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) && app.viewer && !app.meshEdit) {
         if (passoSeta(app.viewer, e.key, e.shiftKey, e.altKey, e.ctrlKey || e.metaKey)) {
           e.preventDefault();
@@ -144,6 +219,7 @@
       }
     };
     const keyUp = (e: KeyboardEvent) => {
+      if (teclaJogo(e, false)) return;
       if (e.code === "Space") space = false;
     };
     // na captura: antes da timeline, que usa as setas para andar no tempo
@@ -172,6 +248,9 @@
     // o desenho sai se a animacao abrir ou a parte deixar de mostrar o desenho (desfazer)
     const de = app.drawEdit;
     if (de && (app.mode !== "setup" || !app.doc || drawingOfSlot(app.doc.json, de.slot)?.image !== de.image)) stopDrawEdit();
+    // o mosaico sai se deixar de existir (apagado, desfeito)
+    const mo = app.mosaicEdit;
+    if (mo && (!app.doc || !mosaics(app.doc.json).some((m) => m.name === mo.name))) stopMosaicEdit();
   });
 
   function wheel(e: WheelEvent) {
@@ -203,6 +282,10 @@
     }
     if (app.drawEdit) {
       if (!drawDown(v, w, { shift: e.shiftKey, alt: e.altKey })) downAt = null;
+      return;
+    }
+    if (app.mosaicEdit) {
+      if (!mosaicDown(v, w)) downAt = null;
       return;
     }
     // clicando os pontos de uma parte especial (o ponto conclui no primeiro clique)
@@ -254,6 +337,10 @@
     const s = app.selection;
     void s.bone, s.slot;
     if (app.drawEdit) return (app.drawEdit.tool, app.drawEdit.pen, drawHelp());
+    if (app.mosaicEdit) {
+      const t = app.mosaicEdit.tool;
+      return `Mosaico ${app.mosaicEdit.name}: ${t === "brush" ? "arraste para pintar" : t === "erase" ? "arraste para apagar" : t === "rect" ? "arraste de um canto ao outro" : t === "fill" ? "clique para o balde" : "clique numa célula"} · Esc conclui`;
+    }
     return app.doc && app.viewer && !app.meshEdit ? ajudaFerramenta(app.viewer) : "";
   });
 
@@ -261,7 +348,7 @@
   let dica = $state<{ t: string; x: number; y: number } | null>(null);
   function mostraAlvo(e: PointerEvent) {
     const v = app.viewer;
-    if (!v || !app.doc || app.meshEdit || app.drawEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
+    if (!v || !app.doc || app.meshEdit || app.drawEdit || app.mosaicEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
     const w = v.screenToSkel(e.clientX, e.clientY);
     const a = alvoEm(w.x, w.y);
     const igual = a.bone === app.selection.bone && a.slot === app.selection.slot;
@@ -290,6 +377,11 @@
       drawMove(v, v.screenToSkel(e.clientX, e.clientY), { shift: e.shiftKey, alt: e.altKey });
       return;
     }
+    if (mosaicDragging()) {
+      mosaicMove(v, v.screenToSkel(e.clientX, e.clientY));
+      return;
+    }
+    if (downAt && app.mosaicEdit) return;
     if (downAt && app.drawEdit) return;
     if (downAt && app.meshEdit) return;
     if (downAt && (app.tool === "deform" || app.tool === "bone")) {
@@ -352,12 +444,24 @@
     endStroke();
     meshUp();
     drawUp();
+    mosaicUp();
   }
 </script>
 
 <div class="wrap" class:setup={app.doc && app.mode === "setup"}>
   {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animações">POSE BASE</div>
   {:else if app.doc && app.play.animation && !app.spectator}<div class="base-tag anima" title="Mexer numa parte grava uma chave no instante da régua">ANIMANDO {app.play.animation} · mexer grava chave</div>{/if}
+  {#if temPalco && !app.spectator}
+    <button class="jogar-tag" class:on={jogando} onclick={jogar} title={jogando ? "parar o jogo (Esc)" : "jogar a fase: setas ou A/D andam, espaço ou W pula, R recomeça, Esc sai"}>{jogando ? "■ parar" : "🎮 jogar"}</button>
+    {#if jogando && placar}
+      <div class="placar">🪙 {placar.pontos}{placar.venceu ? " · venceu! (R recomeça)" : placar.morreu ? " · morreu (R recomeça)" : ""}</div>
+    {/if}
+  {/if}
+  {#if pixelAvisos}
+    <button class="pixel-tag" title={"Fora da grade de pixel inteiro (pixel art: docs/ANIMAR.md, seção 6):\n" + pixelAvisos.lista.slice(0, 30).join("\n") + (pixelAvisos.lista.length > 30 ? `\n(+${pixelAvisos.lista.length - 30})` : "") + (pixelAvisos.consertaveis ? "\n\nClique para encaixar." : "")} onclick={encaixarPixel} disabled={!pixelAvisos.consertaveis}>
+      ▦ {pixelAvisos.total} fora da grade{pixelAvisos.consertaveis ? " · encaixar" : ""}
+    </button>
+  {/if}
   <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={dblclick} onpointerleave={() => ((cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
   {#if ajuda}<div class="ajuda" role="status">{ajuda}</div>{/if}
   {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
@@ -591,6 +695,55 @@
   }
   .leitura.alvo {
     color: #9ee8ff;
+  }
+  .jogar-tag {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    background: #2a2533;
+    color: #b8f5c8;
+    border: 1px solid #b8f5c866;
+    font-size: 12px;
+    padding: 3px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .jogar-tag.on {
+    background: #ff3d8b;
+    color: #fff;
+  }
+  .placar {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    background: #000a;
+    color: #ffe27a;
+    font-weight: 700;
+    font-size: 18px;
+    padding: 4px 14px;
+    border-radius: 8px;
+    pointer-events: none;
+  }
+  .pixel-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    background: #2a2533;
+    color: #ffd27a;
+    border: 1px solid #ffd27a66;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .pixel-tag:disabled {
+    cursor: help;
+    opacity: 0.8;
   }
   .base-tag.anima {
     background: #ff3d8b33;

@@ -14,6 +14,8 @@ import "./study.ts";
 import "./estilo.ts";
 import "./psd.ts";
 import "./particles.ts";
+import "./mosaic.ts";
+import "./pixel.ts";
 import "./lights.ts";
 import "./instances.ts";
 import "./laco.ts";

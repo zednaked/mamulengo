@@ -22,7 +22,14 @@ export class SemPermissao extends Error {
   }
 }
 
-export async function raizes(): Promise<Raiz[]> {
+// as raizes por um instante: cada operacao de arquivo comeca por elas, e ler o IndexedDB a cada vez
+// pesava numa pasta grande. A pagina muda a lista (adicionar, tirar) e o service worker ve em ate 2 s
+let raizesGuardadas: { em: number; lista: Promise<Raiz[]> } | null = null;
+export function raizes(): Promise<Raiz[]> {
+  if (!raizesGuardadas || Date.now() - raizesGuardadas.em > 2000) raizesGuardadas = { em: Date.now(), lista: lerRaizes() };
+  return raizesGuardadas.lista;
+}
+async function lerRaizes(): Promise<Raiz[]> {
   const out: Raiz[] = [];
   try {
     out.push({ caminho: OPFS, nome: "navegador", handle: await navigator.storage.getDirectory(), opfs: true });
@@ -39,6 +46,7 @@ export async function adicionarPasta(handle: FileSystemDirectoryHandle): Promise
   for (let i = 2; lista.some((p) => p.nome === nome); i++) nome = `${handle.name}-${i}`;
   lista.push({ nome, handle });
   await idb.gravar("kv", "pastas", lista);
+  raizesGuardadas = null;
   return `${PASTAS}/${nome}`;
 }
 
@@ -49,6 +57,7 @@ export async function tirarPasta(caminho: string) {
     "pastas",
     lista.filter((p) => `${PASTAS}/${p.nome}` !== caminho),
   );
+  raizesGuardadas = null;
 }
 
 // pode ler e gravar? `pedir` so na pagina, num clique (o navegador mostra a pergunta)
@@ -129,6 +138,22 @@ export async function gravarArquivo(caminho: string, dados: BufferSource | Blob 
 export async function apagarArquivo(caminho: string) {
   const d = await pasta(pastaDe(caminho));
   await d?.removeEntry(nomeDe(caminho)).catch(() => {});
+}
+
+// os arquivos abaixo de uma pasta (recursivo) com o handle de cada um: para ler o tamanho e a data
+// sem refazer o caminho desde a raiz (a lista de personagens numa pasta grande)
+export async function percorrerComArquivo(caminho: string, filtro: (nome: string) => boolean): Promise<{ caminho: string; h: FileSystemFileHandle }[]> {
+  const out: { caminho: string; h: FileSystemFileHandle }[] = [];
+  const andar = async (d: FileSystemDirectoryHandle, base: string) => {
+    for await (const [nome, h] of (d as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+      if (h.kind === "directory") {
+        if (!PULAR.has(nome)) await andar(h as FileSystemDirectoryHandle, `${base}/${nome}`);
+      } else if (filtro(nome)) out.push({ caminho: `${base}/${nome}`, h: h as FileSystemFileHandle });
+    }
+  };
+  const d = await pasta(caminho);
+  if (d) await andar(d, normalizar(caminho));
+  return out.sort((a, b) => (a.caminho < b.caminho ? -1 : a.caminho > b.caminho ? 1 : 0));
 }
 
 // os arquivos de uma pasta so (sem descer), em caminhos absolutos

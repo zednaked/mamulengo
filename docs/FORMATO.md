@@ -120,6 +120,7 @@ descobre se há pesos comparando tamanhos. Sem pesos: `vertices` como no Spine.
 | Efeitos por slot | não existem | `efeitos` no slot e na animação: linha, brilho, dissolver e tingir (docs/NUCLEO.md, "Efeitos") | destaque de prêmio, aparecer e sumir, dano, sem arte nova; a exportação para o Spine os tira e avisa |
 | Partículas | não existem | `particulas` (emissores presos a ossos) e `particulas` na animação (taxa e rajadas); docs/NUCLEO.md, "Partículas" | brilho de prêmio, moedas, faíscas, sem vídeo nem nó à parte no jogo; a exportação para o Spine as tira e avisa |
 | Instâncias | não existem | `instancias` (um `.boneco` dentro de outro, preso a slot e osso) e `instancias` na animação (troca animação e tempo); docs/NUCLEO.md, "Instâncias" | repetir uma peça animada (letras, multidão), compor cenas; o filho é lido uma vez e dividido; a exportação para o Spine as tira e avisa |
+| Mosaico | não existe | `mosaicos`: grade de imagens do atlas presa a um slot (grade, iso ou perspectiva forçada), com cor, altura, giro, espelho e efeitos por célula; docs/NUCLEO.md, "Mosaico" | mapas, chão e paredes sem uma parte por ladrilho; a exportação para o Spine os tira e avisa |
 | Binário | `.skel` fechado | `.bonecob`, especificado aqui | carregar rápido no jogo |
 
 Fora do v0, por não aparecerem em nenhum dos 102 assets: slider, sequência de imagens, cor

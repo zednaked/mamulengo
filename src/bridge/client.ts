@@ -1,5 +1,6 @@
 // Lado do editor na ponte: recebe chamadas do agente (MCP) e executa no documento
 // aberto, com origem "claude", para o usuario ver acontecendo.
+import { passosDoRoteiro } from "../core/palco-roteiro.ts";
 import { NAVEGADOR } from "../navegador/pagina.ts";
 import { estatisticas as estatisticasMedidas, modoMedidas } from "../core/instantes.ts";
 import { app, fileUrl } from "../app/state.svelte.ts";
@@ -231,12 +232,14 @@ const handlers: Record<string, Handler> = {
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; onion?: boolean; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number; start?: number; speed?: number; loop?: boolean; front?: boolean } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; onion?: boolean; pixel?: number; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number; start?: number; speed?: number; loop?: boolean; front?: boolean } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
     // imagem de referencia por cima (file: caminho dentro das raizes); null tira
     // a cebola (fantasmas dos quadros vizinhos, pausado; com video de referencia, os quadros vizinhos dele tambem)
     if (p.onion !== undefined) app.onion = p.onion;
+    // pixel perfeito: pixels da textura por unidade do mundo (0 desliga)
+    if (p.pixel !== undefined) app.usarPixel(p.pixel);
     if (p.reference === null) app.tirarReferencia();
     else if (p.reference) {
       const r = p.reference;
@@ -457,6 +460,16 @@ const handlers: Record<string, Handler> = {
       };
       const s0 = { ...v.stats };
       out.dragStepMs = anim ? ms(step) : null;
+      // a pose depois do arrasto (pela grade de checkpoints) contra a refeita desde 0: tem de ser 0
+      if (anim) {
+        const inc = mundo();
+        atalhos(false);
+        v.invalidatePose();
+        v.poseAt(t);
+        const ref = mundo();
+        atalhos(true);
+        out.dragDiff = Math.max(0, ...inc.map((x, i) => Math.abs(x - ref[i])));
+      }
       // setup: mexe no osso (reconstroi e repoe no tempo atual)
       const merge2 = `bench2${Date.now()}`;
       const stepSetup = () => {
@@ -492,6 +505,41 @@ const handlers: Record<string, Handler> = {
       v.poseAt(saved.view.time);
       if (v.runtime !== runtime0) await v.setRuntime(runtime0);
     }
+  },
+
+  // o palco (docs/PALCO.md): joga o roteiro desde o comeco; aoVivo (padrao) na tela, em tempo real
+  // (a pessoa ve o agente jogar), senao de uma vez. Devolve o estado no fim de cada trecho
+  async play(p: { roteiro: string; aoVivo?: boolean; parar?: boolean }) {
+    const v = app.viewer;
+    if (!v?.pose) throw new Error("nada aberto");
+    if (p.parar) {
+      app.jogando = false;
+      v.pararJogo();
+      return { parado: true };
+    }
+    if (!v.comecarJogo()) throw new Error(v.useNucleo ? "este personagem nao tem palco (docs/PALCO.md)" : "o palco roda no modo nucleo (view {runtime: 'nucleo'})");
+    app.jogando = true;
+    const { bits, fins, trechos } = passosDoRoteiro(p.roteiro);
+    const j = v.jogo!;
+    if (p.aoVivo === false) {
+      j.i = bits.length;
+      const marcas: any[] = [];
+      let k = 0;
+      fins.forEach((fim) => {
+        for (; k <= fim; k++) v.nucleo!.palcoPasso(bits[k]);
+        marcas.push(v.nucleo!.palcoEstado());
+      });
+      j.estado = marcas.at(-1);
+      j.roteiro = [];
+      return { trechos: trechos.map((t, i) => ({ trecho: t.texto, ...marcas[i] })) };
+    }
+    j.roteiro = bits;
+    j.fins = fins;
+    await new Promise<void>((ok) => {
+      const espera = () => (v.jogo !== j || j.i >= bits.length ? ok() : requestAnimationFrame(espera));
+      espera();
+    });
+    return { trechos: trechos.map((t, i) => ({ trecho: t.texto, ...j.marcas[i] })) };
   },
 
   look(p: { animation?: string; time?: number; times?: number[]; frames?: number; fit?: boolean; bones?: boolean; meshes?: boolean; scale?: number; sequence?: SequenceParam }) {

@@ -20,14 +20,22 @@
 //   --referencia v.mp4  video atras do personagem (rotoscopia, N-023): --ref x,y,largura (centro e
 //              largura no mundo; padrao: a altura do esqueleto), --ref-alfa 0.5, --ref-inicio s,
 //              --ref-velocidade 1, --ref-cebola n (os n quadros vizinhos do video, tingidos)
+//   --palco r  joga o palco (docs/PALCO.md) com o roteiro r ("direita 40, direita+pulo 30", como no
+//              tools/palco.ts) e filma: o video tem o roteiro e mais 1 s; --tempos e --cada valem
+//   --pixel N  pixel art: desenha a 1 pixel por unidade do mundo (precisa de --rect) e amplia N vezes
+//              sem suavizar (o pixel da arte cai sempre na grade, andando ou nao); quadros em PNG
+//              e o video sem perda de cor. Liga sozinho (N = largura / largura do rect) quando
+//              todas as paginas sao Nearest; --pixel 0 desliga
 //   --gpu      a placa de video em vez do SwiftShader (mais rapido; o SwiftShader sai igual em
 //              qualquer maquina)
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import sharp from "sharp";
+import { passosDoRoteiro } from "../src/core/palco-roteiro.ts";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -52,6 +60,9 @@ const port = Number(opt("port", "5260"));
 const gpu = flag("gpu");
 const semCamera = flag("sem-camera");
 const video = opt("video", "");
+const pixelArg = opt("pixel", "");
+const palcoArg = opt("palco", "");
+const palco = palcoArg ? passosDoRoteiro(palcoArg).bits : undefined;
 // video de referencia atras do personagem (N-023, spike; src/render/videoref.ts): o quadro exato
 // do instante (inicio + velocidade x t, repetindo) e, com --ref-cebola n, os n vizinhos do video
 const referencia = opt("referencia", "");
@@ -149,24 +160,45 @@ if (referencia) {
   const m = await avaliar(`quadro.referencia(${JSON.stringify(resolve(referencia))}, ${JSON.stringify({ x, y, largura: w, opacidade: refAlfa, inicio: refInicio, velocidade: refVelocidade, cebola: refCebola })})`);
   console.log(`referencia: ${m.quadros} quadros ${m.largura}x${m.altura} a ${m.fps} fps (${m.codec}), decodificada em ${m.msTotal} ms (${m.msPorQuadro} ms/quadro, ${m.memoriaMB} MB)`);
 }
-const dur = anim ? (aberto.animacoes.find((a: any) => a.nome === anim)?.duracao ?? 0) : 0;
+const dur = palco ? palco.length / 60 + 1 : anim ? (aberto.animacoes.find((a: any) => a.nome === anim)?.duracao ?? 0) : 0;
 const tempos = temposArg
   ? temposArg.split(",").map(Number)
   : cada > 0
     ? Array.from({ length: Math.floor(dur / cada + 1e-9) + 1 }, (_, k) => Math.round(k * cada * 1000) / 1000)
     : [0];
 const rect = rectArg ? rectArg.split(",").map(Number) : undefined;
+// pixel art: todas as paginas Nearest (ou --pixel N)
+let pixel = pixelArg === "" ? 0 : Math.max(0, Math.round(Number(pixelArg)) || 0);
+if (pixelArg === "")
+  try {
+    const b = JSON.parse(readFileSync(arq, "utf8"));
+    if (b.paginas?.length && b.paginas.every((p: any) => /^nearest/i.test(p.filtro ?? ""))) pixel = -1;
+  } catch {}
+if (pixel && !rect) {
+  if (pixel > 0) console.log("aviso: --pixel precisa de --rect (o tamanho do mundo); desenhando sem ele");
+  pixel = 0;
+}
+if (pixel < 0) pixel = Math.max(1, Math.round(largura / rect![2]));
+// com pixel, a pagina desenha a 1 pixel por unidade e a ampliacao e sem suavizar
+const larguraDesenho = pixel ? Math.round(rect![2]) : largura;
+if (pixel) console.log(`pixel art: ${larguraDesenho} px por quadro, ampliado ${pixel} vezes`);
 if (video) {
   // o video: os quadros em lotes de JPEG (a simulacao continua de um lote para o outro) direto
   // para o ffmpeg
   const total = Math.max(1, Math.round(dur * fps));
   const sai = resolve(video);
-  const cod = sai.endsWith(".webm") ? ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "28", "-row-mt", "1"] : ["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
-  const ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(fps), "-c:v", "mjpeg", "-i", "-", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", ...cod, sai], { stdio: ["pipe", "inherit", "inherit"] });
+  // pixel art: quadros PNG, ampliados sem suavizar, e a ampliacao par (cada pixel da arte e um
+  // bloco de N x N: a cor pela metade do yuv420 fica dentro do bloco, sem vazar para o vizinho)
+  const n = pixel ? pixel + (pixel % 2) : 0;
+  const cod = sai.endsWith(".webm")
+    ? ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", pixel ? "10" : "28", "-row-mt", "1"]
+    : ["-c:v", "libx264", "-crf", pixel ? "8" : "18", "-preset", "medium", ...(pixel ? ["-tune", "animation"] : []), "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
+  const vf = (pixel ? `scale=iw*${n}:ih*${n}:flags=neighbor,` : "") + "pad=ceil(iw/2)*2:ceil(ih/2)*2";
+  const ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(fps), "-c:v", pixel ? "png" : "mjpeg", "-i", "-", "-vf", vf, ...cod, sai], { stdio: ["pipe", "inherit", "inherit"] });
   const fim = new Promise<number>((ok) => ff.once("exit", (c) => ok(c ?? 1)));
   for (let q = 0; q < total; q += 30) {
     const tempos = Array.from({ length: Math.min(30, total - q) }, (_, k) => (q + k) / fps);
-    const lote: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ anim, tempos, rect, largura, fps, fundo: fundo ?? "000000", modo: "normal", camera: semCamera ? false : undefined, formato: "jpeg" })})`);
+    const lote: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, anim, tempos, rect, largura: larguraDesenho, fps, fundo: fundo ?? "000000", modo: "normal", camera: semCamera ? false : undefined, formato: pixel ? "png" : "jpeg" })})`);
     for (const d of lote) if (!ff.stdin!.write(Buffer.from(d.slice(d.indexOf(",") + 1), "base64"))) await new Promise((ok) => ff.stdin!.once("drain", ok));
     process.stdout.write(`\r${Math.min(total, q + 30)}/${total} quadros`);
   }
@@ -175,12 +207,18 @@ if (video) {
   console.log(`\n${sai}: ${total} quadros (${(total / fps).toFixed(1)} s) em ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   process.exit(0);
 }
-const pngs: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ anim, tempos, rect, largura, fps, fundo, modo, camera: semCamera ? false : undefined })})`);
-const nomes = pngs.map((d, k) => {
+const pngs: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, anim, tempos, rect, largura: larguraDesenho, fps, fundo, modo, camera: semCamera ? false : undefined })})`);
+const nomes: string[] = [];
+for (const [k, d] of pngs.entries()) {
   const f = join(saida, `q_${String(tempos[k].toFixed(3)).padStart(7, "0")}${modo === "normal" ? "" : "_" + modo}.png`);
-  writeFileSync(f, Buffer.from(d.slice(d.indexOf(",") + 1), "base64"));
-  return f;
-});
+  let b = Buffer.from(d.slice(d.indexOf(",") + 1), "base64");
+  if (pixel > 1) {
+    const m = await sharp(b).metadata();
+    b = await sharp(b).resize(m.width! * pixel, m.height! * pixel, { kernel: "nearest" }).png().toBuffer();
+  }
+  writeFileSync(f, b);
+  nomes.push(f);
+}
 if (folha > 0 && nomes.length > 1) {
   const f = join(saida, `folha${modo === "normal" ? "" : "_" + modo}.png`);
   const r = spawnSync("magick", ["montage", ...nomes, "-tile", `${folha}x`, "-geometry", "+4+4", "-background", "#222", "-fill", "#ddd", "-pointsize", "14", f], { encoding: "utf8" });

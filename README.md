@@ -129,6 +129,21 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   timeline with a handful of keys. The child is read once and shared, a hidden
   instance is not computed at all, and children draw into the parent's draw list
   with the slot's color, effects and the parent's lights. They nest.
+- **Mosaic (tile maps):** a grid of atlas images tied to a slot, painted in the
+  editor with brush, eraser, rectangle and bucket: top-down, isometric (drawn back
+  to front, with per-cell height) or a forced-perspective floor from four corners.
+  Each cell can have its own color, height, quarter turn, mirror and effects; tiles
+  meet without seams. A whole Godot `TileMapLayer` level converts to it.
+- **Pixel-perfect pixel art:** with Nearest pages the editor and the video export
+  draw at the art's resolution and scale up without smoothing; `query.pixel` and a
+  badge in the editor point out what leaves the integer pixel grid (fractional
+  positions, smooth moves, small turns) and `pixel.snap` fixes it in one undo step.
+- **Stage, a game the agent builds and plays:** a `palco` block turns instances into
+  actors (player, patrol, collectible, door) colliding with a mosaic, simulated in
+  fixed deterministic steps by the core. The agent plays scripted input and measures
+  (does the jump reach the platform? does the enemy turn at the edge?), you play it
+  in the editor with the keyboard, and the MCP can play it live on your screen.
+  [docs/PALCO.md](docs/PALCO.md).
 
 ![The robot looking around in 2.5D, flying on jets with a glow and a ring of stars, dissolving its arms and firing a lightning arc between its hands](exemplos/vitrine/vitrine.gif)
 
@@ -159,6 +174,14 @@ its beam lights the ground and bends the trees, and the robot spins up into it.*
 *[exemplos/jogo](exemplos/jogo): a whole game screen in one `.boneco`, with
 parallax, platforms, coins, an enemy, a HUD and the robot as the hero. Art: Jumper
 Pack, UI Pack and Particle Pack by Kenney (CC0).*
+
+![A platformer level: the bunny jumps up three platforms picking coins while a spike patrols the ground, and reaches the carrot](exemplos/palco/vence.gif)
+
+*[exemplos/palco](exemplos/palco): the first stage level, played by the agent with
+scripted input. Measuring it found three level-design bugs in seconds (the bunny
+bumped its head under the lowest platform, the pit was under a platform, and a held
+jump flew over two platforms into the enemy). Art: Jumper Pack by Kenney (CC0);
+[exemplos/mosaico](exemplos/mosaico) has the three mosaic shapes.*
 
 ![Through a camera's viewfinder, the focus racks between the group of monsters and a monster in front of the lens, then the photo becomes a Polaroid](exemplos/foco/foco.gif)
 

@@ -211,16 +211,41 @@ export const CAMPOS: Record<string, string> = {
   coupling: "contagio",
   wobble: "moleza",
   followers: "seguem",
+  // mosaico (so do Mamulengo; docs/NUCLEO.md "Mosaico"): a grade de imagens presa a um slot;
+  // altura, cor, efeitos e giro (o spin das particulas: quartos de volta) ja estao acima, e
+  // "escala" e "extras" ficam iguais nos dois lados
+  mosaics: "mosaicos",
+  shape: "forma",
+  cell: "celula",
+  columns: "colunas",
+  rows: "linhas",
+  palette: "paleta",
+  cells: "celulas",
+  anchor: "ancora",
+  corners: "cantos",
+  flip: "espelho",
+  // palco (so do Mamulengo; docs/PALCO.md): o jogo; os estados das animacoes do ator, a caixa
+  stage: "palco",
+  solid: "solido",
+  mosaic: "mosaico",
+  actors: "atores",
+  box: "caixa",
+  jump: "pulo",
+  side: "lado",
+  idle: "parado",
+  walk: "andando",
+  dead: "morto",
 };
 
 // valores de enum que mudam de nome (por campo)
 export const VALORES: Record<string, Record<string, string>> = {
   blend: { additive: "aditivo", multiply: "multiplica", screen: "tela", overlay: "sobrepor", softLight: "luz_suave", darken: "escurecer", lighten: "clarear", difference: "diferenca", colorDodge: "subexpor" },
-  type: { region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
+  type: { player: "jogador", patrol: "patrulha", collectible: "coletavel", door: "porta", prop: "enfeite", region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
   curve: { stepped: "degrau" },
   align: { inside: "dentro", center: "centro", outside: "fora" },
   join: { miter: "viva", round: "redonda", bevel: "chanfrada" },
   cap: { butt: "reta", round: "redonda", square: "quadrada" },
+  shape: { grid: "grade" },
 };
 
 export const CAMPOS_VOLTA: Record<string, string> = Object.fromEntries(Object.entries(CAMPOS).map(([a, b]) => [b, a]));

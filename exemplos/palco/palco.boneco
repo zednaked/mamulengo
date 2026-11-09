@@ -1,0 +1,565 @@
+{
+ "boneco": 0,
+ "nome": "palco",
+ "paginas": [
+  {
+   "arquivo": "palco.png",
+   "tamanho": [
+    264,
+    480
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "areia_meio",
+   "pagina": 0,
+   "ret": [
+    66,
+    0,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "areia_ponta",
+   "pagina": 0,
+   "ret": [
+    0,
+    384,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "grama_meio",
+   "pagina": 0,
+   "ret": [
+    0,
+    96,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "grama_ponta",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "madeira_meio",
+   "pagina": 0,
+   "ret": [
+    198,
+    0,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "madeira_ponta",
+   "pagina": 0,
+   "ret": [
+    132,
+    0,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "pedra_meio",
+   "pagina": 0,
+   "ret": [
+    0,
+    288,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "pedra_ponta",
+   "pagina": 0,
+   "ret": [
+    0,
+    192,
+    64,
+    94
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "",
+  "audio": "",
+  "x": 0,
+  "y": 0,
+  "largura": 1536,
+  "altura": 912
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "mapa",
+   "pai": "root"
+  },
+  {
+   "nome": "coelho",
+   "pai": "root",
+   "x": 96,
+   "y": 94
+  },
+  {
+   "nome": "espinho",
+   "pai": "root",
+   "x": 1300,
+   "y": 94
+  },
+  {
+   "nome": "moeda_1",
+   "pai": "root",
+   "x": 320,
+   "y": 396
+  },
+  {
+   "nome": "moeda_2",
+   "pai": "root",
+   "x": 576,
+   "y": 490
+  },
+  {
+   "nome": "moeda_3",
+   "pai": "root",
+   "x": 1344,
+   "y": 114
+  },
+  {
+   "nome": "cenoura",
+   "pai": "root",
+   "x": 1088,
+   "y": 574
+  }
+ ],
+ "slots": [
+  {
+   "nome": "mapa",
+   "osso": "mapa"
+  },
+  {
+   "nome": "coelho",
+   "osso": "coelho"
+  },
+  {
+   "nome": "espinho",
+   "osso": "espinho"
+  },
+  {
+   "nome": "moeda_1",
+   "osso": "moeda_1"
+  },
+  {
+   "nome": "moeda_2",
+   "osso": "moeda_2"
+  },
+  {
+   "nome": "moeda_3",
+   "osso": "moeda_3"
+  },
+  {
+   "nome": "cenoura",
+   "osso": "cenoura"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {}
+  }
+ ],
+ "animacoes": {},
+ "mosaicos": [
+  {
+   "nome": "mapa",
+   "slot": "mapa",
+   "forma": "grade",
+   "x": 0,
+   "y": 752,
+   "celula": [
+    64,
+    94
+   ],
+   "colunas": 24,
+   "linhas": 8,
+   "paleta": [
+    "grama_ponta",
+    "grama_meio",
+    "pedra_ponta",
+    "pedra_meio",
+    "areia_ponta",
+    "areia_meio",
+    "madeira_ponta",
+    "madeira_meio"
+   ],
+   "celulas": [
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    6,
+    7,
+    7,
+    6,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    4,
+    5,
+    5,
+    4,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    2,
+    3,
+    3,
+    2,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    -1,
+    -1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0
+   ],
+   "extras": {
+    "65": {
+     "espelho": true
+    },
+    "66": {
+     "espelho": true
+    },
+    "81": {
+     "espelho": true
+    },
+    "82": {
+     "espelho": true
+    },
+    "101": {
+     "espelho": true
+    },
+    "102": {
+     "espelho": true
+    },
+    "170": {
+     "espelho": true
+    },
+    "172": {
+     "espelho": true
+    },
+    "174": {
+     "espelho": true
+    },
+    "176": {
+     "espelho": true
+    },
+    "178": {
+     "espelho": true
+    },
+    "179": {
+     "espelho": true
+    },
+    "184": {
+     "espelho": true
+    },
+    "186": {
+     "espelho": true
+    },
+    "188": {
+     "espelho": true
+    },
+    "190": {
+     "espelho": true
+    },
+    "191": {
+     "espelho": true
+    }
+   }
+  }
+ ],
+ "instancias": [
+  {
+   "nome": "coelho",
+   "slot": "coelho",
+   "boneco": "coelho.boneco",
+   "animacao": "parado"
+  },
+  {
+   "nome": "espinho",
+   "slot": "espinho",
+   "boneco": "espinho.boneco",
+   "animacao": "andando"
+  },
+  {
+   "nome": "moeda_1",
+   "slot": "moeda_1",
+   "boneco": "moeda.boneco",
+   "animacao": "parado"
+  },
+  {
+   "nome": "moeda_2",
+   "slot": "moeda_2",
+   "boneco": "moeda.boneco",
+   "animacao": "parado"
+  },
+  {
+   "nome": "moeda_3",
+   "slot": "moeda_3",
+   "boneco": "moeda.boneco",
+   "animacao": "parado"
+  },
+  {
+   "nome": "cenoura",
+   "slot": "cenoura",
+   "boneco": "cenoura.boneco",
+   "animacao": "parado"
+  }
+ ],
+ "palco": {
+  "gravidade": 2400,
+  "solido": {
+   "mosaico": "mapa"
+  },
+  "atores": [
+   {
+    "nome": "coelho",
+    "instancia": "coelho",
+    "tipo": "jogador",
+    "caixa": [
+     70,
+     180
+    ],
+    "velocidade": 360,
+    "pulo": 1350
+   },
+   {
+    "nome": "espinho",
+    "instancia": "espinho",
+    "tipo": "patrulha",
+    "caixa": [
+     80,
+     140
+    ],
+    "velocidade": 110,
+    "lado": -1,
+    "animacoes": {
+     "parado": "andando"
+    }
+   },
+   {
+    "nome": "moeda_1",
+    "instancia": "moeda_1",
+    "tipo": "coletavel",
+    "caixa": [
+     60,
+     84
+    ]
+   },
+   {
+    "nome": "moeda_2",
+    "instancia": "moeda_2",
+    "tipo": "coletavel",
+    "caixa": [
+     60,
+     84
+    ]
+   },
+   {
+    "nome": "moeda_3",
+    "instancia": "moeda_3",
+    "tipo": "coletavel",
+    "caixa": [
+     60,
+     84
+    ]
+   },
+   {
+    "nome": "cenoura",
+    "instancia": "cenoura",
+    "tipo": "porta",
+    "caixa": [
+     70,
+     70
+    ]
+   }
+  ]
+ }
+}

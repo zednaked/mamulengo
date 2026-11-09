@@ -1,0 +1,211 @@
+{
+ "boneco": 0,
+ "nome": "coelho",
+ "paginas": [
+  {
+   "arquivo": "coelho.png",
+   "tamanho": [
+    396,
+    412
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "bunny1_hurt",
+   "pagina": 0,
+   "ret": [
+    244,
+    183,
+    150,
+    174
+   ]
+  },
+  {
+   "nome": "bunny1_jump",
+   "pagina": 0,
+   "ret": [
+    244,
+    0,
+    150,
+    181
+   ]
+  },
+  {
+   "nome": "bunny1_stand",
+   "pagina": 0,
+   "ret": [
+    0,
+    209,
+    120,
+    201
+   ]
+  },
+  {
+   "nome": "bunny1_walk1",
+   "pagina": 0,
+   "ret": [
+    122,
+    0,
+    120,
+    201
+   ]
+  },
+  {
+   "nome": "bunny1_walk2",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    120,
+    207
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./kenney/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "corpo",
+   "osso": "root",
+   "parte": "bunny1_stand"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "corpo": {
+     "bunny1_stand": {
+      "x": 0,
+      "y": 100.5,
+      "largura": 120,
+      "altura": 201
+     },
+     "bunny1_walk1": {
+      "x": 0,
+      "y": 100.5,
+      "largura": 120,
+      "altura": 201
+     },
+     "bunny1_walk2": {
+      "x": 0,
+      "y": 103.5,
+      "largura": 120,
+      "altura": 207
+     },
+     "bunny1_jump": {
+      "x": 0,
+      "y": 90.5,
+      "largura": 150,
+      "altura": 181
+     },
+     "bunny1_hurt": {
+      "x": 0,
+      "y": 87,
+      "largura": 150,
+      "altura": 174
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "parado": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "bunny1_stand"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 1
+      }
+     ]
+    }
+   }
+  },
+  "andando": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "bunny1_walk1"
+      },
+      {
+       "tempo": 0.12,
+       "nome": "bunny1_walk2"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 0.24
+      }
+     ]
+    }
+   }
+  },
+  "pulo": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "bunny1_jump"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 1
+      }
+     ]
+    }
+   }
+  },
+  "morto": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "bunny1_hurt"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 1
+      }
+     ]
+    }
+   }
+  }
+ }
+}

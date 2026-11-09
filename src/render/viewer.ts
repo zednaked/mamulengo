@@ -32,7 +32,7 @@ import { PoseSim, likeSpineGodot, sequenceTimes, type Sequence } from "../core/s
 import { patchSkeletonData } from "../core/patch.ts";
 import { usarMedidas } from "../core/instantes.ts";
 import { parseAtlas } from "../core/atlas-text.ts";
-import { NucleoCena, diretorio, normalizarCaminho } from "./nucleo.ts";
+import { NucleoCena, diretorio, normalizarCaminho, ortho } from "./nucleo.ts";
 import { SpinePose, drawDebug, type PoseView, type SlotView } from "./pose.ts";
 import { DesenhoVideo, desenharRefVideo, type RefVideo } from "./videoref.ts";
 
@@ -51,6 +51,10 @@ export interface ViewState {
   // previa de transicao: depois da animacao (ou interrompendo-a) vem outra, com mix.
   // O tempo da timeline cobre a sequencia inteira.
   sequence: Sequence | null;
+  // pixel perfeito: o personagem desenhado na resolucao da arte (este numero de pixels da textura
+  // por unidade do mundo) e ampliado sem suavizar, como um jogo de pixel art (posicoes e giros
+  // presos na grade). 0 desliga. So no modo nucleo.
+  pixel?: number;
 }
 
 export class Viewer {
@@ -571,7 +575,9 @@ export class Viewer {
     }
     this.pending = [];
     this.stats.patches++;
-    this.invalidatePose();
+    // no nucleo, o remendo ja tirou da grade de checkpoints so o que a edicao mudou
+    this.sim?.invalidate();
+    this.nucleo?.invalidarAtual();
     this.poseAt(this.view.time);
     this.builtVersion = doc.version;
     return true;
@@ -647,8 +653,42 @@ export class Viewer {
     cancelAnimationFrame(this.raf);
   }
 
+  // o jogo (docs/PALCO.md): as teclas apertadas agora e o tempo que sobrou do ultimo passo
+  // roteiro: a entrada de cada passo (o agente jogando, docs/PALCO.md); fins: os passos onde o
+  // estado e guardado em `marcas`; acabou: o roteiro chegou ao fim
+  jogo: { teclas: number; sobra: number; estado: any; roteiro?: number[]; i: number; fins?: number[]; marcas: any[] } | null = null;
+  comecarJogo(): boolean {
+    if (!this.useNucleo || !this.nucleo?.palcoComecar()) return false;
+    this.view.playing = false;
+    this.jogo = { teclas: 0, sobra: 0, estado: this.nucleo.palcoEstado(), i: 0, marcas: [] };
+    return true;
+  }
+  pararJogo() {
+    if (!this.jogo) return;
+    this.jogo = null;
+    this.nucleo?.invalidar();
+    this.poseAt(this.view.time);
+  }
+
   frame(dt: number) {
     this.sync();
+    if (this.jogo && this.nucleo) {
+      // passos fixos de 1/60 s (no maximo 6 por quadro: uma aba parada nao vira avalanche)
+      const j = this.jogo;
+      j.sobra = Math.min(j.sobra + dt, 6 / 60);
+      let n = 0;
+      while (j.sobra >= 1 / 60 - 1e-9) {
+        const passo = j.i;
+        this.nucleo.palcoPasso(j.roteiro ? (j.roteiro[passo] ?? 0) : j.teclas);
+        j.i++;
+        if (j.fins?.includes(passo)) j.marcas.push(this.nucleo.palcoEstado());
+        j.sobra -= 1 / 60;
+        n++;
+      }
+      if (n) j.estado = this.nucleo.palcoEstado();
+      this.draw();
+      return;
+    }
     const sk = this.skeleton;
     const st = this.state;
     if ((this.useNucleo || (sk && st)) && this.view.playing && this.view.animation && !this.setupOnly) {
@@ -721,8 +761,11 @@ export class Viewer {
         // o desenho do nucleo (cebola e personagem) no mesmo contexto e com a mesma camera; o
         // spine-webgl volta depois so para os gizmos
         scene.end();
-        this.drawOnionNucleo();
-        this.drawNucleo();
+        if (this.view.pixel && this.view.pixel > 0) this.drawPixel(this.view.pixel, w, h);
+        else {
+          this.drawOnionNucleo();
+          this.drawNucleo();
+        }
         scene.begin();
       } else {
         this.drawOnion();
@@ -792,6 +835,115 @@ export class Viewer {
     const hidden = this.hiddenBones.size || this.hiddenSlots.size ? (i: number) => this.isSlotHidden(pose.slots[i]) : null;
     this.nucleo!.desenhar(this.scene.camera.projectionView.values, hidden);
     this.nucleoMs.draw = performance.now() - t0;
+  }
+
+  // ---- pixel perfeito (view.pixel): cebola e personagem num quadro pequeno, um pixel por pixel da
+  // arte, e o quadro ampliado sem suavizar para a tela. O centro da camera fica preso na grade da
+  // arte, entao o personagem parado nao treme ao mover a camera.
+  private pixelFbo: { fb: WebGLFramebuffer; tex: WebGLTexture; rb: WebGLRenderbuffer; w: number; h: number } | null = null;
+  private drawPixel(texels: number, w: number, h: number) {
+    const gl = this.ctx.gl as WebGL2RenderingContext;
+    const dpr = this.fixed ? 1 : window.devicePixelRatio || 1;
+    const telaPorPixel = (this.cam.zoom * dpr) / texels;
+    const lw = Math.max(1, Math.ceil(w / telaPorPixel) + 2),
+      lh = Math.max(1, Math.ceil(h / telaPorPixel) + 2);
+    let f = this.pixelFbo;
+    if (!f || f.w !== lw || f.h !== lh) {
+      if (f) (gl.deleteFramebuffer(f.fb), gl.deleteTexture(f.tex), gl.deleteRenderbuffer(f.rb));
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, lw, lh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const rb = gl.createRenderbuffer()!;
+      gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+      // stencil: o recorte do desenho do nucleo
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, lw, lh);
+      const fb = gl.createFramebuffer()!;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, rb);
+      f = this.pixelFbo = { fb, tex, rb, w: lw, h: lh };
+    }
+    // o centro preso na grade da arte (em unidades do mundo: 1 / texels)
+    const passo = 1 / texels;
+    const cx = Math.round(this.cam.x / passo) * passo,
+      cy = Math.round(this.cam.y / passo) * passo;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f.fb);
+    gl.viewport(0, 0, lw, lh);
+    // com o video de referencia atras (ja desenhado na tela), o quadro pequeno nasce transparente e e
+    // composto por cima; sem ele, com o fundo (os blends que leem a tela leem o fundo, como no jogo)
+    const composto = !!this.refVideo && !this.refVideo.frente;
+    const [r, g, b] = this.view.background;
+    if (composto) gl.clearColor(0, 0, 0, 0);
+    else gl.clearColor(r, g, b, 1);
+    gl.clearStencil(0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    const proj = ortho(cx, cy, texels, lw, lh);
+    const name = this.view.animation;
+    if (name) for (const o of this.onionFrames()) this.nucleo!.desenharFantasma(name, o.t, this.view.loop, o.color, proj);
+    const t0 = performance.now();
+    const pose = this.nucleo!.pose!;
+    const hidden = this.hiddenBones.size || this.hiddenSlots.size ? (i: number) => this.isSlotHidden(pose.slots[i]) : null;
+    this.nucleo!.desenhar(proj, hidden);
+    this.nucleoMs.draw = performance.now() - t0;
+    // ampliado sem suavizar: o quadro pequeno cobre a tela com sobra; o centro dele (cx, cy) cai
+    // onde a camera (cam.x, cam.y) poe esse ponto na tela
+    const ox = w / 2 + (cx - this.cam.x) * this.cam.zoom * dpr - (lw / 2) * telaPorPixel,
+      oy = h / 2 + (cy - this.cam.y) * this.cam.zoom * dpr - (lh / 2) * telaPorPixel;
+    // um retangulo com a textura do quadro pequeno (o blitFramebuffer nao serve: a tela do editor tem
+    // antisserrilhado, e o WebGL nao copia para um quadro multiamostrado)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, w, h);
+    const x0 = (Math.round(ox) / w) * 2 - 1,
+      y0 = (Math.round(oy) / h) * 2 - 1,
+      x1 = (Math.round(ox + lw * telaPorPixel) / w) * 2 - 1,
+      y1 = (Math.round(oy + lh * telaPorPixel) / h) * 2 - 1;
+    this.quadroNaTela(gl, f.tex, [x0, y0, x1, y1], composto);
+  }
+
+  private progQuadro: { prog: WebGLProgram; buf: WebGLBuffer; vao: WebGLVertexArrayObject } | null = null;
+  // composto: o quadro (cor pre-multiplicada, como o nucleo desenha) por cima do que ja esta na tela;
+  // sem, substitui (o quadro ja traz o fundo)
+  private quadroNaTela(gl: WebGL2RenderingContext, tex: WebGLTexture, [x0, y0, x1, y1]: number[], composto = false) {
+    if (!this.progQuadro) {
+      const sh = (tipo: number, src: string) => {
+        const s = gl.createShader(tipo)!;
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+      };
+      const prog = gl.createProgram()!;
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, "#version 300 es\nin vec4 p; out vec2 uv; void main() { uv = p.zw; gl_Position = vec4(p.xy, 0.0, 1.0); }"));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, "#version 300 es\nprecision mediump float; in vec2 uv; uniform sampler2D t; out vec4 cor; void main() { cor = texture(t, uv); }"));
+      gl.linkProgram(prog);
+      const vao = gl.createVertexArray()!;
+      const buf = gl.createBuffer()!;
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.enableVertexAttribArray(gl.getAttribLocation(prog, "p"));
+      gl.vertexAttribPointer(gl.getAttribLocation(prog, "p"), 4, gl.FLOAT, false, 0, 0);
+      gl.bindVertexArray(null);
+      this.progQuadro = { prog, buf, vao };
+    }
+    const q = this.progQuadro;
+    gl.useProgram(q.prog);
+    gl.bindVertexArray(q.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, q.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x0, y0, 0, 0, x1, y0, 1, 0, x0, y1, 0, 1, x1, y1, 1, 1]), gl.STREAM_DRAW);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(gl.getUniformLocation(q.prog, "t"), 0);
+    gl.disable(gl.STENCIL_TEST);
+    if (composto) {
+      gl.enable(gl.BLEND);
+      gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    } else gl.disable(gl.BLEND);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.enable(gl.BLEND);
+    gl.bindVertexArray(null);
   }
 
   private drawMain(sk: Skeleton) {

@@ -236,6 +236,10 @@ export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
       avisos.push(`instancias (${resto.instancias.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);
       delete resto.instancias;
     }
+    if (resto.mosaicos?.length) {
+      avisos.push(`mosaicos (${resto.mosaicos.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);
+      delete resto.mosaicos;
+    }
     if (resto.particulas?.length) {
       avisos.push(`particulas (${resto.particulas.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);
       delete resto.particulas;

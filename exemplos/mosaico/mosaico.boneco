@@ -1,0 +1,623 @@
+{
+ "boneco": 0,
+ "nome": "mosaico",
+ "paginas": [
+  {
+   "arquivo": "mosaico.png",
+   "tamanho": [
+    490,
+    474
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "areia_meio",
+   "pagina": 0,
+   "ret": [
+    66,
+    186,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "areia_ponta",
+   "pagina": 0,
+   "ret": [
+    66,
+    90,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "bloco_areia",
+   "pagina": 0,
+   "ret": [
+    196,
+    0,
+    96,
+    88
+   ]
+  },
+  {
+   "nome": "bloco_grama",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    96,
+    88
+   ]
+  },
+  {
+   "nome": "bloco_madeira",
+   "pagina": 0,
+   "ret": [
+    294,
+    0,
+    96,
+    88
+   ]
+  },
+  {
+   "nome": "bloco_neve",
+   "pagina": 0,
+   "ret": [
+    392,
+    0,
+    96,
+    88
+   ]
+  },
+  {
+   "nome": "bloco_pedra",
+   "pagina": 0,
+   "ret": [
+    98,
+    0,
+    96,
+    88
+   ]
+  },
+  {
+   "nome": "grama_meio",
+   "pagina": 0,
+   "ret": [
+    0,
+    186,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "grama_ponta",
+   "pagina": 0,
+   "ret": [
+    0,
+    90,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "madeira_meio",
+   "pagina": 0,
+   "ret": [
+    66,
+    378,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "madeira_ponta",
+   "pagina": 0,
+   "ret": [
+    66,
+    282,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "neve_meio",
+   "pagina": 0,
+   "ret": [
+    132,
+    186,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "neve_ponta",
+   "pagina": 0,
+   "ret": [
+    132,
+    90,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "pedra_meio",
+   "pagina": 0,
+   "ret": [
+    0,
+    378,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "pedra_ponta",
+   "pagina": 0,
+   "ret": [
+    0,
+    282,
+    64,
+    94
+   ]
+  },
+  {
+   "nome": "piso_areia",
+   "pagina": 0,
+   "ret": [
+    132,
+    324,
+    64,
+    40
+   ]
+  },
+  {
+   "nome": "piso_grama",
+   "pagina": 0,
+   "ret": [
+    132,
+    282,
+    64,
+    40
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./fontes/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "plataformas",
+   "pai": "root"
+  },
+  {
+   "nome": "ilha",
+   "pai": "root",
+   "y": 0
+  },
+  {
+   "nome": "piso",
+   "pai": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "piso",
+   "osso": "piso"
+  },
+  {
+   "nome": "ilha",
+   "osso": "ilha"
+  },
+  {
+   "nome": "plataformas",
+   "osso": "plataformas"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {}
+  }
+ ],
+ "animacoes": {
+  "flutua": {
+   "ossos": {
+    "ilha": {
+     "mover": [
+      {
+       "tempo": 0,
+       "y": 0,
+       "curva": [
+        0.4,
+        0,
+        0.6,
+        0,
+        0.4,
+        0,
+        0.6,
+        12
+       ]
+      },
+      {
+       "tempo": 1,
+       "y": 12,
+       "curva": [
+        1.4,
+        0,
+        1.6,
+        0,
+        1.4,
+        12,
+        1.6,
+        0
+       ]
+      },
+      {
+       "tempo": 2,
+       "y": 0
+      }
+     ]
+    }
+   }
+  }
+ },
+ "mosaicos": [
+  {
+   "nome": "plataformas",
+   "slot": "plataformas",
+   "forma": "grade",
+   "x": -512,
+   "y": 900,
+   "celula": [
+    64,
+    94
+   ],
+   "colunas": 16,
+   "linhas": 5,
+   "paleta": [
+    "grama_ponta",
+    "grama_meio",
+    "pedra_ponta",
+    "pedra_meio",
+    "areia_ponta",
+    "areia_meio",
+    "madeira_ponta",
+    "madeira_meio",
+    "neve_ponta",
+    "neve_meio"
+   ],
+   "celulas": [
+    -1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    -1,
+    -1,
+    -1,
+    8,
+    9,
+    9,
+    9,
+    9,
+    8,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    2,
+    3,
+    3,
+    3,
+    3,
+    2,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    4,
+    5,
+    5,
+    4,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    6,
+    7,
+    7,
+    6,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0
+   ],
+   "extras": {
+    "3": {
+     "espelho": true
+    },
+    "5": {
+     "espelho": true
+    },
+    "6": {
+     "espelho": true
+    },
+    "12": {
+     "espelho": true
+    },
+    "14": {
+     "espelho": true
+    },
+    "15": {
+     "espelho": true
+    },
+    "23": {
+     "espelho": true
+    },
+    "25": {
+     "espelho": true
+    },
+    "26": {
+     "espelho": true
+    },
+    "34": {
+     "espelho": true
+    },
+    "35": {
+     "espelho": true
+    },
+    "46": {
+     "espelho": true
+    },
+    "47": {
+     "espelho": true
+    },
+    "66": {
+     "espelho": true
+    },
+    "68": {
+     "espelho": true
+    },
+    "70": {
+     "espelho": true
+    },
+    "72": {
+     "espelho": true
+    },
+    "74": {
+     "espelho": true
+    },
+    "76": {
+     "espelho": true
+    },
+    "78": {
+     "espelho": true
+    },
+    "79": {
+     "espelho": true
+    }
+   }
+  },
+  {
+   "nome": "ilha",
+   "slot": "ilha",
+   "forma": "iso",
+   "x": 0,
+   "y": 330,
+   "celula": [
+    96,
+    48
+   ],
+   "colunas": 6,
+   "linhas": 6,
+   "paleta": [
+    "bloco_grama",
+    "bloco_pedra",
+    "bloco_areia",
+    "bloco_madeira",
+    "bloco_neve"
+   ],
+   "celulas": [
+    -1,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    0,
+    1,
+    0,
+    0,
+    2,
+    2,
+    1,
+    0,
+    0,
+    4,
+    2,
+    2,
+    0,
+    0,
+    1,
+    0,
+    2,
+    2,
+    0,
+    1,
+    0,
+    0,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    -1
+   ],
+   "ancora": [
+    0.5,
+    0.2727272727272727
+   ],
+   "extras": {
+    "10": {
+     "altura": 10
+    },
+    "14": {
+     "altura": 20
+    },
+    "15": {
+     "altura": 20
+    },
+    "16": {
+     "altura": 40,
+     "efeitos": {
+      "brilho": {
+       "cor": "bfe6ffff",
+       "forca": 1,
+       "raio": 10
+      }
+     }
+    },
+    "20": {
+     "altura": 20
+    },
+    "21": {
+     "altura": 20
+    },
+    "25": {
+     "cor": "ffb0b0ff"
+    }
+   }
+  },
+  {
+   "nome": "piso",
+   "slot": "piso",
+   "forma": "grade",
+   "celula": [
+    64,
+    40
+   ],
+   "colunas": 10,
+   "linhas": 6,
+   "paleta": [
+    "piso_grama",
+    "piso_areia"
+   ],
+   "celulas": [
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "cantos": [
+    -520,
+    -420,
+    -260,
+    -110,
+    260,
+    -110,
+    520,
+    -420
+   ]
+  }
+ ]
+}

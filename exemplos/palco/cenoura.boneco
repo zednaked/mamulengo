@@ -1,0 +1,109 @@
+{
+ "boneco": 0,
+ "nome": "cenoura",
+ "paginas": [
+  {
+   "arquivo": "cenoura.png",
+   "tamanho": [
+    80,
+    72
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "carrot",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    78,
+    70
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./kenney/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  }
+ ],
+ "slots": [
+  {
+   "nome": "corpo",
+   "osso": "root",
+   "parte": "carrot"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "corpo": {
+     "carrot": {
+      "x": 0,
+      "y": 35,
+      "largura": 78,
+      "altura": 70
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "parado": {
+   "slots": {
+    "corpo": {
+     "parte": [
+      {
+       "tempo": 0,
+       "nome": "carrot"
+      }
+     ]
+    }
+   },
+   "ossos": {
+    "root": {
+     "mover": [
+      {
+       "tempo": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        0,
+        0.5,
+        0,
+        0.3,
+        0,
+        0.5,
+        8
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "y": 8,
+       "curva": [
+        1.1,
+        0,
+        1.3,
+        0,
+        1.1,
+        8,
+        1.3,
+        0
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "y": 0
+      }
+     ]
+    }
+   }
+  }
+ }
+}

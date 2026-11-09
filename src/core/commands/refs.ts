@@ -153,6 +153,7 @@ defineCommand({
       renameKey(e, ["animations", an, "effects"], p.slot, p.to);
     }
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.slot === p.slot && e.set(["particles", k, "slot"], p.to));
+    ((e.json as any).mosaics ?? []).forEach((x: any, k: number) => x.slot === p.slot && e.set(["mosaics", k, "slot"], p.to));
     ((e.json as any).instances ?? []).forEach((x: any, k: number) => x.slot === p.slot && e.set(["instances", k, "slot"], p.to));
     for (const [an, a] of anims(e)) {
       for (const skin of Object.keys(a.attachments ?? {})) renameKey(e, ["animations", an, "attachments", skin], p.slot, p.to);
@@ -180,6 +181,7 @@ defineCommand({
           if (a.type === "clipping" && a.end === p.slot && slot !== p.slot) throw new Error(`a máscara ${slot}/${name} termina neste slot; mude o end antes`);
     for (const { c, type } of allC(e)) if (type === "path" && (c.slot ?? c.target) === p.slot) ctx.run("constraint.delete", { name: c.name });
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("particles.delete", { name: em.name });
+    for (const x of ((e.json as any).mosaics ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("mosaic.delete", { name: x.name });
     for (const x of ((e.json as any).instances ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("instance.delete", { name: x.name });
     // ordem de desenho: decodifica com a ordem antiga, tira o slot, recodifica
     const after = before.filter((n) => n !== p.slot);

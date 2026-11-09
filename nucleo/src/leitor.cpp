@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "mamulengo/json.h"
 #include "mamulengo/modelo.h"
@@ -198,6 +199,7 @@ class Leitor {
  public:
   Modelo& m;
   std::unordered_map<std::string, Imagem> imagens;
+  std::vector<std::vector<std::string>> mosaico_paleta;  // os nomes da paleta de cada mosaico (o palco)
   std::unordered_map<std::string, int> ids_partes;
   Carga* carga = nullptr;
   std::string caminho;  // deste arquivo (os filhos sao relativos ao diretorio dele)
@@ -239,6 +241,7 @@ class Leitor {
       p.largura = int(pg["tamanho"][0].num(0));
       p.altura = int(pg["tamanho"][1].num(0));
       p.pma = pg.sim("pma", false);
+      p.perto = pg.str("filtro", "").rfind("Nearest", 0) == 0;
       p.relevo = pg.str("relevo", "");
       m.paginas.push_back(std::move(p));
     }
@@ -265,8 +268,10 @@ class Leitor {
     ler_skins(r["skins"]);
     ler_restricoes(r["restricoes"]);
     ler_particulas(r["particulas"]);
+    ler_mosaicos(r["mosaicos"]);
     ler_luzes(r["luzes"], r["ambiente"]);
     ler_instancias(r["instancias"]);
+    ler_palco(r["palco"]);
     for (const auto& [nome, d] : r["eventos"].campos()) {
       DadosEvento e;
       e.nome = nome;
@@ -530,6 +535,171 @@ class Leitor {
       m.emissores_do_slot[size_t(d.slot)].push_back(int(m.emissores.size()));
       m.emissores.push_back(std::move(d));
     }
+  }
+
+  // ---- palco (docs/PALCO.md)
+
+  void ler_palco(const Json& j) {
+    if (!j.objeto()) return;
+    DadosPalco& p = m.palco;
+    p.existe = true;
+    p.gravidade = j.num("gravidade", p.gravidade);
+    p.pixel = j.sim("pixel", false);
+    if (const Json* s = j.acha("solido"); s && s->objeto()) {
+      const std::string nome = s->str("mosaico", "");
+      for (size_t i = 0; i < m.mosaicos.size(); ++i)
+        if (m.mosaicos[i].nome == nome) p.mosaico = int(i);
+      if (p.mosaico < 0) falha("palco: solido: mosaico desconhecido " + nome);
+      const Json& imgs = (*s)["paleta"];
+      if (imgs.lista() && imgs.tamanho()) {
+        // as imagens da paleta que sao solidas (pelo nome, como no arquivo)
+        const auto& pal = mosaico_paleta[size_t(p.mosaico)];
+        p.solido.assign(pal.size(), 0);
+        for (const Json& n : imgs.itens())
+          for (size_t i = 0; i < pal.size(); ++i)
+            if (pal[i] == n.str()) p.solido[i] = 1;
+      }
+    }
+    for (const Json& a : j["atores"].itens()) {
+      DadosAtor d;
+      d.nome = a.str("nome", "");
+      const std::string t = a.str("tipo", "enfeite");
+      d.tipo = t == "jogador" ? TipoAtor::Jogador : t == "patrulha" ? TipoAtor::Patrulha : t == "coletavel" ? TipoAtor::Coletavel : t == "porta" ? TipoAtor::Porta : TipoAtor::Enfeite;
+      d.instancia = m.instancia(a.str("instancia", d.nome));
+      if (d.instancia < 0) falha("palco: ator " + d.nome + ": instancia desconhecida " + a.str("instancia", d.nome));
+      d.largura = a["caixa"][size_t(0)].num(d.largura);
+      d.altura = a["caixa"][size_t(1)].num(d.altura);
+      d.velocidade = a.num("velocidade", d.tipo == TipoAtor::Patrulha ? 40 : d.velocidade);
+      d.pulo = a.num("pulo", d.pulo);
+      d.lado = a.num("lado", 1) < 0 ? -1 : 1;
+      const DadosInstancia& di = m.instancias[size_t(d.instancia)];
+      const Modelo* filho = di.filho >= 0 ? m.filhos[size_t(di.filho)].get() : nullptr;
+      auto anim = [&](const char* estado, const char* padrao) {
+        if (!filho) return -1;
+        return filho->animacao(a["animacoes"].str(estado, padrao));
+      };
+      d.anim_parado = anim("parado", "parado");
+      d.anim_andando = anim("andando", "andando");
+      d.anim_pulo = anim("pulo", "pulo");
+      d.anim_morto = anim("morto", "morto");
+      p.atores.push_back(std::move(d));
+    }
+  }
+
+  // ---- mosaico (docs/NUCLEO.md "Mosaico")
+
+  void ler_mosaicos(const Json& lista) {
+    m.mosaicos_do_slot.assign(m.slots.size(), {});
+    for (const Json& j : lista.itens()) {
+      DadosMosaico d;
+      d.nome = j.str("nome", "");
+      d.slot = slot(j["slot"], "mosaico");
+      d.osso = m.slots[size_t(d.slot)].osso;
+      d.x = j.num("x", 0);
+      d.y = j.num("y", 0);
+      const std::string forma = j.str("forma", "grade");
+      if (forma == "iso") d.forma = FormaMosaico::Iso;
+      else if (forma != "grade") falha("mosaico " + d.nome + ": forma desconhecida " + forma);
+      d.cw = j["celula"][size_t(0)].num(32);
+      d.ch = j["celula"][size_t(1)].num(32);
+      if (d.cw <= 0 || d.ch <= 0) falha("mosaico " + d.nome + ": celula sem tamanho");
+      d.colunas = std::max(0, int(j.num("colunas", 0)));
+      d.linhas = std::max(0, int(j.num("linhas", 0)));
+      const size_t n = size_t(d.colunas) * size_t(d.linhas);
+      if (n > 1u << 20) falha("mosaico " + d.nome + ": grade grande demais");
+      mosaico_paleta.emplace_back();
+      for (const Json& nome : j["paleta"].itens()) {
+        mosaico_paleta.back().push_back(nome.str());
+        DadosMosaico::Imagem im;
+        auto it = imagens.find(nome.str());
+        if (it != imagens.end()) {
+          const Imagem& g = it->second;
+          im.pagina = g.pagina;
+          // meio pixel para dentro: o filtro linear na borda da celula nao puxa a sangria
+          // transparente do atlas (a costura entre ladrilhos vizinhos)
+          // (com filtro Nearest nao ha costura, e o recuo pularia um texel da pixel art)
+          const bool perto = g.pagina >= 0 && g.pagina < int(m.paginas.size()) && m.paginas[size_t(g.pagina)].perto;
+          const double e = perto ? 0 : std::min({0.5, g.rw / 4, g.rh / 4});
+          const double cx[4] = {e, e, g.rw - e, g.rw - e}, cy[4] = {g.rh - e, e, e, g.rh - e};
+          for (int i = 0; i < 4; ++i) uv_pagina(g, cx[i], cy[i], &im.uvs[i * 2]);
+          im.ow = g.rw, im.oh = g.rh;
+          if (g.cortada && g.ow > 0 && g.oh > 0) {
+            im.ow = g.ow, im.oh = g.oh;
+            im.l = g.ox / g.ow, im.b = g.oy / g.oh;
+            im.r = (g.ox + g.rw) / g.ow, im.t = (g.oy + g.rh) / g.oh;
+          }
+        }
+        d.imagens.push_back(im);  // imagem que nao esta no atlas: fica na paleta, sem desenhar
+      }
+      d.celulas.assign(n, -1);
+      size_t k = 0;
+      for (const Json& c : j["celulas"].itens()) {
+        if (k >= n) break;
+        const int v = int(c.num(-1));
+        d.celulas[k++] = v >= 0 && v < int(d.imagens.size()) ? v : -1;
+      }
+      d.escala = j.num("escala", 1);
+      d.ancora[0] = j["ancora"][size_t(0)].num(0.5);
+      d.ancora[1] = j["ancora"][size_t(1)].num(0.5);
+      if (const Json* c = j.acha("cantos"); c && c->tamanho() == 8) {
+        double q[8];
+        for (int i = 0; i < 8; ++i) q[i] = (*c)[size_t(i)].num(0);
+        d.cantos = homografia(q, d.h);
+      }
+      d.extra_da_celula.assign(n, -1);
+      for (const auto& [chave, e] : j["extras"].campos()) {
+        const long i = std::strtol(chave.c_str(), nullptr, 10);
+        if (i < 0 || size_t(i) >= n) continue;
+        DadosMosaico::Extra x;
+        if (const Json* c = e.acha("cor"); c && c->texto()) x.cor = cor_hex(c->str());
+        x.altura = e.num("altura", 0);
+        x.giro = ((int(e.num("giro", 0)) % 4) + 4) % 4;
+        x.espelho = e.sim("espelho", false);
+        for (const auto& [nome_ef, je] : e["efeitos"].campos()) {
+          const int t = tipo_efeito(nome_ef);
+          if (t < 0) falha("mosaico " + d.nome + ": efeito desconhecido " + nome_ef);
+          ler_campos_efeito(t, je, x.ef.v + EFEITO_INICIO[t]);
+        }
+        x.ef.limitar();
+        x.efeitos = x.ef.algum();
+        d.extra_da_celula[size_t(i)] = int(d.extras.size());
+        d.extras.push_back(x);
+      }
+      // a ordem de desenho: grade, linha a linha de cima para baixo; iso, de tras (em cima) para
+      // a frente, pela soma coluna + linha
+      d.ordem.reserve(n);
+      for (size_t i = 0; i < n; ++i) d.ordem.push_back(int(i));
+      if (d.forma == FormaMosaico::Iso) {
+        const int nc = d.colunas;
+        std::stable_sort(d.ordem.begin(), d.ordem.end(), [nc](int a, int b) { return a % nc + a / nc < b % nc + b / nc; });
+      }
+      m.mosaicos_do_slot[size_t(d.slot)].push_back(int(m.mosaicos.size()));
+      m.mosaicos.push_back(std::move(d));
+    }
+  }
+
+  // a homografia que leva o quadrado 0..1 (u para a direita, v para cima) aos cantos q (baixo-
+  // esquerda, cima-esquerda, cima-direita, baixo-direita); false se o quadrilatero e degenerado
+  static bool homografia(const double* q, double* h) {
+    // (0,0)->q0, (0,1)->q1, (1,1)->q2, (1,0)->q3 (Heckbert, "Fundamentals of Texture Mapping")
+    const double x0 = q[0], y0 = q[1], x1 = q[6], y1 = q[7], x2 = q[4], y2 = q[5], x3 = q[2], y3 = q[3];
+    // na ordem do Heckbert: (0,0), (1,0), (1,1), (0,1)
+    const double sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+    double a, b, c, dd, e, f, g, hh;
+    if (std::abs(sx) < 1e-12 && std::abs(sy) < 1e-12) {
+      a = x1 - x0, b = x2 - x1, c = x0, dd = y1 - y0, e = y2 - y1, f = y0, g = 0, hh = 0;
+    } else {
+      const double dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+      const double den = dx1 * dy2 - dx2 * dy1;
+      if (std::abs(den) < 1e-12) return false;
+      g = (sx * dy2 - dx2 * sy) / den;
+      hh = (dx1 * sy - sx * dy1) / den;
+      a = x1 - x0 + g * x1, b = x3 - x0 + hh * x3, c = x0;
+      dd = y1 - y0 + g * y1, e = y3 - y0 + hh * y3, f = y0;
+    }
+    // x = (a u + b v + c) / (g u + hh v + 1), y = (dd u + e v + f) / (...)
+    h[0] = a, h[1] = b, h[2] = c, h[3] = dd, h[4] = e, h[5] = f, h[6] = g, h[7] = hh, h[8] = 1;
+    return true;
   }
 
   // ---- desenho
@@ -1452,6 +1622,78 @@ bool ler_animacao(Modelo& m, std::string_view nome, std::string_view texto, std:
     m.animacoes.pop_back();
   }
   return true;
+}
+
+namespace {
+// a primeira chave em que duas timelines diferem (tempo, valores, curva); a menor quantidade de
+// chaves se uma e o comeco da outra; -1 se sao iguais
+int primeira_diferenca(const Timeline& a, const Timeline& b) {
+  const size_t n = std::min(a.chaves(), b.chaves()), nc = size_t(a.canais);
+  if (a.canais != b.canais) return 0;
+  for (size_t k = 0; k < n; ++k) {
+    if (a.tempos[k] != b.tempos[k] || a.curvas[k] != b.curvas[k]) return int(k);
+    for (size_t c = 0; c < nc; ++c)
+      if (a.valores[k * nc + c] != b.valores[k * nc + c]) return int(k);
+    if (Curva(a.curvas[k]) == Curva::Bezier)
+      for (size_t x = 0; x < nc * 4; ++x)
+        if (a.bezier[k * nc * 4 + x] != b.bezier[k * nc * 4 + x]) return int(k);
+  }
+  return a.chaves() == b.chaves() ? -1 : int(n);
+}
+}  // namespace
+
+// Troca so uma timeline de osso que ja existe (o arrasto de uma chave no editor): le as chaves
+// dela e poe no lugar, sem reler a animacao inteira. Devolve o instante a partir do qual a pose
+// pode ter mudado (a chave antes da primeira diferente: antes dela, as chaves e a curva entre
+// elas ficam iguais; infinito se nada mudou), ou -1 sem mudar nada quando nao da: animacao, osso
+// ou timeline que nao existe, tipo que nao e de osso, ou a duracao que precisaria ser refeita (a
+// timeline era a mais longa e encurtou); quem chama troca a animacao.
+double trocar_timeline_osso(Modelo& m, std::string_view anim, std::string_view osso, std::string_view tipo, std::string_view texto, std::string* erro) {
+  const int ai = m.animacao(anim), oi = m.osso(osso);
+  if (ai < 0 || oi < 0) return -1;
+  PropOsso prop;
+  std::initializer_list<std::pair<const char*, double>> canais = {{"valor", 0}};
+  static const std::initializer_list<std::pair<const char*, double>> xy0 = {{"x", 0}, {"y", 0}}, xy1 = {{"x", 1}, {"y", 1}},
+                                                                     v0 = {{"valor", 0}}, v1 = {{"valor", 1}};
+  if (tipo == "girar") prop = PropOsso::Girar, canais = v0;
+  else if (tipo == "mover") prop = PropOsso::Mover, canais = xy0;
+  else if (tipo == "mover_x") prop = PropOsso::MoverX, canais = v0;
+  else if (tipo == "mover_y") prop = PropOsso::MoverY, canais = v0;
+  else if (tipo == "escalar") prop = PropOsso::Escalar, canais = xy1;
+  else if (tipo == "escalar_x") prop = PropOsso::EscalarX, canais = v1;
+  else if (tipo == "escalar_y") prop = PropOsso::EscalarY, canais = v1;
+  else if (tipo == "cisalhar") prop = PropOsso::Cisalhar, canais = xy0;
+  else if (tipo == "cisalhar_x") prop = PropOsso::CisalharX, canais = v0;
+  else if (tipo == "cisalhar_y") prop = PropOsso::CisalharY, canais = v0;
+  else return -1;
+  Animacao& an = m.animacoes[size_t(ai)];
+  TimelineOsso* alvo = nullptr;
+  for (TimelineOsso& t : an.ossos)
+    if (t.osso == oi && t.prop == prop) {
+      if (alvo) return -1;  // duas timelines iguais: a troca nao saberia qual
+      alvo = &t;
+    }
+  if (!alvo) return -1;
+  std::string e;
+  Json r = Json::ler(texto, &e);
+  if (!r.lista()) {
+    if (erro) *erro = "JSON invalido: " + e;
+    return -1;
+  }
+  Timeline tl;
+  try {
+    tl = ler_timeline(r, canais);
+  } catch (const Erro& x) {
+    if (erro) *erro = x.msg;
+    return -1;
+  }
+  const double velho = alvo->tl.fim(), novo = tl.fim();
+  if (novo < velho && velho >= an.duracao) return -1;
+  const int d = primeira_diferenca(alvo->tl, tl);
+  const double inicio = d < 0 ? HUGE_VAL : d == 0 ? 0 : tl.tempos[size_t(d - 1)];
+  alvo->tl = std::move(tl);
+  if (novo > an.duracao) an.duracao = novo;
+  return inicio;
 }
 
 }  // namespace mamulengo
