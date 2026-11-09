@@ -1029,6 +1029,38 @@ runtimeOk("constraints");
       `palco: stage chega ao .boneco como palco (${JSON.stringify(p?.atores?.[0])}) e volta igual`,
     );
   }
+  // palco por comandos: stage.actor com boneco cria osso, camada, instancia e ator de uma vez;
+  // sem type recusa; stage.set liga o mosaico solido e recusa imagem fora da paleta; renomear a
+  // instancia leva o ator; apagar a instancia tira o ator; stage.remove com delete apaga tudo
+  {
+    const antes = doc.serialize();
+    const h0 = doc.history().length;
+    let semTipo = false,
+      foraPaleta = false;
+    await run("stage.actor", { name: "t.heroi", boneco: "t.heroi.boneco" }).catch(() => (semTipo = true));
+    await run("stage.actor", { name: "t.heroi", boneco: "t.heroi.boneco", type: "player", x: 40, y: 10, box: [20, 40], jump: 500, animations: { walk: "anda" } });
+    await run("stage.actor", { name: "t.moeda", boneco: "t.moeda.boneco", type: "collectible", x: 100, y: 10 });
+    const s0 = doc.json.slots.find((s: any) => s.attachment)!;
+    await run("mosaic.set", { name: "t.chao", slot: s0.name, columns: 4, rows: 2, palette: [s0.attachment], fill: 0 });
+    await run("stage.set", { gravity: 1500, solid: { mosaic: "t.chao", palette: ["nao_existe"] } }).catch(() => (foraPaleta = true));
+    await run("stage.set", { gravity: 1500, solid: { mosaic: "t.chao" } });
+    const st = (doc.json as any).stage;
+    const criou = doc.json.bones.some((b: any) => b.name === "t.heroi" && b.x === 40) && doc.json.slots.some((x: any) => x.name === "t.heroi") && (doc.json as any).instances.some((x: any) => x.name === "t.heroi" && x.boneco === "t.heroi.boneco");
+    await run("instance.rename", { name: "t.moeda", to: "t.ouro" });
+    const renomeou = st && (doc.json as any).stage.actors.find((a: any) => a.name === "t.moeda")?.instance === "t.ouro";
+    await run("instance.delete", { name: "t.ouro" });
+    const tirou = !(doc.json as any).stage.actors.some((a: any) => a.name === "t.moeda");
+    await run("stage.remove", { name: "t.heroi", delete: true });
+    const apagou = !doc.json.bones.some((b: any) => b.name === "t.heroi") && !((doc.json as any).instances ?? []).length && !(doc.json as any).stage.actors.length;
+    const { importarSpine } = await import("../src/boneco/spine.ts");
+    while (doc.history().length > h0 + 5) doc.undo();
+    const p = (importarSpine(doc.json, atlasText, "t") as any).palco;
+    while (doc.history().length > h0) doc.undo();
+    check(
+      semTipo && foraPaleta && criou && renomeou && tirou && apagou && st.gravity === 1500 && st.solid.mosaic === "t.chao" && st.actors[0].animations.walk === "anda" && p?.atores?.[0]?.tipo === "jogador" && p?.solido?.mosaico === "t.chao" && doc.serialize() === antes,
+      `palco por comandos: stage.actor cria osso, camada, instancia e ator; stage.set; renomear e apagar a instancia acompanham; stage.remove apaga; desfazer volta (${JSON.stringify({ semTipo, foraPaleta, criou, renomeou, tirou, apagou })})`,
+    );
+  }
   // particulas: particles.set cria (imagem do slot por padrao) e muda, key.set anima rate e
   // burst, renomear o slot e o osso acompanha, apagar o slot leva o emissor; o spine-core le
   {

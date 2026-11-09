@@ -656,11 +656,16 @@ export class Viewer {
   // o jogo (docs/PALCO.md): as teclas apertadas agora e o tempo que sobrou do ultimo passo
   // roteiro: a entrada de cada passo (o agente jogando, docs/PALCO.md); fins: os passos onde o
   // estado e guardado em `marcas`; acabou: o roteiro chegou ao fim
-  jogo: { teclas: number; sobra: number; estado: any; roteiro?: number[]; i: number; fins?: number[]; marcas: any[] } | null = null;
+  // seguir: a camera acompanha o jogador (quando a fase nao cabe na tela)
+  jogo: { teclas: number; sobra: number; estado: any; roteiro?: number[]; i: number; fins?: number[]; marcas: any[]; seguir: boolean } | null = null;
   comecarJogo(): boolean {
     if (!this.useNucleo || !this.nucleo?.palcoComecar()) return false;
     this.view.playing = false;
-    this.jogo = { teclas: 0, sobra: 0, estado: this.nucleo.palcoEstado(), i: 0, marcas: [] };
+    // a camera so segue se a fase nao cabe no que se ve agora
+    const b = this.pose?.bounds();
+    const r = this.canvas.getBoundingClientRect();
+    const seguir = !!b && (b[2] * this.cam.zoom > r.width * 1.05 || b[3] * this.cam.zoom > r.height * 1.05);
+    this.jogo = { teclas: 0, sobra: 0, estado: this.nucleo.palcoEstado(), i: 0, marcas: [], seguir };
     return true;
   }
   pararJogo() {
@@ -686,6 +691,15 @@ export class Viewer {
         n++;
       }
       if (n) j.estado = this.nucleo.palcoEstado();
+      // a camera vai atras do jogador, macia (o jogador um pouco abaixo do meio)
+      const jog = j.seguir ? j.estado?.atores?.find((a: any) => a.tipo === "jogador") : null;
+      if (jog) {
+        const r = this.canvas.getBoundingClientRect();
+        const alvoY = jog.y + (r.height / this.cam.zoom) * 0.15;
+        const k = Math.min(1, dt * 5);
+        this.cam.x += (jog.x - this.cam.x) * k;
+        this.cam.y += ((this.flip ? -alvoY : alvoY) - this.cam.y) * k;
+      }
       this.draw();
       return;
     }

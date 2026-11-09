@@ -94,10 +94,10 @@ async function referencia(caminho: string, o: { x?: number; y?: number; largura?
   return v.medida;
 }
 
-type Pedido = { palco?: number[]; anim: string | null; tempos: number[]; rect?: [number, number, number, number]; largura?: number; fps?: number; fundo?: string | null; modo?: "normal" | "cinza" | "silhueta"; repetir?: boolean; camera?: boolean; formato?: "png" | "jpeg" };
+type Pedido = { palco?: number[]; seguir?: boolean; anim: string | null; tempos: number[]; rect?: [number, number, number, number]; largura?: number; fps?: number; fundo?: string | null; modo?: "normal" | "cinza" | "silhueta"; repetir?: boolean; camera?: boolean; formato?: "png" | "jpeg" };
 
 // o filme continua de onde parou (quadros pedidos em lotes, em ordem): a instancia e o tempo
-let corrente: { chave: string; inst: number; agora: number; passos: number } | null = null;
+let corrente: { chave: string; inst: number; agora: number; passos: number; cam?: [number, number] } | null = null;
 
 // os quadros pedidos, em PNG (data URL), na ordem dos tempos
 function fotos(p: Pedido): string[] {
@@ -141,7 +141,19 @@ function fotos(p: Pedido): string[] {
   for (const [t, i] of ordem) {
     if (p.palco) {
       // o jogo anda em passos de 1/60 s ate o instante do quadro (depois do roteiro, sem teclas)
-      while ((corrente!.passos + 1) / 60 <= t + 1e-9) N._mm_palco_passo(inst, p.palco[corrente!.passos++] ?? 0, 1, 1 / 60);
+      while ((corrente!.passos + 1) / 60 <= t + 1e-9) {
+        N._mm_palco_passo(inst, p.palco[corrente!.passos++] ?? 0, 1, 1 / 60);
+        // a camera anda a cada passo do jogo (nao so nos quadros filmados)
+        if (p.seguir) {
+          const jog = JSON.parse(N.UTF8ToString(N._mm_palco_estado(inst)))?.atores?.find((a: any) => a.tipo === "jogador");
+          if (jog) {
+            const alvo: [number, number] = [jog.x, jog.y + rect[3] * 0.15];
+            const c = (corrente!.cam ??= alvo);
+            c[0] += (alvo[0] - c[0]) * 0.08;
+            c[1] += (alvo[1] - c[1]) * 0.08;
+          }
+        }
+      }
       agora = t;
     }
     while (!p.palco && agora + passo <= t + 1e-9) {
@@ -157,6 +169,23 @@ function fotos(p: Pedido): string[] {
     gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     let proj = fixa;
+    // o palco com --seguir: o retangulo do tamanho pedido, centrado no jogador (macio, sem sair da fase)
+    if (p.palco && p.seguir) {
+      if (!corrente!.cam) {
+        const jog = JSON.parse(N.UTF8ToString(N._mm_palco_estado(inst)))?.atores?.find((a: any) => a.tipo === "jogador");
+        if (jog) corrente!.cam = [jog.x, jog.y + rect[3] * 0.15];
+      }
+      const c = corrente!.cam;
+      if (c) {
+        const fx = e.x ?? c[0] - rect[2] / 2,
+          fw = e.largura ?? rect[2],
+          fy = e.y ?? c[1] - rect[3] / 2,
+          fh = e.altura ?? rect[3];
+        const cx = Math.min(Math.max(c[0], fx + rect[2] / 2), fx + fw - rect[2] / 2),
+          cy = Math.min(Math.max(c[1], fy + rect[3] / 2), fy + fh - rect[3] / 2);
+        proj = ortho(fw >= rect[2] ? cx : fx + fw / 2, fh >= rect[3] ? cy : fy + fh / 2, escala, w, h);
+      }
+    }
     if (comCamera) {
       const o = N._mm_pose_ossos(inst) / 8 + ossoCam * 14;
       proj = projecaoDaVista(vistaDaCamera(N.HEAPF64.subarray(o, o + 6), e.largura ?? 800, e.altura ?? 800), e.largura ?? 800, w, h);

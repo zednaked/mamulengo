@@ -22,6 +22,7 @@
 //              --ref-velocidade 1, --ref-cebola n (os n quadros vizinhos do video, tingidos)
 //   --palco r  joga o palco (docs/PALCO.md) com o roteiro r ("direita 40, direita+pulo 30", como no
 //              tools/palco.ts) e filma: o video tem o roteiro e mais 1 s; --tempos e --cada valem
+//   --seguir   com --palco: o --rect so da o tamanho; a camera acompanha o jogador sem sair da fase
 //   --pixel N  pixel art: desenha a 1 pixel por unidade do mundo (precisa de --rect) e amplia N vezes
 //              sem suavizar (o pixel da arte cai sempre na grade, andando ou nao); quadros em PNG
 //              e o video sem perda de cor. Liga sozinho (N = largura / largura do rect) quando
@@ -62,6 +63,7 @@ const semCamera = flag("sem-camera");
 const video = opt("video", "");
 const pixelArg = opt("pixel", "");
 const palcoArg = opt("palco", "");
+const seguir = flag("seguir");
 const palco = palcoArg ? passosDoRoteiro(palcoArg).bits : undefined;
 // video de referencia atras do personagem (N-023, spike; src/render/videoref.ts): o quadro exato
 // do instante (inicio + velocidade x t, repetindo) e, com --ref-cebola n, os n vizinhos do video
@@ -198,7 +200,7 @@ if (video) {
   const fim = new Promise<number>((ok) => ff.once("exit", (c) => ok(c ?? 1)));
   for (let q = 0; q < total; q += 30) {
     const tempos = Array.from({ length: Math.min(30, total - q) }, (_, k) => (q + k) / fps);
-    const lote: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, anim, tempos, rect, largura: larguraDesenho, fps, fundo: fundo ?? "000000", modo: "normal", camera: semCamera ? false : undefined, formato: pixel ? "png" : "jpeg" })})`);
+    const lote: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, seguir, anim, tempos, rect, largura: larguraDesenho, fps, fundo: fundo ?? "000000", modo: "normal", camera: semCamera ? false : undefined, formato: pixel ? "png" : "jpeg" })})`);
     for (const d of lote) if (!ff.stdin!.write(Buffer.from(d.slice(d.indexOf(",") + 1), "base64"))) await new Promise((ok) => ff.stdin!.once("drain", ok));
     process.stdout.write(`\r${Math.min(total, q + 30)}/${total} quadros`);
   }
@@ -207,7 +209,7 @@ if (video) {
   console.log(`\n${sai}: ${total} quadros (${(total / fps).toFixed(1)} s) em ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   process.exit(0);
 }
-const pngs: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, anim, tempos, rect, largura: larguraDesenho, fps, fundo, modo, camera: semCamera ? false : undefined })})`);
+const pngs: string[] = await avaliar(`quadro.fotos(${JSON.stringify({ palco, seguir, anim, tempos, rect, largura: larguraDesenho, fps, fundo, modo, camera: semCamera ? false : undefined })})`);
 const nomes: string[] = [];
 for (const [k, d] of pngs.entries()) {
   const f = join(saida, `q_${String(tempos[k].toFixed(3)).padStart(7, "0")}${modo === "normal" ? "" : "_" + modo}.png`);

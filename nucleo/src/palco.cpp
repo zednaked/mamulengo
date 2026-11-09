@@ -214,7 +214,8 @@ std::string Palco::json() const {
   for (size_t i = 0; i < a_.size(); ++i) {
     const EstadoAtor& s = a_[i];
     if (i) o += ",";
-    o += "{\"nome\":\"" + m_.palco.atores[i].nome + "\",\"x\":" + num(s.x) + ",\"y\":" + num(s.y) + ",\"vx\":" + num(s.vx) + ",\"vy\":" + num(s.vy) +
+    static const char* tipos[] = {"jogador", "patrulha", "coletavel", "porta", "enfeite"};
+    o += "{\"nome\":\"" + m_.palco.atores[i].nome + "\",\"tipo\":\"" + tipos[int(m_.palco.atores[i].tipo)] + "\",\"x\":" + num(s.x) + ",\"y\":" + num(s.y) + ",\"vx\":" + num(s.vx) + ",\"vy\":" + num(s.vy) +
          ",\"lado\":" + std::to_string(s.lado) + ",\"chao\":" + (s.chao ? "true" : "false") + ",\"vivo\":" + (s.vivo ? "true" : "false") + ",\"estado\":\"" +
          nome_estado(s.estado) + "\"}";
   }

@@ -23,6 +23,21 @@ pequeno na web.
 Tipos (`type` no editor → `tipo` no `.boneco`): `player` → `jogador`, `patrol` → `patrulha`,
 `collectible` → `coletavel`, `door` → `porta`, `prop` → `enfeite`.
 
+## Montar por comandos
+
+O agente monta a fase inteira pelo MCP (`mamulengo_run`), sem gerador:
+
+- **o mapa:** `mosaic.set` (a grade e a paleta) e `mosaic.paint` (pincel, retângulo, balde);
+- **o palco:** `stage.set {gravity, solid: {mosaic, palette?}, pixel?}`;
+- **cada ator:** `stage.actor {name, boneco, x, y, type, box, speed, jump, side, animations}`. Com
+  `boneco`, cria de uma vez o osso (os pés em x, y), a camada e a instância; sem ele, faz ator de
+  uma instância que já existe (e x, y movem o osso dela);
+- **tirar:** `stage.remove {name, delete?}` (com delete, apaga instância, camada e osso) e
+  `stage.delete`. Renomear ou apagar a instância leva o ator junto.
+
+`tools/nucleo-palco.ts` confere isso: parte do mapa sem nenhum ator, põe os seis só com
+`stage.set` e `stage.actor`, e a mesma rota vence igual, quadro a quadro.
+
 ## As regras (passo de 1/60 s)
 
 - **Entrada:** bits por passo (1 esquerda, 2 direita, 4 pulo). O pulo vale na borda (apertar) e só no chão.
@@ -36,8 +51,9 @@ Tipos (`type` no editor → `tipo` no `.boneco`): `player` → `jogador`, `patro
 ## Jogar e medir
 
 - **Pela linha de comando:** `npx tsx tools/palco.ts x.boneco --roteiro "direita+pulo 50, pulo 2, direita 20, nada 40"` mostra onde o jogador está no fim de cada trecho, os pontos, se venceu ou morreu (`--json` para o estado inteiro). Roteiro: trechos `teclas quadros` (teclas: esquerda, direita, pulo, com +, ou nada; 60 quadros por segundo; cada trecho com pulo aperta de novo).
-- **Filmar:** `npx tsx tools/quadro.ts x.boneco --palco "roteiro" --video vence.mp4 --rect ...` (o roteiro e mais 1 s).
-- **No editor:** com o palco, o botão "🎮 jogar" no alto da tela: setas ou A/D andam, espaço, W ou ↑ pulam, R recomeça, Esc sai; o placar mostra as moedas e o fim.
+- **Filmar:** `npx tsx tools/quadro.ts x.boneco --palco "roteiro" --video vence.mp4 --rect ...` (o roteiro e mais 1 s); com `--seguir`, o `--rect` só dá o tamanho e a câmera acompanha o jogador (macia, a cada passo do jogo, sem sair da caixa do esqueleto).
+- **No editor:** com o palco, o botão "🎮 jogar" no alto da tela: setas ou A/D andam, espaço, W ou ↑ pulam, R recomeça, Esc sai; o placar mostra as moedas e o fim. Quando a fase não cabe na tela, a câmera acompanha o jogador.
+- **Exportar:** `npx tsx tools/exportar-jogo.ts x.boneco jogo.html [--titulo "nome"] [--fundo cfe8f7] [--vista 1280,720]` gera uma página HTML só (cerca de 750 KB na fase de exemplo) com o núcleo em wasm, os `.boneco`, os filhos e as páginas dentro, e o tocador (`src/jogo/jogo.ts`): teclado, botões de toque no celular, câmera que acompanha o jogador, placar e recomeçar. Abre direto do disco ou de qualquer hospedagem estática. A fase de exemplo fica no GitHub Pages em `/jogo/`.
 - **Pelo MCP:** `mamulengo_play {roteiro, aoVivo}` joga no editor da pessoa (ao vivo, em tempo real; ou de uma vez) e devolve o estado no fim de cada trecho; `{parar: true}` sai.
 - **No Godot:** o `BonecoSprite` joga o mesmo palco (`stage_start`, `set_stage_input`, `stage_step`, `get_stage_state`; docs/NUCLEO.md, "No Godot"). A rota que vence dá o mesmo jogo que o núcleo web, quadro a quadro.
 - **Conferência:** `tools/nucleo-palco.ts` joga a fase de exemplo: a rota que vence, a mesma entrada dando o mesmo jogo, cair no buraco, o pisão, encostar no inimigo e a patrulha virando nas beiras.
@@ -51,7 +67,6 @@ plataforma mais baixa, o buraco embaixo de uma plataforma impedia de pular o bur
 
 ## Falta
 
-- montar a fase pelos comandos (`stage.*`) e pelo editor (hoje o bloco vem do gerador ou do JSON);
+- montar a fase pelo editor (hoje: por comandos ou pelo gerador): inspetor do ator, caixa na tela;
 - regras "quando X, então Y", estados com mais animações (golpe, dor), som pelos eventos;
-- câmera que segue o jogador, rolagem e paralaxe; ladrilho de uma via (subir por baixo);
-- exportar o jogo numa página só.
+- paralaxe no fundo; ladrilho de uma via (subir por baixo);

@@ -86,6 +86,13 @@ defineCommand({
     if (seguem.length) throw new Error(`"${p.name}" é seguida por ${seguem.join(", ")}: tire o follow antes`);
     const resto = instances(e.json).filter((_, k) => k !== i);
     e.set(["instances"], resto.length ? resto : undefined);
+    // o ator do palco que era esta instancia sai junto
+    const st = (e.json as any).stage;
+    if (st?.actors?.some((a: any) => (a.instance ?? a.name) === p.name))
+      e.set(
+        ["stage", "actors"],
+        st.actors.filter((a: any) => (a.instance ?? a.name) !== p.name),
+      );
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {}))
       if (a.instances?.[p.name]) {
         const { [p.name]: _, ...outras } = a.instances;
@@ -105,6 +112,8 @@ defineCommand({
     const i = requireInstance(e.json, p.name);
     if (instances(e.json).some((x) => x.name === p.to)) throw new Error(`instância já existe: ${p.to}`);
     e.set(["instances", i, "name"], p.to);
+    // o ator do palco segue o nome novo
+    ((e.json as any).stage?.actors ?? []).forEach((a: any, k: number) => (a.instance ?? a.name) === p.name && e.set(["stage", "actors", k, "instance"], p.to));
     // quem segue esta passa a seguir pelo nome novo
     instances(e.json).forEach((x, k) => x.follow?.instance === p.name && e.set(["instances", k, "follow", "instance"], p.to));
     for (const [an, a] of Object.entries<any>(e.json.animations ?? {})) {
