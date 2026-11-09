@@ -144,6 +144,13 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   (does the jump reach the platform? does the enemy turn at the edge?), you play it
   in the editor with the keyboard, and the MCP can play it live on your screen.
   [docs/PALCO.md](docs/PALCO.md).
+- **A Godot UI scene, without Godot:** `src/cena` reads a `.tscn`, lays out its
+  `Control` nodes the way Godot 4 does (anchors, min and max size, grow direction,
+  pivot, the containers, label sizes from the font metrics) and `src/tela` draws it
+  in one WebGL2 pass, for the exact window size, rebuilding when the window turns.
+  Variants per aspect ratio do what Godot's stretch cannot (a centered column on
+  desktop). A production game ported this way loads 7x less before its first screen
+  than its Godot export. [docs/BACKEND.md](docs/BACKEND.md).
 
 ![The robot looking around in 2.5D, flying on jets with a glow and a ring of stars, dissolving its arms and firing a lightning arc between its hands](exemplos/vitrine/vitrine.gif)
 
@@ -434,7 +441,10 @@ Working: the editor (drawing, posing and measuring through the core in the
 particles, the core with its Godot module and GDExtension. A slot game runs on
 staging with the engine module, and its `.boneco` build, all on the core, passes
 its tests. The core is now the editor's default mode for every project, the binary
-`.boneco` is done and the editor opens from a link, nothing to install. Next: the
+`.boneco` is done and the editor opens from a link, nothing to install. A first
+production web game runs entirely on the Mamulengo runtime, its screens generated
+from the Godot project at deploy time. Next: a layout editor that saves to `.tscn`
+or straight to the screen, the
 addon on the Godot Asset Library, PSD import and atlas repacking in the browser
 editor too, and faster physics replay after each edit. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).

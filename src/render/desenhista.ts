@@ -343,13 +343,16 @@ export class Desenhista {
   // Desenha o desenho atual do modulo (depois de mm_limpar_desenho e mm_desenhar) com a
   // projecao dada (mat4 em colunas). Nao limpa a tela; deixa o stencil desligado e nenhum
   // VAO ligado (o spine-webgl desenha depois no mesmo contexto).
-  desenhar(N: any, paginas: PaginaGL[], proj: Float32Array | number[]) {
+  // tinta: a cor herdada do no (o modulate do Godot), multiplicada na cor de cada vertice
+  desenhar(N: any, paginas: PaginaGL[], proj: Float32Array | number[], tinta?: number[]) {
     const gl = this.gl;
     const nv = N._mm_num_vertices(),
       ni = N._mm_num_indices(),
       nl = N._mm_num_lotes();
     if (!nl) return { lotes: 0, chamadas: 0, vertices: 0 };
     const v = N.HEAPF32.subarray(N._mm_vertices() / 4, N._mm_vertices() / 4 + nv * 8);
+    if (tinta && (tinta[0] !== 1 || tinta[1] !== 1 || tinta[2] !== 1 || tinta[3] !== 1))
+      for (let o = 4; o < v.length; o += 8) (v[o] *= tinta[0]), (v[o + 1] *= tinta[1]), (v[o + 2] *= tinta[2]), (v[o + 3] *= tinta[3]);
     const ind = N.HEAPU32.subarray(N._mm_indices() / 4, N._mm_indices() / 4 + ni);
     const pl = N._mm_lotes() / 4;
     const lotes = N.HEAP32.subarray(pl, pl + nl * 7);

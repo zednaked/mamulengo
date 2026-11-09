@@ -7,6 +7,13 @@ O que está aberto, em ordem de prioridade.
 1. **Desempenho no celular:** medir de novo com o canvas no tamanho base (docs/CELULAR.md) e o `.boneco` binário, e ver o que sobra para o núcleo.
 2. **O addon na Godot Asset Library,** e o build de macOS conferido num Mac.
 3. **Teste com uma pessoa:** levar para o editor o que a pessoa achou.
+4. **Editor de layout:** abrir uma cena de interface, mover, ancorar, editar textos e traduções, ver em vários tamanhos e idiomas, e salvar em `.tscn` (para o Godot) ou direto na cena do Mamulengo.
+
+Feito agora: a interface de jogo web sem o Godot (docs/BACKEND.md "A cena do Mamulengo"). `src/cena`
+lê o `.tscn`, calcula os `Control` como o Godot 4 e `src/tela` desenha em WebGL2 no tamanho exato
+da janela, com variantes por proporção, estados de layout interpolados e bonecos com trilhas. Um
+jogo de produção portado assim (1310 de 1330 nós iguais ao Godot) baixa 7x menos até a primeira
+tela e fica pronto 5x mais rápido em 4G que o export do Godot.
 
 Feito há pouco: o editor revisado com testes acompanhados (Mover numa junta dobra o membro, Alt
 solta, Ctrl ajusta a imagem no osso, setas em passos, linha de ajuda da ferramenta, árvore com

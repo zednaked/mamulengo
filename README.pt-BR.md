@@ -143,6 +143,13 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   com entrada roteirizada e mede (o pulo alcança a plataforma? o inimigo vira na
   beira?), você joga no editor com o teclado, e o MCP joga ao vivo na sua tela.
   [docs/PALCO.md](docs/PALCO.md).
+- **Uma cena de interface do Godot, sem o Godot:** `src/cena` lê um `.tscn`,
+  calcula os `Control` como o Godot 4 (âncoras, tamanho mínimo e máximo, direção de
+  crescimento, pivô, os containers, o tamanho dos textos pelas medidas da fonte) e
+  `src/tela` desenha num passo WebGL2, no tamanho exato da janela, remontando quando
+  ela gira. Variantes por proporção fazem o que o esticar do Godot não faz (uma
+  coluna centrada no desktop). Um jogo de produção portado assim baixa 7x menos até
+  a primeira tela que o export do Godot. [docs/BACKEND.md](docs/BACKEND.md).
 
 ![O robô olhando em 2,5D, voando com jatos, brilho e um anel de estrelas, dissolvendo os braços e soltando um raio entre as mãos](exemplos/vitrine/vitrine.gif)
 
@@ -433,7 +440,10 @@ servidor MCP, a bancada de agentes, o `.boneco` com efeitos e partículas, o
 núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
 o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
 O núcleo já é o modo padrão do editor para todo projeto, o `.boneco` binário
-está pronto e o editor abre por um link, sem instalar. Próximos: o addon na Godot
+está pronto e o editor abre por um link, sem instalar. Um primeiro jogo web de
+produção roda inteiro no runtime do Mamulengo, com as telas geradas do projeto do
+Godot no deploy. Próximos: um editor de layout que salva em `.tscn` ou direto na
+tela, o addon na Godot
 Asset Library, PSD e reempacotar o atlas também no editor pelo navegador, e a
 física refeita mais rápido depois de cada edição. Plano:
 [docs/ROADMAP.md](docs/ROADMAP.md).

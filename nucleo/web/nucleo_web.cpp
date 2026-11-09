@@ -38,6 +38,10 @@ namespace {
 
 struct Instancia {
   std::shared_ptr<const Modelo> modelo;
+  // o que o jogo faz por cima da animacao, so no desenho: tinta por slot (multiplica a cor) e slot
+  // escondido (o pintar e o esconder do jogo); vazio = nada
+  std::vector<Cor> tinta;
+  std::vector<uint8_t> com_tinta, escondido;
   Esqueleto e;
   std::unique_ptr<Estado> estado;  // so no uso com trilhas (mm_reiniciar)
   int anim = -1;
@@ -356,6 +360,13 @@ EMSCRIPTEN_KEEPALIVE void mm_estado_tocar(int inst, int trilha, int anim, int lo
   e->mix_duracao = mix;
 }
 
+// set_animation tocando ao contrario (do fim para o comeco), como o play_reverso do jogo
+EMSCRIPTEN_KEEPALIVE void mm_estado_tocar_reverso(int inst, int trilha, int anim, double mix) {
+  Entrada* e = instancias[size_t(inst)]->estado->tocar(trilha, anim, false);
+  e->reverso = true;
+  e->mix_duracao = mix;
+}
+
 // add_animation com o atraso ja calculado e o mix dado
 EMSCRIPTEN_KEEPALIVE void mm_estado_enfileirar(int inst, int trilha, int anim, int loop, double atraso, double mix) {
   Entrada* e = instancias[size_t(inst)]->estado->enfileirar(trilha, anim, loop != 0, atraso);
@@ -394,7 +405,41 @@ EMSCRIPTEN_KEEPALIVE double mm_tempo(int inst) { return instancias[size_t(inst)]
 
 // desenho: mm_limpar_desenho, um mm_desenhar por instancia e os ponteiros abaixo
 EMSCRIPTEN_KEEPALIVE void mm_limpar_desenho() { desenho.limpar(); }
-EMSCRIPTEN_KEEPALIVE void mm_desenhar(int inst) { desenhar(instancias[size_t(inst)]->e, desenho); }
+EMSCRIPTEN_KEEPALIVE void mm_desenhar(int inst) {
+  Instancia& in = *instancias[size_t(inst)];
+  if (in.com_tinta.empty() && in.escondido.empty()) return desenhar(in.e, desenho);
+  Esqueleto& e = in.e;
+  std::vector<std::pair<int, Cor>> cores;
+  std::vector<std::pair<int, int>> partes;
+  for (int s = 0; s < int(e.slots().size()); ++s) {
+    if (s < int(in.escondido.size()) && in.escondido[size_t(s)]) {
+      partes.emplace_back(s, e.slot(s).parte);
+      e.slot(s).parte = -1;
+    }
+    if (s < int(in.com_tinta.size()) && in.com_tinta[size_t(s)]) {
+      Cor& c = e.slot(s).cor;
+      cores.emplace_back(s, c);
+      const Cor& t = in.tinta[size_t(s)];
+      c = Cor{c.r * t.r, c.g * t.g, c.b * t.b, c.a * t.a};
+    }
+  }
+  desenhar(e, desenho);
+  for (auto [s, p] : partes) e.slot(s).parte = p;
+  for (auto& [s, c] : cores) e.slot(s).cor = c;
+}
+// tinta de um slot no desenho (a < 0 tira); esconder um slot no desenho
+EMSCRIPTEN_KEEPALIVE void mm_slot_tinta(int inst, int slot, float r, float g, float b, float a) {
+  Instancia& in = *instancias[size_t(inst)];
+  size_t n = in.modelo->slots.size();
+  in.tinta.resize(n), in.com_tinta.resize(n);
+  in.com_tinta[size_t(slot)] = a >= 0;
+  in.tinta[size_t(slot)] = Cor{r, g, b, a};
+}
+EMSCRIPTEN_KEEPALIVE void mm_slot_esconder(int inst, int slot, int sim) {
+  Instancia& in = *instancias[size_t(inst)];
+  in.escondido.resize(in.modelo->slots.size());
+  in.escondido[size_t(slot)] = sim != 0;
+}
 // desenha sem os slots marcados (um byte por slot, nao zero esconde): o olho do editor
 EMSCRIPTEN_KEEPALIVE void mm_desenhar_escondendo(int inst, const uint8_t* esconder) {
   Esqueleto& e = instancias[size_t(inst)]->e;
