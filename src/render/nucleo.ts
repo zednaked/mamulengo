@@ -395,6 +395,12 @@ export class NucleoCena {
     this.N._mm_palco_passo(this.inst, teclas, n, 1 / 60);
     this.mudou();
   }
+  // a caixa do que a instancia (indice na lista do modelo) desenha agora: [x0, y0, x1, y1]
+  caixaInstancia(i: number): number[] | null {
+    if (this.inst < 0 || !this.N._mm_caixa_instancia || !this.N._mm_caixa_instancia(this.inst, i)) return null;
+    const p = this.N._mm_saida() / 8;
+    return [...this.N.HEAPF64.subarray(p, p + 4)];
+  }
   palcoEstado(): any {
     return this.inst < 0 ? null : JSON.parse(this.N.UTF8ToString(this.N._mm_palco_estado(this.inst)));
   }

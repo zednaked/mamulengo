@@ -563,6 +563,23 @@ EMSCRIPTEN_KEEPALIVE int mm_caixa(int inst) {
   return x0 <= x1 ? 1 : 0;
 }
 
+// a caixa do que a instancia `i` desenha agora (o filho, no espaco do pai) em mm_saida: x0, y0,
+// x1, y1; 0 se ela nao desenha nada. O palco usa para a caixa de um ator novo (docs/PALCO.md)
+EMSCRIPTEN_KEEPALIVE int mm_caixa_instancia(int inst, int i) {
+  Instancia& I = *instancias[size_t(inst)];
+  auto& lista = I.e.instancias();
+  if (i < 0 || size_t(i) >= lista.size() || !lista[size_t(i)].e) return 0;
+  Desenho d;
+  desenhar(*lista[size_t(i)].e, d);
+  double x0 = 1e300, y0 = 1e300, x1 = -1e300, y1 = -1e300;
+  for (size_t k = 0; k + 1 < d.vertices.size(); k += 8) {
+    x0 = std::min(x0, double(d.vertices[k])), x1 = std::max(x1, double(d.vertices[k]));
+    y0 = std::min(y0, double(d.vertices[k + 1])), y1 = std::max(y1, double(d.vertices[k + 1]));
+  }
+  saida.assign({x0, y0, x1, y1});
+  return x0 <= x1 ? 1 : 0;
+}
+
 // triangulos de uma parte (regiao: os 2 do retangulo; malha: os do arquivo) em mm_saida
 EMSCRIPTEN_KEEPALIVE int mm_parte_triangulos(int modelo, int parte) {
   const Parte& p = modelos[size_t(modelo)]->partes[size_t(parte)];

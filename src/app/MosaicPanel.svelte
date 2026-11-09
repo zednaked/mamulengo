@@ -121,6 +121,16 @@
       {/if}
     {/if}
 
+    {#if m.shape !== "iso" && !m.corners}
+      <label class="linha" title="o palco (docs/PALCO.md): os ladrilhos deste mosaico seguram os atores (chão e paredes)">
+        <input
+          type="checkbox"
+          checked={(app.doc?.json as any)?.stage?.solid?.mosaic === m.name}
+          onchange={(e) => app.run({ cmd: "stage.set", args: { solid: (e.target as HTMLInputElement).checked ? { mosaic: m.name } : null } }, (e.target as HTMLInputElement).checked ? `${m.name} é o chão do palco` : "palco sem chão")}
+        />
+        🎮 chão sólido do palco
+      </label>
+    {/if}
     <details>
       <summary>grade</summary>
       <div class="campos">

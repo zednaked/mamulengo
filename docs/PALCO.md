@@ -38,6 +38,12 @@ O agente monta a fase inteira pelo MCP (`mamulengo_run`), sem gerador:
 `tools/nucleo-palco.ts` confere isso: parte do mapa sem nenhum ator, põe os seis só com
 `stage.set` e `stage.actor`, e a mesma rota vence igual, quadro a quadro.
 
+## Montar pelo editor
+
+- **Ator:** no inspetor da camada, cada instância tem "🎮 ator": escolher o tipo a faz ator, com a caixa pelo tamanho do boneco (70% da largura que ele desenha, dos pés ao topo); os campos (caixa, velocidade, pulo, para onde olha, a animação de cada estado e a gravidade do palco) mudam o ator; ✕ deixa de ser ator.
+- **Chão:** no painel do mosaico, "🎮 chão sólido do palco" faz dos ladrilhos dele o chão e as paredes.
+- **Na tela:** fora do jogo, a caixa de cada ator aparece por cima, na cor do tipo (jogador verde, patrulha vermelha, coletável amarela, porta azul), com o ponto dos pés no osso; no ator escolhido, as alças da direita (largura, igual dos dois lados) e de cima (altura) ajustam a caixa arrastando, num passo de desfazer.
+
 ## As regras (passo de 1/60 s)
 
 - **Entrada:** bits por passo (1 esquerda, 2 direita, 4 pulo). O pulo vale na borda (apertar) e só no chão.
@@ -67,6 +73,5 @@ plataforma mais baixa, o buraco embaixo de uma plataforma impedia de pular o bur
 
 ## Falta
 
-- montar a fase pelo editor (hoje: por comandos ou pelo gerador): inspetor do ator, caixa na tela;
 - regras "quando X, então Y", estados com mais animações (golpe, dor), som pelos eventos;
 - paralaxe no fundo; ladrilho de uma via (subir por baixo);

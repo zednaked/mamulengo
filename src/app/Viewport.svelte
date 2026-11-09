@@ -83,6 +83,78 @@
   import { Color } from "@esotericsoftware/spine-webgl";
   import type { Viewer as V } from "../render/viewer.ts";
 
+  // o palco (docs/PALCO.md): a caixa de cada ator (o que colide), com o meio de baixo nos pes, na cor
+  // do tipo; fora do jogo
+  const COR_ATOR: Record<string, [number, number, number]> = { player: [0.4, 1, 0.55], patrol: [1, 0.35, 0.35], collectible: [1, 0.85, 0.3], door: [0.45, 0.75, 1], prop: [0.8, 0.8, 0.8] };
+  // o ator da camada escolhida e a caixa dele no esqueleto (pes no meio de baixo)
+  function caixaDoAtor(v: V, a: any): { x: number; y: number; w: number; h: number } | null {
+    const j: any = app.doc?.json;
+    const inst = (j?.instances ?? []).find((x: any) => x.name === (a.instance ?? a.name));
+    const osso = inst?.bone ?? j?.slots?.find((x: any) => x.name === inst?.slot)?.bone;
+    const b = osso ? v.pose?.findBone(osso) : null;
+    if (!b) return null;
+    const [w, h] = a.box ?? [16, 16];
+    return { x: b.worldX, y: b.worldY, w, h };
+  }
+  function atorEscolhido(): any {
+    const j: any = app.doc?.json;
+    const sl = app.selection.slot;
+    if (!sl || !j?.stage?.actors) return null;
+    const inst = (j.instances ?? []).find((x: any) => x.slot === sl);
+    return inst ? (j.stage.actors.find((a: any) => (a.instance ?? a.name) === inst.name) ?? null) : null;
+  }
+  // as alcas: a borda da direita (largura, simetrica) e a de cima (altura), em pixels de tela
+  function alcaEm(v: V, sx: number, sy: number): { ator: any; borda: "w" | "h" } | null {
+    const a = atorEscolhido();
+    const c = a ? caixaDoAtor(v, a) : null;
+    if (!a || !c) return null;
+    const fy = v.flip ? -1 : 1;
+    const perto = (x: number, y: number) => {
+      const p = v.worldToScreen(x, y * fy);
+      return Math.hypot(p.x - sx, p.y - sy) < 10;
+    };
+    if (perto(c.x + c.w / 2, c.y + c.h / 2)) return { ator: a, borda: "w" };
+    if (perto(c.x, c.y + c.h)) return { ator: a, borda: "h" };
+    return null;
+  }
+  let arrastoCaixa: { ator: any; borda: "w" | "h"; merge: string } | null = null;
+  function drawPalco(v: V) {
+    const j: any = app.doc?.json;
+    if (!j?.stage?.actors?.length || v.jogo) return;
+    const escolhido = atorEscolhido();
+    const s = v.scene;
+    const fy = v.flip ? -1 : 1;
+    for (const a of j.stage.actors) {
+      const inst = (j.instances ?? []).find((x: any) => x.name === (a.instance ?? a.name));
+      const osso = inst?.bone ?? j.slots.find((x: any) => x.name === inst?.slot)?.bone;
+      const b = osso ? v.pose?.findBone(osso) : null;
+      if (!b) continue;
+      const [w, h] = a.box ?? [16, 16];
+      const [r, g, bl] = COR_ATOR[a.type] ?? [1, 1, 1];
+      const cor = new Color(r, g, bl, 0.9);
+      const x0 = b.worldX - w / 2,
+        x1 = b.worldX + w / 2,
+        y0 = b.worldY * fy,
+        y1 = (b.worldY + h) * fy;
+      s.line(x0, y0, x1, y0, cor);
+      s.line(x1, y0, x1, y1, cor);
+      s.line(x1, y1, x0, y1, cor);
+      s.line(x0, y1, x0, y0, cor);
+      s.circle(true, b.worldX, y0, 3 / v.cam.zoom, cor, 10);
+      // as alcas do ator escolhido: largura (direita) e altura (em cima)
+      if (a === escolhido) {
+        const q = 5 / v.cam.zoom;
+        for (const [x, y] of [
+          [x1, (y0 + y1) / 2],
+          [b.worldX, y1],
+        ]) {
+          s.rect(true, x - q, y - q, q * 2, q * 2, new Color(1, 1, 1, 0.95));
+          s.rect(false, x - q, y - q, q * 2, q * 2, cor);
+        }
+      }
+    }
+  }
+
   // os pontos clicados de uma parte especial e o trecho ate o cursor
   function drawCaptura(v: V) {
     const c = app.captura;
@@ -157,6 +229,7 @@
       if (app.captura) return drawCaptura(v);
       if (app.drawEdit) return drawDrawEdit(v);
       if (app.mosaicEdit) return drawMosaicEdit(v);
+      drawPalco(v);
       drawLigacoes(v);
       drawHover(v);
       drawGizmo(v);
@@ -288,6 +361,12 @@
       if (!mosaicDown(v, w)) downAt = null;
       return;
     }
+    // a alca da caixa do ator escolhido (o palco)
+    const alca = !v.jogo ? alcaEm(v, e.clientX, e.clientY) : null;
+    if (alca) {
+      arrastoCaixa = { ...alca, merge: `caixa-${alca.ator.name}-${Date.now()}` };
+      return;
+    }
     // clicando os pontos de uma parte especial (o ponto conclui no primeiro clique)
     if (app.captura) {
       app.captura.pontos = [...app.captura.pontos, [w.x, w.y]];
@@ -381,6 +460,19 @@
       mosaicMove(v, v.screenToSkel(e.clientX, e.clientY));
       return;
     }
+    if (arrastoCaixa) {
+      const a = arrastoCaixa.ator;
+      const c = caixaDoAtor(v, a);
+      const p = v.screenToSkel(e.clientX, e.clientY);
+      if (c) {
+        const box: [number, number] = arrastoCaixa.borda === "w" ? [Math.max(2, Math.round(Math.abs(p.x - c.x) * 2)), c.h] : [c.w, Math.max(2, Math.round(p.y - c.y))];
+        app.run({ cmd: "stage.actor", args: { name: a.name, box } }, `caixa de ${a.name}`, arrastoCaixa.merge, true);
+        arrastoCaixa.ator = (app.doc?.json as any).stage.actors.find((x: any) => x.name === a.name) ?? a;
+        const r = canvas.getBoundingClientRect();
+        leitura = { t: `caixa ${box[0]} × ${box[1]}`, x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+      return;
+    }
     if (downAt && app.mosaicEdit) return;
     if (downAt && app.drawEdit) return;
     if (downAt && app.meshEdit) return;
@@ -445,6 +537,7 @@
     meshUp();
     drawUp();
     mosaicUp();
+    arrastoCaixa = null;
   }
 </script>
 

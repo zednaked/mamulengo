@@ -354,6 +354,39 @@
   const animsDe = (i: any, f: { anims: string[] } | undefined): string[] => (f?.anims.length ? f.anims : i.animation ? [i.animation] : []);
   const instSet = (nome: string, campo: string, valor: any, arrasto = false) =>
     app.run({ cmd: "instance.set", args: { name: nome, [campo]: valor } }, `instância ${nome}: ${campo}`, arrasto ? `inst-${nome}-${campo}` : undefined, arrasto);
+  // ---- palco (docs/PALCO.md): a instancia como ator (jogador, patrulha, coletavel, porta)
+  const palco = $derived.by(() => {
+    app.version;
+    return (app.doc?.json as any)?.stage ?? null;
+  });
+  const atorDe = (inst: string) => (palco?.actors ?? []).find((a: any) => (a.instance ?? a.name) === inst) ?? null;
+  const TIPOS_ATOR: [string, string][] = [
+    ["player", "jogador"],
+    ["patrol", "patrulha"],
+    ["collectible", "coletável"],
+    ["door", "porta (vence)"],
+    ["prop", "enfeite"],
+  ];
+  const atorSet = (nome: string, args: any, arrasto = false) => app.run({ cmd: "stage.actor", args: { name: nome, ...args } }, `ator ${nome}`, arrasto ? `ator-${nome}-${Object.keys(args).join(",")}` : undefined, arrasto);
+  // a caixa sugerida: o que o boneco desenha agora, 70% da largura (orelha e braco nao colidem) e a
+  // altura dos pes (o osso) ao topo
+  function caixaSugerida(inst: string): [number, number] | null {
+    const j: any = app.doc?.json;
+    const v = app.viewer;
+    const idx = (j?.instances ?? []).findIndex((x: any) => x.name === inst);
+    const c = idx >= 0 ? v?.nucleo?.caixaInstancia(idx) : null;
+    const ix = j?.instances?.[idx];
+    const osso = ix?.bone ?? j?.slots?.find((x: any) => x.name === ix?.slot)?.bone;
+    const pe = osso ? v?.pose?.findBone(osso) : null;
+    if (!c || !pe) return null;
+    return [Math.max(4, Math.round((c[2] - c[0]) * 0.7)), Math.max(4, Math.round(c[3] - pe.worldY))];
+  }
+  function tornarAtor(inst: string, tipo: string) {
+    if (!tipo) return;
+    const box = caixaSugerida(inst);
+    const r = app.run({ cmd: "stage.actor", args: { name: inst, instance: inst, type: tipo, ...(box ? { box } : {}), ...(tipo === "player" ? { speed: 300, jump: 900 } : {}) } }, `${inst} vira ator`);
+    if (r) app.avisar(`${inst} agora é ${TIPOS_ATOR.find(([t]) => t === tipo)?.[1]} no palco${box ? `, com a caixa ${box[0]} × ${box[1]} pelo tamanho do boneco` : ""}. Ajuste arrastando as alças da caixa na tela e jogue com 🎮 no alto da tela.`);
+  }
   let renInst = $state<string | null>(null);
   let textoInst = $state("");
   function renomearInst() {
@@ -1145,6 +1178,57 @@
                 <label class="mini-campo">{rot}<input type="number" step={passo} value={+(i[k as string] ?? (String(k).startsWith("scale") ? 1 : 0)).toFixed(2)} onchange={(e) => instSet(i.name, k as string, +(e.target as HTMLInputElement).value)} /></label>
               {/each}
             </div>
+            {#if !animando}
+              {@const ator = atorDe(i.name)}
+              {#if !ator}
+                <label class="efcampo" title="o palco (docs/PALCO.md): a simulação move esta instância como um personagem do jogo">
+                  <span>🎮 ator</span>
+                  <select value="" onchange={(e) => tornarAtor(i.name, (e.target as HTMLSelectElement).value)}>
+                    <option value="">(não é ator)</option>
+                    {#each TIPOS_ATOR as [t, rot]}<option value={t}>{rot}</option>{/each}
+                  </select>
+                  <span></span>
+                </label>
+              {:else}
+                <div class="ator">
+                  <label class="efcampo" title="o papel no jogo">
+                    <span>🎮 ator</span>
+                    <select value={ator.type} onchange={(e) => atorSet(ator.name, { type: (e.target as HTMLSelectElement).value })}>
+                      {#each TIPOS_ATOR as [t, rot]}<option value={t}>{rot}</option>{/each}
+                    </select>
+                    <button class="tira" onclick={() => app.run({ cmd: "stage.remove", args: { name: ator.name } }, `${ator.name} deixa de ser ator`)} title="deixa de ser ator (a instância fica)">✕</button>
+                  </label>
+                  <div class="imagem-osso" title="a caixa que colide: largura e altura, com o meio de baixo nos pés (o osso)">
+                    <label class="mini-campo">caixa L<input type="number" min="1" value={ator.box?.[0] ?? 16} onchange={(e) => atorSet(ator.name, { box: [+(e.target as HTMLInputElement).value, ator.box?.[1] ?? 16] })} /></label>
+                    <label class="mini-campo">A<input type="number" min="1" value={ator.box?.[1] ?? 16} onchange={(e) => atorSet(ator.name, { box: [ator.box?.[0] ?? 16, +(e.target as HTMLInputElement).value] })} /></label>
+                    {#if ator.type === "player" || ator.type === "patrol"}
+                      <label class="mini-campo">velocidade<input type="number" min="0" step="10" value={ator.speed ?? (ator.type === "patrol" ? 40 : 100)} onchange={(e) => atorSet(ator.name, { speed: +(e.target as HTMLInputElement).value })} /></label>
+                    {/if}
+                    {#if ator.type === "player"}
+                      <label class="mini-campo">pulo<input type="number" min="0" step="10" value={ator.jump ?? 300} onchange={(e) => atorSet(ator.name, { jump: +(e.target as HTMLInputElement).value })} /></label>
+                    {/if}
+                    {#if ator.type === "patrol"}
+                      <label class="mini-campo">começa olhando<select value={String(ator.side ?? 1)} onchange={(e) => atorSet(ator.name, { side: +(e.target as HTMLSelectElement).value })}><option value="1">→</option><option value="-1">←</option></select></label>
+                    {/if}
+                  </div>
+                  {#if ator.type === "player" || ator.type === "patrol"}
+                    <div class="imagem-osso" title="a animação do boneco em cada estado (sem: a de mesmo nome, se houver)">
+                      {#each [["idle", "parado"], ["walk", "andando"], ["jump", "pulo"], ["dead", "morto"]] as [k, rot]}
+                        <label class="mini-campo">{rot}<select value={ator.animations?.[k] ?? ""} onchange={(e) => atorSet(ator.name, { animations: { [k]: (e.target as HTMLSelectElement).value || undefined } })}>
+                          <option value="">({rot})</option>
+                          {#each animsDe(i, f) as a}<option value={a}>{a}</option>{/each}
+                        </select></label>
+                      {/each}
+                    </div>
+                  {/if}
+                  <label class="efcampo" title="a gravidade do palco inteiro, px/s² para baixo">
+                    <span>gravidade</span>
+                    <input type="range" min="0" max="4000" step="50" value={palco?.gravity ?? 900} oninput={(e) => app.run({ cmd: "stage.set", args: { gravity: +(e.target as HTMLInputElement).value } }, "gravidade do palco", "palco-gravidade", true)} />
+                    <span class="num">{palco?.gravity ?? 900}</span>
+                  </label>
+                </div>
+              {/if}
+            {/if}
           </div>
         {/each}
         {#if !animando && bonecosPossiveis.length}
