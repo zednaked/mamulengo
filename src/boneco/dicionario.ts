@@ -235,17 +235,64 @@ export const CAMPOS: Record<string, string> = {
   idle: "parado",
   walk: "andando",
   dead: "morto",
+  // tela (so do Mamulengo; docs/NUCLEO.md "Tela"): a arte base, o encaixe numa janela de outro
+  // tamanho e os ossos presos a pontos dela; osso, ancora e estica ja estao acima
+  screen: "tela",
+  art: "arte",
+  fit: "encaixe",
+  anchors: "ancoras",
+  cover: "cobre",
+  // texto (so do Mamulengo; docs/NUCLEO.md "Texto"): a parte de texto, as fontes do projeto e a
+  // tabela de idiomas. O conteudo e `string` no editor (como o do evento) e `texto` no .boneco;
+  // largura, altura, cor, alinhar e linha (o contorno) ja estao acima
+  key: "chave",
+  font: "familia",
+  size: "tamanho",
+  minSize: "minimo",
+  valign: "alinhar_v",
+  overflow: "estouro",
+  shadow: "sombra",
+  fonts: "fontes",
+  file: "arquivo",
+  translations: "traducoes",
+  languages: "idiomas",
+  strings: "textos",
+  // nove-fatias (so do Mamulengo; docs/NUCLEO.md "Nove-fatias"): as 4 margens da regiao, o que o
+  // miolo faz em cada eixo e o texto que a caixa acompanha
+  slice: "fatias",
+  left: "esquerda",
+  top: "cima",
+  right: "direita",
+  bottom: "baixo",
+  axisX: "eixo_x",
+  axisY: "eixo_y",
+  fitText: "acompanha",
+  padding: "respiro",
+  // papeis (so do Mamulengo; docs/NUCLEO.md "Papeis"): o que cada osso e para o codigo do jogo
+  // (botao, toque, texto), a area de toque e os estados do botao; nome, tipo, osso, slot, caixa e
+  // mix ja estao acima
+  roles: "papeis",
+  states: "estados",
+  hover: "em_cima",
+  pressed: "apertado",
+  disabled: "desligado",
+  track: "trilha",
 };
 
 // valores de enum que mudam de nome (por campo)
 export const VALORES: Record<string, Record<string, string>> = {
   blend: { additive: "aditivo", multiply: "multiplica", screen: "tela", overlay: "sobrepor", softLight: "luz_suave", darken: "escurecer", lighten: "clarear", difference: "diferenca", colorDodge: "subexpor" },
-  type: { player: "jogador", patrol: "patrulha", collectible: "coletavel", door: "porta", prop: "enfeite", region: "regiao", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
+  type: { player: "jogador", patrol: "patrulha", collectible: "coletavel", door: "porta", prop: "enfeite", region: "regiao", text: "texto", button: "botao", touch: "toque", mesh: "malha", linkedmesh: "malha_ligada", boundingbox: "caixa", path: "caminho", point: "ponto", clipping: "recorte", ik: "ik", transform: "transformacao", physics: "fisica", slider: "slider", lightning: "raio", orbit: "orbita" },
   curve: { stepped: "degrau" },
-  align: { inside: "dentro", center: "centro", outside: "fora" },
+  align: { inside: "dentro", center: "centro", outside: "fora", left: "esquerda", right: "direita" },
+  valign: { top: "cima", middle: "meio", bottom: "baixo" },
+  overflow: { shrink: "encolher", wrap: "quebrar", clip: "cortar", none: "nada" },
   join: { miter: "viva", round: "redonda", bevel: "chanfrada" },
   cap: { butt: "reta", round: "redonda", square: "quadrada" },
   shape: { grid: "grade" },
+  axisX: { stretch: "esticar", tile: "repetir", tileFit: "repetir_caber" },
+  axisY: { stretch: "esticar", tile: "repetir", tileFit: "repetir_caber" },
+  fit: { contain: "caber", cover: "cobrir", width: "largura", height: "altura" },
 };
 
 export const CAMPOS_VOLTA: Record<string, string> = Object.fromEntries(Object.entries(CAMPOS).map(([a, b]) => [b, a]));

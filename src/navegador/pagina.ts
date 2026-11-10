@@ -33,17 +33,18 @@ export async function iniciar() {
   await semearExemplos();
 }
 
-// os exemplos (tests/boneco, CC0) na primeira vez: /navegador/exemplos/<personagem>/
+// os exemplos (tests/boneco e exemplos/coelho, CC0) na primeira vez: /navegador/exemplos/<pasta>/. A
+// marca muda quando entra um exemplo novo: so os arquivos que faltam sao trazidos
 async function semearExemplos() {
   const lista = typeof __EXEMPLOS__ !== "undefined" ? __EXEMPLOS__ : [];
-  if (!lista.length || localStorage.getItem("mamulengo.exemplos") === "1") return;
+  if (!lista.length || localStorage.getItem("mamulengo.exemplos") === "2") return;
   for (const rel of lista) {
     const destino = `${fs.OPFS}/${rel}`;
     if (await fs.existe(destino)) continue;
     const r = await fetch(new URL(rel, document.baseURI));
     if (r.ok) await fs.gravarArquivo(destino, await r.blob());
   }
-  localStorage.setItem("mamulengo.exemplos", "1");
+  localStorage.setItem("mamulengo.exemplos", "2");
 }
 
 // escolher uma pasta do computador (num clique)

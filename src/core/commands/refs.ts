@@ -48,6 +48,8 @@ defineCommand({
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.bone === p.bone && e.set(["particles", k, "bone"], p.to));
     ((e.json as any).lights ?? []).forEach((l: any, k: number) => l.bone === p.bone && e.set(["lights", k, "bone"], p.to));
     ((e.json as any).instances ?? []).forEach((x: any, k: number) => x.bone === p.bone && e.set(["instances", k, "bone"], p.to));
+    ((e.json as any).screen?.anchors ?? []).forEach((x: any, k: number) => x.bone === p.bone && e.set(["screen", "anchors", k, "bone"], p.to));
+    ((e.json as any).roles ?? []).forEach((x: any, k: number) => x.bone === p.bone && e.set(["roles", k, "bone"], p.to));
     return { renamed: p.to };
   },
 });
@@ -107,6 +109,10 @@ defineCommand({
     // luzes presas neles
     for (const l of ((e.json as any).lights ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("light.delete", { name: l.name });
     for (const x of ((e.json as any).instances ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("instance.delete", { name: x.name });
+    // ancoras da tela
+    for (const x of ((e.json as any).screen?.anchors ?? []).filter((x: any) => dead.has(x.bone))) ctx.run("anchor.set", { bone: x.bone, off: true });
+    // papeis do grupo que some (docs/NUCLEO.md "Papeis")
+    for (const x of ((e.json as any).roles ?? []).filter((x: any) => x.bone && dead.has(x.bone))) ctx.run("role.set", { name: x.name, off: true });
     // constraints que dependem deles
     for (const { c } of allC(e).filter(({ c }) => dead.has(c.target) || dead.has(c.source) || dead.has(c.bone) || c.bones?.some((b: string) => dead.has(b))))
       ctx.run("constraint.delete", { name: c.name });
@@ -145,6 +151,8 @@ defineCommand({
         for (const [name, a] of Object.entries<any>(atts)) {
           if (a.type === "clipping" && a.end === p.slot) e.set(["skins", si, "attachments", slot, name, "end"], p.to);
           if (a.type === "linkedmesh" && a.slot === p.slot) e.set(["skins", si, "attachments", slot, name, "slot"], p.to);
+          // nove-fatias: o texto que a caixa acompanha (docs/NUCLEO.md "Nove-fatias")
+          if (a.slice?.fitText?.slot === p.slot) e.set(["skins", si, "attachments", slot === p.slot ? p.to : slot, name, "slice", "fitText", "slot"], p.to);
         }
     });
     for (const { c, path, type } of allC(e)) if (type === "path") for (const f of ["slot", "target"]) if (c[f] === p.slot) e.set([...path, f], p.to);
@@ -155,6 +163,10 @@ defineCommand({
     ((e.json as any).particles ?? []).forEach((em: any, k: number) => em.slot === p.slot && e.set(["particles", k, "slot"], p.to));
     ((e.json as any).mosaics ?? []).forEach((x: any, k: number) => x.slot === p.slot && e.set(["mosaics", k, "slot"], p.to));
     ((e.json as any).instances ?? []).forEach((x: any, k: number) => x.slot === p.slot && e.set(["instances", k, "slot"], p.to));
+    ((e.json as any).roles ?? []).forEach((x: any, k: number) => {
+      if (x.slot === p.slot) e.set(["roles", k, "slot"], p.to);
+      if (x.area?.slot === p.slot) e.set(["roles", k, "area", "slot"], p.to);
+    });
     for (const [an, a] of anims(e)) {
       for (const skin of Object.keys(a.attachments ?? {})) renameKey(e, ["animations", an, "attachments", skin], p.slot, p.to);
       (a.drawOrder ?? []).forEach((k: any, ki: number) =>
@@ -183,6 +195,14 @@ defineCommand({
     for (const em of ((e.json as any).particles ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("particles.delete", { name: em.name });
     for (const x of ((e.json as any).mosaics ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("mosaic.delete", { name: x.name });
     for (const x of ((e.json as any).instances ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("instance.delete", { name: x.name });
+    // papeis: o texto deste slot sai; a area que era so ele volta a ser o grupo
+    for (const x of ((e.json as any).roles ?? []).filter((x: any) => x.slot === p.slot)) ctx.run("role.set", { name: x.name, off: true });
+    ((e.json as any).roles ?? []).forEach((x: any, k: number) => x.area?.slot === p.slot && e.set(["roles", k, "area"], x.area.box ? { box: x.area.box } : undefined));
+    // nove-fatias que acompanham o texto deste slot: deixam de acompanhar (o tamanho base)
+    skins(e.json).forEach((s, si) => {
+      for (const [slot, atts] of Object.entries<any>(s.attachments ?? {}))
+        for (const [name, a] of Object.entries<any>(atts)) if (slot !== p.slot && a.slice?.fitText?.slot === p.slot) e.set(["skins", si, "attachments", slot, name, "slice", "fitText"], undefined);
+    });
     // ordem de desenho: decodifica com a ordem antiga, tira o slot, recodifica
     const after = before.filter((n) => n !== p.slot);
     for (const [an, a] of anims(e))

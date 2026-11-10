@@ -13,6 +13,8 @@ import { contextoDoJogo } from "../navegador/godot.ts";
 import { drawingsOf } from "../core/desenho.ts";
 import { Desenhos, drawingPixels } from "./desenho.ts";
 import { VideoReferencia } from "../render/videoref.ts";
+import { RTL, registrarMedidor } from "../core/texto.ts";
+import { carregarFonte, medidorCanvas } from "../tela/textos.ts";
 
 export interface AssetInfo {
   id: string;
@@ -84,6 +86,25 @@ export interface DrawEdit {
 }
 
 export const fileUrl =(p: string) => `/api/file?p=${encodeURIComponent(p)}`;
+
+// os comandos que medem texto (query.texts) medem aqui pelo navegador: o Canvas 2D com as fontes do
+// projeto (as mesmas do desenho, com o shaping de verdade)
+if (typeof document !== "undefined")
+  registrarMedidor(async (doc: any) => {
+    const dir = (doc.file?.atlas ?? doc.file?.skeleton ?? "").replace(/[^/]*$/, "");
+    const fontes: { name: string; file: string }[] = doc.json.fonts ?? [];
+    const fam = new Map<string, string>();
+    await Promise.all(fontes.map(async (f) => {
+      const n = await carregarFonte(fileUrl(f.file.startsWith("/") ? f.file : dir + f.file));
+      if (n) fam.set(f.name, n);
+    }));
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    return (familia?: string, idioma = "pt") => {
+      const nomes = [familia ?? fontes[0]?.name, ...fontes.map((f) => f.name).filter((n) => n !== familia)];
+      const pilha = [...nomes.map((n) => fam.get(n ?? "")).filter((x): x is string => !!x).map((x) => JSON.stringify(x)), "sans-serif"].join(",");
+      return medidorCanvas(ctx, pilha, RTL.test(idioma));
+    };
+  });
 
 const RUNTIMES: Runtime[] = ["godot", "spine", "nucleo"];
 const ehRuntime = (r: string | null): r is Runtime => RUNTIMES.includes(r as Runtime);
@@ -251,6 +272,27 @@ class AppState {
   meshEdit = $state<MeshEdit | null>(null);
   // desenhar uma imagem vetorial (na Pose base)
   drawEdit = $state<DrawEdit | null>(null);
+  // a tela vista em varios tamanhos de janela lado a lado (src/app/LadoALado.svelte)
+  ladoALado = $state(false);
+  // os idiomas das fileiras do lado a lado (idioma x tamanho); vazio: so o mostrado
+  ladoIdiomas = $state<string[]>([]);
+  // a janela escolhida no seletor (espelho do viewer.janela, para a UI reagir)
+  janela = $state<{ nome: string; w: number; h: number } | null>(null);
+  usarJanela(j: { nome: string; w: number; h: number } | null) {
+    this.janela = j;
+    this.viewer?.setJanela(j);
+  }
+  // o idioma dos textos no viewport (docs/NUCLEO.md "Texto"): "" e o primeiro da tabela
+  idioma = $state("");
+  usarIdioma(i: string) {
+    this.idioma = i;
+    this.viewer?.nucleo?.usarIdioma(i);
+  }
+  // a tabela de idiomas aberta por cima do viewport (src/app/Idiomas.svelte)
+  tabelaIdiomas = $state(false);
+  // as fontes chegaram ou os textos mudaram: o aviso de estouro se refaz
+  versaoTextos = $state(0);
+  readonly ouveTextos = typeof window !== "undefined" && (window.addEventListener("mamulengo-textos", () => this.versaoTextos++), true);
   // pintar um mosaico (src/app/mosaicedit.ts)
   mosaicEdit = $state<MosaicEdit | null>(null);
   // jogando o palco (docs/PALCO.md): pelo botao, pelo teclado ou pela ponte (play)

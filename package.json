@@ -21,6 +21,7 @@
     "gate:textures": "tsx tools/textures.ts",
     "test": "tsx tests/features.ts",
     "test:corpus": "tsx tests/corpus.ts",
+    "test:imagens": "tsx tests/imagens-reduzidas.ts",
     "parity": "tsx tools/parity.ts",
     "kit": "tsx tools/acceptance-kit.ts",
     "compare": "tsx tools/compare-anim.ts",

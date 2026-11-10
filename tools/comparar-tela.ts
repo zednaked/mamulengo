@@ -45,7 +45,9 @@ const porta = (srv.address() as any).port;
 
 // ---- o Chromium sem janela, no tamanho exato da referencia, densidade 1
 const prof = mkdtempSync(join(tmpdir(), "comparar-tela-"));
-const chrome = spawn("chromium", [`--user-data-dir=${prof}`, "--remote-debugging-port=0", "--no-first-run", "--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--hide-scrollbars", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+// o navegador morre junto com este processo (setpriv --pdeathsig): uma comparacao interrompida nao deixa
+// um Chromium sem tela rodando (achados varios esquecidos de horas antes em 9/11, pesando nas medidas)
+const chrome = spawn("setpriv", ["--pdeathsig", "KILL", "chromium", `--user-data-dir=${prof}`, "--remote-debugging-port=0", "--no-first-run", "--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--hide-scrollbars", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const wsUrl = await new Promise<string>((ok) => {
   let b = "";
   chrome.stderr!.on("data", (d) => {

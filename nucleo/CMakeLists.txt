@@ -20,6 +20,7 @@ add_library(mamulengo_nucleo STATIC
   src/estado.cpp
   src/desenho.cpp
   src/palco.cpp
+  src/papeis.cpp
 )
 target_include_directories(mamulengo_nucleo PUBLIC include)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

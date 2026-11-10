@@ -46,7 +46,7 @@ if (!url || !saida) {
 const prof = cdp ? "" : mkdtempSync(join(tmpdir(), "medir-web-"));
 const chrome = cdp
   ? null
-  : spawn("chromium", [`--user-data-dir=${prof}`, "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check", "--window-size=540,1000", "--autoplay-policy=no-user-gesture-required", ...(janela ? [] : ["--headless=new"]), "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+  : spawn("setpriv", ["--pdeathsig", "KILL", "chromium", `--user-data-dir=${prof}`, "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check", "--window-size=540,1000", "--autoplay-policy=no-user-gesture-required", ...(janela ? [] : ["--headless=new"]), "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 // o Chrome do Android devolve o endereco sem a porta do forward: vale o caminho, com o host do --cdp
 const wsUrl = cdp
   ? `ws://${new URL(cdp).host}${new URL(((await (await fetch(`${cdp}/json/version`)).json()) as any).webSocketDebuggerUrl).pathname}`

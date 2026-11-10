@@ -152,6 +152,12 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   desktop). A production game ported this way loads 7x less before its first screen
   than its Godot export. [docs/BACKEND.md](docs/BACKEND.md).
 
+![A small game: the bunny jumps on its island to catch floating coins, a mission checks itself off and the pause dims the screen](exemplos/coelho/coelho.gif)
+
+*[exemplos/coelho](exemplos/coelho): the layout mode in one small game (anchors,
+translated text in 12 languages, nine-slice and roles), with the logic written only
+from the screen's manifest. Art and sounds by Kenney (CC0).*
+
 ![The robot looking around in 2.5D, flying on jets with a glow and a ring of stars, dissolving its arms and firing a lightning arc between its hands](exemplos/vitrine/vitrine.gif)
 
 *[exemplos/vitrine](exemplos/vitrine): the CC0 robot going through every feature
@@ -279,9 +285,13 @@ npx tsx tools/boneco.ts exportar <x.boneco> <folder>
 
 ## The core
 
-`nucleo/` is C++17 with no dependencies, written clean-room: from a written spec
-and from numbers measured on a reference runtime used as a black box, never from
-its source. It does poses (bones, curves, slots, regions, weighted meshes,
+`nucleo/` is C++17 with no dependencies, written clean-room: whoever writes it
+works only from a written spec (`docs/NUCLEO.md`) and from numbers measured on a
+reference runtime used as a black box, never from that runtime's source. Most of
+the spec comes from measurement alone; where measuring was not enough, a separate
+person read the reference and wrote down the behavior (rules and math, no code),
+and someone who never saw the reference implemented it from that text. Those
+passages are marked in the spec. It does poses (bones, curves, slots, regions, weighted meshes,
 deform, IK, transform, path and physics constraints), animation state (tracks,
 queues, mixing, events) and draw lists (batches by page and blend, clipping on
 the GPU stencil or on the CPU).
@@ -440,13 +450,22 @@ Working: the editor (drawing, posing and measuring through the core in the
 "nucleo" mode), the MCP server, the agent bench, `.boneco` with effects and
 particles, the core with its Godot module and GDExtension. A slot game runs on
 staging with the engine module, and its `.boneco` build, all on the core, passes
-its tests. The core is now the editor's default mode for every project, the binary
+its tests. The core is the editor's default mode for every project, the binary
 `.boneco` is done and the editor opens from a link, nothing to install. A first
 production web game runs entirely on the Mamulengo runtime, its screens generated
-from the Godot project at deploy time. Next: a layout editor that saves to `.tscn`
-or straight to the screen, the
-addon on the Godot Asset Library, PSD import and atlas repacking in the browser
-editor too, and faster physics replay after each edit. Plan:
+from the Godot project at deploy time; on a mid-range phone profile it is ready
+about nine times sooner than its Godot export.
+
+**Layout mode (screens without Godot):** a screen is a `.boneco` built in the
+editor. Bones anchor to the window (corners, edges, center, stretch), text parts
+carry translation keys for 12 languages (right-to-left and Devanagari included),
+images can be nine-sliced, and bones get roles (button with normal, hover,
+pressed and disabled states, touch area, text set by code). A layered PSD comes
+in already proposed as a screen ([docs/LAYOUT-PSD.md](docs/LAYOUT-PSD.md)). The
+screen writes a manifest, and the game logic is written against it by name
+(`tela.botao("jogar").aoTocar(...)`): see [exemplos/coelho](exemplos/coelho).
+Next: copies made at play time (lists), moving a bone from code, fixed-margin
+anchors, and a first production game converted this way. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License

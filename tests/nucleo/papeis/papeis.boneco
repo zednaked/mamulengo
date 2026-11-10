@@ -1,0 +1,65 @@
+{
+  "boneco": 0,
+  "nome": "papeis",
+  "paginas": [ { "arquivo": "papeis.png", "tamanho": [256, 256] } ],
+  "imagens": [
+    { "nome": "botao", "pagina": 0, "ret": [0, 100, 60, 40] },
+    { "nome": "redondo", "pagina": 0, "ret": [0, 0, 40, 40] },
+    { "nome": "icone", "pagina": 0, "ret": [50, 0, 15, 20] },
+    { "nome": "tampa", "pagina": 0, "ret": [70, 0, 30, 30] },
+    { "nome": "pedra", "pagina": 0, "ret": [110, 0, 40, 40] }
+  ],
+  "esqueleto": { "x": -300, "y": 0, "largura": 600, "altura": 1000 },
+  "ossos": [
+    { "nome": "root" },
+    { "nome": "botao", "pai": "root", "y": 150, "rotacao": 10 },
+    { "nome": "cima", "pai": "root", "x": 100, "y": 150 },
+    { "nome": "pausa", "pai": "root", "x": 220, "y": 900, "rotacao": 30 },
+    { "nome": "icone", "pai": "pausa", "x": 50 },
+    { "nome": "zona", "pai": "root", "x": -200, "y": 500, "rotacao": -20 },
+    { "nome": "sumido", "pai": "root", "x": 200, "y": 500 },
+    { "nome": "pedra", "pai": "root", "x": 0, "y": 600, "escala_x": 1.5 }
+  ],
+  "slots": [
+    { "nome": "fundo_botao", "osso": "botao", "parte": "botao" },
+    { "nome": "rotulo", "osso": "botao", "parte": "rotulo" },
+    { "nome": "tampa", "osso": "cima", "parte": "tampa" },
+    { "nome": "redondo", "osso": "pausa", "parte": "redondo" },
+    { "nome": "icone", "osso": "icone", "parte": "icone" },
+    { "nome": "sumido", "osso": "sumido", "parte": "redondo", "cor": "ffffff00" },
+    { "nome": "pedra", "osso": "pedra", "parte": "pedra" },
+    { "nome": "placar", "osso": "root", "parte": "placar" }
+  ],
+  "skins": [ { "nome": "default", "partes": {
+    "fundo_botao": { "botao": { "largura": 120, "altura": 80,
+                                "fatias": { "largura": 240, "altura": 90, "esquerda": 30, "cima": 20, "direita": 30, "baixo": 20, "acompanha": { "slot": "rotulo", "respiro": [20, 8] } } } },
+    "rotulo": { "rotulo": { "tipo": "texto", "largura": 400, "altura": 60, "texto": "JOGAR", "tamanho": 40 } },
+    "tampa": { "tampa": { "largura": 60, "altura": 60 } },
+    "redondo": { "redondo": { "largura": 80, "altura": 80 } },
+    "icone": { "icone": { "x": 20, "largura": 30, "altura": 40 } },
+    "sumido": { "redondo": { "largura": 80, "altura": 80 } },
+    "pedra": { "pedra": { "tipo": "malha", "uvs": [0, 0, 1, 0, 0.5, 1], "triangulos": [0, 1, 2], "vertices": [-50, -40, 50, -40, 0, 50], "contorno": 3, "largura": 100, "altura": 90 } },
+    "placar": { "placar": { "tipo": "texto", "y": 960, "largura": 200, "altura": 50, "texto": "1250 {n}", "tamanho": 30 } }
+  } } ],
+  "tela": { "arte": [-300, 0, 600, 1000], "encaixe": "caber",
+            "ancoras": [ { "osso": "botao", "ancora": [0.5, 1] }, { "osso": "pausa", "ancora": [1, 0] } ] },
+  "papeis": [
+    { "nome": "jogar", "tipo": "botao", "osso": "botao",
+      "estados": { "normal": "jogar/normal", "em_cima": "jogar/em_cima", "apertado": "jogar/apertado", "desligado": "jogar/desligado" } },
+    { "nome": "tampa", "tipo": "toque", "osso": "cima" },
+    { "nome": "pausa", "tipo": "botao", "osso": "pausa", "estados": { "normal": "pausa/normal" }, "mix": 0.25, "trilha": 3, "desligado": true },
+    { "nome": "zona", "tipo": "toque", "osso": "zona", "area": { "caixa": [10, 20, 120, 60] } },
+    { "nome": "sumido", "tipo": "botao", "osso": "sumido" },
+    { "nome": "pedra", "tipo": "toque", "osso": "pedra" },
+    { "nome": "so_icone", "tipo": "toque", "osso": "pausa", "area": { "slot": "icone" } },
+    { "nome": "pontos", "tipo": "texto", "slot": "placar" }
+  ],
+  "animacoes": {
+    "jogar/normal": { "ossos": { "botao": { "escalar": [ { "x": 1, "y": 1 } ] } } },
+    "jogar/em_cima": { "ossos": { "botao": { "escalar": [ { "x": 1.1, "y": 1.1 } ] } } },
+    "jogar/apertado": { "ossos": { "botao": { "escalar": [ { "x": 0.9, "y": 0.9 } ] } } },
+    "jogar/desligado": { "slots": { "fundo_botao": { "rgba": [ { "cor": "80808080" } ] } } },
+    "pausa/normal": { "ossos": { "pausa": { "girar": [ { "valor": 0 }, { "tempo": 1, "valor": 20 } ] } } },
+    "parado": { "ossos": { "cima": { "mover": [ { "x": 0 } ] } } }
+  }
+}

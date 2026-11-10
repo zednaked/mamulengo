@@ -7,6 +7,7 @@ import { importarSpine, importarAnimacao } from "../boneco/spine.ts";
 import { STEP, type Sequence } from "../core/sim.ts";
 import { Desenhista, carregarNucleo, ortho, type PaginaGL } from "./desenhista.ts";
 import type { Blend, BoneView, Local, PartKind, PartView, PoseView, SlotView } from "./pose.ts";
+import { TextosBoneco } from "../tela/textos.ts";
 
 export { Desenhista, carregarNucleo, ortho, type PaginaGL };
 
@@ -18,8 +19,10 @@ type Info = {
   fisica: boolean;
   ossos: { nome: string; pai: number }[];
   slots: { nome: string; osso: number; blend: number }[];
+  papeis?: { nome: string; tipo: string; osso: number; slot: number; estados: number[]; trilha: number; mix: number; desligado: boolean }[];
   partes: { nome: string; tipo: number; slot: number; vertices: number; contorno: number; pesada: boolean; fechado: boolean }[];
   animacoes: { nome: string; duracao: number }[];
+  textos?: { nome: string; parte: number; slot: number }[];
 };
 
 // campos do osso que mudam direto no setup do nucleo (os mesmos do patch.ts)
@@ -94,6 +97,13 @@ export class NucleoCena {
   // texturas por arquivo da pagina (sobrevivem a recarga do modelo)
   private texturas = new Map<string, WebGLTexture>();
   private paginas: PaginaGL[] = [];
+  // os textos (docs/NUCLEO.md "Texto"): as letras pelo navegador, numa pagina depois das do boneco.
+  // urlFonte: o arquivo da fonte (relativo ao documento) -> url; o idioma mostrado
+  textos: TextosBoneco | null = null;
+  urlFonte: ((arquivo: string) => string) | null = null;
+  idioma = "";
+  // os textos foram relidos (o editor refaz o aviso de estouro; tambem o evento "mamulengo-textos")
+  aoTextos: (() => void) | null = null;
   // mascara de slots escondidos, na memoria do wasm (um byte por slot do nucleo)
   private mascara = 0;
   private nMascara = 0;
@@ -137,6 +147,31 @@ export class NucleoCena {
     // pagina sem textura (ainda nao carregada) fica de fora do desenho
     // o relevo (docs/NUCLEO.md "Luzes") e uma textura como as outras, pelo nome do arquivo
     this.paginas = (this.info?.paginas ?? []).map((p) => ({ tex: this.texturas.get(p.arquivo) as WebGLTexture, pma: p.pma, relevo: p.relevo ? (this.texturas.get(p.relevo) ?? null) : null }));
+    // a pagina dos textos logo depois das do desenho
+    if (this.textos && this.info?.textos?.length) this.paginas.push(this.textos.pagina);
+  }
+
+  // os textos do modelo novo: as fontes que faltam chegam depois (refaz as letras com elas)
+  private lerTextos() {
+    if (!this.info?.textos?.length) return;
+    this.textos ??= TextosBoneco.novo(this.desenhista, this.N);
+    if (this.idioma) this.textos.idioma = this.idioma;
+    const url = this.urlFonte ?? ((a: string) => a);
+    // quem mostra o aviso de estouro refaz a conta (o modelo novo, as fontes que chegaram)
+    void this.textos.ler(this.modelo, "", url).then(() => {
+      this.aoTextos?.();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("mamulengo-textos"));
+    });
+  }
+  usarIdioma(i: string) {
+    this.idioma = i;
+    if (this.textos) this.textos.idioma = i;
+  }
+  // pixels da tela por unidade do mundo, pela projecao e o viewport atual
+  private prepararTextos(inst: number, proj: Float32Array | number[]) {
+    if (!this.textos || !this.info?.textos?.length) return;
+    const vp = this.desenhista.gl.getParameter(this.desenhista.gl.VIEWPORT) as Int32Array;
+    this.textos.preparar(inst, Math.hypot(proj[0], proj[1]) * vp[2] * 0.5);
   }
 
   private lerInfo() {
@@ -183,10 +218,12 @@ export class NucleoCena {
     N._mm_limpar_instancias();
     this.inst = N._mm_instancia(m);
     this.fantasma = N._mm_instancia(m);
+    this.aplicaJanela();
     this.aplicaSkin();
     this.ck = null;
     this.grade = null;
     this.lerInfo();
+    this.lerTextos();
     this.ligaPaginas();
     const n = this.info!.slots.length;
     if (n > this.nMascara) {
@@ -198,6 +235,40 @@ export class NucleoCena {
     this.pose = new NucleoPose(this, this.inst, json);
     this.stats.cargas++;
     this.stats.cargaMs = performance.now() - t0;
+  }
+
+  // a janela da tela (docs/NUCLEO.md "Tela"): o tamanho em pixels de quem mostra o boneco inteiro;
+  // null e a arte base. Vale nas duas instancias e a cada recarga do modelo
+  tamJanela: [number, number] | null = null;
+  janela(t: [number, number] | null) {
+    this.tamJanela = t;
+    this.aplicaJanela();
+    this.invalidar();
+  }
+  private aplicaJanela() {
+    if (!this.N._mm_janela) return;
+    const [w, h] = this.tamJanela ?? [0, 0];
+    for (const i of [this.inst, this.fantasma]) if (i >= 0) this.N._mm_janela(i, w, h);
+  }
+  // nove-fatias (docs/NUCLEO.md "Nove-fatias"): a grade da regiao fatiada que o slot mostra agora:
+  // o tamanho L x A em que foi feita (o do texto acompanhado inclusive) e o esticar da janela
+  fatiaDoSlot(slot: number): { largura: number; altura: number; ex: number; ey: number; nx: number; ny: number } | null {
+    if (this.inst < 0 || !this.N._mm_fatias || !this.info) return null;
+    const p = this.N._mm_pose_slots(this.inst) / 8;
+    const parte = this.N.HEAPF64[p + slot * 5];
+    if (!(parte >= 0)) return null;
+    const n = this.N._mm_fatias(this.inst);
+    const v = this.N.HEAPF64.subarray(this.N._mm_saida() / 8, this.N._mm_saida() / 8 + n);
+    for (let k = 0; k + 6 < n; k += 7) if (v[k] === parte) return { nx: v[k + 1], ny: v[k + 2], largura: v[k + 3], altura: v[k + 4], ex: v[k + 5], ey: v[k + 6] };
+    return null;
+  }
+
+  // a vista: escala (pixels por unidade), x, y (canto de baixo e da esquerda), largura e altura
+  vista(): { escala: number; x: number; y: number; largura: number; altura: number } | null {
+    if (this.inst < 0 || !this.N._mm_vista) return null;
+    const p = this.N._mm_vista(this.inst) / 8;
+    const v = this.N.HEAPF64.subarray(p, p + 5);
+    return { escala: v[0], x: v[1], y: v[2], largura: v[3], altura: v[4] };
   }
 
   // a skin mostrada (null: a padrao); vale nas duas instancias e a cada recarga do modelo
@@ -380,6 +451,71 @@ export class NucleoCena {
     if (t - done > 0) this.passoN(t - done);
   }
 
+  // ---- papeis (docs/NUCLEO.md "Papeis"): a area de cada um e "jogar a tela" (os botoes pelo ponteiro)
+  papeis(): { nome: string; tipo: string; osso: number; slot: number; estados: number[]; trilha: number; mix: number; desligado: boolean }[] {
+    return this.info?.papeis ?? [];
+  }
+  papel(nome: string): number {
+    return this.papeis().findIndex((p) => p.nome === nome);
+  }
+  // os triangulos da area no mundo (6 numeros cada)
+  papelArea(k: number): number[] {
+    if (this.inst < 0 || !this.N._mm_papel_area || k < 0) return [];
+    const n = this.N._mm_papel_area(this.inst, k);
+    const p = this.N._mm_saida() / 8;
+    return Array.from(this.N.HEAPF64.subarray(p, p + n));
+  }
+  // a caixa do que o papel mostra agora, no espaco do osso: [x do meio, y do meio, largura, altura]
+  papelCaixaNoOsso(nome: string): number[] | null {
+    const k = this.papel(nome);
+    const t = this.papelArea(k);
+    if (!t.length) return null;
+    const q = this.N._mm_pose_ossos(this.inst) / 8 + this.papeis()[k].osso * 14;
+    const [a, b, c, d, x, y] = Array.from(this.N.HEAPF64.subarray(q, q + 6)) as number[];
+    const det = a * d - b * c || 1e-12;
+    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < t.length; i += 2) {
+      const dx = t[i] - x,
+        dy = t[i + 1] - y;
+      const lx = (d * dx - b * dy) / det,
+        ly = (-c * dx + a * dy) / det;
+      (x0 = Math.min(x0, lx)), (x1 = Math.max(x1, lx)), (y0 = Math.min(y0, ly)), (y1 = Math.max(y1, ly));
+    }
+    const r = (v: number) => Math.round(v * 10) / 10;
+    return [r((x0 + x1) / 2), r((y0 + y1) / 2), r(x1 - x0), r(y1 - y0)];
+  }
+  // comeca a tela: personagem novo, a animacao em laco na trilha 0 (ou nada) e os botoes no estado
+  // inicial; depois, passo(dt) a cada quadro
+  telaComecar(anim: string | null): boolean {
+    if (this.inst < 0 || !this.N._mm_papeis_iniciar || !this.papeis().length) return false;
+    this.ck = null;
+    this.grade = null;
+    this.N._mm_reiniciar(this.inst);
+    const a = anim ? this.anims.get(anim) : undefined;
+    if (a !== undefined) this.N._mm_estado_tocar(this.inst, 0, a, 1, 0);
+    this.N._mm_papeis_iniciar(this.inst);
+    this.passoN(0);
+    this.mudou();
+    return true;
+  }
+  // o ponteiro no mundo: 0 anda, 1 aperta, 2 solta, 3 solta (dedo), 4 sai; o papel sob ele e os tocados
+  telaPonteiro(tipo: number, x: number, y: number): { sobre: number; toques: number[] } {
+    if (this.inst < 0) return { sobre: -1, toques: [] };
+    const sobre = this.N._mm_papeis_ponteiro(this.inst, tipo, x, y);
+    const n = this.N._mm_papeis_toques(this.inst);
+    const p = this.N._mm_saida() / 8;
+    return { sobre, toques: Array.from(this.N.HEAPF64.subarray(p, p + n)) as number[] };
+  }
+  papelDesligar(k: number, desligado: boolean) {
+    if (this.inst >= 0) this.N._mm_papel_desligar(this.inst, k, desligado ? 1 : 0);
+  }
+  papelDesligado(k: number): boolean {
+    return this.inst >= 0 && this.N._mm_papel_desligado(this.inst, k) === 1;
+  }
+  papelEstado(k: number): number {
+    return this.inst >= 0 ? this.N._mm_papel_estado(this.inst, k) : -1;
+  }
+
   // ---- o palco (docs/PALCO.md): o jogo no lugar da animacao, em passos de 1/60 s
   temPalco = false;
   palcoComecar(): boolean {
@@ -531,6 +667,7 @@ export class NucleoCena {
     const N = this.N,
       i = this.inst;
     if (i < 0) return { lotes: 0, chamadas: 0, vertices: 0 };
+    this.prepararTextos(i, proj);
     N._mm_limpar_desenho();
     this.desenharInst(i, esconder);
     return this.desenhista.desenhar(N, this.paginas, proj);
@@ -552,6 +689,7 @@ export class NucleoCena {
       a = this.anims.get(anim);
     if (this.fantasma < 0 || a === undefined) return;
     N._mm_pose_direta(this.fantasma, a, t, loop ? 1 : 0);
+    this.prepararTextos(this.fantasma, proj);
     N._mm_limpar_desenho();
     this.desenharInst(this.fantasma, esconder);
     const nv = N._mm_num_vertices();

@@ -17,7 +17,17 @@ enum Modo : uint8_t {
   SEGUINTE = 2,  // uma mais antiga ja anima a propriedade: mistura com o que ela deixou
   SEGURA = 4,    // a entrada que entra tambem anima a propriedade: a que sai fica com o peso
                  // cheio (ou some enquanto uma ainda mais nova, que nao anima, entra: modo_mix)
+  // so com Estado::mix_spine_godot: SEGUINTE porque uma entrada mais antiga (de qualquer
+  // trilha) ja anima a propriedade; mistura Substitui (Soma se a entrada soma), nao a da trilha
+  ANTIGA = 8,
 };
+
+// a mistura de uma timeline que nao e a primeira: a da trilha, ou com a regra do spine-godot
+// (bit ANTIGA) Substitui/Soma tambem na trilha 0 (docs/NUCLEO.md "Regra de mistura do spine-godot")
+inline Mistura mistura_seguinte(uint8_t modo, Mistura trilha, bool somar) {
+  if (modo & ANTIGA) return somar ? Mistura::Soma : Mistura::Substitui;
+  return trilha;
+}
 
 enum class TipoTl : uint8_t { Parte, Cor, Efeito, Taxa, Luz, Rajada, Osso, Restricao, Deformar, Ordem, Evento, Instancia };
 
@@ -121,6 +131,7 @@ void Estado::copiar_de(const Estado& o) {
   mix_padrao = o.mix_padrao;
   escala_tempo = o.escala_tempo;
   relogio_float = o.relogio_float;
+  mix_spine_godot = o.mix_spine_godot;
   tls_ = o.tls_;
   ids_ = o.ids_;
   usados_ = o.usados_;
@@ -629,8 +640,8 @@ double Estado::aplicar_de(Entrada* para, Esqueleto& e, Mistura mist) {
         Mistura tm;
         double alfa;
         const uint8_t modo = de->modo[i];
-        if (modo == SEGUINTE && !ordem && tl.tipo == TipoTl::Ordem) continue;
-        tm = (modo & PRIMEIRA) ? Mistura::Setup : mist;
+        if ((modo & ~ANTIGA) == SEGUINTE && !ordem && tl.tipo == TipoTl::Ordem) continue;
+        tm = (modo & PRIMEIRA) ? Mistura::Setup : mistura_seguinte(modo, mist, de->somar);
         if (!(modo & SEGURA)) {
           alfa = alfa_mix;
         } else if (const Entrada* manda = de->modo_mix[i]) {
@@ -686,7 +697,8 @@ bool Estado::aplicar(Esqueleto& e) {
         if (primeiro) cur->rotacoes.assign(tls.size() * 2, 0.0);
         for (size_t i = 0; i < tls.size(); ++i) {
           const Tl& tl = tls[i];
-          const Mistura tm = (cur->modo[i] & PRIMEIRA) ? Mistura::Setup : mist;
+          const uint8_t modo = cur->modo[i];
+          const Mistura tm = (modo & PRIMEIRA) ? Mistura::Setup : mistura_seguinte(modo, mist, cur->somar);
           if (tl.tipo == TipoTl::Osso && an.ossos[size_t(tl.indice)].prop == PropOsso::Girar)
             girar(e, an.ossos[size_t(tl.indice)], ta, alfa, tm, *cur, i, primeiro);
           else if (tl.tipo == TipoTl::Parte)
@@ -738,9 +750,21 @@ void Estado::calcular_modos(Entrada* en) {
   // com manter_segura, o bit SEGURA de cada timeline fica o que era (0 na primeira conta)
   if (en->modo.size() != n) en->modo.assign(n, 0);
   en->modo_mix.assign(n, nullptr);
+  // com a regra do spine-godot: as propriedades que esta entrada pos em usados_ (a timeline
+  // repetida na mesma animacao segue com a mistura da trilha)
+  std::unordered_set<uint64_t> proprios;
+  bool antiga = false;
   auto novos = [&](const Tl& tl) {
     bool algum = false;
-    for (int k = 0; k < tl.nids; ++k) algum |= usados_.insert(tl.ids[k]).second;
+    antiga = false;
+    for (int k = 0; k < tl.nids; ++k) {
+      if (usados_.insert(tl.ids[k]).second) {
+        algum = true;
+        if (mix_spine_godot) proprios.insert(tl.ids[k]);
+      } else if (mix_spine_godot && !proprios.count(tl.ids[k])) {
+        antiga = true;
+      }
+    }
     return algum;
   };
   auto tem = [&](const Entrada* x, const Tl& tl) {
@@ -755,6 +779,7 @@ void Estado::calcular_modos(Entrada* en) {
   for (size_t i = 0; i < n; ++i) {
     const Tl& tl = tls[i];
     uint8_t modo = novos(tl) ? PRIMEIRA : SEGUINTE;
+    if (modo == SEGUINTE && antiga) modo |= ANTIGA;
     if (para && tl.tipo != TipoTl::Parte && tl.tipo != TipoTl::Ordem && tl.tipo != TipoTl::Evento && tem(para, tl)) {
       modo |= SEGURA;
       for (Entrada* nx = para->para; nx; nx = nx->para) {

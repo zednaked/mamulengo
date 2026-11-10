@@ -10,7 +10,7 @@ import { parseTags, type PsdBone, type PsdPiece, type PsdPlan, type Rect, type T
 
 // sem canvas (no Node e no service worker): o ag-psd so precisa criar ImageData (useImageData: true)
 let canvasReady = false;
-function initCanvas() {
+export function initCanvas() {
   if (canvasReady) return;
   initializeCanvas(
     (() => {
@@ -623,5 +623,6 @@ export function readPsdPlan(buf: Uint8Array, file: string, opts: ReadOptions = {
   return { plan, images, psd };
 }
 
-const PSD_KNOWN = ["bone", "slot", "skin", "folder", "ignore", "merge", "path", "scale", "trim", "mesh", "name", "overlay", "origin"] as const;
+// [9] e [9:margens] sao do modo de tela (src/core/psd-tela.ts, docs/LAYOUT-PSD.md): a importacao comum ignora
+const PSD_KNOWN = ["bone", "slot", "skin", "folder", "ignore", "merge", "path", "scale", "trim", "mesh", "name", "overlay", "origin", "9"] as const;
 

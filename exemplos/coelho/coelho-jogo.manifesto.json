@@ -1,0 +1,477 @@
+{
+ "boneco": "coelho-jogo",
+ "api": "src/tela/tela-boneco.ts (docs/BACKEND.md, \"Papeis\"): const tela = await TelaBoneco.abrir(gl, N, desenhista, url); tela.ligarPonteiro(canvas)",
+ "botoes": [
+  {
+   "nome": "jogar",
+   "osso": "botao",
+   "area": "a parte do slot botao",
+   "estados": {
+    "normal": "jogar/normal",
+    "em_cima": "jogar/em_cima",
+    "apertado": "jogar/apertado",
+    "desligado": "jogar/desligado"
+   },
+   "desligado": false,
+   "trilha": 10,
+   "codigo": "tela.botao(\"jogar\").aoTocar(() => { ... })"
+  },
+  {
+   "nome": "pausa",
+   "osso": "pausa",
+   "area": "as partes do osso pausa e dos filhos",
+   "estados": {
+    "normal": "pausa/normal",
+    "em_cima": "pausa/em_cima",
+    "apertado": "pausa/apertado",
+    "desligado": "pausa/desligado"
+   },
+   "desligado": false,
+   "trilha": 11,
+   "codigo": "tela.botao(\"pausa\").aoTocar(() => { ... })"
+  },
+  {
+   "nome": "denovo",
+   "osso": "denovo",
+   "area": "a parte do slot denovo_fundo",
+   "estados": {
+    "normal": "denovo/normal",
+    "em_cima": "denovo/em_cima",
+    "apertado": "denovo/apertado",
+    "desligado": "denovo/desligado"
+   },
+   "desligado": false,
+   "trilha": 12,
+   "codigo": "tela.botao(\"denovo\").aoTocar(() => { ... })"
+  }
+ ],
+ "toques": [
+  {
+   "nome": "pular",
+   "osso": "fundo",
+   "area": "caixa [0, 0, 700, 1370] no osso",
+   "codigo": "tela.toque(\"pular\", () => { ... })"
+  }
+ ],
+ "textos": [
+  {
+   "nome": "jogar",
+   "slot": "jogar",
+   "doCodigo": false,
+   "chave": "JOGAR",
+   "parametros": [],
+   "exemplo": "JOGAR",
+   "codigo": "tela.texto(\"jogar\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "dica",
+   "slot": "dica",
+   "doCodigo": false,
+   "chave": "DICA",
+   "parametros": [],
+   "exemplo": "toque para pular",
+   "codigo": "tela.texto(\"dica\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "missoes",
+   "slot": "missoes",
+   "doCodigo": false,
+   "chave": "MISSOES",
+   "parametros": [],
+   "exemplo": "MISSÕES",
+   "codigo": "tela.texto(\"missoes\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "m1_texto",
+   "slot": "m1_texto",
+   "doCodigo": false,
+   "chave": "MOEDAS",
+   "parametros": [
+    "n"
+   ],
+   "exemplo": "{n} moedas",
+   "codigo": "tela.texto(\"m1_texto\", { n: 3 })"
+  },
+  {
+   "nome": "m2_texto",
+   "slot": "m2_texto",
+   "doCodigo": false,
+   "chave": "PULOS",
+   "parametros": [],
+   "exemplo": "10 pulos",
+   "codigo": "tela.texto(\"m2_texto\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "m3_texto",
+   "slot": "m3_texto",
+   "doCodigo": false,
+   "chave": "CENOURA",
+   "parametros": [],
+   "exemplo": "a cenoura",
+   "codigo": "tela.texto(\"m3_texto\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "placar",
+   "slot": "pontos",
+   "doCodigo": true,
+   "texto": "0",
+   "parametros": [],
+   "codigo": "tela.texto(\"placar\", \"...\")"
+  },
+  {
+   "nome": "tempo",
+   "slot": "tempo",
+   "doCodigo": true,
+   "texto": "30",
+   "parametros": [],
+   "codigo": "tela.texto(\"tempo\", \"...\")"
+  },
+  {
+   "nome": "aviso",
+   "slot": "aviso_texto",
+   "doCodigo": true,
+   "texto": "",
+   "parametros": [],
+   "codigo": "tela.texto(\"aviso\", \"...\")"
+  },
+  {
+   "nome": "pausa_texto",
+   "slot": "pausa_texto",
+   "doCodigo": false,
+   "chave": "PAUSA",
+   "parametros": [],
+   "exemplo": "PAUSA",
+   "codigo": "tela.texto(\"pausa_texto\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "fim_titulo",
+   "slot": "fim_titulo",
+   "doCodigo": false,
+   "chave": "FIM",
+   "parametros": [],
+   "exemplo": "ACABOU!",
+   "codigo": "tela.texto(\"fim_titulo\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "resultado",
+   "slot": "fim_moedas",
+   "doCodigo": true,
+   "chave": "MOEDAS",
+   "parametros": [
+    "n"
+   ],
+   "exemplo": "{n} moedas",
+   "codigo": "tela.texto(\"resultado\", { n: 3 })"
+  },
+  {
+   "nome": "recorde",
+   "slot": "fim_recorde",
+   "doCodigo": true,
+   "chave": "RECORDE",
+   "parametros": [
+    "n"
+   ],
+   "exemplo": "recorde: {n}",
+   "codigo": "tela.texto(\"recorde\", { n: 3 })"
+  },
+  {
+   "nome": "fim_novo",
+   "slot": "fim_novo",
+   "doCodigo": false,
+   "chave": "NOVO",
+   "parametros": [],
+   "exemplo": "novo recorde!",
+   "codigo": "tela.texto(\"fim_novo\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "denovo_texto",
+   "slot": "denovo_texto",
+   "doCodigo": false,
+   "chave": "DENOVO",
+   "parametros": [],
+   "exemplo": "DE NOVO",
+   "codigo": "tela.texto(\"denovo_texto\", \"...\")  // troca a chave por texto livre"
+  }
+ ],
+ "estados": [
+  {
+   "nome": "parado",
+   "duracao": 2,
+   "eventos": [],
+   "codigo": "tela.estado(\"parado\")"
+  },
+  {
+   "nome": "coelho/respira",
+   "duracao": 2,
+   "eventos": [],
+   "codigo": "tela.estado(\"coelho/respira\")"
+  },
+  {
+   "nome": "coelho/pula",
+   "duracao": 0.82,
+   "eventos": [
+    "pulo",
+    "pousa"
+   ],
+   "codigo": "tela.estado(\"coelho/pula\")"
+  },
+  {
+   "nome": "coelho/ai",
+   "duracao": 0.62,
+   "eventos": [
+    "ai"
+   ],
+   "codigo": "tela.estado(\"coelho/ai\")"
+  },
+  {
+   "nome": "coelho/festa",
+   "duracao": 0.5,
+   "eventos": [],
+   "codigo": "tela.estado(\"coelho/festa\")"
+  },
+  {
+   "nome": "brilho/pega",
+   "duracao": 0.45,
+   "eventos": [],
+   "codigo": "tela.estado(\"brilho/pega\")"
+  },
+  {
+   "nome": "placar/soma",
+   "duracao": 0.3,
+   "eventos": [],
+   "codigo": "tela.estado(\"placar/soma\")"
+  },
+  {
+   "nome": "placar/perde",
+   "duracao": 0.35,
+   "eventos": [],
+   "codigo": "tela.estado(\"placar/perde\")"
+  },
+  {
+   "nome": "tempo/urgente",
+   "duracao": 0.5,
+   "eventos": [],
+   "codigo": "tela.estado(\"tempo/urgente\")"
+  },
+  {
+   "nome": "moeda1/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda1/passa\")"
+  },
+  {
+   "nome": "moeda1/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda1/pega\")"
+  },
+  {
+   "nome": "moeda2/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda2/passa\")"
+  },
+  {
+   "nome": "moeda2/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda2/pega\")"
+  },
+  {
+   "nome": "moeda3/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda3/passa\")"
+  },
+  {
+   "nome": "moeda3/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda3/pega\")"
+  },
+  {
+   "nome": "moeda4/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda4/passa\")"
+  },
+  {
+   "nome": "moeda4/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda4/pega\")"
+  },
+  {
+   "nome": "moeda5/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda5/passa\")"
+  },
+  {
+   "nome": "moeda5/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda5/pega\")"
+  },
+  {
+   "nome": "moeda6/passa",
+   "duracao": 3.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"moeda6/passa\")"
+  },
+  {
+   "nome": "moeda6/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "moeda"
+   ],
+   "codigo": "tela.estado(\"moeda6/pega\")"
+  },
+  {
+   "nome": "cenoura/passa",
+   "duracao": 4,
+   "eventos": [],
+   "codigo": "tela.estado(\"cenoura/passa\")"
+  },
+  {
+   "nome": "cenoura/pega",
+   "duracao": 0.3,
+   "eventos": [
+    "cenoura"
+   ],
+   "codigo": "tela.estado(\"cenoura/pega\")"
+  },
+  {
+   "nome": "espinho1/passa",
+   "duracao": 3.2,
+   "eventos": [],
+   "codigo": "tela.estado(\"espinho1/passa\")"
+  },
+  {
+   "nome": "espinho1/bate",
+   "duracao": 0.5,
+   "eventos": [],
+   "codigo": "tela.estado(\"espinho1/bate\")"
+  },
+  {
+   "nome": "espinho2/passa",
+   "duracao": 3.2,
+   "eventos": [],
+   "codigo": "tela.estado(\"espinho2/passa\")"
+  },
+  {
+   "nome": "espinho2/bate",
+   "duracao": 0.5,
+   "eventos": [],
+   "codigo": "tela.estado(\"espinho2/bate\")"
+  },
+  {
+   "nome": "jogar/sai",
+   "duracao": 0.35,
+   "eventos": [],
+   "codigo": "tela.estado(\"jogar/sai\")"
+  },
+  {
+   "nome": "dica/mostra",
+   "duracao": 2.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"dica/mostra\")"
+  },
+  {
+   "nome": "desktop",
+   "duracao": 0.8,
+   "eventos": [],
+   "codigo": "tela.estado(\"desktop\")"
+  },
+  {
+   "nome": "retrato",
+   "duracao": 0.8,
+   "eventos": [],
+   "codigo": "tela.estado(\"retrato\")"
+  },
+  {
+   "nome": "missao1/feita",
+   "duracao": 0.45,
+   "eventos": [
+    "missao"
+   ],
+   "codigo": "tela.estado(\"missao1/feita\")"
+  },
+  {
+   "nome": "missao2/feita",
+   "duracao": 0.45,
+   "eventos": [
+    "missao"
+   ],
+   "codigo": "tela.estado(\"missao2/feita\")"
+  },
+  {
+   "nome": "missao3/feita",
+   "duracao": 0.45,
+   "eventos": [
+    "missao"
+   ],
+   "codigo": "tela.estado(\"missao3/feita\")"
+  },
+  {
+   "nome": "aviso/mostra",
+   "duracao": 2.1,
+   "eventos": [],
+   "codigo": "tela.estado(\"aviso/mostra\")"
+  },
+  {
+   "nome": "pausa/entra",
+   "duracao": 0.32,
+   "eventos": [],
+   "codigo": "tela.estado(\"pausa/entra\")"
+  },
+  {
+   "nome": "fim/entra",
+   "duracao": 0.5,
+   "eventos": [
+    "fim"
+   ],
+   "codigo": "tela.estado(\"fim/entra\")"
+  },
+  {
+   "nome": "fim/recorde",
+   "duracao": 0.6,
+   "eventos": [],
+   "codigo": "tela.estado(\"fim/recorde\")"
+  }
+ ],
+ "eventos": [
+  "pulo",
+  "pousa",
+  "moeda",
+  "cenoura",
+  "ai",
+  "missao",
+  "fim"
+ ],
+ "idiomas": [
+  "pt",
+  "en",
+  "es",
+  "hi",
+  "ru",
+  "fr",
+  "it",
+  "ne",
+  "ar",
+  "fil",
+  "de",
+  "nl"
+ ],
+ "avisos": []
+}

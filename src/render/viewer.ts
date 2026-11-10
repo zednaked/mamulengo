@@ -321,6 +321,9 @@ export class Viewer {
     if (nucleo) {
       try {
         this.nucleo ??= await NucleoCena.criar(this.ctx.gl);
+        // as fontes dos textos, relativas ao documento como as paginas (docs/NUCLEO.md "Texto")
+        // (o arquivo cru: /api/file, nao a textura)
+        this.nucleo.urlFonte = (a) => urlFor(a).replace("/api/texture?", "/api/file?");
         // os filhos das instancias de novo a cada abertura (podem ter mudado no disco)
         this.instArquivos.clear();
         this.instFalhou.clear();
@@ -375,7 +378,9 @@ export class Viewer {
       if (this.view.sequence && (!this.view.animation || !has(this.view.sequence.next))) this.view.sequence = null;
       // a primeira animacao so ao abrir o documento: depois, sem animacao e a Pose base
       const first = this.nucleo.info?.animacoes[0]?.nome;
-      if (!this.view.animation && first && this.builtVersion === -1) this.view.animation = first;
+      // uma tela (com ancoras ou papeis) abre na Pose base: a primeira animacao costuma ser o estado de
+      // um botao, e mexer nela por engano gravaria chave no estado (10/11)
+      if (!this.view.animation && first && this.builtVersion === -1 && !this.ehTela()) this.view.animation = first;
       this.poseAt(this.view.time);
       this.builtVersion = this.doc.version;
       return;
@@ -404,7 +409,7 @@ export class Viewer {
       if (this.view.sequence && (!this.view.animation || !data.findAnimation(this.view.sequence.next))) this.view.sequence = null;
       // a primeira animacao so ao abrir o documento: depois, sem animacao e a Pose base (uma
       // edicao estrutural na Pose base, como mexer na malha, nao pode abrir uma animacao)
-      if (!this.view.animation && data.animations.length && this.builtVersion === -1) this.view.animation = data.animations[0].name;
+      if (!this.view.animation && data.animations.length && this.builtVersion === -1 && !this.ehTela()) this.view.animation = data.animations[0].name;
       this.error = null;
       this.poseAt(this.view.time);
     } catch (e: any) {
@@ -526,6 +531,20 @@ export class Viewer {
     this.poseAt(this.view.time);
   }
 
+  // ---- a janela da tela (docs/NUCLEO.md "Tela"): so no modo nucleo. nome: o preset do seletor
+  janela: { nome: string; w: number; h: number } | null = null;
+  setJanela(j: { nome: string; w: number; h: number } | null) {
+    this.janela = j;
+    this.nucleo?.janela(j ? [j.w, j.h] : null);
+    if (this.useNucleo) this.poseAt(this.view.time);
+  }
+  // o retangulo do mundo que a janela mostra (y para cima), ou null sem janela
+  vistaJanela(): number[] | null {
+    if (!this.janela || !this.useNucleo) return null;
+    const v = this.nucleo?.vista();
+    return v ? [v.x, v.y, v.largura, v.altura] : null;
+  }
+
   // esquece os atalhos da pose (checkpoints): o estado mudou por fora
   invalidatePose() {
     this.sim?.invalidate();
@@ -616,6 +635,10 @@ export class Viewer {
 
   // Pose deterministica no tempo t: setup + animacao desde 0 em passos fixos, para
   // a fisica chegar no mesmo estado que chegaria tocando (igual ao jogo). Ver PoseSim.
+  private ehTela(): boolean {
+    const j = this.doc?.json as any;
+    return !!(j?.screen || j?.roles?.length);
+  }
   poseAt(t: number) {
     this.view.time = t;
     if (this.useNucleo) {
@@ -668,6 +691,31 @@ export class Viewer {
     this.jogo = { teclas: 0, sobra: 0, estado: this.nucleo.palcoEstado(), i: 0, marcas: [], seguir };
     return true;
   }
+  // jogar a tela (docs/NUCLEO.md "Papeis"): os botoes respondem ao ponteiro e o relogio anda; os
+  // toques ficam na lista (o editor mostra)
+  tela: { toques: string[]; sobre: string | null } | null = null;
+  comecarTela(anim: string | null): boolean {
+    if (!this.useNucleo || !this.nucleo?.telaComecar(anim)) return false;
+    this.view.playing = false;
+    this.tela = { toques: [], sobre: null };
+    return true;
+  }
+  pararTela() {
+    if (!this.tela) return;
+    this.tela = null;
+    this.nucleo?.invalidar();
+    this.poseAt(this.view.time);
+  }
+  telaPonteiro(tipo: number, sx: number, sy: number): { sobre: string | null; toques: string[] } {
+    if (!this.tela || !this.nucleo) return { sobre: null, toques: [] };
+    const w = this.screenToSkel(sx, sy);
+    const r = this.nucleo.telaPonteiro(tipo, w.x, w.y);
+    const ps = this.nucleo.papeis();
+    const toques = r.toques.map((k) => ps[k].nome);
+    this.tela.sobre = r.sobre >= 0 ? ps[r.sobre].nome : null;
+    this.tela.toques.push(...toques);
+    return { sobre: this.tela.sobre, toques };
+  }
   pararJogo() {
     if (!this.jogo) return;
     this.jogo = null;
@@ -677,6 +725,11 @@ export class Viewer {
 
   frame(dt: number) {
     this.sync();
+    if (this.tela && this.nucleo) {
+      this.nucleo.passo(dt);
+      this.draw();
+      return;
+    }
     if (this.jogo && this.nucleo) {
       // passos fixos de 1/60 s (no maximo 6 por quadro: uma aba parada nao vira avalanche)
       const j = this.jogo;

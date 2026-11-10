@@ -2,7 +2,8 @@
   // Importar PSD: escolher ou largar um .psd cria um personagem novo ou atualiza o
   // aberto, e mostra o resumo do que foi feito.
   import { app } from "./state.svelte.ts";
-  import { createFromPsd, suggestDir, updateFromPsd, uploadPsd, type PsdImportResult } from "./psd.ts";
+  import { createFromPsd, proposeScreen, suggestDir, updateFromPsd, uploadPsd, type PropostaResult, type PsdImportResult } from "./psd.ts";
+  import { ANCORAS, NOME_DO_ESTADO } from "../core/psd-tela.ts";
 
   let open = $state(false);
   let file = $state<{ name: string; path: string } | null>(null);
@@ -15,6 +16,26 @@
   let dragging = $state(false);
   // a pasta acompanha o nome ate a pessoa mexer nela
   let dirTouched = false;
+  // tela (docs/LAYOUT-PSD.md): a proposta de cada camada, que a pessoa desmarca ou troca antes de criar
+  let tela = $state(false);
+  let proposta = $state<PropostaResult | null>(null);
+  let ligado = $state<Record<string, boolean>>({});
+  let troca = $state<Record<string, { ancora?: string; esticar?: string }>>({});
+  const TIPO: Record<string, string> = { ancora: "âncora", botao: "botão", toque: "toque", texto: "texto", fatias: "nove-fatias" };
+  async function propor() {
+    if (!file) return;
+    proposta = await proposeScreen({ psd: file.path });
+    ligado = Object.fromEntries(proposta.proposta.itens.map((i) => [i.id, i.ligado]));
+    troca = {};
+  }
+  function escolhas() {
+    const itens = proposta?.proposta.itens ?? [];
+    const off = itens.filter((i) => i.ligado && !ligado[i.id]).map((i) => i.id);
+    const on = itens.filter((i) => !i.ligado && ligado[i.id]).map((i) => i.id);
+    const change: Record<string, any> = {};
+    for (const [id, t] of Object.entries(troca)) if (t.ancora || t.esticar) change[id] = { ...(t.ancora ? { ancora: t.ancora } : {}), ...(t.esticar ? { esticar: t.esticar } : {}) };
+    return { off, on, change };
+  }
 
   const folders = $derived([...new Set(app.assets.map((a) => a.skeleton.slice(0, a.skeleton.lastIndexOf("/", a.skeleton.lastIndexOf("/") - 1))))].sort());
 
@@ -33,6 +54,10 @@
       name = f.name.replace(/\.psd$/i, "").replace(/[^\w.-]+/g, "_");
       dir = suggestDir(name);
       dirTouched = false;
+      busy = "Lendo as camadas…";
+      // a proposta de tela: marcada sozinha quando o nome ou as camadas dizem que e uma tela
+      await propor().catch(() => (proposta = null));
+      tela = !!proposta?.proposta.pareceTela;
     } catch (e: any) {
       error = String(e?.message ?? e);
     } finally {
@@ -45,7 +70,7 @@
     error = null;
     busy = mode === "create" ? "Montando o personagem…" : "Atualizando…";
     try {
-      result = mode === "create" ? await createFromPsd({ psd: file.path, dir, name }) : await updateFromPsd({ psd: file.path });
+      result = mode === "create" ? await createFromPsd({ psd: file.path, dir, name, ...(tela && proposta ? { tela: escolhas() } : {}) }) : await updateFromPsd({ psd: file.path });
     } catch (e: any) {
       error = String(e?.message ?? e);
     } finally {
@@ -58,6 +83,8 @@
     file = null;
     result = null;
     error = null;
+    proposta = null;
+    tela = false;
   }
 
   // largar um .psd em qualquer lugar da janela
@@ -112,7 +139,36 @@
           <datalist id="psd-folders">
             {#each folders as f}<option value="{f}/{name}"></option>{/each}
           </datalist>
-          <div class="row end"><button class="ok" disabled={!name || !dir} onclick={() => act("create")}>Criar</button></div>
+          {#if proposta}
+            <label class="check" title="Tela de jogo (.boneco): âncoras pela posição, papéis pelos nomes (btn_, toque_, txt_), camadas de texto como texto e nove-fatias (9_). docs/LAYOUT-PSD.md"><input type="checkbox" bind:checked={tela} /> Criar como tela de jogo{proposta.proposta.pareceTela ? " (parece uma tela)" : ""}</label>
+          {/if}
+          {#if tela && proposta}
+            <div class="dim small">Arte base {proposta.proposta.arte.rect[2]} × {proposta.proposta.arte.rect[3]} px, caber: {proposta.proposta.arte.porque}.{proposta.mapaArquivo ? ` Mapa: ${proposta.mapaArquivo}.` : ""}</div>
+            <ul class="prop">
+              {#each proposta.proposta.itens as it (it.id)}
+                <li class:off={!ligado[it.id]}>
+                  <label class="item" title={it.porque}><input type="checkbox" bind:checked={ligado[it.id]} /> <b>{TIPO[it.tipo]}</b> {it.tipo === "ancora" ? it.osso : it.tipo === "texto" ? it.slot : it.tipo === "fatias" ? it.slot : it.nome}</label>
+                  {#if it.tipo === "ancora"}
+                    <select value={troca[it.id]?.ancora ?? it.ancora} onchange={(e) => (troca[it.id] = { ...troca[it.id], ancora: (e.target as HTMLSelectElement).value })}>
+                      {#each ANCORAS as a}<option value={a}>{a}</option>{/each}
+                    </select>
+                    <select value={troca[it.id]?.esticar ?? it.esticar} onchange={(e) => (troca[it.id] = { ...troca[it.id], esticar: (e.target as HTMLSelectElement).value })}>
+                      {#each ["none", "x", "y", "xy"] as a}<option value={a}>{a === "none" ? "sem esticar" : `estica ${a}`}</option>{/each}
+                    </select>
+                  {:else if it.tipo === "texto"}
+                    <span class="dim">{it.chave ? `chave ${it.chave}` : `do código: ${it.doCodigo ?? "livre"}`}{it.fonte && !it.arquivoFonte ? " · fonte falta" : ""}</span>
+                  {:else if it.tipo === "fatias"}
+                    <span class="dim">[{it.margens.join(", ")}]</span>
+                  {:else if it.tipo === "botao"}
+                    <span class="dim">{it.slot ? Object.keys(it.estados).map((e) => NOME_DO_ESTADO[e as keyof typeof NOME_DO_ESTADO]).join(", ") : "estados padrão"}</span>
+                  {/if}
+                  <div class="why">{it.camada}: {it.porque}</div>
+                </li>
+              {/each}
+            </ul>
+            {#each proposta.proposta.avisos as a}<div class="warn small">⚠ {a}</div>{/each}
+          {/if}
+          <div class="row end"><button class="ok" disabled={!name || !dir} onclick={() => act("create")}>{tela ? "Criar tela" : "Criar"}</button></div>
         </div>
         <div class="opt">
           <div class="h">Atualizar o personagem aberto</div>
@@ -217,6 +273,50 @@
   }
   .warn {
     color: var(--accent2);
+  }
+  .check {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    color: var(--text, inherit);
+    font-size: 13px;
+  }
+  .prop {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 40vh;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .prop li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: var(--panel);
+  }
+  .prop li.off {
+    opacity: 0.5;
+  }
+  .prop .item {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+  }
+  .prop select {
+    font-size: 11px;
+  }
+  .why {
+    width: 100%;
+    color: var(--dim);
+    font-size: 11px;
   }
   .err {
     color: var(--err);

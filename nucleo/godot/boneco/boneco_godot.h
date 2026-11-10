@@ -12,6 +12,9 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/font.hpp>
+#include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/text_line.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/templates/vector.hpp>
@@ -21,6 +24,9 @@ using namespace godot;
 #include "core/io/resource.h"
 #include "core/object/ref_counted.h"
 #include "scene/2d/node_2d.h"
+#include "core/input/input_event.h"
+#include "scene/resources/font.h"
+#include "scene/resources/text_line.h"
 #include "scene/resources/texture.h"
 #include "servers/rendering/rendering_server.h"
 #define BONECO_RS RSE
@@ -34,6 +40,7 @@ using namespace godot;
 #include "mamulengo/estado.h"
 #include "mamulengo/modelo.h"
 #include "mamulengo/palco.h"
+#include "mamulengo/papeis.h"
 #include "mamulengo/pose.h"
 
 void boneco_liberar_materiais();
@@ -45,6 +52,10 @@ class BonecoData : public Resource {
   std::shared_ptr<const mamulengo::Modelo> modelo;
   Vector<Ref<Texture2D>> paginas;
   Vector<Ref<Texture2D>> relevos;  // por pagina, o relevo (nulo: sem relevo)
+  Vector<RID> paginas_rid;  // o RID de cada pagina (o desenho nao copia a Ref a cada item)
+  // os textos (docs/NUCLEO.md "Texto"): por fonte do .boneco, uma FontVariation com as outras de
+  // reserva (as letras que faltam numa caem na seguinte); vazio: a fonte padrao do tema
+  Vector<Ref<Font>> fontes;
   Rect2 caixa;  // esqueleto x, y, largura, altura (unidades do arquivo, y para cima)
   String caminho, erro;
 
@@ -127,6 +138,11 @@ class BonecoSprite : public Node2D {
   // da o passo no mesmo quadro que ele. false: em double, como o oraculo
   void set_float_clock(bool p);
   bool get_float_clock() const { return float_clock; }
+  // regra de mistura do binario do spine-godot dos jogos (docs/NUCLEO.md, "Regra de mistura do
+  // spine-godot"): a propriedade que a animacao que sai anima fica com o valor dela ate a primeira
+  // chave da que entra. false (padrao): o spine 4.3 atual. Vale a partir da proxima troca
+  void set_spine_godot_mix(bool p);
+  bool get_spine_godot_mix() const { return spine_godot_mix; }
   void set_time_scale(float p) { time_scale = p; }
   float get_time_scale() const { return time_scale; }
   void set_playing(bool p);
@@ -177,6 +193,55 @@ class BonecoSprite : public Node2D {
   // entrada de set_stage_input (bits: 1 esquerda, 2 direita, 4 pulo); stage_step anda n passos
   // na mao; get_stage_state: tick, won, died, points e os atores (posicao no espaco do no, y para
   // baixo)
+  // tela (docs/NUCLEO.md "Tela"): a janela em pixels; fit_window usa a da viewport a cada quadro e
+  // poe o no para a vista cobrir a viewport inteira
+  void set_window(const Vector2 &p_tamanho);
+  Vector2 get_window() const { return janela; }
+  void set_fit_window(bool p);
+  bool get_fit_window() const { return fit_window; }
+  Rect2 get_view() const;
+  float get_view_scale() const;
+  // textos (docs/NUCLEO.md "Texto"): as letras pelo TextServer do Godot (o shaping do arabe e do
+  // devanagari), na caixa que o nucleo poe no osso. language: o idioma da tabela do .boneco
+  // ("" = o do TranslationServer; "pt_BR" acha "pt"). set_text: texto livre pelo nome da parte
+  // (ou do slot), no lugar da chave; set_text_params: os "{nome}" da chave ou do texto;
+  // clear_text volta ao do arquivo. get_text_overflows: os textos que estouram a caixa no idioma
+  void set_language(const String &p_idioma);
+  String get_language() const { return idioma; }
+  PackedStringArray get_languages() const;
+  void set_text(const String &p_nome, const String &p_valor);
+  void set_text_params(const String &p_nome, const Dictionary &p_params);
+  void clear_text(const String &p_nome);
+  String get_text_shown(const String &p_nome) const;
+  Array get_text_overflows() const;
+  // nove-fatias (docs/NUCLEO.md "Nove-fatias"): a regiao fatiada mostrada no slot (pelo nome do slot):
+  // {size: o tamanho L x A da grade (o do texto acompanhado inclusive), stretch: o esticar da janela,
+  // grid: os pontos por eixo, corners: os 4 cantos de fora no espaco do no (y para baixo)}; vazio
+  // se o slot nao mostra regiao fatiada
+  Dictionary get_slice_info(const String &p_slot) const;
+  // papeis (docs/NUCLEO.md "Papeis"): o codigo acha cada elemento pelo nome. O no le o mouse e o
+  // dedo (roles_input, padrao ligado) e emite role_touched(nome) quando apertam e soltam num botao
+  // ligado ou numa area de toque; os estados dos botoes (normal, em_cima, apertado, desligado) tocam
+  // a animacao de cada um. Posicoes no espaco do no (y para baixo)
+  void set_roles_input(bool p);
+  bool get_roles_input() const { return roles_input; }
+  Array get_roles() const;
+  // ponteiro a mao (o jogo com entrada propria, os testes): 0 anda, 1 aperta, 2 solta (mouse),
+  // 3 solta (dedo), 4 sai; devolve o papel sob o ponteiro ("" nenhum)
+  String role_pointer(int p_tipo, const Vector2 &p_pos);
+  String get_role_at(const Vector2 &p_pos) const;
+  void set_role_disabled(const String &p_nome, bool p_desligado);
+  bool is_role_disabled(const String &p_nome) const;
+  String get_role_state(const String &p_nome) const;
+  void show_role_state(const String &p_nome, const String &p_estado);
+  // a area: triangulos (3 pontos cada) no espaco do no
+  PackedVector2Array get_role_area(const String &p_nome) const;
+  // o mouse e o dedo (roles_input)
+#ifdef GDEXTENSION
+  void _input(const Ref<InputEvent> &p_evento) override;
+#else
+  void input(const Ref<InputEvent> &p_evento) override;
+#endif
   bool stage_start();
   void stage_stop();
   void set_stage_input(int p_bits) { palco_teclas = p_bits; }
@@ -203,6 +268,14 @@ class BonecoSprite : public Node2D {
   bool medir = false;
   bool pose_when_hidden = false;
   bool float_clock = false;
+  bool spine_godot_mix = false;
+  bool fit_window = false;
+  bool roles_input = true;
+  std::unique_ptr<mamulengo::Interface> ui;
+  int _papel(const String &p_nome) const;
+  void _entrada_papeis(const Ref<InputEvent> &p_evento);
+  Vector2 janela;
+  void _encaixar_janela();
   bool avisando = false;  // dentro do _avisar (um sinal que toca outra animacao nao reentra)
   String boneco, preview;
 
@@ -236,14 +309,57 @@ class BonecoSprite : public Node2D {
   Vector<bool> copia_item;  // o item copia o backbuffer antes (camada de ajuste)
   Vector<Vector<int>> indices_item;
   Vector<int> vertices_item;
-  // o que foi enviado por ultimo a cada malha: so reenvia o que mudou (peca parada nao custa)
-  Vector<PackedByteArray> enviado_v, enviado_a;
-  // por item: os vertices crus (x, y, u, v, cor) do ultimo envio e a caixa deles
+  // por item: os indices do lote como o nucleo deu (sem renumerar) e o primeiro vertice; os
+  // mesmos indices crus que no quadro anterior dao a mesma malha sem renumerar nada
+  std::vector<std::vector<uint32_t>> cru_ind_item;
+  std::vector<uint32_t> vmin_item;
+  // por item: os vertices crus (x, y, u, v, cor) do ultimo envio (o que a malha tem agora);
+  // so reenvia o que mudou (peca parada nao custa)
   std::vector<std::vector<float>> cru_item;
-  std::vector<Rect2> caixa_item;
+  // por item: a textura do comando de malha posto (o item fica com ele de um quadro para o
+  // outro; so e refeito quando a textura ou a malha mudam). posto: 0 limpo, 1 comando de
+  // malha comum, 2 o de ajuste ou o que le a tela (refeitos a cada quadro)
+  std::vector<RID> textura_item;
+  std::vector<uint8_t> posto_item;
+  // os itens deste quadro e os indices renumerados (reusados de um quadro para o outro)
+  struct ItemLista {
+    int lote;
+    RID material;
+    int passo;
+    bool pma;
+    bool ajuste;
+    int modo;  // blend que le a tela (o numero do enum Blend; 0: nao)
+    bool texto = false;  // lote na pagina dos textos: as letras pelo TextServer, sem malha
+  };
+  std::vector<ItemLista> lista;
+  Vector<int> indices_buf;
   PackedByteArray bytes_v, bytes_a;
   int64_t last_update_usec = 0, last_draw_usec = 0;
 
+  // textos: o que o jogo pos por texto (livre e parametros) e a diagramacao guardada (refeita
+  // quando o texto, o idioma ou as fontes mudam)
+  String idioma;
+  struct LinhaTexto {
+    Ref<TextLine> linha;
+    float x = 0, base = 0;
+  };
+  struct EstadoTexto {
+    bool livre = false;
+    String valor;
+    Dictionary params;
+    String assinatura;
+    std::vector<LinhaTexto> linhas;
+    bool estoura = false;
+    float usado_w = 0, usado_h = 0;  // o que o texto ocupa (as nove-fatias que o acompanham)
+  };
+  std::vector<EstadoTexto> textos;
+  String _idioma_efetivo() const;
+  int _texto(const String &p_nome) const;
+  String _mostrado(int k) const;
+  void _diagramar(int k);
+  void _textos_imagem();
+  void _textos_medida();
+  void _desenhar_textos(const RID &it, const mamulengo::Lote &lt);
   Ref<BonecoEntrada> _entrada(int trilha, int animacao, bool loop) const;
   void _previa();
   void _montar();

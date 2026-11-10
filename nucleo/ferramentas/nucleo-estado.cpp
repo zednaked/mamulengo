@@ -65,6 +65,8 @@ bool tocar(const std::shared_ptr<const Modelo>& modelo, const Json& r, const Rot
     if (const Json* ps = mx->acha("pares"); ps && ps->lista())
       for (const Json& p : ps->itens()) st.definir_mix(m.animacao(p.str("de", "")), m.animacao(p.str("para", "")), p.num("tempo", 0));
   }
+  // "regra_mix": "spine-godot" liga a regra de mistura do spine-godot (docs/NUCLEO.md "Estado")
+  if (r.str("regra_mix", "") == "spine-godot") st.mix_spine_godot = true;
   e.setup();
   e.atualizar_mundo();
   std::vector<double> v;

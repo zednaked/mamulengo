@@ -42,9 +42,11 @@ export type ElementoTela =
     })
   | (Base & { tipo: "boneco"; arquivo: string; animacao: string; tempo: number; loop: boolean })
   | (Base & { tipo: "toque"; ret: number[] });
-// uma imagem: um arquivo, ou um gradiente gerado aqui (o GradientTexture2D do Godot)
 export type Gradiente = { w: number; h: number; cores: number[]; offsets: number[]; preenchimento: number; de: [number, number]; para: [number, number] };
-export type Imagem = { arquivo: string; mip?: boolean; gradiente?: Gradiente };
+// uma imagem: um arquivo, ou um gradiente gerado aqui (o GradientTexture2D do Godot). tam: o tamanho
+// logico (o do arquivo original), em que estao os recortes (src) e a repeticao; o arquivo pode ter
+// sido reduzido pelo empacotador (tools/reduzir-imagens.ts) e vir menor, os uvs saem iguais
+export type Imagem = { arquivo: string; mip?: boolean; gradiente?: Gradiente; tam?: [number, number] };
 // os pixels de um gradiente como o Godot gera (gradient_texture.cpp): centro do pixel, linear, radial
 // ou quadrado, interpolado em sRGB entre os pontos
 export function pixelsDoGradiente(g: Gradiente): Uint8ClampedArray {
@@ -112,6 +114,21 @@ const mult = (a: Xf, b: Xf): Xf => [
   a[0] * b[4] + a[2] * b[5] + a[4],
   a[1] * b[4] + a[3] * b[5] + a[5],
 ];
+// o .boneco em texto ou binario (docs/FORMATO.md "Binario", magica BNCB 1): o binario vira o texto
+// compacto pelo nucleo (o leitor recebe texto terminado em zero, e o binario tem zeros no meio)
+export function textoDoBoneco(N: any, bytes: Uint8Array, arquivo: string): string {
+  const bin = bytes.length >= 5 && bytes[0] === 0x42 && bytes[1] === 0x4e && bytes[2] === 0x43 && bytes[3] === 0x42 && bytes[4] === 1;
+  if (!bin) return new TextDecoder().decode(bytes);
+  const p = N._malloc(bytes.length);
+  try {
+    N.HEAPU8.set(bytes, p);
+    const t = N._mm_boneco_texto(p, bytes.length);
+    if (!t) throw new Error(`${arquivo}: ${N.UTF8ToString(N._mm_erro())}`);
+    return N.UTF8ToString(t);
+  } finally {
+    N._free(p);
+  }
+}
 const IDIOMAS_RTL = /^(ar|he|fa|ur|ps|sd|ug|yi|dv|ckb)(_|-|$)/;
 
 const VS = `#version 300 es
@@ -258,7 +275,8 @@ export class Tela {
     if (im.mip) gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, im.mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    this.texturas.set(k, { tex, w: bmp.width, h: bmp.height });
+    // w, h: o tamanho logico (os uvs dividem os recortes por ele); o arquivo pode ser menor
+    this.texturas.set(k, { tex, w: im.tam?.[0] ?? bmp.width, h: im.tam?.[1] ?? bmp.height });
     bmp.close();
   }
 
@@ -266,7 +284,7 @@ export class Tela {
     if (e.tipo !== "boneco") return;
     const { N } = this;
     const url = new URL(e.arquivo, this.base).href;
-    const texto = await (await fetch(url)).text();
+    const texto = this.textoDoBoneco(new Uint8Array(await (await fetch(url)).arrayBuffer()), e.arquivo);
     const caminho = "/" + e.arquivo.replace(/^(\.\.\/)+/, "");
     const modelo = this.comTexto(texto, (pt) => this.comTexto(caminho, (pc) => N._mm_carregar_de(pt, pc)));
     if (modelo < 0) throw new Error(`${e.arquivo}: ${N.UTF8ToString(N._mm_erro())}`);
@@ -314,6 +332,12 @@ export class Tela {
       this.fontesProntas.set(nome, p);
     }
     return p;
+  }
+
+  // o .boneco em texto ou binario (docs/FORMATO.md "Binario", magica BNCB 1): o binario vira o texto
+  // compacto pelo nucleo (o leitor recebe texto terminado em zero, e o binario tem zeros no meio)
+  private textoDoBoneco(bytes: Uint8Array, arquivo: string): string {
+    return textoDoBoneco(this.N, bytes, arquivo);
   }
 
   private comTexto<T>(s: string, f: (p: number) => T): T {

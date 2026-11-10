@@ -7,6 +7,7 @@
 // do atlas ao lado do .boneco e o registro da importacao em images/psd-import.json (onde cada
 // imagem estava no PSD, para a proxima atualizacao saber o que mudou de lugar).
 import { importarSpine } from "../boneco/spine.ts";
+import { aplicarEscolhas, lerTela, mapaDaTela, nomesDaFonte, type EscolhasTela, type FonteConhecida, type MapaTela, type PropostaTela } from "./psd-tela.ts";
 import { parseAtlas } from "./atlas-text.ts";
 import { Document } from "./document.ts";
 import { executeAsync, type AssetProvider } from "./commands/index.ts";
@@ -22,6 +23,8 @@ export interface PsdIO {
   gravar(p: string, dados: Uint8Array | string): Promise<void>;
   // imagens de uma pasta (recursivo): nome da regiao = caminho relativo sem extensao
   imagens(dir: string): Promise<{ name: string; file: string }[]>;
+  // os arquivos de uma pasta (sem descer; caminhos inteiros): as fontes da tela
+  listar?(dir: string): Promise<string[]>;
   // os pixels (RGBA sem premultiplicar) de um arquivo de imagem, ou dos bytes de um PNG
   bruto(p: string): Promise<Bruto | null>;
   brutoDe(png: Uint8Array): Promise<Bruto>;
@@ -118,7 +121,10 @@ async function gravarImagens(io: PsdIO, imagesDir: string, images: { piece: { im
 
 // Personagem novo: <dir>/<name>.boneco com as paginas ao lado e as imagens em <dir>/images. O
 // editor abre o .boneco pelos arquivos virtuais (server/boneco.ts, src/navegador/api.ts).
-export async function criarBonecoDePsd(io: PsdIO, opts: { psd: Uint8Array; arquivoPsd: string; dir: string; name: string; read?: ReadOptions }): Promise<PsdResult & { tres: string; skeleton: string; atlas: string; pages: string[] }> {
+export async function criarBonecoDePsd(
+  io: PsdIO,
+  opts: { psd: Uint8Array; arquivoPsd: string; dir: string; name: string; read?: ReadOptions; depois?: (doc: Document, assets: AssetProvider) => Promise<void> },
+): Promise<PsdResult & { tres: string; skeleton: string; atlas: string; pages: string[] }> {
   if (!/^[\w.-]+$/.test(opts.name)) throw new Error(`nome invalido "${opts.name}": use letras, numeros, - e _ (sem espacos)`);
   const arquivo = juntar(opts.dir, `${opts.name}.boneco`);
   if (await io.existe(arquivo)) throw new Error(`ja existe: ${arquivo}`);
@@ -134,6 +140,7 @@ export async function criarBonecoDePsd(io: PsdIO, opts: { psd: Uint8Array; arqui
   const doc = Document.fromText(JSON.stringify(json), { text: packed.atlas, pages: {} });
   const { calls, report } = psdCalls(doc.json, plan);
   await executeAsync(doc, calls, "psd", `PSD ${plan.file}`, {}, assetsDe(io, opts.dir, packed.atlas));
+  if (opts.depois) await opts.depois(doc, assetsDe(io, opts.dir, packed.atlas));
   await io.gravarBoneco(arquivo, importarSpine(doc.json, packed.atlas, opts.name), false);
   // o registro: a proxima atualizacao sabe onde cada imagem estava no PSD
   await gravarRegistro(io, arquivo + ".atlas", plan, null, opts.read?.mapa);
@@ -228,4 +235,85 @@ export async function atualizarDePsd(
   }
   await gravarRegistro(io, opts.atlas, plan, prev, read.mapa);
   return { plan, atlasText, pages };
+}
+
+// ---- a tela (docs/LAYOUT-PSD.md): o PSD de uma tela de jogo chega com a arte base, as ancoras, os
+// papeis, os textos e as nove-fatias propostos (src/core/psd-tela.ts) e aplicados pelo psd.layout.
+
+// as fontes que o PSD pode usar: ao lado dele, em fontes/ ou fonts/ ao lado dele, e nas pastas extras
+export async function fontesConhecidas(io: PsdIO, arquivoPsd: string, extras: string[] = []): Promise<FonteConhecida[]> {
+  const out: FonteConhecida[] = [];
+  const d = pasta(arquivoPsd);
+  for (const dir of [d, juntar(d, "fontes"), juntar(d, "fonts"), ...extras]) {
+    for (const f of (await io.listar?.(dir)) ?? []) {
+      if (!/\.(ttf|otf)$/i.test(f) || out.some((x) => x.arquivo === f)) continue;
+      const b = await io.ler(f);
+      if (b) out.push({ arquivo: f, nomes: nomesDaFonte(b) });
+    }
+  }
+  return out;
+}
+
+// o mapa externo da tela ao lado do PSD: <nome>.tela.json
+export const mapaTelaAoLado = (arquivoPsd: string) => arquivoPsd.replace(/\.psd$/i, "") + ".tela.json";
+
+export async function proporTela(io: PsdIO, opts: { psd: Uint8Array; arquivoPsd: string; mapa?: MapaTela | null; fontes?: string[] }): Promise<{ proposta: PropostaTela; mapa: MapaTela | null; mapaArquivo: string | null }> {
+  let mapa = opts.mapa ?? null;
+  let mapaArquivo: string | null = null;
+  if (!mapa) {
+    const b = await io.ler(mapaTelaAoLado(opts.arquivoPsd));
+    if (b) {
+      mapaArquivo = mapaTelaAoLado(opts.arquivoPsd);
+      try {
+        mapa = JSON.parse(new TextDecoder().decode(b));
+      } catch (e: any) {
+        throw new Error(`${mapaArquivo}: JSON invalido (${e.message})`);
+      }
+    }
+  }
+  const fontes = await fontesConhecidas(io, opts.arquivoPsd, opts.fontes);
+  return { proposta: lerTela(opts.psd, opts.arquivoPsd, { mapa, fontes }), mapa, mapaArquivo };
+}
+
+// A tela nova: <dir>/<name>.boneco (sempre .boneco: a tela e so do Mamulengo), as fontes achadas em
+// <dir>/fontes e o manifesto <name>.manifesto.json (query.roles) ao lado.
+export async function criarTelaDePsd(
+  io: PsdIO,
+  opts: { psd: Uint8Array; arquivoPsd: string; dir: string; name: string; mapa?: MapaTela | null; escolhas?: EscolhasTela; fontes?: string[]; ignoreHidden?: boolean },
+): Promise<PsdResult & { tres: string; skeleton: string; atlas: string; pages: string[]; proposta: PropostaTela; linhas: string[]; manifesto: string }> {
+  // as fontes tambem na pasta da tela (o PSD largado na janela vem de uma pasta temporaria)
+  const { proposta: p0, mapa } = await proporTela(io, { ...opts, fontes: [...(opts.fontes ?? []), opts.dir, juntar(opts.dir, "fontes")] });
+  const proposta = aplicarEscolhas(p0, opts.escolhas);
+  // as fontes usadas vao para <dir>/fontes (o .boneco aponta para elas, relativo a ele)
+  const fonts: Record<string, string> = {};
+  for (const t of proposta.itens) {
+    if (t.tipo !== "texto" || !t.ligado || !t.fonte || !t.arquivoFonte || fonts[t.fonte]) continue;
+    const b = await io.ler(t.arquivoFonte);
+    if (!b) continue;
+    const nome = t.arquivoFonte.slice(t.arquivoFonte.lastIndexOf("/") + 1);
+    await io.gravar(juntar(opts.dir, "fontes", nome), b);
+    fonts[t.fonte] = `fontes/${nome}`;
+  }
+  // o mapa comum (camadas, ossos, esconder) do mapa da tela vai junto com as tags da proposta
+  const base = mapa ? { camadas: mapa.camadas, ossos: mapa.ossos, esconder: mapa.esconder } : null;
+  let linhas: string[] = [];
+  let avisos: string[] = [];
+  let man: any = null;
+  const r = await criarBonecoDePsd(io, {
+    psd: opts.psd,
+    arquivoPsd: opts.arquivoPsd,
+    dir: opts.dir,
+    name: opts.name,
+    read: { ignoreHidden: opts.ignoreHidden, mapa: mapaDaTela(proposta, base) },
+    async depois(doc, assets) {
+      const [res] = await executeAsync(doc, { cmd: "psd.layout", args: { proposal: proposta, fonts } }, "psd", `tela ${proposta.arquivo}`, {}, assets);
+      linhas = res.lines;
+      avisos = res.warnings;
+      man = (await executeAsync(doc, { cmd: "query.roles", args: { name: opts.name } }, "psd"))[0].manifest;
+    },
+  });
+  // o manifesto (o contrato com quem escreve a logica)
+  const manifesto = juntar(opts.dir, `${opts.name}.manifesto.json`);
+  await io.gravar(manifesto, JSON.stringify(man, null, 1) + "\n");
+  return { ...r, proposta, linhas, manifesto, summary: [...r.summary, "Tela:", ...linhas.filter((l) => !l.startsWith("Atencao")), ...avisos.map((a) => `Atencao: ${a}`)] };
 }

@@ -296,7 +296,7 @@ server.registerTool(
   "mamulengo_view",
   {
     description:
-      "Controla a visualizacao (nao altera o documento): animation, time, playing, loop, speed, showBones, showMeshes, select {bone|slot}, fit, rect [x, y, w, h] (enquadra um retangulo do mundo), sequence (previa de transicao na tela do usuario), draw {slot, tool, shape, point} (abre o Desenhar na parte desenhada, com a ferramenta e a forma escolhidas; null fecha).",
+      "Controla a visualizacao (nao altera o documento): animation, time, playing, loop, speed, showBones, showMeshes, select {bone|slot}, fit, rect [x, y, w, h] (enquadra um retangulo do mundo), sequence (previa de transicao na tela do usuario), draw {slot, tool, shape, point} (abre o Desenhar na parte desenhada, com a ferramenta e a forma escolhidas; null fecha), window (a tela vista numa janela: \"arte\", \"9:16\", \"9:20\", \"3:4\", \"16:9\", \"21:9\" ou [largura, altura]; os ossos ancorados com anchor.set vao para o lugar e a moldura da janela aparece; null tira), sideBySide (todos os tamanhos lado a lado embaixo do viewport; com a tabela de idiomas, uma fileira por idioma de sideBySideLanguages, ou so a do idioma mostrado), language (o idioma dos textos: \"pt\", \"en\", \"ar\"...; troca todos na hora), languageTable (abre ou fecha a tabela de idiomas). Os estouros de texto no idioma: state.view.textOverflows ou query.texts.",
     inputSchema: {
       animation: z.string().nullable().optional(),
       time: z.number().optional(),
@@ -310,6 +310,11 @@ server.registerTool(
       rect: z.array(z.number()).length(4).optional(),
       sequence,
       draw: z.object({ slot: z.string(), tool: z.enum(["select", "pen", "rect", "ellipse"]).optional(), shape: z.number().int().nullable().optional(), point: z.number().int().nullable().optional() }).nullable().optional(),
+      window: z.union([z.string(), z.array(z.number()).length(2)]).nullable().optional(),
+      sideBySide: z.boolean().optional(),
+      sideBySideLanguages: z.array(z.string()).optional(),
+      language: z.string().optional(),
+      languageTable: z.boolean().optional(),
     },
   },
   wrap(async (a) => text(await call("view", a))),
@@ -359,7 +364,7 @@ server.registerTool(
   "mamulengo_psd",
   {
     description:
-      "Importa um PSD em camadas (tags do PhotoshopToSpine: [bone], [slot], [skin], [folder], [ignore], [merge], [path], [scale], [trim], [mesh], [name], [overlay], e [origin]). mode create: personagem novo em <dir>/<name> (spine-json, atlas, webp, -data.tres), cada camada visivel numa parte na ordem do PSD e no lugar da composicao; escondidas viram trocas escondidas. mode update: atualiza o asset aberto casando camada com imagem pelo nome (imagem mudada e reempacotada sem sair do lugar, camada nova vira imagem nova, malhas mantem vertices e pesos) e salva. Devolve o resumo.",
+      "Importa um PSD em camadas (tags do PhotoshopToSpine: [bone], [slot], [skin], [folder], [ignore], [merge], [path], [scale], [trim], [mesh], [name], [overlay], e [origin]). mode create: personagem novo em <dir>/<name> (spine-json, atlas, webp, -data.tres), cada camada visivel numa parte na ordem do PSD e no lugar da composicao; escondidas viram trocas escondidas. mode update: atualiza o asset aberto casando camada com imagem pelo nome (imagem mudada e reempacotada sem sair do lugar, camada nova vira imagem nova, malhas mantem vertices e pesos) e salva. tela:true (com create) monta uma tela de jogo com ancoras, papeis, textos e nove-fatias propostos pela estrutura do PSD; tela + dryRun so mostra a proposta. Devolve o resumo.",
     inputSchema: {
       file: z.string().describe("caminho absoluto do .psd (dentro das raizes)"),
       mode: z.enum(["create", "update"]).optional().describe("padrao: create se houver dir, senao update"),
@@ -370,8 +375,15 @@ server.registerTool(
         .union([z.string(), z.record(z.string(), z.any())])
         .optional()
         .describe(
-          'mapa externo, sem regravar o PSD: caminho absoluto de um .json ou o objeto { camadas: { "antebraco": "[bone:antebraco]" }, ossos: { "antebraco": { pai: "braco", at: [x,y], ponta: [x,y] } }, esconder: ["camada"] } (px do PSD; chave pelo nome limpo ou "grupo/camada"). A atualizacao sem mapa reaplica o da importacao anterior.',
+          'mapa externo, sem regravar o PSD: caminho absoluto de um .json ou o objeto { camadas: { "antebraco": "[bone:antebraco]" }, ossos: { "antebraco": { pai: "braco", at: [x,y], ponta: [x,y] } }, esconder: ["camada"] } (px do PSD; chave pelo nome limpo ou "grupo/camada"). A atualizacao sem mapa reaplica o da importacao anterior. Com tela, o mapa da tela tem tambem arte [x,y,w,h], encaixe, nomes {camada: "btn_x"}, ancoras {camada: "top-left" | {ancora, esticar} | null}, fatias {camada: [m] | [l,t,r,b] | null}, textos {camada: {chave, fonte}} e idioma; sem mapa vale o <psd>.tela.json ao lado do PSD.',
         ),
+      tela: z
+        .union([z.boolean(), z.object({ off: z.array(z.string()).optional(), on: z.array(z.string()).optional(), change: z.record(z.string(), z.any()).optional(), art: z.array(z.number()).length(4).optional(), fit: z.enum(["contain", "cover", "width", "height"]).optional() })])
+        .optional()
+        .describe(
+          "importa como TELA de jogo (.boneco; docs/LAYOUT-PSD.md): arte base pelo tamanho do PSD, ancoras pela posicao de cada grupo, papeis pelos nomes (btn_, toque_, txt_) com os estados de botao pelas camadas, camadas de texto como partes de texto e nove-fatias (9_x ou bordas iguais). true aceita a proposta; o objeto ajusta itens pelo id (off, on, change: {\"ancora:painel\": {ancora: \"right\"}}). Escreve tambem <name>.manifesto.json.",
+        ),
+      dryRun: z.boolean().optional().describe("com tela: so devolve a proposta (cada camada -> ancora, papel, texto, fatias, com o porque e o id), sem criar nada"),
     },
   },
   wrap(async (a) => text(await call("psd", a, 180_000))),

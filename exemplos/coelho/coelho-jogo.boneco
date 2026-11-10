@@ -1,0 +1,8031 @@
+{
+ "boneco": 0,
+ "nome": "coelho-jogo",
+ "paginas": [
+  {
+   "arquivo": "coelho-jogo.png",
+   "tamanho": [
+    2048,
+    3628
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "ceu",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    1400,
+    2740
+   ]
+  },
+  {
+   "nome": "coelho_stand",
+   "pagina": 0,
+   "ret": [
+    1404,
+    0,
+    240,
+    402
+   ]
+  },
+  {
+   "nome": "grama",
+   "pagina": 0,
+   "ret": [
+    0,
+    2744,
+    1400,
+    400
+   ]
+  },
+  {
+   "nome": "coelho_ready",
+   "pagina": 0,
+   "ret": [
+    1404,
+    2744,
+    240,
+    382
+   ]
+  },
+  {
+   "nome": "coelho_jump",
+   "pagina": 0,
+   "ret": [
+    1648,
+    2744,
+    300,
+    362
+   ]
+  },
+  {
+   "nome": "coelho_hurt",
+   "pagina": 0,
+   "ret": [
+    0,
+    3148,
+    300,
+    348
+   ]
+  },
+  {
+   "nome": "painel",
+   "pagina": 0,
+   "ret": [
+    304,
+    3148,
+    256,
+    256
+   ]
+  },
+  {
+   "nome": "espinho",
+   "pagina": 0,
+   "ret": [
+    564,
+    3148,
+    184,
+    192
+   ]
+  },
+  {
+   "nome": "nuvem",
+   "pagina": 0,
+   "ret": [
+    752,
+    3148,
+    440,
+    180
+   ]
+  },
+  {
+   "nome": "redondo",
+   "pagina": 0,
+   "ret": [
+    1196,
+    3148,
+    168,
+    168
+   ]
+  },
+  {
+   "nome": "ilha",
+   "pagina": 0,
+   "ret": [
+    1368,
+    3148,
+    600,
+    148
+   ]
+  },
+  {
+   "nome": "botao",
+   "pagina": 0,
+   "ret": [
+    0,
+    3500,
+    384,
+    128
+   ]
+  },
+  {
+   "nome": "titulo",
+   "pagina": 0,
+   "ret": [
+    388,
+    3500,
+    384,
+    128
+   ]
+  },
+  {
+   "nome": "barra",
+   "pagina": 0,
+   "ret": [
+    776,
+    3500,
+    384,
+    128
+   ]
+  },
+  {
+   "nome": "cenoura",
+   "pagina": 0,
+   "ret": [
+    1164,
+    3500,
+    140,
+    126
+   ]
+  },
+  {
+   "nome": "moeda_1",
+   "pagina": 0,
+   "ret": [
+    1308,
+    3500,
+    116,
+    116
+   ]
+  },
+  {
+   "nome": "moeda_2",
+   "pagina": 0,
+   "ret": [
+    1428,
+    3500,
+    91,
+    116
+   ]
+  },
+  {
+   "nome": "moeda_3",
+   "pagina": 0,
+   "ret": [
+    1523,
+    3500,
+    69,
+    116
+   ]
+  },
+  {
+   "nome": "moeda_4",
+   "pagina": 0,
+   "ret": [
+    1596,
+    3500,
+    21,
+    116
+   ]
+  },
+  {
+   "nome": "estrela",
+   "pagina": 0,
+   "ret": [
+    1621,
+    3500,
+    80,
+    80
+   ]
+  },
+  {
+   "nome": "marcado",
+   "pagina": 0,
+   "ret": [
+    1705,
+    3500,
+    68,
+    68
+   ]
+  },
+  {
+   "nome": "vazio",
+   "pagina": 0,
+   "ret": [
+    1777,
+    3500,
+    68,
+    68
+   ]
+  },
+  {
+   "nome": "pausa",
+   "pagina": 0,
+   "ret": [
+    1849,
+    3500,
+    48,
+    60
+   ]
+  },
+  {
+   "nome": "tocar",
+   "pagina": 0,
+   "ret": [
+    1901,
+    3500,
+    52,
+    60
+   ]
+  },
+  {
+   "nome": "escuro",
+   "pagina": 0,
+   "ret": [
+    1957,
+    3500,
+    32,
+    32
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "x": -350,
+  "y": 0,
+  "largura": 700,
+  "altura": 1370
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "fundo",
+   "pai": "root",
+   "x": 0,
+   "y": 685
+  },
+  {
+   "nome": "nuvens",
+   "pai": "root",
+   "x": 0,
+   "y": 1000
+  },
+  {
+   "nome": "chao",
+   "pai": "root",
+   "x": 0,
+   "y": 100
+  },
+  {
+   "nome": "heroi",
+   "pai": "root",
+   "x": 0,
+   "y": 640
+  },
+  {
+   "nome": "coelho",
+   "pai": "heroi",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "corpo",
+   "pai": "coelho",
+   "x": 0,
+   "y": 85
+  },
+  {
+   "nome": "brilho",
+   "pai": "corpo",
+   "x": 0,
+   "y": 30
+  },
+  {
+   "nome": "brilho_1",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "brilho_2",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "brilho_3",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "brilho_4",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "brilho_5",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "brilho_6",
+   "pai": "brilho",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "moeda1",
+   "pai": "heroi",
+   "x": 460,
+   "y": 85
+  },
+  {
+   "nome": "moeda2",
+   "pai": "heroi",
+   "x": 460,
+   "y": 330
+  },
+  {
+   "nome": "moeda3",
+   "pai": "heroi",
+   "x": 460,
+   "y": 85
+  },
+  {
+   "nome": "moeda4",
+   "pai": "heroi",
+   "x": 460,
+   "y": 330
+  },
+  {
+   "nome": "moeda5",
+   "pai": "heroi",
+   "x": 460,
+   "y": 85
+  },
+  {
+   "nome": "moeda6",
+   "pai": "heroi",
+   "x": 460,
+   "y": 330
+  },
+  {
+   "nome": "cenoura",
+   "pai": "heroi",
+   "x": 460,
+   "y": 330
+  },
+  {
+   "nome": "espinho1",
+   "pai": "heroi",
+   "x": 460,
+   "y": 58
+  },
+  {
+   "nome": "espinho2",
+   "pai": "heroi",
+   "x": 460,
+   "y": 58
+  },
+  {
+   "nome": "botao",
+   "pai": "root",
+   "x": 0,
+   "y": 250
+  },
+  {
+   "nome": "dica",
+   "pai": "root",
+   "x": 0,
+   "y": 250
+  },
+  {
+   "nome": "painel",
+   "pai": "root",
+   "x": 200,
+   "y": 685
+  },
+  {
+   "nome": "m1",
+   "pai": "painel",
+   "x": 0,
+   "y": 55
+  },
+  {
+   "nome": "m1_marca",
+   "pai": "m1",
+   "x": -88,
+   "y": 0
+  },
+  {
+   "nome": "m2",
+   "pai": "painel",
+   "x": 0,
+   "y": -15
+  },
+  {
+   "nome": "m2_marca",
+   "pai": "m2",
+   "x": -88,
+   "y": 0
+  },
+  {
+   "nome": "m3",
+   "pai": "painel",
+   "x": 0,
+   "y": -85
+  },
+  {
+   "nome": "m3_marca",
+   "pai": "m3",
+   "x": -88,
+   "y": 0
+  },
+  {
+   "nome": "topo",
+   "pai": "root",
+   "x": 0,
+   "y": 1315
+  },
+  {
+   "nome": "placar",
+   "pai": "root",
+   "x": -306,
+   "y": 1318
+  },
+  {
+   "nome": "moeda",
+   "pai": "placar",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "nome": "tempo",
+   "pai": "root",
+   "x": 0,
+   "y": 1318
+  },
+  {
+   "nome": "aviso",
+   "pai": "root",
+   "x": 0,
+   "y": 1195
+  },
+  {
+   "nome": "veu",
+   "pai": "root",
+   "x": 0,
+   "y": 685
+  },
+  {
+   "nome": "pausa_titulo",
+   "pai": "root",
+   "x": 0,
+   "y": 760
+  },
+  {
+   "nome": "fim",
+   "pai": "root",
+   "x": 0,
+   "y": 720
+  },
+  {
+   "nome": "fim_novo",
+   "pai": "fim",
+   "x": 0,
+   "y": -40
+  },
+  {
+   "nome": "denovo",
+   "pai": "fim",
+   "x": 0,
+   "y": -160
+  },
+  {
+   "nome": "pausa",
+   "pai": "root",
+   "x": 292,
+   "y": 1316
+  }
+ ],
+ "slots": [
+  {
+   "nome": "ceu",
+   "osso": "fundo",
+   "parte": "ceu"
+  },
+  {
+   "nome": "nuvem_1",
+   "osso": "nuvens",
+   "parte": "nuvem"
+  },
+  {
+   "nome": "nuvem_2",
+   "osso": "nuvens",
+   "parte": "nuvem",
+   "cor": "ffffffcc"
+  },
+  {
+   "nome": "grama",
+   "osso": "chao",
+   "parte": "grama"
+  },
+  {
+   "nome": "ilha",
+   "osso": "heroi",
+   "parte": "ilha"
+  },
+  {
+   "nome": "coelho",
+   "osso": "coelho",
+   "parte": "coelho_stand"
+  },
+  {
+   "nome": "brilho_1",
+   "osso": "brilho_1",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "brilho_2",
+   "osso": "brilho_2",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "brilho_3",
+   "osso": "brilho_3",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "brilho_4",
+   "osso": "brilho_4",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "brilho_5",
+   "osso": "brilho_5",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "brilho_6",
+   "osso": "brilho_6",
+   "parte": "estrela",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda1",
+   "osso": "moeda1",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda2",
+   "osso": "moeda2",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda3",
+   "osso": "moeda3",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda4",
+   "osso": "moeda4",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda5",
+   "osso": "moeda5",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "moeda6",
+   "osso": "moeda6",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "cenoura",
+   "osso": "cenoura",
+   "parte": "cenoura",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "espinho1",
+   "osso": "espinho1",
+   "parte": "espinho",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "espinho2",
+   "osso": "espinho2",
+   "parte": "espinho",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "botao",
+   "osso": "botao",
+   "parte": "botao"
+  },
+  {
+   "nome": "jogar",
+   "osso": "botao",
+   "parte": "jogar"
+  },
+  {
+   "nome": "dica",
+   "osso": "dica",
+   "cor": "ffffff00",
+   "parte": "dica"
+  },
+  {
+   "nome": "painel",
+   "osso": "painel",
+   "parte": "painel"
+  },
+  {
+   "nome": "titulo",
+   "osso": "painel",
+   "parte": "titulo"
+  },
+  {
+   "nome": "missoes",
+   "osso": "painel",
+   "parte": "missoes"
+  },
+  {
+   "nome": "m1_texto",
+   "osso": "m1",
+   "parte": "m1_texto"
+  },
+  {
+   "nome": "m1_caixa",
+   "osso": "m1_marca",
+   "parte": "vazio"
+  },
+  {
+   "nome": "m2_texto",
+   "osso": "m2",
+   "parte": "m2_texto"
+  },
+  {
+   "nome": "m2_caixa",
+   "osso": "m2_marca",
+   "parte": "vazio"
+  },
+  {
+   "nome": "m3_texto",
+   "osso": "m3",
+   "parte": "m3_texto"
+  },
+  {
+   "nome": "m3_caixa",
+   "osso": "m3_marca",
+   "parte": "vazio"
+  },
+  {
+   "nome": "barra",
+   "osso": "topo",
+   "parte": "barra",
+   "cor": "3d4f8cff"
+  },
+  {
+   "nome": "pontos",
+   "osso": "placar",
+   "parte": "pontos"
+  },
+  {
+   "nome": "moeda",
+   "osso": "moeda",
+   "parte": "moeda_1"
+  },
+  {
+   "nome": "tempo",
+   "osso": "tempo",
+   "parte": "tempo"
+  },
+  {
+   "nome": "aviso_fundo",
+   "osso": "aviso",
+   "parte": "titulo",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "aviso_marca",
+   "osso": "aviso",
+   "parte": "marcado",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "aviso_texto",
+   "osso": "aviso",
+   "cor": "ffffff00",
+   "parte": "aviso_texto"
+  },
+  {
+   "nome": "escuro",
+   "osso": "veu",
+   "parte": "escuro",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "pausa_texto",
+   "osso": "pausa_titulo",
+   "cor": "ffffff00",
+   "parte": "pausa_texto"
+  },
+  {
+   "nome": "fim_painel",
+   "osso": "fim",
+   "parte": "painel",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "fim_faixa",
+   "osso": "fim",
+   "parte": "titulo",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "fim_titulo",
+   "osso": "fim",
+   "cor": "ffffff00",
+   "parte": "fim_titulo"
+  },
+  {
+   "nome": "fim_moeda",
+   "osso": "fim",
+   "parte": "moeda_1",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "fim_moedas",
+   "osso": "fim",
+   "cor": "ffffff00",
+   "parte": "fim_moedas"
+  },
+  {
+   "nome": "fim_recorde",
+   "osso": "fim",
+   "cor": "ffffff00",
+   "parte": "fim_recorde"
+  },
+  {
+   "nome": "fim_novo",
+   "osso": "fim_novo",
+   "cor": "ffffff00",
+   "parte": "fim_novo"
+  },
+  {
+   "nome": "denovo_fundo",
+   "osso": "denovo",
+   "parte": "botao",
+   "cor": "ffffff00"
+  },
+  {
+   "nome": "denovo_texto",
+   "osso": "denovo",
+   "cor": "ffffff00",
+   "parte": "denovo_texto"
+  },
+  {
+   "nome": "redondo",
+   "osso": "pausa",
+   "parte": "redondo"
+  },
+  {
+   "nome": "pausa",
+   "osso": "pausa",
+   "parte": "pausa"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "ceu": {
+     "ceu": {
+      "largura": 700,
+      "altura": 1370
+     }
+    },
+    "nuvem_1": {
+     "nuvem": {
+      "x": -190,
+      "largura": 220,
+      "altura": 90
+     }
+    },
+    "nuvem_2": {
+     "nuvem": {
+      "x": 170,
+      "y": -120,
+      "largura": 220,
+      "altura": 90
+     }
+    },
+    "grama": {
+     "grama": {
+      "largura": 700,
+      "altura": 200
+     }
+    },
+    "ilha": {
+     "ilha": {
+      "y": -30,
+      "largura": 300,
+      "altura": 74
+     }
+    },
+    "coelho": {
+     "coelho_stand": {
+      "y": 100.5,
+      "largura": 120,
+      "altura": 201
+     },
+     "coelho_ready": {
+      "y": 95.5,
+      "largura": 120,
+      "altura": 191
+     },
+     "coelho_jump": {
+      "y": 90.5,
+      "largura": 150,
+      "altura": 181
+     },
+     "coelho_hurt": {
+      "y": 87,
+      "largura": 150,
+      "altura": 174
+     }
+    },
+    "brilho_1": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "brilho_2": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "brilho_3": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "brilho_4": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "brilho_5": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "brilho_6": {
+     "estrela": {
+      "largura": 40,
+      "altura": 40
+     }
+    },
+    "moeda1": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "moeda2": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "moeda3": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "moeda4": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "moeda5": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "moeda6": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "cenoura": {
+     "cenoura": {
+      "largura": 70,
+      "altura": 63
+     }
+    },
+    "espinho1": {
+     "espinho": {
+      "largura": 92,
+      "altura": 96
+     }
+    },
+    "espinho2": {
+     "espinho": {
+      "largura": 92,
+      "altura": 96
+     }
+    },
+    "botao": {
+     "botao": {
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 270,
+       "altura": 92,
+       "esquerda": 16,
+       "cima": 16,
+       "direita": 16,
+       "baixo": 22,
+       "acompanha": {
+        "slot": "jogar",
+        "respiro": [
+         38,
+         12
+        ]
+       }
+      }
+     }
+    },
+    "painel": {
+     "painel": {
+      "y": -5,
+      "largura": 128,
+      "altura": 128,
+      "fatias": {
+       "largura": 268,
+       "altura": 340,
+       "esquerda": 22,
+       "cima": 22,
+       "direita": 22,
+       "baixo": 22
+      }
+     }
+    },
+    "titulo": {
+     "titulo": {
+      "y": 128,
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 214,
+       "altura": 58,
+       "esquerda": 14,
+       "cima": 14,
+       "direita": 14,
+       "baixo": 20,
+       "acompanha": {
+        "slot": "missoes",
+        "respiro": [
+         22,
+         8
+        ]
+       }
+      }
+     }
+    },
+    "m1_caixa": {
+     "vazio": {
+      "largura": 34,
+      "altura": 34
+     },
+     "marcado": {
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "m2_caixa": {
+     "vazio": {
+      "largura": 34,
+      "altura": 34
+     },
+     "marcado": {
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "m3_caixa": {
+     "vazio": {
+      "largura": 34,
+      "altura": 34
+     },
+     "marcado": {
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "barra": {
+     "barra": {
+      "y": 4,
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 700,
+       "altura": 98,
+       "esquerda": 16,
+       "cima": 14,
+       "direita": 16,
+       "baixo": 20
+      }
+     }
+    },
+    "moeda": {
+     "moeda_1": {
+      "largura": 58,
+      "altura": 58
+     },
+     "moeda_2": {
+      "largura": 45.5,
+      "altura": 58
+     },
+     "moeda_3": {
+      "largura": 34.5,
+      "altura": 58
+     },
+     "moeda_4": {
+      "largura": 10.5,
+      "altura": 58
+     }
+    },
+    "aviso_fundo": {
+     "titulo": {
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 430,
+       "altura": 70,
+       "esquerda": 14,
+       "cima": 14,
+       "direita": 14,
+       "baixo": 20
+      }
+     }
+    },
+    "aviso_marca": {
+     "marcado": {
+      "x": -175,
+      "y": 3,
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "escuro": {
+     "escuro": {
+      "largura": 1050,
+      "altura": 2055
+     }
+    },
+    "fim_painel": {
+     "painel": {
+      "largura": 128,
+      "altura": 128,
+      "fatias": {
+       "largura": 470,
+       "altura": 480,
+       "esquerda": 22,
+       "cima": 22,
+       "direita": 22,
+       "baixo": 22
+      }
+     }
+    },
+    "fim_faixa": {
+     "titulo": {
+      "y": 228,
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 300,
+       "altura": 76,
+       "esquerda": 14,
+       "cima": 14,
+       "direita": 14,
+       "baixo": 20,
+       "acompanha": {
+        "slot": "fim_titulo",
+        "respiro": [
+         30,
+         12
+        ]
+       }
+      }
+     }
+    },
+    "fim_moeda": {
+     "moeda_1": {
+      "x": -150,
+      "y": 105,
+      "largura": 58,
+      "altura": 58
+     }
+    },
+    "denovo_fundo": {
+     "botao": {
+      "largura": 192,
+      "altura": 64,
+      "fatias": {
+       "largura": 270,
+       "altura": 88,
+       "esquerda": 16,
+       "cima": 16,
+       "direita": 16,
+       "baixo": 22,
+       "acompanha": {
+        "slot": "denovo_texto",
+        "respiro": [
+         38,
+         12
+        ]
+       }
+      }
+     }
+    },
+    "redondo": {
+     "redondo": {
+      "largura": 84,
+      "altura": 84
+     }
+    },
+    "pausa": {
+     "pausa": {
+      "y": 3,
+      "largura": 24,
+      "altura": 30
+     },
+     "tocar": {
+      "y": 3,
+      "largura": 26,
+      "altura": 30
+     }
+    },
+    "jogar": {
+     "jogar": {
+      "tipo": "texto",
+      "y": 6,
+      "largura": 600,
+      "altura": 60,
+      "chave": "JOGAR",
+      "familia": "kenney",
+      "tamanho": 40,
+      "minimo": 24,
+      "sombra": {
+       "cor": "1d7a4aff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "dica": {
+     "dica": {
+      "tipo": "texto",
+      "largura": 600,
+      "altura": 50,
+      "chave": "DICA",
+      "familia": "kenney",
+      "tamanho": 34,
+      "minimo": 20,
+      "sombra": {
+       "cor": "2a6a9aff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "missoes": {
+     "missoes": {
+      "tipo": "texto",
+      "y": 132,
+      "largura": 320,
+      "altura": 50,
+      "chave": "MISSOES",
+      "familia": "kenney",
+      "tamanho": 28,
+      "minimo": 17
+     }
+    },
+    "m1_texto": {
+     "m1_texto": {
+      "tipo": "texto",
+      "x": 21,
+      "largura": 166,
+      "altura": 34,
+      "chave": "MOEDAS",
+      "familia": "kenney",
+      "tamanho": 22,
+      "minimo": 13,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "m2_texto": {
+     "m2_texto": {
+      "tipo": "texto",
+      "x": 21,
+      "largura": 166,
+      "altura": 34,
+      "chave": "PULOS",
+      "familia": "kenney",
+      "tamanho": 22,
+      "minimo": 13,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "m3_texto": {
+     "m3_texto": {
+      "tipo": "texto",
+      "x": 21,
+      "largura": 166,
+      "altura": 34,
+      "chave": "CENOURA",
+      "familia": "kenney",
+      "tamanho": 22,
+      "minimo": 13,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "pontos": {
+     "pontos": {
+      "tipo": "texto",
+      "x": 146,
+      "largura": 200,
+      "altura": 50,
+      "texto": "0",
+      "familia": "kenney",
+      "tamanho": 40,
+      "minimo": 24,
+      "alinhar": "esquerda"
+     }
+    },
+    "tempo": {
+     "tempo": {
+      "tipo": "texto",
+      "largura": 140,
+      "altura": 56,
+      "texto": "30",
+      "familia": "kenney",
+      "tamanho": 44,
+      "minimo": 26,
+      "sombra": {
+       "cor": "1d2a5aff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "aviso_texto": {
+     "aviso_texto": {
+      "tipo": "texto",
+      "x": 20,
+      "y": 6,
+      "largura": 320,
+      "altura": 44,
+      "texto": "",
+      "familia": "kenney",
+      "tamanho": 30,
+      "minimo": 18
+     }
+    },
+    "pausa_texto": {
+     "pausa_texto": {
+      "tipo": "texto",
+      "largura": 640,
+      "altura": 110,
+      "chave": "PAUSA",
+      "familia": "kenney",
+      "tamanho": 84,
+      "minimo": 50,
+      "sombra": {
+       "cor": "0b1020ff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "fim_titulo": {
+     "fim_titulo": {
+      "tipo": "texto",
+      "y": 233,
+      "largura": 520,
+      "altura": 56,
+      "chave": "FIM",
+      "familia": "kenney",
+      "tamanho": 42,
+      "minimo": 25
+     }
+    },
+    "fim_moedas": {
+     "fim_moedas": {
+      "tipo": "texto",
+      "x": 40,
+      "y": 105,
+      "largura": 300,
+      "altura": 70,
+      "chave": "MOEDAS",
+      "familia": "kenney",
+      "tamanho": 54,
+      "minimo": 32,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "fim_recorde": {
+     "fim_recorde": {
+      "tipo": "texto",
+      "y": 25,
+      "largura": 400,
+      "altura": 44,
+      "chave": "RECORDE",
+      "familia": "kenney",
+      "tamanho": 30,
+      "minimo": 18,
+      "cor": "6a5f98ff"
+     }
+    },
+    "fim_novo": {
+     "fim_novo": {
+      "tipo": "texto",
+      "largura": 400,
+      "altura": 46,
+      "chave": "NOVO",
+      "familia": "kenney",
+      "tamanho": 32,
+      "minimo": 19,
+      "cor": "ffb000ff",
+      "sombra": {
+       "cor": "7a4a00ff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "denovo_texto": {
+     "denovo_texto": {
+      "tipo": "texto",
+      "y": 6,
+      "largura": 400,
+      "altura": 56,
+      "chave": "DENOVO",
+      "familia": "kenney",
+      "tamanho": 38,
+      "minimo": 23,
+      "sombra": {
+       "cor": "1d7a4aff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    }
+   }
+  }
+ ],
+ "eventos": {
+  "pulo": {},
+  "pousa": {},
+  "moeda": {},
+  "cenoura": {},
+  "ai": {},
+  "missao": {},
+  "fim": {}
+ },
+ "animacoes": {
+  "jogar/normal": {
+   "ossos": {
+    "botao": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.4,
+        1,
+        0.6,
+        1.06,
+        0.4,
+        1,
+        0.6,
+        1.06
+       ]
+      },
+      {
+       "tempo": 1,
+       "x": 1.06,
+       "y": 1.06,
+       "curva": [
+        1.4,
+        1.06,
+        1.6,
+        1,
+        1.4,
+        1.06,
+        1.6,
+        1
+       ]
+      },
+      {
+       "tempo": 2,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "botao": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/em_cima": {
+   "ossos": {
+    "botao": {
+     "escalar": [
+      {
+       "x": 1.1,
+       "y": 1.1
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": 6
+      }
+     ]
+    }
+   },
+   "slots": {
+    "botao": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/apertado": {
+   "ossos": {
+    "botao": {
+     "escalar": [
+      {
+       "x": 0.93,
+       "y": 0.9
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": -4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "botao": {
+     "rgba": [
+      {
+       "cor": "c8d8c8ff"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "e8f0e8ff"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/desligado": {
+   "ossos": {
+    "botao": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "botao": {
+     "rgba": [
+      {
+       "cor": "8c8c8cff"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "ffffff8c"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/normal": {
+   "ossos": {
+    "pausa": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/em_cima": {
+   "ossos": {
+    "pausa": {
+     "escalar": [
+      {
+       "x": 1.06,
+       "y": 1.06
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/apertado": {
+   "ossos": {
+    "pausa": {
+     "escalar": [
+      {
+       "x": 0.94,
+       "y": 0.94
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "d1d1d1ff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "d1d1d1ff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/desligado": {
+   "ossos": {
+    "pausa": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "8c8c8c99"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "8c8c8c99"
+      }
+     ]
+    }
+   }
+  },
+  "denovo/normal": {
+   "ossos": {
+    "denovo": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.32000000000000006,
+        1,
+        0.48,
+        1.06,
+        0.32000000000000006,
+        1,
+        0.48,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": 1.06,
+       "y": 1.06,
+       "curva": [
+        1.12,
+        1.06,
+        1.28,
+        1,
+        1.12,
+        1.06,
+        1.28,
+        1
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   }
+  },
+  "denovo/em_cima": {
+   "ossos": {
+    "denovo": {
+     "escalar": [
+      {
+       "x": 1.1,
+       "y": 1.1
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": 6
+      }
+     ]
+    }
+   }
+  },
+  "denovo/apertado": {
+   "ossos": {
+    "denovo": {
+     "escalar": [
+      {
+       "x": 0.93,
+       "y": 0.9
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": -4
+      }
+     ]
+    }
+   }
+  },
+  "denovo/desligado": {
+   "ossos": {
+    "denovo": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   }
+  },
+  "parado": {
+   "ossos": {
+    "nuvens": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.4,
+        0,
+        0.6,
+        16,
+        0.4,
+        0,
+        0.6,
+        0
+       ]
+      },
+      {
+       "tempo": 1,
+       "x": 16,
+       "y": 0,
+       "curva": [
+        1.4,
+        16,
+        1.6,
+        0,
+        1.4,
+        0,
+        1.6,
+        0
+       ]
+      },
+      {
+       "tempo": 2,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda": {
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.3,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.4,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.5,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.6,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.7,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.8,
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   }
+  },
+  "coelho/respira": {
+   "ossos": {
+    "coelho": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.4,
+        1,
+        0.6,
+        0.97,
+        0.4,
+        1,
+        0.6,
+        1.04
+       ]
+      },
+      {
+       "tempo": 1,
+       "x": 0.97,
+       "y": 1.04,
+       "curva": [
+        1.4,
+        0.97,
+        1.6,
+        1,
+        1.4,
+        1.04,
+        1.6,
+        1
+       ]
+      },
+      {
+       "tempo": 2,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "coelho": {
+     "parte": [
+      {
+       "nome": "coelho_stand"
+      }
+     ],
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "coelho/pula": {
+   "ossos": {
+    "coelho": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.08,
+       "x": 0,
+       "y": -4,
+       "curva": [
+        0.122,
+        0,
+        0.20600000000000002,
+        0,
+        0.122,
+        135.70000000000002,
+        0.20600000000000002,
+        250
+       ]
+      },
+      {
+       "tempo": 0.36,
+       "x": 0,
+       "y": 250,
+       "curva": [
+        0.392,
+        0,
+        0.408,
+        0,
+        0.392,
+        250,
+        0.408,
+        244
+       ]
+      },
+      {
+       "tempo": 0.44,
+       "x": 0,
+       "y": 244,
+       "curva": [
+        0.55,
+        0,
+        0.61,
+        0,
+        0.55,
+        244,
+        0.61,
+        134.2
+       ]
+      },
+      {
+       "tempo": 0.64,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.7,
+       "x": 0,
+       "y": -6,
+       "curva": [
+        0.748,
+        0,
+        0.7719999999999999,
+        0,
+        0.748,
+        -6,
+        0.7719999999999999,
+        0
+       ]
+      },
+      {
+       "tempo": 0.82,
+       "x": 0,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.012,
+        1.088,
+        0.036000000000000004,
+        1.16,
+        0.012,
+        0.89,
+        0.036000000000000004,
+        0.8
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 1.16,
+       "y": 0.8,
+       "curva": [
+        0.092,
+        0.984,
+        0.116,
+        0.84,
+        0.092,
+        1.02,
+        0.116,
+        1.2
+       ]
+      },
+      {
+       "tempo": 0.16,
+       "x": 0.84,
+       "y": 1.2,
+       "curva": [
+        0.24,
+        0.84,
+        0.27999999999999997,
+        0.97,
+        0.24,
+        1.2,
+        0.27999999999999997,
+        1.03
+       ]
+      },
+      {
+       "tempo": 0.36,
+       "x": 0.97,
+       "y": 1.03,
+       "curva": [
+        0.44,
+        0.97,
+        0.48000000000000004,
+        0.92,
+        0.44,
+        1.03,
+        0.48000000000000004,
+        1.1
+       ]
+      },
+      {
+       "tempo": 0.56,
+       "x": 0.92,
+       "y": 1.1,
+       "curva": [
+        0.6040000000000001,
+        0.92,
+        0.628,
+        1.055,
+        0.6040000000000001,
+        1.1,
+        0.628,
+        0.9470000000000001
+       ]
+      },
+      {
+       "tempo": 0.64,
+       "x": 1.22,
+       "y": 0.76,
+       "curva": [
+        0.652,
+        1.0659999999999998,
+        0.676,
+        0.94,
+        0.652,
+        0.9305000000000001,
+        0.676,
+        1.07
+       ]
+      },
+      {
+       "tempo": 0.72,
+       "x": 0.94,
+       "y": 1.07,
+       "curva": [
+        0.76,
+        0.94,
+        0.7799999999999999,
+        1,
+        0.76,
+        1.07,
+        0.7799999999999999,
+        1
+       ]
+      },
+      {
+       "tempo": 0.82,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "coelho": {
+     "parte": [
+      {
+       "nome": "coelho_ready"
+      },
+      {
+       "tempo": 0.08,
+       "nome": "coelho_jump"
+      },
+      {
+       "tempo": 0.64,
+       "nome": "coelho_ready"
+      },
+      {
+       "tempo": 0.74,
+       "nome": "coelho_stand"
+      }
+     ],
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0.08,
+     "nome": "pulo"
+    },
+    {
+     "tempo": 0.64,
+     "nome": "pousa"
+    }
+   ]
+  },
+  "coelho/ai": {
+   "ossos": {
+    "coelho": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.009,
+        -12.100000000000001,
+        0.027,
+        -22,
+        0.009,
+        9.9,
+        0.027,
+        18
+       ]
+      },
+      {
+       "tempo": 0.06,
+       "x": -22,
+       "y": 18,
+       "curva": [
+        0.115,
+        -22,
+        0.14500000000000002,
+        -16.6,
+        0.115,
+        18,
+        0.14500000000000002,
+        9.9
+       ]
+      },
+      {
+       "tempo": 0.16,
+       "x": -10,
+       "y": 0,
+       "curva": [
+        0.17200000000000001,
+        -1.1999999999999993,
+        0.196,
+        6,
+        0.17200000000000001,
+        0,
+        0.196,
+        0
+       ]
+      },
+      {
+       "tempo": 0.24,
+       "x": 6,
+       "y": 0,
+       "curva": [
+        0.28,
+        6,
+        0.3,
+        0,
+        0.28,
+        0,
+        0.3,
+        0
+       ]
+      },
+      {
+       "tempo": 0.34,
+       "x": 0,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1.15,
+       "y": 0.85,
+       "curva": [
+        0.018,
+        1.04,
+        0.054,
+        0.95,
+        0.018,
+        0.96,
+        0.054,
+        1.05
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 0.95,
+       "y": 1.05,
+       "curva": [
+        0.192,
+        0.95,
+        0.22799999999999998,
+        1,
+        0.192,
+        1.05,
+        0.22799999999999998,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "coelho": {
+     "parte": [
+      {
+       "nome": "coelho_hurt"
+      },
+      {
+       "tempo": 0.62,
+       "nome": "coelho_stand"
+      }
+     ],
+     "rgba": [
+      {
+       "cor": "ff7070ff"
+      },
+      {
+       "tempo": 0.1,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.18,
+       "cor": "ff7070ff"
+      },
+      {
+       "tempo": 0.28,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.36,
+       "cor": "ff9090ff"
+      },
+      {
+       "tempo": 0.46,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "ai"
+    }
+   ]
+  },
+  "coelho/festa": {
+   "ossos": {
+    "coelho": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.033,
+        0,
+        0.099,
+        0,
+        0.033,
+        38.5,
+        0.099,
+        70
+       ]
+      },
+      {
+       "tempo": 0.22,
+       "x": 0,
+       "y": 70,
+       "curva": [
+        0.33,
+        0,
+        0.39,
+        0,
+        0.33,
+        70,
+        0.39,
+        38.5
+       ]
+      },
+      {
+       "tempo": 0.42,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.5,
+       "x": 0,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1.12,
+       "y": 0.86,
+       "curva": [
+        0.012,
+        0.9990000000000001,
+        0.036000000000000004,
+        0.9,
+        0.012,
+        1.0030000000000001,
+        0.036000000000000004,
+        1.12
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 0.9,
+       "y": 1.12,
+       "curva": [
+        0.136,
+        0.9,
+        0.164,
+        1,
+        0.136,
+        1.12,
+        0.164,
+        1
+       ]
+      },
+      {
+       "tempo": 0.22,
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.29200000000000004,
+        1,
+        0.328,
+        0.94,
+        0.29200000000000004,
+        1,
+        0.328,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "x": 0.94,
+       "y": 1.06,
+       "curva": [
+        0.406,
+        1.0390000000000001,
+        0.41800000000000004,
+        1.12,
+        0.406,
+        0.95,
+        0.41800000000000004,
+        0.86
+       ]
+      },
+      {
+       "tempo": 0.44,
+       "x": 1.12,
+       "y": 0.86,
+       "curva": [
+        0.464,
+        1.12,
+        0.476,
+        1.12,
+        0.464,
+        0.86,
+        0.476,
+        0.86
+       ]
+      },
+      {
+       "tempo": 0.5,
+       "x": 1.12,
+       "y": 0.86
+      }
+     ]
+    }
+   },
+   "slots": {
+    "coelho": {
+     "parte": [
+      {
+       "nome": "coelho_jump"
+      },
+      {
+       "tempo": 0.42,
+       "nome": "coelho_ready"
+      }
+     ],
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "brilho/pega": {
+   "ossos": {
+    "brilho_1": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        36.78045483133584,
+        0.2025,
+        66.87355423879242,
+        0.0675,
+        11.377527956461574,
+        0.2025,
+        20.68641446629377
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 66.87355423879242,
+       "y": 20.68641446629377
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": -140
+      }
+     ]
+    },
+    "brilho_2": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        11.585927449213314,
+        0.2025,
+        21.065322634933295,
+        0.0675,
+        50.94927659095432,
+        0.2025,
+        92.63504834718967
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 21.065322634933295,
+       "y": 92.63504834718967
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": 140
+      }
+     ]
+    },
+    "brilho_3": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        -28.24345565823128,
+        0.2025,
+        -51.3517375604205,
+        0.0675,
+        26.164044268452148,
+        0.2025,
+        47.5709895790039
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": -51.3517375604205,
+       "y": 47.5709895790039
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": -140
+      }
+     ]
+    },
+    "brilho_4": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        -49.91633155681292,
+        0.2025,
+        -90.75696646693258,
+        0.0675,
+        -15.440930798054978,
+        0.2025,
+        -28.07441963282723
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": -90.75696646693258,
+       "y": -28.07441963282723
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": 140
+      }
+     ]
+    },
+    "brilho_5": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        -8.536999173104567,
+        0.2025,
+        -15.521816678371938,
+        0.0675,
+        -37.54157222491371,
+        0.2025,
+        -68.25740404529765
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": -15.521816678371938,
+       "y": -68.25740404529765
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": -140
+      }
+     ]
+    },
+    "brilho_6": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.0675,
+        38.330404107599605,
+        0.2025,
+        69.69164383199927,
+        0.0675,
+        -35.508345792899334,
+        0.2025,
+        -64.56062871436242
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 69.69164383199927,
+       "y": -64.56062871436242
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3,
+        0.018,
+        0.8500000000000001,
+        0.054,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.12,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999,
+        0.3015,
+        1.3,
+        0.4005,
+        0.8049999999999999
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 0.2,
+       "y": 0.2
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.45,
+       "valor": 140
+      }
+     ]
+    }
+   },
+   "slots": {
+    "brilho_1": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "brilho_2": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "brilho_3": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "brilho_4": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "brilho_5": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "brilho_6": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.45,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "placar/soma": {
+   "ossos": {
+    "placar": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.012,
+        1.165,
+        0.036000000000000004,
+        1.3,
+        0.012,
+        1.165,
+        0.036000000000000004,
+        1.3
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 1.3,
+       "y": 1.3,
+       "curva": [
+        0.16799999999999998,
+        1.3,
+        0.21199999999999997,
+        1,
+        0.16799999999999998,
+        1.3,
+        0.21199999999999997,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   }
+  },
+  "placar/perde": {
+   "ossos": {
+    "placar": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.05,
+       "x": -8,
+       "y": 0
+      },
+      {
+       "tempo": 0.1,
+       "x": 8,
+       "y": 0
+      },
+      {
+       "tempo": 0.15,
+       "x": -6,
+       "y": 0
+      },
+      {
+       "tempo": 0.2,
+       "x": 4,
+       "y": 0
+      },
+      {
+       "tempo": 0.25,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "pontos": {
+     "rgba": [
+      {
+       "cor": "ff5050ff"
+      },
+      {
+       "tempo": 0.35,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "tempo/urgente": {
+   "ossos": {
+    "tempo": {
+     "escalar": [
+      {
+       "x": 1.25,
+       "y": 1.25,
+       "curva": [
+        0.0375,
+        1.1125,
+        0.1125,
+        1,
+        0.0375,
+        1.1125,
+        0.1125,
+        1
+       ]
+      },
+      {
+       "tempo": 0.25,
+       "x": 1,
+       "y": 1
+      },
+      {
+       "tempo": 0.5,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "tempo": {
+     "rgba": [
+      {
+       "cor": "ff4040ff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.5,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "moeda1/passa": {
+   "ossos": {
+    "moeda1": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda1": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda1/pega": {
+   "ossos": {
+    "moeda1": {
+     "mover": [
+      {
+       "x": -460,
+       "y": 0,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        27.500000000000004,
+        0.135,
+        50
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 50
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda1": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "moeda2/passa": {
+   "ossos": {
+    "moeda2": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda2": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda2/pega": {
+   "ossos": {
+    "moeda2": {
+     "mover": [
+      {
+       "x": -460,
+       "y": -20,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        7.5000000000000036,
+        0.135,
+        30
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 30
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda2": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "moeda3/passa": {
+   "ossos": {
+    "moeda3": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda3": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda3/pega": {
+   "ossos": {
+    "moeda3": {
+     "mover": [
+      {
+       "x": -460,
+       "y": 0,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        27.500000000000004,
+        0.135,
+        50
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 50
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda3": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "moeda4/passa": {
+   "ossos": {
+    "moeda4": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda4": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda4/pega": {
+   "ossos": {
+    "moeda4": {
+     "mover": [
+      {
+       "x": -460,
+       "y": -20,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        7.5000000000000036,
+        0.135,
+        30
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 30
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda4": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "moeda5/passa": {
+   "ossos": {
+    "moeda5": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda5": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda5/pega": {
+   "ossos": {
+    "moeda5": {
+     "mover": [
+      {
+       "x": -460,
+       "y": 0,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        27.500000000000004,
+        0.135,
+        50
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 50
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda5": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "moeda6/passa": {
+   "ossos": {
+    "moeda6": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3,
+        -76.66666666666667,
+        0.6000000000000001,
+        -153.33333333333331,
+        0.36000000000000004,
+        0,
+        0.54,
+        12
+       ]
+      },
+      {
+       "tempo": 0.9,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.2,
+        -306.6666666666667,
+        1.5,
+        -383.3333333333333,
+        1.26,
+        12,
+        1.44,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.8,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        2.1,
+        -536.6666666666666,
+        2.4000000000000004,
+        -613.3333333333334,
+        2.16,
+        -12,
+        2.34,
+        12
+       ]
+      },
+      {
+       "tempo": 2.7,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        3,
+        -766.6666666666666,
+        3.3000000000000003,
+        -843.3333333333334,
+        3.06,
+        12,
+        3.24,
+        0
+       ]
+      },
+      {
+       "tempo": 3.6,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda6": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.35,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.6,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.09,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.18,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.27,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.36,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.45,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.54,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 0.63,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 0.72,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.81,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 0.9,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 0.99,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.08,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.17,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.26,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.35,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.44,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.53,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.62,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 1.71,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 1.8,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 1.89,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 1.98,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.07,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.16,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.25,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.34,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.43,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 2.52,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.61,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.7,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 2.79,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 2.88,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 2.97,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.06,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.15,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.24,
+       "nome": "moeda_1"
+      },
+      {
+       "tempo": 3.33,
+       "nome": "moeda_2"
+      },
+      {
+       "tempo": 3.42,
+       "nome": "moeda_3"
+      },
+      {
+       "tempo": 3.51,
+       "nome": "moeda_4"
+      },
+      {
+       "tempo": 3.6,
+       "nome": "moeda_3"
+      }
+     ]
+    }
+   }
+  },
+  "moeda6/pega": {
+   "ossos": {
+    "moeda6": {
+     "mover": [
+      {
+       "x": -460,
+       "y": -20,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        7.5000000000000036,
+        0.135,
+        30
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 30
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "moeda6": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "moeda_1"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "moeda"
+    }
+   ]
+  },
+  "cenoura/passa": {
+   "ossos": {
+    "cenoura": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.3333333333333333,
+        -76.66666666666667,
+        0.6666666666666667,
+        -153.33333333333331,
+        0.4,
+        0,
+        0.6,
+        22
+       ]
+      },
+      {
+       "tempo": 1,
+       "x": -230,
+       "y": 22,
+       "curva": [
+        1.3333333333333333,
+        -306.6666666666667,
+        1.6666666666666667,
+        -383.3333333333333,
+        1.4,
+        22,
+        1.6,
+        -22
+       ]
+      },
+      {
+       "tempo": 2,
+       "x": -460,
+       "y": -22,
+       "curva": [
+        2.3333333333333335,
+        -536.6666666666666,
+        2.6666666666666665,
+        -613.3333333333334,
+        2.4,
+        -22,
+        2.6,
+        22
+       ]
+      },
+      {
+       "tempo": 3,
+       "x": -690,
+       "y": 22,
+       "curva": [
+        3.3333333333333335,
+        -766.6666666666666,
+        3.6666666666666665,
+        -843.3333333333334,
+        3.4,
+        22,
+        3.6,
+        0
+       ]
+      },
+      {
+       "tempo": 4,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": -12,
+       "curva": [
+        0.30000000000000004,
+        -12,
+        0.44999999999999996,
+        12
+       ]
+      },
+      {
+       "tempo": 0.75,
+       "valor": 12,
+       "curva": [
+        1.05,
+        12,
+        1.2,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.5,
+       "valor": -12,
+       "curva": [
+        1.8,
+        -12,
+        1.95,
+        12
+       ]
+      },
+      {
+       "tempo": 2.25,
+       "valor": 12,
+       "curva": [
+        2.55,
+        12,
+        2.7,
+        -12
+       ]
+      },
+      {
+       "tempo": 3,
+       "valor": -12
+      }
+     ]
+    }
+   },
+   "slots": {
+    "cenoura": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.75,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 4,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "cenoura/pega": {
+   "ossos": {
+    "cenoura": {
+     "mover": [
+      {
+       "x": -460,
+       "y": -20,
+       "curva": [
+        0.045,
+        -460,
+        0.135,
+        -460,
+        0.045,
+        7.5000000000000036,
+        0.135,
+        30
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": -460,
+       "y": 30
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6,
+        0.015,
+        1.33,
+        0.045000000000000005,
+        1.6
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.6,
+       "y": 1.6,
+       "curva": [
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06,
+        0.21000000000000002,
+        1.6,
+        0.27,
+        1.06
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 0.4,
+       "y": 0.4
+      }
+     ]
+    }
+   },
+   "slots": {
+    "cenoura": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.12,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "cenoura"
+    }
+   ]
+  },
+  "espinho1/passa": {
+   "ossos": {
+    "espinho1": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.26666666666666666,
+        -76.66666666666667,
+        0.5333333333333334,
+        -153.33333333333331,
+        0.32000000000000006,
+        0,
+        0.48,
+        12
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.0666666666666667,
+        -306.6666666666667,
+        1.3333333333333335,
+        -383.3333333333333,
+        1.12,
+        12,
+        1.28,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        1.866666666666667,
+        -536.6666666666666,
+        2.1333333333333337,
+        -613.3333333333334,
+        1.9200000000000002,
+        -12,
+        2.08,
+        12
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        2.666666666666667,
+        -766.6666666666666,
+        2.9333333333333336,
+        -843.3333333333334,
+        2.72,
+        12,
+        2.8800000000000003,
+        0
+       ]
+      },
+      {
+       "tempo": 3.2,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 3.2,
+       "valor": 540
+      }
+     ]
+    }
+   },
+   "slots": {
+    "espinho1": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.95,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.2,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "espinho1/bate": {
+   "ossos": {
+    "espinho1": {
+     "mover": [
+      {
+       "x": -420,
+       "y": 0,
+       "curva": [
+        0.075,
+        -277,
+        0.225,
+        -160,
+        0.075,
+        121.00000000000001,
+        0.225,
+        220
+       ]
+      },
+      {
+       "tempo": 0.5,
+       "x": -160,
+       "y": 220
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.5,
+       "valor": -400
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1.2,
+       "y": 0.8,
+       "curva": [
+        0.015,
+        1.0899999999999999,
+        0.045000000000000005,
+        1,
+        0.015,
+        0.91,
+        0.045000000000000005,
+        1
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "espinho1": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.5,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "espinho2/passa": {
+   "ossos": {
+    "espinho2": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.26666666666666666,
+        -76.66666666666667,
+        0.5333333333333334,
+        -153.33333333333331,
+        0.32000000000000006,
+        0,
+        0.48,
+        12
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": -230,
+       "y": 12,
+       "curva": [
+        1.0666666666666667,
+        -306.6666666666667,
+        1.3333333333333335,
+        -383.3333333333333,
+        1.12,
+        12,
+        1.28,
+        -12
+       ]
+      },
+      {
+       "tempo": 1.6,
+       "x": -460,
+       "y": -12,
+       "curva": [
+        1.866666666666667,
+        -536.6666666666666,
+        2.1333333333333337,
+        -613.3333333333334,
+        1.9200000000000002,
+        -12,
+        2.08,
+        12
+       ]
+      },
+      {
+       "tempo": 2.4,
+       "x": -690,
+       "y": 12,
+       "curva": [
+        2.666666666666667,
+        -766.6666666666666,
+        2.9333333333333336,
+        -843.3333333333334,
+        2.72,
+        12,
+        2.8800000000000003,
+        0
+       ]
+      },
+      {
+       "tempo": 3.2,
+       "x": -920,
+       "y": 0
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.027,
+        0.7675,
+        0.081,
+        1.15,
+        0.027,
+        0.7675,
+        0.081,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.18,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1,
+        0.22799999999999998,
+        1.15,
+        0.252,
+        1
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 3.2,
+       "valor": 540
+      }
+     ]
+    }
+   },
+   "slots": {
+    "espinho2": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.95,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 3.2,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "espinho2/bate": {
+   "ossos": {
+    "espinho2": {
+     "mover": [
+      {
+       "x": -420,
+       "y": 0,
+       "curva": [
+        0.075,
+        -277,
+        0.225,
+        -160,
+        0.075,
+        121.00000000000001,
+        0.225,
+        220
+       ]
+      },
+      {
+       "tempo": 0.5,
+       "x": -160,
+       "y": 220
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.5,
+       "valor": -400
+      }
+     ],
+     "escalar": [
+      {
+       "x": 1.2,
+       "y": 0.8,
+       "curva": [
+        0.015,
+        1.0899999999999999,
+        0.045000000000000005,
+        1,
+        0.015,
+        0.91,
+        0.045000000000000005,
+        1
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "espinho2": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.5,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/sai": {
+   "ossos": {
+    "botao": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.015,
+        1.0825,
+        0.045000000000000005,
+        1.15,
+        0.015,
+        1.0825,
+        0.045000000000000005,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.2375,
+        1.15,
+        0.3125,
+        0.9025,
+        0.2375,
+        1.15,
+        0.3125,
+        0.9025
+       ]
+      },
+      {
+       "tempo": 0.35,
+       "x": 0.6,
+       "y": 0.6
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.015,
+        0,
+        0.045000000000000005,
+        0,
+        0.015,
+        7.700000000000001,
+        0.045000000000000005,
+        14
+       ]
+      },
+      {
+       "tempo": 0.1,
+       "x": 0,
+       "y": 14,
+       "curva": [
+        0.2375,
+        0,
+        0.3125,
+        0,
+        0.2375,
+        14,
+        0.3125,
+        -109.3
+       ]
+      },
+      {
+       "tempo": 0.35,
+       "x": 0,
+       "y": -260
+      }
+     ]
+    }
+   },
+   "slots": {
+    "botao": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.35,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 0.35,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "dica/mostra": {
+   "ossos": {
+    "dica": {
+     "escalar": [
+      {
+       "x": 0.8,
+       "y": 0.8,
+       "curva": [
+        0.0375,
+        0.9375,
+        0.1125,
+        1.05,
+        0.0375,
+        0.9375,
+        0.1125,
+        1.05
+       ]
+      },
+      {
+       "tempo": 0.25,
+       "x": 1.05,
+       "y": 1.05,
+       "curva": [
+        0.31,
+        1.05,
+        0.34,
+        1,
+        0.31,
+        1.05,
+        0.34,
+        1
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.72,
+        1,
+        0.8799999999999999,
+        1.06,
+        0.72,
+        1,
+        0.8799999999999999,
+        1.06
+       ]
+      },
+      {
+       "tempo": 1.2,
+       "x": 1.06,
+       "y": 1.06,
+       "curva": [
+        1.52,
+        1.06,
+        1.68,
+        1,
+        1.52,
+        1.06,
+        1.68,
+        1
+       ]
+      },
+      {
+       "tempo": 2,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "dica": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.1,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.6,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "desktop": {
+   "ossos": {
+    "painel": {
+     "mover": [
+      {
+       "x": 340,
+       "y": 0,
+       "curva": [
+        0.24,
+        340,
+        0.36,
+        -12,
+        0.24,
+        0,
+        0.36,
+        0
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "x": -12,
+       "y": 0,
+       "curva": [
+        0.68,
+        -12,
+        0.72,
+        0,
+        0.68,
+        0,
+        0.72,
+        0
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "painel": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "titulo": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "missoes": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m1_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m1_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m2_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m2_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m3_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m3_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "retrato": {
+   "ossos": {
+    "painel": {
+     "mover": [
+      {
+       "x": 340,
+       "y": 300,
+       "curva": [
+        0.24,
+        340,
+        0.36,
+        -12,
+        0.24,
+        300,
+        0.36,
+        300
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "x": -12,
+       "y": 300,
+       "curva": [
+        0.68,
+        -12,
+        0.72,
+        0,
+        0.68,
+        300,
+        0.72,
+        300
+       ]
+      },
+      {
+       "tempo": 0.8,
+       "x": 0,
+       "y": 300
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.82,
+       "y": 0.82
+      }
+     ]
+    }
+   },
+   "slots": {
+    "painel": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "titulo": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "missoes": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m1_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m1_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m2_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m2_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m3_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "m3_caixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "missao1/feita": {
+   "ossos": {
+    "m1_marca": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82,
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 0.6,
+       "y": 0.6,
+       "curva": [
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45,
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45
+       ]
+      },
+      {
+       "tempo": 0.22,
+       "x": 1.45,
+       "y": 1.45,
+       "curva": [
+        0.312,
+        1.45,
+        0.358,
+        1,
+        0.312,
+        1.45,
+        0.358,
+        1
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.08,
+       "valor": -15,
+       "curva": [
+        0.11299999999999999,
+        -3.4499999999999993,
+        0.179,
+        6
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "valor": 6,
+       "curva": [
+        0.36,
+        6,
+        0.39,
+        0
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "valor": 0
+      }
+     ]
+    },
+    "m1": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.1,
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.115,
+        0,
+        0.14500000000000002,
+        0,
+        0.115,
+        4.4,
+        0.14500000000000002,
+        8
+       ]
+      },
+      {
+       "tempo": 0.2,
+       "x": 0,
+       "y": 8,
+       "curva": [
+        0.266,
+        0,
+        0.302,
+        0,
+        0.266,
+        8,
+        0.302,
+        4.4
+       ]
+      },
+      {
+       "tempo": 0.32,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "m1_caixa": {
+     "parte": [
+      {
+       "nome": "vazio"
+      },
+      {
+       "tempo": 0.08,
+       "nome": "marcado"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0.08,
+     "nome": "missao"
+    }
+   ]
+  },
+  "missao2/feita": {
+   "ossos": {
+    "m2_marca": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82,
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 0.6,
+       "y": 0.6,
+       "curva": [
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45,
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45
+       ]
+      },
+      {
+       "tempo": 0.22,
+       "x": 1.45,
+       "y": 1.45,
+       "curva": [
+        0.312,
+        1.45,
+        0.358,
+        1,
+        0.312,
+        1.45,
+        0.358,
+        1
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.08,
+       "valor": -15,
+       "curva": [
+        0.11299999999999999,
+        -3.4499999999999993,
+        0.179,
+        6
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "valor": 6,
+       "curva": [
+        0.36,
+        6,
+        0.39,
+        0
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "valor": 0
+      }
+     ]
+    },
+    "m2": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.1,
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.115,
+        0,
+        0.14500000000000002,
+        0,
+        0.115,
+        4.4,
+        0.14500000000000002,
+        8
+       ]
+      },
+      {
+       "tempo": 0.2,
+       "x": 0,
+       "y": 8,
+       "curva": [
+        0.266,
+        0,
+        0.302,
+        0,
+        0.266,
+        8,
+        0.302,
+        4.4
+       ]
+      },
+      {
+       "tempo": 0.32,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "m2_caixa": {
+     "parte": [
+      {
+       "nome": "vazio"
+      },
+      {
+       "tempo": 0.08,
+       "nome": "marcado"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0.08,
+     "nome": "missao"
+    }
+   ]
+  },
+  "missao3/feita": {
+   "ossos": {
+    "m3_marca": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82,
+        0.044000000000000004,
+        1,
+        0.068,
+        0.82
+       ]
+      },
+      {
+       "tempo": 0.08,
+       "x": 0.6,
+       "y": 0.6,
+       "curva": [
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45,
+        0.101,
+        1.0675,
+        0.14300000000000002,
+        1.45
+       ]
+      },
+      {
+       "tempo": 0.22,
+       "x": 1.45,
+       "y": 1.45,
+       "curva": [
+        0.312,
+        1.45,
+        0.358,
+        1,
+        0.312,
+        1.45,
+        0.358,
+        1
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.08,
+       "valor": -15,
+       "curva": [
+        0.11299999999999999,
+        -3.4499999999999993,
+        0.179,
+        6
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "valor": 6,
+       "curva": [
+        0.36,
+        6,
+        0.39,
+        0
+       ]
+      },
+      {
+       "tempo": 0.45,
+       "valor": 0
+      }
+     ]
+    },
+    "m3": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 0.1,
+       "x": 0,
+       "y": 0,
+       "curva": [
+        0.115,
+        0,
+        0.14500000000000002,
+        0,
+        0.115,
+        4.4,
+        0.14500000000000002,
+        8
+       ]
+      },
+      {
+       "tempo": 0.2,
+       "x": 0,
+       "y": 8,
+       "curva": [
+        0.266,
+        0,
+        0.302,
+        0,
+        0.266,
+        8,
+        0.302,
+        4.4
+       ]
+      },
+      {
+       "tempo": 0.32,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "m3_caixa": {
+     "parte": [
+      {
+       "nome": "vazio"
+      },
+      {
+       "tempo": 0.08,
+       "nome": "marcado"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0.08,
+     "nome": "missao"
+    }
+   ]
+  },
+  "aviso/mostra": {
+   "ossos": {
+    "aviso": {
+     "mover": [
+      {
+       "x": 0,
+       "y": 70,
+       "curva": [
+        0.0375,
+        0,
+        0.1125,
+        0,
+        0.0375,
+        27.099999999999994,
+        0.1125,
+        -8
+       ]
+      },
+      {
+       "tempo": 0.25,
+       "x": 0,
+       "y": -8,
+       "curva": [
+        0.31,
+        0,
+        0.34,
+        0,
+        0.31,
+        -8,
+        0.34,
+        0
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "tempo": 1.7,
+       "x": 0,
+       "y": 0,
+       "curva": [
+        1.92,
+        0,
+        2.04,
+        0,
+        1.92,
+        0,
+        2.04,
+        22.5
+       ]
+      },
+      {
+       "tempo": 2.1,
+       "x": 0,
+       "y": 50
+      }
+     ],
+     "escalar": [
+      {
+       "x": 0.8,
+       "y": 0.8,
+       "curva": [
+        0.0375,
+        0.9375,
+        0.1125,
+        1.05,
+        0.0375,
+        0.9375,
+        0.1125,
+        1.05
+       ]
+      },
+      {
+       "tempo": 0.25,
+       "x": 1.05,
+       "y": 1.05,
+       "curva": [
+        0.31,
+        1.05,
+        0.34,
+        1,
+        0.31,
+        1.05,
+        0.34,
+        1
+       ]
+      },
+      {
+       "tempo": 0.4,
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "aviso_fundo": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.8,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.1,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "aviso_marca": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.8,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.1,
+       "cor": "ffffff00"
+      }
+     ]
+    },
+    "aviso_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 1.8,
+       "cor": "ffffffff"
+      },
+      {
+       "tempo": 2.1,
+       "cor": "ffffff00"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/entra": {
+   "ossos": {
+    "pausa_titulo": {
+     "escalar": [
+      {
+       "x": 0.6,
+       "y": 0.6,
+       "curva": [
+        0.03,
+        0.875,
+        0.09000000000000001,
+        1.1,
+        0.03,
+        0.875,
+        0.09000000000000001,
+        1.1
+       ]
+      },
+      {
+       "tempo": 0.2,
+       "x": 1.1,
+       "y": 1.1,
+       "curva": [
+        0.248,
+        1.1,
+        0.272,
+        1,
+        0.248,
+        1.1,
+        0.272,
+        1
+       ]
+      },
+      {
+       "tempo": 0.32,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": 60,
+       "curva": [
+        0.03,
+        0,
+        0.09000000000000001,
+        0,
+        0.03,
+        23.699999999999996,
+        0.09000000000000001,
+        -6
+       ]
+      },
+      {
+       "tempo": 0.2,
+       "x": 0,
+       "y": -6,
+       "curva": [
+        0.248,
+        0,
+        0.272,
+        0,
+        0.248,
+        -6,
+        0.272,
+        0
+       ]
+      },
+      {
+       "tempo": 0.32,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "escuro": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.25,
+       "cor": "ffffff8c"
+      }
+     ]
+    },
+    "pausa_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.15,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "pausa": {
+     "parte": [
+      {
+       "nome": "pausa"
+      },
+      {
+       "tempo": 0.02,
+       "nome": "tocar"
+      }
+     ]
+    }
+   }
+  },
+  "fim/entra": {
+   "ossos": {
+    "fim": {
+     "escalar": [
+      {
+       "x": 0.3,
+       "y": 0.3,
+       "curva": [
+        0.0525,
+        0.7290000000000001,
+        0.1575,
+        1.08,
+        0.0525,
+        0.7290000000000001,
+        0.1575,
+        1.08
+       ]
+      },
+      {
+       "tempo": 0.35,
+       "x": 1.08,
+       "y": 1.08,
+       "curva": [
+        0.41,
+        1.08,
+        0.44,
+        1,
+        0.41,
+        1.08,
+        0.44,
+        1
+       ]
+      },
+      {
+       "tempo": 0.5,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "mover": [
+      {
+       "x": 0,
+       "y": -120,
+       "curva": [
+        0.0525,
+        0,
+        0.1575,
+        0,
+        0.0525,
+        -48.5,
+        0.1575,
+        10
+       ]
+      },
+      {
+       "tempo": 0.35,
+       "x": 0,
+       "y": 10,
+       "curva": [
+        0.41,
+        0,
+        0.44,
+        0,
+        0.41,
+        10,
+        0.44,
+        0
+       ]
+      },
+      {
+       "tempo": 0.5,
+       "x": 0,
+       "y": 0
+      }
+     ]
+    }
+   },
+   "slots": {
+    "escuro": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.3,
+       "cor": "ffffff80"
+      }
+     ]
+    },
+    "fim_painel": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "fim_faixa": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "fim_titulo": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "fim_moeda": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "fim_moedas": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "fim_recorde": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "denovo_fundo": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "denovo_texto": {
+     "rgba": [
+      {
+       "cor": "ffffff00"
+      },
+      {
+       "tempo": 0.2,
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   },
+   "eventos": [
+    {
+     "tempo": 0,
+     "nome": "fim"
+    }
+   ]
+  },
+  "fim/recorde": {
+   "ossos": {
+    "fim_novo": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1,
+       "curva": [
+        0.12,
+        1,
+        0.18,
+        1.15,
+        0.12,
+        1,
+        0.18,
+        1.15
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "x": 1.15,
+       "y": 1.15,
+       "curva": [
+        0.42,
+        1.15,
+        0.48,
+        1,
+        0.42,
+        1.15,
+        0.48,
+        1
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "x": 1,
+       "y": 1
+      }
+     ],
+     "girar": [
+      {
+       "valor": -3,
+       "curva": [
+        0.12,
+        -3,
+        0.18,
+        3
+       ]
+      },
+      {
+       "tempo": 0.3,
+       "valor": 3,
+       "curva": [
+        0.42,
+        3,
+        0.48,
+        -3
+       ]
+      },
+      {
+       "tempo": 0.6,
+       "valor": -3
+      }
+     ]
+    }
+   },
+   "slots": {
+    "fim_novo": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  }
+ },
+ "tela": {
+  "arte": [
+   -350,
+   0,
+   700,
+   1370
+  ],
+  "encaixe": "caber",
+  "ancoras": [
+   {
+    "osso": "fundo",
+    "ancora": [
+     0.5,
+     0.5
+    ],
+    "estica": "xy"
+   },
+   {
+    "osso": "nuvens",
+    "ancora": [
+     0.5,
+     0
+    ]
+   },
+   {
+    "osso": "chao",
+    "ancora": [
+     0.5,
+     1
+    ],
+    "estica": "x"
+   },
+   {
+    "osso": "heroi",
+    "ancora": [
+     0.5,
+     0.5
+    ]
+   },
+   {
+    "osso": "botao",
+    "ancora": [
+     0.5,
+     1
+    ]
+   },
+   {
+    "osso": "dica",
+    "ancora": [
+     0.5,
+     1
+    ]
+   },
+   {
+    "osso": "painel",
+    "ancora": [
+     1,
+     0.5
+    ]
+   },
+   {
+    "osso": "topo",
+    "ancora": [
+     0.5,
+     0
+    ],
+    "estica": "x"
+   },
+   {
+    "osso": "placar",
+    "ancora": [
+     0,
+     0
+    ]
+   },
+   {
+    "osso": "tempo",
+    "ancora": [
+     0.5,
+     0
+    ]
+   },
+   {
+    "osso": "aviso",
+    "ancora": [
+     0.5,
+     0
+    ]
+   },
+   {
+    "osso": "veu",
+    "ancora": [
+     0.5,
+     0.5
+    ],
+    "estica": "xy"
+   },
+   {
+    "osso": "pausa_titulo",
+    "ancora": [
+     0.5,
+     0.5
+    ]
+   },
+   {
+    "osso": "fim",
+    "ancora": [
+     0.5,
+     0.5
+    ]
+   },
+   {
+    "osso": "pausa",
+    "ancora": [
+     1,
+     0
+    ]
+   }
+  ]
+ },
+ "fontes": [
+  {
+   "nome": "kenney",
+   "arquivo": "kenney/kenney-future.ttf"
+  },
+  {
+   "nome": "arabe",
+   "arquivo": "fontes/NotoSansArabic-Bold.ttf"
+  },
+  {
+   "nome": "devanagari",
+   "arquivo": "fontes/NotoSansDevanagari-Bold.ttf"
+  }
+ ],
+ "traducoes": {
+  "idiomas": [
+   "pt",
+   "en",
+   "es",
+   "hi",
+   "ru",
+   "fr",
+   "it",
+   "ne",
+   "ar",
+   "fil",
+   "de",
+   "nl"
+  ],
+  "textos": {
+   "JOGAR": [
+    "JOGAR",
+    "PLAY",
+    "JUGAR",
+    "खेलें",
+    "ИГРАТЬ",
+    "JOUER",
+    "GIOCA",
+    "खेल्नुहोस्",
+    "العب",
+    "MAGLARO",
+    "SPIELEN",
+    "SPELEN"
+   ],
+   "MISSOES": [
+    "MISSÕES",
+    "MISSIONS",
+    "MISIONES",
+    "मिशन",
+    "ЗАДАНИЯ",
+    "MISSIONS",
+    "MISSIONI",
+    "मिसनहरू",
+    "المهام",
+    "MGA MISYON",
+    "MISSIONEN",
+    "MISSIES"
+   ],
+   "MOEDAS": [
+    "{n} moedas",
+    "{n} coins",
+    "{n} monedas",
+    "{n} सिक्के",
+    "{n} монет",
+    "{n} pièces",
+    "{n} monete",
+    "{n} सिक्का",
+    "{n} عملات",
+    "{n} barya",
+    "{n} Münzen",
+    "{n} munten"
+   ],
+   "PULOS": [
+    "10 pulos",
+    "10 jumps",
+    "10 saltos",
+    "10 छलांगें",
+    "10 прыжков",
+    "10 sauts",
+    "10 salti",
+    "10 उफ्राइ",
+    "10 قفزات",
+    "10 talon",
+    "10 Sprünge",
+    "10 sprongen"
+   ],
+   "CENOURA": [
+    "a cenoura",
+    "the carrot",
+    "la zanahoria",
+    "गाजर",
+    "морковка",
+    "la carotte",
+    "la carota",
+    "गाजर",
+    "الجزرة",
+    "ang karot",
+    "die Karotte",
+    "de wortel"
+   ],
+   "PAUSA": [
+    "PAUSA",
+    "PAUSED",
+    "PAUSA",
+    "विराम",
+    "ПАУЗА",
+    "PAUSE",
+    "PAUSA",
+    "विश्राम",
+    "إيقاف مؤقت",
+    "NAKAHINTO",
+    "PAUSE",
+    "PAUZE"
+   ],
+   "FIM": [
+    "ACABOU!",
+    "TIME'S UP!",
+    "¡TIEMPO!",
+    "समय खत्म!",
+    "ВРЕМЯ!",
+    "TERMINÉ !",
+    "TEMPO!",
+    "समय सकियो!",
+    "انتهى الوقت!",
+    "TAPOS NA!",
+    "ZEIT UM!",
+    "TIJD OM!"
+   ],
+   "RECORDE": [
+    "recorde: {n}",
+    "best: {n}",
+    "récord: {n}",
+    "सर्वश्रेष्ठ: {n}",
+    "рекорд: {n}",
+    "record : {n}",
+    "record: {n}",
+    "उत्कृष्ट: {n}",
+    "أفضل نتيجة: {n}",
+    "pinakamataas: {n}",
+    "Rekord: {n}",
+    "record: {n}"
+   ],
+   "NOVO": [
+    "novo recorde!",
+    "new best!",
+    "¡nuevo récord!",
+    "नया रिकॉर्ड!",
+    "новый рекорд!",
+    "nouveau record !",
+    "nuovo record!",
+    "नयाँ रेकर्ड!",
+    "رقم قياسي جديد!",
+    "bagong rekord!",
+    "neuer Rekord!",
+    "nieuw record!"
+   ],
+   "DENOVO": [
+    "DE NOVO",
+    "AGAIN",
+    "OTRA VEZ",
+    "फिर से",
+    "ЕЩЁ РАЗ",
+    "REJOUER",
+    "ANCORA",
+    "फेरि",
+    "مرة أخرى",
+    "ULIT",
+    "NOCHMAL",
+    "OPNIEUW"
+   ],
+   "DICA": [
+    "toque para pular",
+    "tap to jump",
+    "toca para saltar",
+    "कूदने के लिए टैप करें",
+    "нажми, чтобы прыгнуть",
+    "touche pour sauter",
+    "tocca per saltare",
+    "उफ्रन ट्याप गर्नुहोस्",
+    "المس للقفز",
+    "pindutin para tumalon",
+    "tippen zum Springen",
+    "tik om te springen"
+   ]
+  }
+ },
+ "papeis": [
+  {
+   "nome": "jogar",
+   "tipo": "botao",
+   "osso": "botao",
+   "area": {
+    "slot": "botao"
+   },
+   "estados": {
+    "normal": "jogar/normal",
+    "em_cima": "jogar/em_cima",
+    "apertado": "jogar/apertado",
+    "desligado": "jogar/desligado"
+   },
+   "mix": 0.12
+  },
+  {
+   "nome": "pausa",
+   "tipo": "botao",
+   "osso": "pausa",
+   "estados": {
+    "normal": "pausa/normal",
+    "em_cima": "pausa/em_cima",
+    "apertado": "pausa/apertado",
+    "desligado": "pausa/desligado"
+   }
+  },
+  {
+   "nome": "denovo",
+   "tipo": "botao",
+   "osso": "denovo",
+   "area": {
+    "slot": "denovo_fundo"
+   },
+   "estados": {
+    "normal": "denovo/normal",
+    "em_cima": "denovo/em_cima",
+    "apertado": "denovo/apertado",
+    "desligado": "denovo/desligado"
+   },
+   "mix": 0.12
+  },
+  {
+   "nome": "pular",
+   "tipo": "toque",
+   "osso": "fundo",
+   "area": {
+    "caixa": [
+     0,
+     0,
+     700,
+     1370
+    ]
+   }
+  },
+  {
+   "nome": "placar",
+   "tipo": "texto",
+   "slot": "pontos"
+  },
+  {
+   "nome": "tempo",
+   "tipo": "texto",
+   "slot": "tempo"
+  },
+  {
+   "nome": "aviso",
+   "tipo": "texto",
+   "slot": "aviso_texto"
+  },
+  {
+   "nome": "resultado",
+   "tipo": "texto",
+   "slot": "fim_moedas"
+  },
+  {
+   "nome": "recorde",
+   "tipo": "texto",
+   "slot": "fim_recorde"
+  }
+ ]
+}

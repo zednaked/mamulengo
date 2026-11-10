@@ -525,7 +525,7 @@ async function conferePagina(): Promise<number> {
   const portaCdp = port + 1000;
   const profile = mkdtempSync(join(tmpdir(), "nucleo-medidas-chromium-"));
   kids.push(
-    spawn("chromium", ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1400,900", `--user-data-dir=${profile}`, "--no-first-run", `--remote-debugging-port=${portaCdp}`, `http://localhost:${port}/?acompanhar=0&runtime=spine`], {
+    spawn("setpriv", ["--pdeathsig", "KILL", "chromium", "--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1400,900", `--user-data-dir=${profile}`, "--no-first-run", `--remote-debugging-port=${portaCdp}`, `http://localhost:${port}/?acompanhar=0&runtime=spine`], {
       detached: true,
       stdio: ["ignore", openSync(join(out, "chromium.log"), "w"), openSync(join(out, "chromium.log"), "a")],
     }),

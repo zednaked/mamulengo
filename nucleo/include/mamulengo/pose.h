@@ -232,6 +232,56 @@ class Esqueleto {
   const float* ambiente() const { return ambiente_; }
   const std::vector<EstadoEmissor>& emissores() const { return emis_; }
 
+  // ---- tela (docs/NUCLEO.md "Tela"): a janela em pixels de quem mostra o boneco inteiro
+  // a vista: o retangulo do mundo (y para cima, canto de baixo e da esquerda) que aparece na
+  // janela e quantos pixels da janela cabem numa unidade do mundo
+  struct Vista {
+    double escala = 1, x = 0, y = 0, largura = 0, altura = 0;
+  };
+  // muda a janela: a vista sai na hora; a correcao dos ossos ancorados, no proximo
+  // atualizar_mundo. 0 x 0 (o padrao): a arte base, sem correcao
+  void janela(double largura, double altura);
+  const Vista& vista() const { return vista_; }
+  double janela_largura() const { return janela_w_; }
+  double janela_altura() const { return janela_h_; }
+  // o setup do modelo mudou (o editor remenda ossos): refaz a correcao no proximo atualizar_mundo
+  void tela_mudou() { tela_sujo_ = true; }
+
+  // ---- texto (docs/NUCLEO.md "Texto"): o nucleo nao desenha letras. Quem mostra o boneco monta a
+  // imagem de cada parte de texto (k: indice em Modelo::textos) numa pagina so dela, a pagina dos
+  // textos, de indice Modelo::paginas_desenho.size(), e diz onde: `ret` e o retangulo da imagem
+  // no espaco da caixa (o meio da caixa na origem, y para cima: esquerda, baixo, direita, cima),
+  // antes da transformacao da parte; `uv` e u0, v0 (canto de cima e da esquerda), u1, v1 na pagina.
+  // Dai em diante a parte desenha como uma regiao (cor do slot, ordem, recorte, efeitos)
+  void imagem_texto(int k, const double ret[4], const float uv[4]);
+  // sem imagem: a parte nao desenha (o clique e a caixa seguem a caixa do texto)
+  void sem_imagem_texto(int k);
+  // o tamanho da pagina dos textos em pixels (os efeitos medem a margem nela)
+  void pagina_textos(int largura, int altura) { pagina_textos_.largura = largura, pagina_textos_.altura = altura; }
+  // quanto o texto k ocupa depois do estouro (largura e altura usadas, nas unidades da caixa): a
+  // regiao com nove-fatias que acompanha o slot dele cresce junto (docs/NUCLEO.md "Nove-fatias").
+  // 0 x 0: sem medida (o tamanho base)
+  void medida_texto(int k, double largura, double altura);
+  // a parte como ela desenha: a de texto vira a regiao da imagem entregue (ou da caixa, sem
+  // pagina); a regiao com nove-fatias, a malha da grade (docs/NUCLEO.md "Nove-fatias")
+  const Parte& parte_desenho(int parte) const {
+    const Parte& p = m_->partes[size_t(parte)];
+    if (p.tipo == TipoParte::Texto) return textos_[size_t(p.texto)];
+    return p.fatias >= 0 ? fatiadas_[size_t(p.fatias)] : p;
+  }
+  // nove-fatias: a malha da grade de cada regiao fatiada (vertices no osso, uvs, triangulos), os
+  // pontos por eixo (nx, ny) e o tamanho L x A em que foi feita
+  struct Fatiada {
+    int nx = 0, ny = 0;
+    double largura = 0, altura = 0, ex = 1, ey = 1;
+  };
+  const std::vector<Fatiada>& fatiadas() const { return fatiadas_info_; }
+  // os 4 cantos de fora da grade em mundo (a caixa da parte, para o clique), na ordem da regiao;
+  // devolve 8, ou 0 se o slot nao mostra regiao fatiada
+  size_t cantos_fatias(int slot, std::vector<double>& out) const;
+  // a pagina pelo indice do desenho (a dos textos inclusive)
+  const Pagina& pagina(int i) const { return size_t(i) < m_->paginas.size() ? m_->paginas[size_t(i)] : pagina_textos_; }
+
   // vertices em mundo da parte do slot (regiao: 4 cantos; malha: 2 numeros por vertice);
   // devolve quantos numeros escreveu (0 se o slot nao mostra regiao nem malha)
   size_t vertices(int slot, std::vector<double>& out) const;
@@ -255,6 +305,17 @@ class Esqueleto {
   std::vector<std::array<float, CANAIS_LUZ>> luzes_;
   float ambiente_[CANAIS_AMBIENTE] = {1, 1, 1, 1, 1};
   std::vector<EstadoInstancia> inst_;
+  // texto: por parte de texto, a regiao que ela desenha (sem imagem: pagina -1)
+  std::vector<Parte> textos_;
+  Pagina pagina_textos_;
+  // nove-fatias: a malha de cada regiao fatiada, a medida de cada texto e, com a correcao da tela,
+  // a parte linear do mundo de setup de cada osso na arte base (lin0_) e corrigido (lin1_)
+  std::vector<Parte> fatiadas_;
+  std::vector<Fatiada> fatiadas_info_;
+  std::vector<double> medidas_;
+  std::vector<double> lin0_, lin1_;
+  void refazer_fatias();
+  void refazer_fatia(size_t i);
   void luzes_setup();
   void instancias_setup();
   void atualizar_instancias();
@@ -272,6 +333,18 @@ class Esqueleto {
   std::vector<Local> antes_;
 
   void mundo_osso(int i);
+  // tela: a janela, a vista e, por osso ancorado, o que soma (x, y, rotacao, cisalhas) e o que
+  // multiplica (escalas) na pose local
+  double janela_w_ = 0, janela_h_ = 0;
+  Vista vista_;
+  bool tela_sujo_ = false;
+  struct Correcao {
+    int osso;
+    Local d;
+  };
+  std::vector<Correcao> correcao_;
+  void calcular_vista();
+  void calcular_tela();
   void restricao_ik(int r);
   void restricao_caminho(int r);
   void restricao_fisica(int r);

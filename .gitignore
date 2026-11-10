@@ -32,3 +32,5 @@ tests/assets/**/*.import
 __pycache__/
 dist-demo
 dist-navegador
+/.tmp/
+/.tmp-coelho/

@@ -1,0 +1,1017 @@
+{
+ "boneco": 0,
+ "nome": "tela",
+ "paginas": [
+  {
+   "arquivo": "tela.webp",
+   "tamanho": [
+    893,
+    2048
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "9_barra",
+   "pagina": 0,
+   "ret": [
+    0,
+    1574,
+    684,
+    98
+   ]
+  },
+  {
+   "nome": "9_painel",
+   "pagina": 0,
+   "ret": [
+    0,
+    1674,
+    268,
+    340
+   ]
+  },
+  {
+   "nome": "9_titulo",
+   "pagina": 0,
+   "ret": [
+    542,
+    1750,
+    214,
+    58
+   ]
+  },
+  {
+   "nome": "btn_jogar_apertado",
+   "pagina": 0,
+   "ret": [
+    270,
+    1750,
+    270,
+    92
+   ]
+  },
+  {
+   "nome": "btn_jogar_desligado",
+   "pagina": 0,
+   "ret": [
+    270,
+    1844,
+    270,
+    92
+   ]
+  },
+  {
+   "nome": "btn_jogar_normal",
+   "pagina": 0,
+   "ret": [
+    270,
+    1938,
+    270,
+    92
+   ]
+  },
+  {
+   "nome": "ceu",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    700,
+    1370
+   ]
+  },
+  {
+   "nome": "coelho",
+   "pagina": 0,
+   "ret": [
+    542,
+    1810,
+    120,
+    201
+   ]
+  },
+  {
+   "nome": "grama",
+   "pagina": 0,
+   "ret": [
+    0,
+    1372,
+    700,
+    200
+   ]
+  },
+  {
+   "nome": "ilha",
+   "pagina": 0,
+   "ret": [
+    270,
+    1674,
+    300,
+    74
+   ]
+  },
+  {
+   "nome": "m1_caixa",
+   "pagina": 0,
+   "ret": [
+    632,
+    1674,
+    34,
+    34
+   ]
+  },
+  {
+   "nome": "m2_caixa",
+   "pagina": 0,
+   "ret": [
+    632,
+    1710,
+    34,
+    34
+   ]
+  },
+  {
+   "nome": "m3_caixa",
+   "pagina": 0,
+   "ret": [
+    664,
+    1896,
+    34,
+    34
+   ]
+  },
+  {
+   "nome": "moeda",
+   "pagina": 0,
+   "ret": [
+    572,
+    1674,
+    58,
+    58
+   ]
+  },
+  {
+   "nome": "nuvem_1",
+   "pagina": 0,
+   "ret": [
+    686,
+    1574,
+    205,
+    84
+   ]
+  },
+  {
+   "nome": "nuvem_2",
+   "pagina": 0,
+   "ret": [
+    686,
+    1660,
+    205,
+    84
+   ]
+  },
+  {
+   "nome": "pausa",
+   "pagina": 0,
+   "ret": [
+    0,
+    2016,
+    24,
+    30
+   ]
+  },
+  {
+   "nome": "redondo",
+   "pagina": 0,
+   "ret": [
+    664,
+    1810,
+    84,
+    84
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "pasta_imagens": "./images/",
+  "audio": ""
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "fundo",
+   "pai": "root",
+   "x": 0.0000158955,
+   "y": 685
+  },
+  {
+   "nome": "nuvens",
+   "pai": "root",
+   "x": -7.499978,
+   "y": 939
+  },
+  {
+   "nome": "chao",
+   "pai": "root",
+   "x": 0.00000232051,
+   "y": 100
+  },
+  {
+   "nome": "heroi",
+   "pai": "root",
+   "x": 0.00001415511,
+   "y": 610
+  },
+  {
+   "nome": "coelho",
+   "pai": "heroi",
+   "x": 0.000006010125,
+   "y": 129.5
+  },
+  {
+   "nome": "topo",
+   "pai": "root",
+   "x": 0.00003060753,
+   "y": 1319
+  },
+  {
+   "nome": "placar",
+   "pai": "root",
+   "x": -306,
+   "y": 1318
+  },
+  {
+   "nome": "btn_pausa",
+   "pai": "root",
+   "x": 292,
+   "y": 1316
+  },
+  {
+   "nome": "btn_jogar",
+   "pai": "root",
+   "x": 0.000005801276,
+   "y": 250
+  },
+  {
+   "nome": "painel",
+   "pai": "root",
+   "x": 200,
+   "y": 680
+  }
+ ],
+ "slots": [
+  {
+   "nome": "ceu",
+   "osso": "fundo",
+   "parte": "ceu"
+  },
+  {
+   "nome": "nuvem_1",
+   "osso": "nuvens",
+   "parte": "nuvem_1"
+  },
+  {
+   "nome": "nuvem_2",
+   "osso": "nuvens",
+   "parte": "nuvem_2"
+  },
+  {
+   "nome": "grama",
+   "osso": "chao",
+   "parte": "grama"
+  },
+  {
+   "nome": "ilha",
+   "osso": "heroi",
+   "parte": "ilha"
+  },
+  {
+   "nome": "coelho",
+   "osso": "coelho",
+   "parte": "coelho"
+  },
+  {
+   "nome": "9_barra",
+   "osso": "topo",
+   "parte": "9_barra"
+  },
+  {
+   "nome": "moeda",
+   "osso": "placar",
+   "parte": "moeda"
+  },
+  {
+   "nome": "txt_placar",
+   "osso": "placar",
+   "parte": "txt_placar"
+  },
+  {
+   "nome": "redondo",
+   "osso": "btn_pausa",
+   "parte": "redondo"
+  },
+  {
+   "nome": "pausa",
+   "osso": "btn_pausa",
+   "parte": "pausa"
+  },
+  {
+   "nome": "btn_jogar",
+   "osso": "btn_jogar",
+   "parte": "normal"
+  },
+  {
+   "nome": "jogar",
+   "osso": "btn_jogar",
+   "parte": "jogar"
+  },
+  {
+   "nome": "9_painel",
+   "osso": "painel",
+   "parte": "9_painel"
+  },
+  {
+   "nome": "9_titulo",
+   "osso": "painel",
+   "parte": "9_titulo"
+  },
+  {
+   "nome": "missoes",
+   "osso": "painel",
+   "parte": "missoes"
+  },
+  {
+   "nome": "m1_caixa",
+   "osso": "painel",
+   "parte": "m1_caixa"
+  },
+  {
+   "nome": "moedas",
+   "osso": "painel",
+   "parte": "moedas"
+  },
+  {
+   "nome": "m2_caixa",
+   "osso": "painel",
+   "parte": "m2_caixa"
+  },
+  {
+   "nome": "pulos",
+   "osso": "painel",
+   "parte": "pulos"
+  },
+  {
+   "nome": "m3_caixa",
+   "osso": "painel",
+   "parte": "m3_caixa"
+  },
+  {
+   "nome": "cenoura",
+   "osso": "painel",
+   "parte": "cenoura"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "ceu": {
+     "ceu": {
+      "x": -4.216797e-12,
+      "y": 1.136868e-13,
+      "escala_y": 1,
+      "largura": 700,
+      "altura": 1370
+     }
+    },
+    "nuvem_1": {
+     "nuvem_1": {
+      "x": -180,
+      "y": 60,
+      "escala_y": 1,
+      "largura": 205,
+      "altura": 84
+     }
+    },
+    "nuvem_2": {
+     "nuvem_2": {
+      "x": 180,
+      "y": -60,
+      "escala_y": 1,
+      "largura": 205,
+      "altura": 84
+     }
+    },
+    "grama": {
+     "grama": {
+      "x": 3.333142e-13,
+      "y": 2.842171e-14,
+      "escala_y": 1,
+      "largura": 700,
+      "altura": 200
+     }
+    },
+    "ilha": {
+     "ilha": {
+      "x": 3.033217e-12,
+      "y": 1.136868e-13,
+      "escala_y": 1,
+      "largura": 300,
+      "altura": 74
+     }
+    },
+    "coelho": {
+     "coelho": {
+      "x": -2.034992e-13,
+      "y": 2.273737e-13,
+      "escala_y": 1,
+      "largura": 120,
+      "altura": 201
+     }
+    },
+    "9_barra": {
+     "9_barra": {
+      "x": 1.296415e-12,
+      "y": 2.273737e-13,
+      "escala_y": 1,
+      "largura": 684,
+      "altura": 98,
+      "fatias": {
+       "esquerda": 6,
+       "cima": 5,
+       "direita": 6,
+       "baixo": 9
+      }
+     }
+    },
+    "moeda": {
+     "moeda": {
+      "x": 0.00003058433,
+      "y": 2.273737e-13,
+      "escala_y": 1,
+      "largura": 58,
+      "altura": 58
+     }
+    },
+    "redondo": {
+     "redondo": {
+      "x": 0.00003053791,
+      "y": 2.273737e-13,
+      "escala_y": 1,
+      "largura": 84,
+      "altura": 84
+     }
+    },
+    "pausa": {
+     "pausa": {
+      "x": 0.00003067715,
+      "y": 3,
+      "escala_y": 1,
+      "largura": 24,
+      "altura": 30
+     }
+    },
+    "btn_jogar": {
+     "desligado": {
+      "caminho": "btn_jogar_desligado",
+      "x": -1.667144e-13,
+      "y": 5.684342e-14,
+      "escala_y": 1,
+      "largura": 270,
+      "altura": 92,
+      "fatias": {
+       "esquerda": 6,
+       "cima": 0,
+       "direita": 6,
+       "baixo": 0,
+       "acompanha": {
+        "slot": "jogar",
+        "respiro": [
+         58,
+         32
+        ]
+       }
+      }
+     },
+     "apertado": {
+      "caminho": "btn_jogar_apertado",
+      "x": -1.667144e-13,
+      "y": 5.684342e-14,
+      "escala_y": 1,
+      "largura": 270,
+      "altura": 92,
+      "fatias": {
+       "esquerda": 6,
+       "cima": 0,
+       "direita": 6,
+       "baixo": 0,
+       "acompanha": {
+        "slot": "jogar",
+        "respiro": [
+         58,
+         32
+        ]
+       }
+      }
+     },
+     "normal": {
+      "caminho": "btn_jogar_normal",
+      "x": -1.667144e-13,
+      "y": 5.684342e-14,
+      "escala_y": 1,
+      "largura": 270,
+      "altura": 92,
+      "fatias": {
+       "esquerda": 6,
+       "cima": 0,
+       "direita": 6,
+       "baixo": 0,
+       "acompanha": {
+        "slot": "jogar",
+        "respiro": [
+         58,
+         32
+        ]
+       }
+      }
+     }
+    },
+    "9_painel": {
+     "9_painel": {
+      "x": 0.00001577947,
+      "y": 1.136868e-13,
+      "escala_y": 1,
+      "largura": 268,
+      "altura": 340,
+      "fatias": {
+       "esquerda": 17,
+       "cima": 17,
+       "direita": 16,
+       "baixo": 16
+      }
+     }
+    },
+    "9_titulo": {
+     "9_titulo": {
+      "x": 0.00002195203,
+      "y": 133,
+      "escala_y": 1,
+      "largura": 214,
+      "altura": 58,
+      "fatias": {
+       "esquerda": 6,
+       "cima": 5,
+       "direita": 6,
+       "baixo": 9,
+       "acompanha": {
+        "slot": "missoes",
+        "respiro": [
+         31.5,
+         16.5
+        ]
+       }
+      }
+     }
+    },
+    "m1_caixa": {
+     "m1_caixa": {
+      "x": -87.99998,
+      "y": 60,
+      "escala_y": 1,
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "m2_caixa": {
+     "m2_caixa": {
+      "x": -87.99998,
+      "y": -10,
+      "escala_y": 1,
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "m3_caixa": {
+     "m3_caixa": {
+      "x": -87.99998,
+      "y": -80,
+      "escala_y": 1,
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "txt_placar": {
+     "txt_placar": {
+      "tipo": "texto",
+      "x": 139,
+      "y": -0.5,
+      "largura": 190,
+      "altura": 52,
+      "texto": "1250",
+      "familia": "kenney_future",
+      "tamanho": 40,
+      "minimo": 24,
+      "alinhar": "esquerda"
+     }
+    },
+    "jogar": {
+     "jogar": {
+      "tipo": "texto",
+      "y": 6,
+      "largura": 246.4,
+      "altura": 52,
+      "texto": "JOGAR",
+      "chave": "JOGAR",
+      "familia": "kenney_future",
+      "tamanho": 40,
+      "minimo": 24,
+      "sombra": {
+       "cor": "1d7a4aff",
+       "x": 0,
+       "y": 3
+      }
+     }
+    },
+    "missoes": {
+     "missoes": {
+      "tipo": "texto",
+      "x": 0.5,
+      "y": 136.5,
+      "largura": 241.6,
+      "altura": 36.4,
+      "texto": "MISSÕES",
+      "chave": "MISSOES",
+      "familia": "kenney_future",
+      "tamanho": 28,
+      "minimo": 16.8
+     }
+    },
+    "moedas": {
+     "moedas": {
+      "tipo": "texto",
+      "x": 46.6,
+      "y": 60,
+      "largura": 217.6,
+      "altura": 28.6,
+      "texto": "3 moedas",
+      "chave": "MOEDAS",
+      "familia": "kenney_future",
+      "tamanho": 22,
+      "minimo": 13.2,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "pulos": {
+     "pulos": {
+      "tipo": "texto",
+      "x": 36.2,
+      "y": -10,
+      "largura": 196.8,
+      "altura": 28.6,
+      "texto": "10 pulos",
+      "chave": "PULOS",
+      "familia": "kenney_future",
+      "tamanho": 22,
+      "minimo": 13.2,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    },
+    "cenoura": {
+     "cenoura": {
+      "tipo": "texto",
+      "x": 57,
+      "y": -80,
+      "largura": 238.4,
+      "altura": 28.6,
+      "texto": "a cenoura",
+      "chave": "CENOURA",
+      "familia": "kenney_future",
+      "tamanho": 22,
+      "minimo": 13.2,
+      "cor": "4a3f78ff",
+      "alinhar": "esquerda"
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "pausa/normal": {
+   "ossos": {
+    "btn_pausa": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/em_cima": {
+   "ossos": {
+    "btn_pausa": {
+     "escalar": [
+      {
+       "x": 1.06,
+       "y": 1.06
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/apertado": {
+   "ossos": {
+    "btn_pausa": {
+     "escalar": [
+      {
+       "x": 0.94,
+       "y": 0.94
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "d1d1d1ff"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "d1d1d1ff"
+      }
+     ]
+    }
+   }
+  },
+  "pausa/desligado": {
+   "ossos": {
+    "btn_pausa": {
+     "escalar": [
+      {
+       "x": 1,
+       "y": 1
+      }
+     ]
+    }
+   },
+   "slots": {
+    "redondo": {
+     "rgba": [
+      {
+       "cor": "8c8c8c99"
+      }
+     ]
+    },
+    "pausa": {
+     "rgba": [
+      {
+       "cor": "8c8c8c99"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/normal": {
+   "slots": {
+    "btn_jogar": {
+     "parte": [
+      {
+       "nome": "normal"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/apertado": {
+   "slots": {
+    "btn_jogar": {
+     "parte": [
+      {
+       "nome": "apertado"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/desligado": {
+   "slots": {
+    "btn_jogar": {
+     "parte": [
+      {
+       "nome": "desligado"
+      }
+     ]
+    }
+   }
+  },
+  "jogar/em_cima": {
+   "ossos": {
+    "btn_jogar": {
+     "escalar": [
+      {
+       "x": 1.06,
+       "y": 1.06
+      }
+     ]
+    }
+   },
+   "slots": {
+    "btn_jogar": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ],
+     "parte": [
+      {
+       "nome": "normal"
+      }
+     ]
+    },
+    "jogar": {
+     "rgba": [
+      {
+       "cor": "ffffffff"
+      }
+     ]
+    }
+   }
+  }
+ },
+ "tela": {
+  "arte": [
+   -350,
+   0,
+   700,
+   1370
+  ],
+  "encaixe": "caber",
+  "ancoras": [
+   {
+    "osso": "fundo",
+    "ancora": [
+     0.5,
+     0.5
+    ],
+    "estica": "xy"
+   },
+   {
+    "osso": "nuvens",
+    "ancora": [
+     0.5,
+     0
+    ]
+   },
+   {
+    "osso": "chao",
+    "ancora": [
+     0.5,
+     1
+    ],
+    "estica": "x"
+   },
+   {
+    "osso": "heroi",
+    "ancora": [
+     0.5,
+     0.5
+    ]
+   },
+   {
+    "osso": "topo",
+    "ancora": [
+     0.5,
+     0
+    ],
+    "estica": "x"
+   },
+   {
+    "osso": "placar",
+    "ancora": [
+     0,
+     0
+    ]
+   },
+   {
+    "osso": "btn_pausa",
+    "ancora": [
+     1,
+     0
+    ]
+   },
+   {
+    "osso": "btn_jogar",
+    "ancora": [
+     0.5,
+     1
+    ]
+   },
+   {
+    "osso": "painel",
+    "ancora": [
+     1,
+     0.5
+    ]
+   }
+  ]
+ },
+ "fontes": [
+  {
+   "nome": "kenney_future",
+   "arquivo": "fontes/kenney-future.ttf"
+  }
+ ],
+ "traducoes": {
+  "idiomas": [
+   "pt"
+  ],
+  "textos": {
+   "JOGAR": [
+    "JOGAR"
+   ],
+   "MISSOES": [
+    "MISSÕES"
+   ],
+   "MOEDAS": [
+    "3 moedas"
+   ],
+   "PULOS": [
+    "10 pulos"
+   ],
+   "CENOURA": [
+    "a cenoura"
+   ]
+  }
+ },
+ "papeis": [
+  {
+   "nome": "pausa",
+   "tipo": "botao",
+   "osso": "btn_pausa",
+   "estados": {
+    "normal": "pausa/normal",
+    "em_cima": "pausa/em_cima",
+    "apertado": "pausa/apertado",
+    "desligado": "pausa/desligado"
+   }
+  },
+  {
+   "nome": "jogar",
+   "tipo": "botao",
+   "osso": "btn_jogar",
+   "estados": {
+    "normal": "jogar/normal",
+    "em_cima": "jogar/em_cima",
+    "apertado": "jogar/apertado",
+    "desligado": "jogar/desligado"
+   }
+  },
+  {
+   "nome": "placar",
+   "tipo": "texto",
+   "slot": "txt_placar"
+  }
+ ]
+}

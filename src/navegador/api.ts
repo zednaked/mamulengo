@@ -11,7 +11,7 @@ import { parseAtlas, type AtlasRegion } from "../core/atlas-text.ts";
 import { serializeSpineJson } from "../core/format.ts";
 import { diffSpine } from "../core/versions.ts";
 import { checkMapa } from "../core/psd-ler.ts";
-import { atualizarDePsd, criarBonecoDePsd } from "../core/psd-importar.ts";
+import { atualizarDePsd, criarBonecoDePsd, criarTelaDePsd, proporTela } from "../core/psd-importar.ts";
 import * as fs from "./fs.ts";
 import * as idb from "./idb.ts";
 import { rotaZip } from "./pacote.ts";
@@ -489,21 +489,34 @@ export async function responder(req: Request): Promise<Response> {
       await fs.gravarArquivo(p, corpo);
       return json({ path: p, bytes: corpo.size });
     }
-    if ((rota === "/api/psd/create" || rota === "/api/psd/update") && req.method === "POST") {
+    if ((rota === "/api/psd/create" || rota === "/api/psd/update" || rota === "/api/psd/tela") && req.method === "POST") {
       const b = await corpoJson();
       const psdPath = fs.normalizar(b.psd ?? "");
       const psd = await fs.lerArquivo(psdPath);
       if (!psd) return erro(404, `PSD nao encontrado: ${psdPath}`);
       // mapa: caminho de um .json numa das pastas, ou o objeto
       let mapa;
+      const io = ioNavegador({ gravarBoneco, copia });
+      const bytesPsd = new Uint8Array(await psd.arrayBuffer());
+      // a tela (docs/LAYOUT-PSD.md): a proposta, ou a tela nova; o mapa da tela tem campos a mais
+      if (rota === "/api/psd/tela" || (rota === "/api/psd/create" && b.tela)) {
+        let mapaTela = typeof b.mapa === "object" && b.mapa ? b.mapa : undefined;
+        if (typeof b.mapa === "string" && b.mapa) mapaTela = JSON.parse((await fs.lerTexto(fs.normalizar(b.mapa))) ?? "null");
+        const t = await import("../core/psd-tela.ts");
+        if (rota === "/api/psd/tela") {
+          const r = await proporTela(io, { psd: bytesPsd, arquivoPsd: psdPath, mapa: mapaTela });
+          const proposta = t.aplicarEscolhas(r.proposta, b.escolhas);
+          return json({ proposta, linhas: t.resumoTela(proposta), mapa: t.mapaDaTela(proposta), mapaArquivo: r.mapaArquivo });
+        }
+        const r = await criarTelaDePsd(io, { psd: bytesPsd, arquivoPsd: psdPath, dir: fs.normalizar(b.dir ?? ""), name: String(b.name ?? "").trim(), mapa: mapaTela, escolhas: b.tela === true ? {} : b.tela, ignoreHidden: !!b.ignoreHidden });
+        return json({ tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan, manifesto: r.manifesto });
+      }
       if (typeof b.mapa === "string" && b.mapa) {
         const t = await fs.lerTexto(fs.normalizar(b.mapa));
         if (t == null) return erro(404, `mapa do PSD nao encontrado: ${b.mapa}`);
         mapa = checkMapa(JSON.parse(t));
       } else if (b.mapa) mapa = checkMapa(b.mapa);
       const read = { ignoreHidden: !!b.ignoreHidden, mapa };
-      const io = ioNavegador({ gravarBoneco, copia });
-      const bytesPsd = new Uint8Array(await psd.arrayBuffer());
       if (rota === "/api/psd/create") {
         const r = await criarBonecoDePsd(io, { psd: bytesPsd, arquivoPsd: psdPath, dir: fs.normalizar(b.dir ?? ""), name: String(b.name ?? "").trim(), read });
         return json({ tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan });

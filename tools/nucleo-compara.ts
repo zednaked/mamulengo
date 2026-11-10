@@ -26,6 +26,22 @@ let falhas = 0;
 const linhas: string[] = ["| arquivo | animação | quadros | osso (px) | matriz | vértice (px) | cor | partes | ordem | |", "|---|---|---|---|---|---|---|---|---|---|"];
 for (const arq of arquivos.sort()) {
   const b = JSON.parse(readFileSync(arq, "utf8"));
+  // partes de texto (docs/NUCLEO.md "Texto") nao existem no Spine: o oraculo as ve vazias. Elas tem a
+  // conferencia propria (tools/nucleo-texto.ts); aqui so nao contam como parte diferente.
+  const textos = new Set<string>();
+  for (const sk of b.skins ?? []) for (const [slot, ps] of Object.entries<any>(sk.partes ?? {})) for (const [nomeP, p] of Object.entries<any>(ps)) if (p?.tipo === "texto") textos.add(`${slot}/${nomeP}`);
+  // nove-fatias (docs/NUCLEO.md "Nove-fatias"): o Spine desenha a regiao inteira; no tamanho base (sem
+  // janela e sem texto que a acompanhe, como aqui) os 4 cantos de fora da grade do nucleo sao os dela.
+  // A grade (nx x ny pontos, do setup) e o resto tem conferencia propria (tools/nucleo-fatias.ts)
+  // (so as de caixa do tamanho da imagem: a caixa maior, o Spine nao tem)
+  const grades: Record<string, { nx: number; ny: number }> = {};
+  const caixaPropria = new Set<string>();
+  for (const sk of b.skins ?? []) for (const [slot, ps] of Object.entries<any>(sk.partes ?? {})) for (const p of Object.values<any>(ps)) if ((p?.fatias?.largura ?? p?.largura) !== p?.largura || (p?.fatias?.altura ?? p?.altura) !== p?.altura) caixaPropria.add(slot);
+  if (JSON.stringify(b.skins ?? []).includes('"fatias"')) {
+    const r = spawnSync(bin, [resolve(arq), "-", "0", "--fatias"], { encoding: "utf8" });
+    const f = /^fatias (.*)$/m.exec(r.stderr ?? "");
+    if (f) for (const [slot, g] of Object.entries<any>(JSON.parse(f[1]))) grades[slot] = { nx: g.nx, ny: g.ny };
+  }
   for (const anim of [null, ...Object.keys(b.animacoes ?? {})]) {
     if (so && anim !== so) continue;
     const ts = tempos(b, anim, anim ? `fps:${fps}` : "0");
@@ -61,11 +77,15 @@ for (const arq of arquivos.sort()) {
       for (const s of q.slots) {
         const k = (n.slots ?? []).find((x: any) => x.nome === s.nome);
         if (!k) continue;
-        if ((s.parte ?? null) !== (k.parte ?? null)) partes++;
+        const soTexto = s.parte == null && k.parte != null && textos.has(`${s.nome}/${k.parte}`);
+        if (!soTexto && (s.parte ?? null) !== (k.parte ?? null)) partes++;
         for (let j = 0; j < 4; j++) cor = Math.max(cor, Math.abs(s.cor[j] - (k.cor?.[j] ?? 0)));
       }
       for (const [s, v] of Object.entries<number[]>(q.vertices)) {
-        const k = n.vertices?.[s];
+        let k = n.vertices?.[s];
+        const g = grades[s];
+        if (k && g && v.length === 8 && k.length === g.nx * g.ny * 2) k = [0, (g.ny - 1) * g.nx, g.ny * g.nx - 1, g.nx - 1].flatMap((i) => [k[i * 2], k[i * 2 + 1]]);
+        if (caixaPropria.has(s)) continue;
         if (!k || k.length !== v.length) {
           faltam++;
           continue;

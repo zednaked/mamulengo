@@ -1,0 +1,30 @@
+Arte CC0 da Kenney (www.kenney.nl), Creative Commons Zero: http://creativecommons.org/publicdomain/zero/1.0/
+
+- botao_verde, redondo_azul, marcado, vazio, painel_azul (Blue/button_square_border), titulo_azul
+  (Blue/button_rectangle_depth_flat), barra_cinza (Grey/button_rectangle_depth_flat) e kenney-future.ttf:
+  UI Pack (2.0), 12-06-2024
+- bunny1_stand, gold_1 e ground_grass: Jumper Pack
+
+--- UI Pack, License.txt original:
+	
+
+	UI Pack (2.0)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 12-06-2024
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Patreon:  http://patreon.com/kenney/
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL

@@ -29,7 +29,7 @@ import { textureFor } from "./texture.ts";
 import { addImages, createAsset, imageInfo, listImages } from "./assets.ts";
 import { ensureImported, renderInGodot } from "./godot-run.ts";
 import { extractRegion, parseAtlas, unpackAtlas } from "./atlas.ts";
-import { checkMapa, createFromPsd, nodeIO, updateFromPsd, type PsdMapa } from "./psd.ts";
+import { checkMapa, createFromPsd, createScreenFromPsd, nodeIO, proposeScreenFromPsd, updateFromPsd, type PsdMapa } from "./psd.ts";
 import { reempacotar } from "../src/core/imagens-atlas.ts";
 import sharp from "sharp";
 import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
@@ -206,10 +206,31 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             }
             return checkMapa(m);
           };
+          // o mapa da tela (docs/LAYOUT-PSD.md): caminho de um .json dentro das raizes, ou o objeto;
+          // sem ele vale o <psd>.tela.json ao lado do PSD
+          const mapaTelaOf = (m: any) => {
+            if (m === undefined || m === null || m === "") return undefined;
+            if (typeof m !== "string") return m;
+            const r = resolve(m);
+            guard(r);
+            if (!existsSync(r)) throw new Error(`mapa da tela nao encontrado: ${r}`);
+            return JSON.parse(readFileSync(r, "utf8"));
+          };
+          // a proposta da tela (dryRun): o que cada camada vira e por que
+          if (url.pathname === "/api/psd/tela" && req.method === "POST") {
+            const b = await json();
+            const r = await proposeScreenFromPsd({ psd: guardPsd(b.psd), mapa: mapaTelaOf(b.mapa), escolhas: b.escolhas });
+            return send(200, r);
+          }
           // personagem novo montado a partir de um PSD
           if (url.pathname === "/api/psd/create" && req.method === "POST") {
             const b = await json();
             guard(b.dir);
+            if (b.tela) {
+              const r = await createScreenFromPsd({ psd: guardPsd(b.psd), dir: resolve(b.dir), name: String(b.name ?? "").trim(), mapa: mapaTelaOf(b.mapa), escolhas: b.tela === true ? {} : b.tela, ignoreHidden: !!b.ignoreHidden });
+              cache = null;
+              return send(200, { tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan, manifesto: r.manifesto });
+            }
             const r = await createFromPsd({ psd: guardPsd(b.psd), dir: resolve(b.dir), name: String(b.name ?? "").trim(), read: { ignoreHidden: !!b.ignoreHidden, mapa: mapaOf(b.mapa) } });
             cache = null;
             return send(200, { tres: r.tres, skeleton: r.skeleton, atlas: r.atlas, pages: r.pages, report: r.report, summary: r.summary, plan: r.plan });

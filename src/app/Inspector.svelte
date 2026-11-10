@@ -1,4 +1,8 @@
 <script lang="ts">
+  import Ancora from "./Ancora.svelte";
+  import Texto from "./Texto.svelte";
+  import NoveFatias from "./NoveFatias.svelte";
+  import Papel from "./Papel.svelte";
   import { untrack } from "svelte";
   import { parseAtlas } from "../core/atlas-text.ts";
   import { app } from "./state.svelte.ts";
@@ -229,6 +233,16 @@
       const time = +app.play.time.toFixed(4);
       app.run({ cmd: "key.set", args: { anim: app.play.animation, target: { ambient: true }, timeline: "ambient", time, [campo]: valor } }, `ambiente @${time}`, `amb-${campo}-${time}`);
     } else app.run({ cmd: "ambient.set", args: { [campo]: valor } }, "luz ambiente", `amb-${campo}`);
+  }
+  // uma parte de texto numa camada nova presa a este osso (docs/EDITOR.md "Texto")
+  function novoTexto() {
+    if (!bone) return;
+    let nome = `${bone.name}_texto`;
+    for (let n = 2; app.doc?.json.slots?.some((s: any) => s.name === nome); n++) nome = `${bone.name}_texto_${n}`;
+    if (app.run({ cmd: "text.set", args: { slot: nome, bone: bone.name, text: "Texto", width: 240, height: 60, size: 32 } }, `texto em ${bone.name}`)) {
+      app.select({ bone: bone.name, slot: nome });
+      app.avisar(`${nome}: escreva o texto ou escolha uma chave da tabela de idiomas no inspetor; o idioma mostrado troca no alto do viewport.`);
+    }
   }
   function novaLuz() {
     if (!bone) return;
@@ -833,6 +847,8 @@
       </label>
     {/if}
     <div class="dim small">pai: {bone.parent ?? "(raiz)"} · {app.mode === "animate" && app.play.animation ? `chave em ${app.play.time.toFixed(2)}s` : "pose de montagem"}</div>
+    {#if (app.doc?.json as any)?.screen}<Ancora osso={bone.name} />{/if}
+    {#if ehBoneco || (app.doc?.json as any)?.screen || (app.doc?.json as any)?.roles}<Papel osso={bone.name} />{/if}
     <details class="fine" open={fineOpen} ontoggle={(e) => (fineOpen = (e.target as HTMLDetailsElement).open)}>
       <summary>ajuste fino</summary>
     <div class="fields">
@@ -984,6 +1000,12 @@
         {#if !animando}<button onclick={novaLuz} title="uma luz presa a este osso (anda com ele)">+ luz</button>{/if}
       </div>
     {/if}
+    {#if ehBoneco && !animando}
+      <div class="linha-texto"><button onclick={novoTexto} title="uma parte de texto (com tradução) numa camada nova presa a este osso">+ texto</button></div>
+    {/if}
+    {#if ehBoneco && !(app.doc?.json as any)?.screen}
+      <Ancora osso={bone.name} />
+    {/if}
   {:else}
     <div class="dim">Clique numa parte do personagem para escolher.</div>
   {/if}
@@ -1086,13 +1108,19 @@
       {#if app.drawEdit?.slot === slot.name}
         <div class="wide"><DrawPanel /></div>
       {/if}
+      {#if attKind?.type === "text" && slot.attachment}
+        <div class="wide"><Texto slot={slot.name} parte={slot.attachment} /></div>
+      {/if}
+      {#if attKind?.type === "region" && slot.attachment && !desenho}
+        <div class="wide"><NoveFatias slot={slot.name} parte={slot.attachment} /></div>
+      {/if}
       {#if attKind && !desenho && (attKind.type === "region" || attKind.type === "mesh")}
         <span></span>
         <div class="mesh">
           <button onclick={() => abrirDesenhar()} title="Transforma esta imagem em desenho vetorial (cada cor vira uma camada de formas com curvas) e abre o Desenhar; Ctrl+Z volta para a imagem">✒️ Vetorizar e desenhar</button>
         </div>
       {/if}
-      {#if attKind && !desenho}
+      {#if attKind && !desenho && attKind.type !== "text"}
         <span></span>
         <div class="mesh">
           {#if attKind.type === "region"}

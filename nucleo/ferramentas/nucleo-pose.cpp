@@ -6,7 +6,17 @@
 // --quadros N: toca a animacao N quadros seguidos a 60 por segundo, como no jogo (aplicar,
 //   relogio, mundo e vertices de todos os slots), e escreve o tempo medio por quadro; depois,
 //   o mesmo laco separando a pose (aplicar e mundo) do desenho (desenhar, o que o jogo chama).
+// --janela LxA: a janela em pixels (docs/NUCLEO.md "Tela"): os ossos ancorados ja corrigidos, e a
+//   vista em stderr ("vista escala x y largura altura")
+// --texto k:LxA: a medida do texto k (docs/NUCLEO.md "Nove-fatias"), como quem desenha as letras a
+//   entrega; pode repetir
+// --fatias: depois das poses, em stderr, uma linha "fatias {json}" com cada regiao fatiada mostrada:
+//   {slot: {nx, ny, largura, altura, ex, ey, uvs, triangulos}}
+// --toque X,Y: o teste de toque (docs/NUCLEO.md "Papeis") no ultimo instante, no ponto do mundo;
+//   pode repetir. Em stderr, uma linha "papeis {json}": {areas: {nome: [triangulos]}, toques: [o
+//   papel no ponto, -1 nenhum]}
 #include <chrono>
+#include "mamulengo/papeis.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -51,11 +61,26 @@ int main(int argc, char** argv) {
     return 2;
   }
   int repetir = 0, quadros = 0;
+  double janela_l = 0, janela_a = 0;
   const char* caixa = nullptr;
+  bool fatias = false;
+  std::vector<std::array<double, 3>> medidas;
+  std::vector<std::array<double, 2>> toques;
+  for (int i = 4; i < argc; ++i)
+    if (!std::strcmp(argv[i], "--fatias")) fatias = true;
   for (int i = 4; i + 1 < argc; ++i) {
+    if (!std::strcmp(argv[i], "--texto")) {
+      std::array<double, 3> md{};
+      if (std::sscanf(argv[i + 1], "%lf:%lfx%lf", &md[0], &md[1], &md[2]) == 3) medidas.push_back(md);
+    }
+    if (!std::strcmp(argv[i], "--toque")) {
+      std::array<double, 2> p{};
+      if (std::sscanf(argv[i + 1], "%lf,%lf", &p[0], &p[1]) == 2) toques.push_back(p);
+    }
     if (!std::strcmp(argv[i], "--caixa")) caixa = argv[i + 1];
     if (!std::strcmp(argv[i], "--repetir")) repetir = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--quadros")) quadros = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--janela")) std::sscanf(argv[i + 1], "%lfx%lf", &janela_l, &janela_a);
   }
 
   std::ifstream f(argv[1], std::ios::binary);
@@ -100,6 +125,12 @@ int main(int argc, char** argv) {
   }
 
   Esqueleto e(modelo);
+  if (janela_l > 0 && janela_a > 0) {
+    e.janela(janela_l, janela_a);
+    const Esqueleto::Vista& v = e.vista();
+    std::fprintf(stderr, "vista %.17g %.17g %.17g %.17g %.17g\n", v.escala, v.x, v.y, v.largura, v.altura);
+  }
+  for (const auto& md : medidas) e.medida_texto(int(md[0]), md[1], md[2]);
   const Modelo& m = *modelo;
 
   if (caixa) {
@@ -191,5 +222,59 @@ int main(int argc, char** argv) {
   }
   out += "]}\n";
   std::fwrite(out.data(), 1, out.size(), stdout);
+  if (fatias) {
+    std::string f = "fatias {";
+    bool primeiro = true;
+    for (size_t s = 0; s < m.slots.size(); ++s) {
+      const int pi = e.slots()[s].parte;
+      if (pi < 0 || m.partes[size_t(pi)].fatias < 0) continue;
+      const int k = m.partes[size_t(pi)].fatias;
+      const Esqueleto::Fatiada& fi = e.fatiadas()[size_t(k)];
+      const Parte& p = e.parte_desenho(pi);
+      if (!primeiro) f += ',';
+      primeiro = false;
+      escreve_texto(f, m.slots[s].nome);
+      f += ":{\"nx\":" + std::to_string(fi.nx) + ",\"ny\":" + std::to_string(fi.ny) + ",\"largura\":";
+      escreve_num(f, fi.largura);
+      f += ",\"altura\":";
+      escreve_num(f, fi.altura);
+      f += ",\"ex\":";
+      escreve_num(f, fi.ex);
+      f += ",\"ey\":";
+      escreve_num(f, fi.ey);
+      f += ",\"uvs\":[";
+      for (size_t j = 0; j < p.uvs.size(); ++j) {
+        if (j) f += ',';
+        escreve_num(f, p.uvs[j]);
+      }
+      f += "],\"triangulos\":[";
+      for (size_t j = 0; j < p.triangulos.size(); ++j) {
+        if (j) f += ',';
+        f += std::to_string(p.triangulos[j]);
+      }
+      f += "]}";
+    }
+    f += "}\n";
+    std::fwrite(f.data(), 1, f.size(), stderr);
+  }
+  if (!toques.empty() || std::any_of(argv + 4, argv + argc, [](const char* a) { return !std::strcmp(a, "--papeis"); })) {
+    std::string f = "papeis {\"areas\":{";
+    std::vector<double> tri;
+    for (size_t k = 0; k < m.papeis.size(); ++k) {
+      if (k) f += ',';
+      escreve_texto(f, m.papeis[k].nome);
+      f += ":[";
+      area_papel(e, int(k), tri);
+      for (size_t j = 0; j < tri.size(); ++j) {
+        if (j) f += ',';
+        escreve_num(f, tri[j]);
+      }
+      f += "]";
+    }
+    f += "},\"toques\":[";
+    for (size_t j = 0; j < toques.size(); ++j) f += (j ? "," : "") + std::to_string(papel_no_ponto(e, toques[j][0], toques[j][1]));
+    f += "]}\n";
+    std::fwrite(f.data(), 1, f.size(), stderr);
+  }
   return 0;
 }

@@ -7,10 +7,11 @@ import { app, fileUrl } from "../app/state.svelte.ts";
 import { execute, describeCommands, type Call } from "../core/commands/index.ts";
 import { exportAnimation, type ExportOptions } from "../app/exporter.ts";
 import { applySequence, type SequenceParam } from "../app/sequence.ts";
-import { createFromPsd, updateFromPsd } from "../app/psd.ts";
+import { createFromPsd, proposeScreen, updateFromPsd } from "../app/psd.ts";
 import { dropDraft } from "../app/drafts.ts";
 import type { Runtime } from "../render/viewer.ts";
 import { startDrawEdit, stopDrawEdit } from "../app/drawedit.ts";
+import { janelaDe } from "../app/janelas.ts";
 void execute;
 
 type Handler = (params: any) => Promise<any> | any;
@@ -158,14 +159,21 @@ const handlers: Record<string, Handler> = {
 
   // PSD em camadas: create monta um personagem novo (dir + name); update atualiza o
   // aberto (casa camada com imagem pelo nome) e salva
-  async psd(p: { file: string; mode?: "create" | "update"; dir?: string; name?: string; ignoreHidden?: boolean; mapa?: string | object }) {
+  // tela (docs/LAYOUT-PSD.md): true ou as escolhas {off, on, change, art, fit}; com dryRun so devolve a
+  // proposta (cada camada: ancora, papel, texto, fatias, com o porque), sem criar nada
+  async psd(p: { file: string; mode?: "create" | "update"; dir?: string; name?: string; ignoreHidden?: boolean; mapa?: string | object; tela?: boolean | object; dryRun?: boolean }) {
     if (!p.file) throw new Error("file: caminho do .psd");
+    if (p.dryRun) {
+      const r = await proposeScreen({ psd: p.file, mapa: p.mapa, escolhas: typeof p.tela === "object" ? p.tela : undefined });
+      return { dryRun: true, lines: r.linhas, proposal: r.proposta, map: r.mapa, mapFile: r.mapaArquivo };
+    }
     const mode = p.mode ?? (p.dir ? "create" : "update");
     if (mode === "create") {
       if (!p.dir || !p.name) throw new Error("create precisa de dir (pasta do personagem dentro do projeto Godot) e name");
-      const r = await createFromPsd({ psd: p.file, dir: p.dir, name: p.name, ignoreHidden: p.ignoreHidden, mapa: p.mapa });
+      const r = await createFromPsd({ psd: p.file, dir: p.dir, name: p.name, ignoreHidden: p.ignoreHidden, mapa: p.mapa, tela: p.tela });
       return { mode, asset: r.asset, summary: r.summary, report: r.report };
     }
+    if (p.tela) throw new Error("tela: so na criacao (mode create, com dir e name); numa tela ja aberta use o comando psd.layout");
     const r = await updateFromPsd({ psd: p.file, ignoreHidden: p.ignoreHidden, mapa: p.mapa }, "claude");
     return { mode, asset: r.asset, saved: r.saved, summary: r.summary, report: r.report };
   },
@@ -220,7 +228,7 @@ const handlers: Record<string, Handler> = {
       asset: app.asset ? `${app.asset.project}/${app.asset.name}` : null,
       file: app.doc?.file ?? null,
       dirty: app.doc?.dirty ?? false,
-      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data }, medidas: { modo: modoMedidas(), ...estatisticasMedidas } } : null,
+      view: v ? { ...v.view, duration: v.duration(), animationDuration: v.animDuration(), sequenceTimes: v.sequenceTimes(), camera: v.cam, runtime: v.runtime, nucleoError: v.nucleoError, nucleo: v.runtime === "nucleo" && v.nucleo ? { ...v.nucleo.stats, drawing: !v.nucleoError, ms: v.nucleoMs } : null, spineCore: { skeleton: !!v.skeleton, data: !!v.data }, window: v.janela ? { ...v.janela, view: v.vistaJanela() } : null, language: app.idioma || ((app.doc?.json as any)?.translations?.languages?.[0] ?? null), textOverflows: v.nucleo?.textos?.estouros() ?? [], medidas: { modo: modoMedidas(), ...estatisticasMedidas } } : null,
       selection: app.selection,
       // o Desenhar aberto na tela (imagem, ferramenta, forma e ponto escolhidos, caminho da caneta)
       draw: app.drawEdit ? { ...app.drawEdit } : null,
@@ -232,7 +240,7 @@ const handlers: Record<string, Handler> = {
   },
 
   // runtime: modo de desenho ("godot", "spine" ou "nucleo"); troca recarregando as texturas
-  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; onion?: boolean; pixel?: number; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number; start?: number; speed?: number; loop?: boolean; front?: boolean } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null }) {
+  async view(p: { animation?: string | null; time?: number; playing?: boolean; loop?: boolean; speed?: number; showBones?: boolean; showMeshes?: boolean; select?: { bone?: string; slot?: string }; fit?: boolean; rect?: number[]; sequence?: SequenceParam; runtime?: Runtime; onion?: boolean; pixel?: number; reference?: { file?: string; x?: number; y?: number; width?: number; opacity?: number; start?: number; speed?: number; loop?: boolean; front?: boolean } | null; draw?: { slot: string; tool?: "select" | "pen" | "rect" | "ellipse"; shape?: number | null; point?: number | null } | null; window?: string | number[] | null; sideBySide?: boolean; sideBySideLanguages?: string[]; language?: string; languageTable?: boolean }) {
     const v = app.viewer;
     if (!v) throw new Error("viewer nao iniciado");
     // imagem de referencia por cima (file: caminho dentro das raizes); null tira
@@ -284,6 +292,25 @@ const handlers: Record<string, Handler> = {
       if (p.draw.shape !== undefined) de.shape = p.draw.shape;
       if (p.draw.point !== undefined) de.point = p.draw.point;
     }
+    // a janela da tela (docs/NUCLEO.md "Tela"): "arte", um preset ("9:16", "9:20", "3:4", "16:9",
+    // "21:9"), [largura, altura] ou null; a camera enquadra a janela
+    if (p.window !== undefined) {
+      if (p.window !== null && app.runtime !== "nucleo") await app.setRuntime("nucleo");
+      v.sync();
+      app.usarJanela(janelaDe(app.doc?.json, p.window));
+      const r = v.vistaJanela();
+      if (r && !p.fit && !p.rect) v.frameRect(r, 1.2);
+    }
+    if (p.sideBySide !== undefined) app.ladoALado = p.sideBySide;
+    // o idioma dos textos (docs/NUCLEO.md "Texto") e a tabela de idiomas aberta
+    if (p.language !== undefined) {
+      const ls: string[] = (app.doc?.json as any)?.translations?.languages ?? [];
+      if (ls.length && !ls.includes(p.language) && !ls.includes(p.language.split(/[_-]/)[0])) throw new Error(`idioma fora da tabela: ${p.language} (${ls.join(", ")})`);
+      if (p.language !== null && app.runtime !== "nucleo") await app.setRuntime("nucleo");
+      app.usarIdioma(p.language);
+    }
+    if (p.languageTable !== undefined) app.tabelaIdiomas = p.languageTable;
+    if (p.sideBySideLanguages !== undefined) app.ladoIdiomas = p.sideBySideLanguages;
     if (p.fit) v.frameAll();
     // um retangulo do mundo [x, y, largura, altura] (y para cima) inteiro na tela, sem folga
     if (Array.isArray(p.rect) && p.rect.length === 4) v.frameRect(p.rect, 1);

@@ -116,7 +116,7 @@ for (let i = 0; ; i++) {
 }
 
 const gl = gpu ? ["--enable-gpu", "--ignore-gpu-blocklist", "--use-angle=gl"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-const chrome = spawn("chromium", ["--headless=new", `--user-data-dir=${perfil}`, "--remote-debugging-port=0", ...gl, "--no-first-run", "about:blank"], { detached: true, stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn("setpriv", ["--pdeathsig", "KILL", "chromium", "--headless=new", `--user-data-dir=${perfil}`, "--remote-debugging-port=0", ...gl, "--no-first-run", "about:blank"], { detached: true, stdio: ["ignore", "ignore", "pipe"] });
 filhos.push(chrome);
 const wsUrl = await new Promise<string>((ok, falha) => {
   let b = "";

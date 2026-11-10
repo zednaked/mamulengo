@@ -1,0 +1,52 @@
+# Os testes que barram um merge: os comandos e o formato (npm test), os tipos (npm run check), o
+# nucleo contra o oraculo e as conferencias do modo de layout (tela, texto, nove-fatias, papeis) e o
+# joguinho do coelho jogado de ponta a ponta num Chromium sem tela. Ate 10/11/2026 tudo isso so
+# rodava na maquina de quem mexia.
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.11
+      - name: nucleo nativo e wasm
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build
+          cmake -S nucleo -B nucleo/build -G Ninja && cmake --build nucleo/build
+          emcmake cmake -S nucleo -B nucleo/build-web -G Ninja
+          cmake --build nucleo/build-web --target nucleo
+      - run: npm ci
+      - name: comandos e formato
+        run: npm test
+      - name: tipos
+        run: npm run check
+      - name: nucleo contra o oraculo
+        run: npx tsx tools/nucleo-compara.ts tests/boneco tests/nucleo
+      - name: modo de layout
+        run: |
+          npx tsx tools/nucleo-tela.ts
+          npx tsx tools/nucleo-texto.ts
+          npx tsx tools/nucleo-fatias.ts
+          npx tsx tools/nucleo-papeis.ts
+      - name: o joguinho do coelho, jogado
+        env:
+          CHROMIUM: google-chrome
+        run: npx tsx tools/tela-jogo-teste.ts

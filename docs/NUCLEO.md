@@ -10,6 +10,14 @@ dá os números do runtime que os jogos usam hoje. Quem escreve o núcleo não l
 runtime; lê este documento e compara números. Onde este
 texto e o oráculo discordarem, o oráculo manda e o texto é corrigido.
 
+**Sala limpa em duas equipes.** O texto nasce, de preferência, só de medida (o oráculo como
+caixa-preta). Quando medir não basta para achar a regra, quem for ler o código do runtime
+de referência **não escreve o núcleo** naquele trabalho: descreve aqui o comportamento (regras
+e contas, sem código nem nomes de função copiados) e outra pessoa ou agente, que não leu o
+runtime, implementa só a partir deste texto e dos números. Cada trecho escrito assim leva a
+marca _(descrito a partir da leitura do runtime de referência, data)_. Os que existem:
+"Aplicar no alvo" (Transformação) e "Regra de mistura do spine-godot", ambos de 2026-11-09.
+
 ## Contrato da ferramenta de teste
 
 ```sh
@@ -217,13 +225,32 @@ deslocamentos **da fonte**, medidos no oráculo com um osso fonte e um alvo:
 - a rotação de mundo com o deslocamento volta a [0, 360); com a fonte espelhada (determinante
   da matriz de mundo negativo) o deslocamento de rotação entra com o sinal trocado.
 
+**Aplicar no alvo.** _(descrito a partir da leitura do runtime de referência, 2026-11-09)_ Com `t` o valor que vai para a propriedade (o da fonte menos o
+`deslocamento` de `de`, vezes `escalar`, mais o `deslocamento` de `para`; com `limitar`, preso
+entre o `deslocamento` e o `max` de `para`) e `m` o mix da propriedade (0 não mexe):
+- **alvo local:** girar e cisalha `v += (somar ? t : t − v) · m`, **sem** levar a diferença a
+  [−180, 180] (com `limitar` e `escalar`, `t − v` passa de 360 e o giro dá a volta inteira); x e y
+  igual; escala `s *= 1 + (t − 1) · m` somando (multiplica, não soma) e, substituindo,
+  `s += (t − s) · m` só se `s ≠ 0` (escala 0 fica 0);
+- **alvo no mundo, girar:** `r = t` em radianos, menos o ângulo atual da coluna x
+  (`atan2(c, a)`) se não somar; depois **uma** volta só para dentro de [−π, π] (`r > π`: −2π;
+  `r < −π`: +2π), **também somando**; gira a matriz por `r · m`. Um `t` grande (escala 2 no
+  giro da fonte) fica fora de [−π, π] mesmo depois da volta, e é assim que o oráculo dá;
+- **alvo no mundo, escala x (y igual com a coluna b, d):** somando, a coluna inteira vezes
+  `1 + (t − 1) · m` (sem olhar o comprimento atual); substituindo, com `s` o comprimento da
+  coluna, vezes `1 + (t − s) · m / s` se `s ≠ 0` (exatamente zero; um `s` pequeno ainda conta);
+- **alvo no mundo, cisalha y:** `by = atan2(d, b)`; somando, `r = t` em radianos (sem volta);
+  substituindo, `r = (t + 90)` em radianos `− (by − atan2(c, a))`, com uma volta só para dentro
+  de [−π, π]; a coluna y passa a `by + r · m` com o mesmo comprimento.
+
 Conferido em casos gerados (`tools/nucleo-fixtures.ts`, `transformacao/`): 144 dirigidos (um
 deslocamento por vez, para cada propriedade do alvo, em mundo, fonte local, alvo local e
-somando), todos iguais. Nos 200 aleatórios (várias propriedades, escala e deslocamento por
-alvo, limites, mixes, fonte que fica espelhada na animação), 183 iguais; os 17 que diferem já
-diferem sem os deslocamentos do topo (18 sem eles): são combinações de `limitar`, `somar` e
-escala que a conta acima ainda não cobre (em aberto). Um asset privado com a fonte em mundo
-girando e movendo outro osso diferia centenas de px antes e agora bate em todas as animações.
+somando) e 200 aleatórios (várias propriedades, escala e deslocamento por alvo, limites, mixes,
+fonte que fica espelhada na animação), todos iguais. Antes destas regras de aplicar, 17 dos 200
+diferiam (só na matriz, posição igual): a escala somando era somada em vez de multiplicada, o
+giro e a cisalha locais eram levados a [−180, 180], e o giro e a cisalha no mundo davam a volta
+inteira (módulo) em vez de uma. Um asset privado com a fonte em mundo girando e movendo outro
+osso diferia centenas de px antes e agora bate em todas as animações.
 
 **Slider:** a restrição dirige uma animação inteira (`animacao`) por um número `t`, medido no
 oráculo:
@@ -728,6 +755,320 @@ no atlas, célula com cor, altura, giro, espelho e linha), iso (escala, âncora,
 perspectiva, desenha pelo núcleo em wasm e compara cada vértice, as UVs, as cores e os lotes com
 a conta refeita pela especificação, e a página Nearest sem o recuo. Exemplo: `exemplos/mosaico`.
 
+## Tela
+
+O boneco inteiro como a tela de um jogo (docs/BACKEND.md, "Quem faz o que"): a arte base, como
+ela encaixa numa janela de outro tamanho e os ossos presos a pontos da janela (`tela` no
+`.boneco`, `screen` no JSON do editor; o Spine não tem, e a exportação para ele a tira e avisa: os
+ossos ficam onde estão na arte base). A conta é a das âncoras e offsets do `Control` do Godot 4
+(`src/cena/layout.ts`, `x = âncora × largura do pai + offset`), aplicada a ossos: o offset não
+é guardado, é a distância do osso ao ponto da âncora na arte base (o setup).
+
+| campo | padrão | o quê |
+|---|---|---|
+| `arte` | a caixa do `esqueleto` | `[x, y, largura, altura]` no mundo (y para cima, canto de baixo e da esquerda): o tamanho de referência em que a tela foi desenhada |
+| `encaixe` | `caber` | `caber` (a arte inteira cabe; sobra janela), `cobrir` (a janela inteira tem arte; corta), `largura` (a largura manda), `altura` (a altura manda) |
+| `ancoras` | nenhuma | `{osso, ancora: [x, y], estica, cobre}`: `x` de 0 (esquerda) a 1 (direita), `y` de 0 (em cima) a 1 (embaixo); `estica` `x`, `y` ou `xy`; `cobre` `[x, y, largura, altura]` (cobrir sem deformar, abaixo). Um osso aparece uma vez só |
+
+**A vista.** Quem mostra o boneco diz a janela, `L × A` pixels (`Esqueleto::janela`). Com a arte
+`B = (bx, by, bw, bh)`, a escala `s` é `min(L/bw, A/bh)` em `caber`, `max` em `cobrir`, `L/bw` em
+`largura` e `A/bh` em `altura`. A vista é o retângulo do mundo que aparece na janela inteira, com
+o meio no meio da arte: `vw = L/s`, `vh = A/s`, `vx = bx + (bw − vw)/2`, `vy = by + (bh − vh)/2`.
+Quem desenha leva `(vx, vy + vh)` ao canto de cima e da esquerda da janela, com `s` pixels por
+unidade e o y invertido. Sem janela (0 × 0, o padrão) a vista é a arte e nada se corrige.
+
+**Os ossos ancorados.** Calculado uma vez por janela (e de novo quando o setup muda), na pose de
+setup sem restrições, em ordem de hierarquia:
+
+1. `W0`: o mundo de setup de cada osso com a arte base.
+2. Para cada osso ancorado, o ponto da janela em frações `(fx, fy)`: os da âncora; no eixo que
+   estica, a fração do próprio osso na arte (`fx = (W0.x − bx)/bw`, `fy = (by + bh − W0.y)/bh`).
+3. O alvo no mundo mantém a distância até esse ponto: `x = W0.x + (vx − bx) + fx·(vw − bw)`,
+   `y = W0.y + (vy − by) + (1 − fy)·(vh − bh)`. Esticando em x, a linha x da matriz do mundo
+   (`a`, `b`) vezes `vw/bw`; em y, a linha y (`c`, `d`) vezes `vh/bh`. O resto do mundo é o de `W0`
+   (um osso ancorado dentro de um que estica não estica junto: o botão dentro da barra não
+   deforma).
+   **Cobrir sem deformar** (`cobre`, a caixa `C = (cx, cy, cw, ch)` no mundo da arte base; não combina
+   com `estica`): o fundo maior que a tela que cresce por igual a partir de um ponto até cobrir a janela
+   (um jogo de mesa cresce o fundo e a mesa a partir de um ponto da mesa). Com `P` o alvo do passo 3 e a
+   distância do osso a cada lado da caixa na arte (`e = W0.x − cx`, `d = cx + cw − W0.x`, `b = W0.y − cy`,
+   `c = cy + ch − W0.y`), a escala é `k = max(1, (P.x − vx)/e, (vx + vw − P.x)/d, (P.y − vy)/b,
+   (vy + vh − P.y)/c)`, contando só os lados com distância positiva (o ponto fora da caixa por um lado
+   não cresce por ele), e a matriz linear do alvo (`a`, `b`, `c`, `d`) vezes `k`. A caixa escalada
+   `P + k·(C − W0)` cobre a vista nos lados que contam. Os filhos sem âncora crescem junto; um filho
+   ancorado não (como no esticar). Uma nove-fatias dentro de um osso que cobre conta a escala como
+   esticar (os cantos ficam do tamanho da arte): ainda não separa os dois.
+4. A pose local que leva o pai (já corrigido) ao alvo: sem esticar e com a matriz do pai igual à
+   de `W0`, só a posição, `inversa(pai) × alvo`; senão, a decomposição do mundo em pose local da
+   seção "Ordem de atualização" (com herança diferente da normal, só a posição).
+5. A correção do osso: o que somar em `x`, `y`, `rotacao`, `cisalha_x`, `cisalha_y` e o que
+   multiplicar em `escala_x`, `escala_y` para ir do setup a essa pose local.
+
+Os ossos sem âncora não mudam: acompanham o pai. O filho de uma instância não tem tela (segue o
+osso do pai).
+
+**A cada quadro**, no começo do cálculo do mundo, a correção entra por cima da pose local animada
+(soma e multiplica como acima) e sai no fim, com a pose local das restrições. A animação continua
+relativa ao setup: um botão que sobe 50 sobe 50 a partir de onde a janela o pôs. Restrições e
+física veem os ossos já no lugar.
+
+**Erros de leitura:** arte sem largura ou altura, encaixe desconhecido, osso desconhecido ou
+repetido nas âncoras, `cobre` que não é `[x, y, largura, altura]`, sem largura ou altura, ou com `estica`.
+
+**O código mexe** (o jogo, não o arquivo): `mm_osso_local(inst, osso, x, y, rotacao, escala_x,
+escala_y)` põe a pose local do osso como uma chave de animação poria (fica até uma animação mexer no
+osso; a correção da tela soma por cima) e `mm_slot_parte(inst, slot, nome)` troca a parte do slot (nome
+vazio tira; devolve 0 se o slot não tem a parte; uma animação que mexe na parte manda). Na web,
+`tela.mexer` e `tela.parte` (um placar em algarismos de imagem, cada um na sua casa).
+
+**No wasm:** `mm_janela(inst, L, A)` (esquece os checkpoints da instância, que guardam a janela
+antiga), `mm_vista(inst)` (em `mm_saida`: escala, x, y, largura, altura) e a `tela` no `mm_info`
+(arte, encaixe e âncoras com o índice do osso). `mm_osso_setup` marca a correção para refazer.
+**No Godot:** `BonecoSprite.fit_window` (seção "No Godot"). **Na web:** `src/tela/tela-boneco.ts`.
+
+Conferência própria (o oráculo não tem tela): `npx tsx tools/nucleo-tela.ts` põe o boneco de
+`tests/nucleo/tela` (arte 700 × 1370; âncoras nos cantos, no meio das bordas e no centro; esticando
+em x, em y e nos dois; uma âncora dentro de um osso que estica; um filho sem âncora; um osso girado
+com animação) em seis janelas (9:16, 9:20, 3:4, 16:9, 21:9 e a própria arte) nos quatro encaixes e
+compara o mundo de cada osso com a conta refeita pela especificação, no nativo
+(`nucleo-pose --janela LxA`), no binário e no wasm; depois o `cobre` (um cenário preso embaixo com uma
+caixa maior que a arte, um filho que cresce junto, um ancorado dentro que não cresce e um osso girado com o
+ponto fora da caixa por um lado), o código mexendo num osso e trocando a parte, e os erros (955
+conferências). Exemplo: `exemplos/coelho`.
+
+## Texto
+
+Uma parte de texto (`tipo: "texto"`, docs/FORMATO.md) ligada a um osso como as outras partes de um
+slot: uma caixa (`largura` × `altura`, com `x`, `y`, `rotacao`, `escala_x`, `escala_y` como uma região),
+o texto livre ou a `chave` na tabela de idiomas (`traducoes`), a `familia` (uma das `fontes` do
+projeto), `tamanho`, `minimo`, `cor`, `alinhar`, `alinhar_v`, `estouro`, `linha` (contorno) e `sombra`.
+
+**Onde mora o desenho das letras (decisão de 2026-11-09).** O núcleo não tem fonte nem montador de
+texto (shaping), e escrever um (HarfBuzz, bidi, as fontes de reserva por escrita) dobraria o tamanho do
+wasm para fazer pior do que o que já está em cada lugar que mostra o boneco: o navegador monta árabe da
+direita para a esquerda e os conjuntos do devanágari pelo Canvas 2D (o caminho que a `src/tela` já
+usa e mede contra o Godot), e o Godot tem o TextServer dele. Então o núcleo guarda o texto e
+põe no lugar; quem mostra desenha as letras e entrega a imagem:
+
+1. O núcleo lê a parte (e a valida: caixa com largura e altura, alinhamento e estouro conhecidos,
+   fontes sem nome repetido), guarda os campos (`Modelo::textos`, `fontes`, `traducoes`) e calcula
+   os 4 cantos da caixa no osso, como uma região do mesmo tamanho. Sem imagem, a parte não desenha
+   (o clique e a caixa do editor seguem a caixa).
+2. Quem mostra monta a imagem de cada texto k e diz onde ela está: `Esqueleto::imagem_texto(k, ret,
+   uv)`, com `ret` o retângulo da imagem no espaço da caixa (o meio na origem, y para cima: esquerda,
+   baixo, direita, cima; maior que a caixa quando o contorno ou a sombra passam dela) e `uv` na
+   **página dos textos**, de índice `paginas_desenho.size()` (logo depois das páginas do boneco e dos
+   filhos). Os cantos são `x, y + R(rotacao) · S(escala) · ret`, na ordem dos cantos da região
+   (baixo-esquerda, cima-esquerda, cima-direita, baixo-direita), e o uv do canto de baixo é o `v1`.
+3. Daí em diante a parte desenha como uma região: a cor do slot (a `cor` da parte é a das letras, não
+   multiplica de novo), a ordem de desenho, a troca de parte por animação, o recorte e os efeitos (a
+   margem dos efeitos é medida no tamanho da página dos textos, `pagina_textos(largura, altura)`). Um
+   texto num filho de instância não desenha (a instância filha não recebe imagem).
+
+**A diagramação** (a mesma no editor, no jogo web e no Godot; `src/core/texto.ts`): o texto mostrado é
+a tradução da chave no idioma (o código exato ou só a língua: `pt_BR` acha `pt`), senão o texto livre,
+senão a primeira tradução que houver, senão a chave; `{nome}` troca pelos parâmetros que o jogo dá. As
+linhas são as do texto (`\n`); a entrelinha é `max(ascendente + descendente, 1,15 × letra)`; cada linha
+alinha na caixa (esquerda, centro, direita) e o bloco em cima, no meio ou embaixo. O estouro:
+`encolher` reduz a letra na proporção do que sobra, em passos de meio pixel, até `minimo` (0: a metade
+do tamanho); `quebrar` quebra nas palavras pela largura da caixa; `cortar` corta o que passa da caixa;
+`nada` deixa passar. Estoura quando a largura ou a altura usadas passam da caixa em mais de 0,5 px (com
+encolher, mesmo no mínimo): é o aviso do editor e o `query.texts`. No idioma da direita para a esquerda
+(ar, fa, he, ur...) o parágrafo inteiro é RTL e o alinhamento fica o declarado, como no Godot.
+
+**No wasm:** `mm_info` lista os `textos` (nome, parte, slot); `mm_textos(modelo)` dá as fontes, os
+idiomas, a tabela e os campos de cada texto; `mm_texto_imagem(inst, k, l, b, r, t, u0, v0, u1, v1)`
+entrega a imagem (sem largura: tira) e `mm_pagina_textos(inst, largura, altura)` o tamanho da página.
+**Na web:** `src/tela/textos.ts` (`TextosBoneco`): um atlas de 2048² (a página dos textos), as
+fontes do projeto por `FontFace` (a da parte primeiro, as outras de reserva, e a do sistema), as
+letras pelo Canvas 2D na escala em que aparecem (pixels da tela por unidade × a escala do osso, em
+degraus de 2^¼: animando a escala, refaz no máximo a cada 19%), e o lugar entregue a cada instância
+antes do desenho. A `TelaBoneco` (`src/tela/tela-boneco.ts`) tem `idioma`, `texto(nome, valor)` (texto
+livre, ou os parâmetros `{nome: valor}`; `null` volta ao do arquivo) e `traducoesCsv(csv)`. O editor
+desenha pelo mesmo código. **No Godot:** seção "No Godot".
+
+Conferência própria (o oráculo não tem texto): `npx tsx tools/nucleo-texto.ts` lê
+`tests/nucleo/texto` (uma parte girada e escalada com chave, fonte, contorno e sombra num osso girado
+e escalado; uma de texto livre com quebra de linha e aspas; a troca de parte por animação) no texto e
+no binário, e confere o que o núcleo lê, a caixa sem imagem, que sem imagem nada desenha, e os cantos,
+o uv, a página e a cor do slot com a imagem entregue (32 conferências, com os erros de leitura).
+Exemplo: `exemplos/coelho` (placar, JOGAR, MISSÕES e as missões em 12 idiomas).
+
+## Nove-fatias
+
+Uma região com `fatias` (docs/FORMATO.md) é cortada por 4 margens em 9 pedaços: os cantos não
+esticam, as bordas de cima e de baixo esticam só na largura, as dos lados só na altura, e o miolo nos
+dois sentidos (ou repete). Serve para o painel e a barra que esticam com a janela (seção "Tela") e
+para o botão que cresce com o texto (seção "Texto"), sem deformar as bordas. O Spine não tem: a
+exportação tira as `fatias` e avisa (a região sai inteira, esticada para a caixa: igual quando a caixa é
+do tamanho da imagem; senão, com as bordas deformadas).
+
+| campo | padrão | o quê |
+|---|---|---|
+| `esquerda`, `cima`, `direita`, `baixo` | 0 | as margens, nas unidades da parte (as de `largura` e `altura` da região, que são a imagem inteira) |
+| `largura`, `altura` | as da região | a caixa: o tamanho em que a região fatiada aparece, nas mesmas unidades (um botão de 260 × 90 feito de uma imagem de 192 × 64) |
+| `eixo_x`, `eixo_y` | `esticar` | o miolo e as bordas nesse eixo: `esticar`, `repetir` (pedaços do tamanho original, o último cortado) ou `repetir_caber` (o número inteiro de pedaços mais perto, esticados para caber) |
+| `acompanha` | nenhum | `{slot, respiro: [x, y]}`: a caixa acompanha o texto mostrado nesse slot, mais o respiro de cada lado |
+
+**O tamanho `L × A`** da região, em unidades da parte (antes da escala dela):
+
+1. Sem `acompanha`: a caixa (`largura × altura` das `fatias`; sem elas, as da região).
+2. Com `acompanha`: o texto é a parte de texto do slot (a do setup, se for texto; senão a primeira
+   parte de texto do slot). Quem desenha as letras diz quanto o texto ocupa, a largura `tl` e a altura
+   `ta` usadas depois do estouro, em unidades da caixa do texto (`Esqueleto::medida_texto(k, tl, ta)`).
+   Levadas à região pelas escalas das duas partes: `L = max(caixa_l, tl · tsx / sx + 2 · rx)`,
+   `A = max(caixa_a, ta · tsy / sy + 2 · ry)` (`tsx`, `tsy` a escala da parte de texto; `sx`, `sy` a da
+   região; `rx`, `ry` o respiro). Sem medida (0), o tamanho do item 1. A caixa cresce em volta do meio
+   da região; o texto, centrado nela, fica no meio. Um texto que estoura a caixa dele encolhe antes de
+   empurrar: a caixa do texto é a largura máxima do botão.
+
+**O esticar da janela `(ex, ey)`.** Com a correção da tela (seção "Tela"), um osso que estica (ou
+filho de um) tem o mundo do setup corrigido `L1` diferente do da arte base `L0` (só a parte linear,
+`a b c d`). Com `u = (cos θ · sx, sin θ · sx)` e `v = (−sin θ · sy, cos θ · sy)` os eixos da região
+no osso (`θ` a rotação da parte): `ex = |L1 u| / |L0 u|`, `ey = |L1 v| / |L0 v|`. Sem janela, sem
+âncoras ou sem esticar, 1. A escala da animação não entra: o botão que pulsa pela escala do osso
+cresce inteiro, cantos inclusive (como a escala de um `Control` no Godot, que não muda o tamanho).
+
+**Os pedaços de um eixo** (o x; o y é igual, de baixo para cima, com `baixo` no lugar de `esquerda`
+e `cima` no de `direita`). A origem (`s`, na imagem) vai de 0 a `largura` a partir da esquerda; o
+destino (`d`, na parte) de `−L/2` a `L/2`.
+
+- Os cantos: `[0, mE]` vai para `[−L/2, −L/2 + cE]` e `[largura − mD, largura]` para
+  `[L/2 − cD, L/2]`, com `cE = mE / ex`, `cD = mD / ex`. Se `cE + cD > L`, os dois vezes
+  `L / (cE + cD)` (o miolo some).
+- O miolo, a origem `[mE, largura − mD]` (tamanho `mo`) no vão `[−L/2 + cE, L/2 − cD]` (tamanho `vão`):
+  `esticar`, um pedaço só. `repetir`: pedaços de `mo / ex`, da esquerda para a direita; o último
+  cortado no destino e na origem na mesma proporção. `repetir_caber`: `n = max(1, round(vão / (mo /
+  ex)))` pedaços de `vão / n`, cada um com a origem inteira. No máximo 64 pedaços por eixo (passando,
+  64 como no `repetir_caber`). Com `mo = 0` (as margens cobrem a imagem), o miolo é `esticar`.
+- O corte do atlas: a imagem cortada (`corte` em `imagens`) só tem pixels em `[p0, p1]` da origem
+  (o retângulo com pixels levado às unidades da parte, como na região); cada pedaço é cortado a ele,
+  o destino na mesma proporção, e o pedaço que fica vazio sai. Sem corte, `[0, largura]`.
+- Os pontos: os pedaços em ordem; o fim de um e o começo do seguinte com o mesmo destino e a mesma
+  origem são um ponto só. Esticando sem corte: 4 pontos e 3 pedaços por eixo.
+
+**Os vértices** são a grade dos pontos, `nx` em x e `ny` em y, linha por linha de baixo para cima,
+cada linha da esquerda para a direita (índice `iy · nx + ix`). A posição no osso é
+`(x, y) + R(θ) · (sx · dx, sy · dy)`, como os cantos da região. O uv vem da fração no retângulo com
+pixels, `fu = (s_x − p0x) / (p1x − p0x)` e `fv = (s_y − p0y) / (p1y − p0y)` (de baixo), sobre os uvs dos
+cantos da região (que já trazem a imagem girada no atlas): `uv = uv_be + fu · (uv_bd − uv_be) + fv ·
+(uv_ce − uv_be)` (`be` baixo-esquerda, `bd` baixo-direita, `ce` cima-esquerda). Cada par de pedaços dá
+dois triângulos na ordem da região: (baixo-esquerda, cima-esquerda, cima-direita) e (cima-direita,
+baixo-direita, baixo-esquerda). Esticando: 16 vértices e 18 triângulos.
+
+Daí em diante a região desenha como uma malha sem pesos (a cor, o blend, a ordem, o recorte, a troca
+de parte por animação, o borrar e o rastro). Os 4 cantos de fora da grade (índices `0`, `(ny − 1) · nx`,
+`ny · nx − 1` e `nx − 1`, na ordem da região) são a caixa da parte: o clique e a caixa do editor
+(`mm_vertices_slot` devolve só eles); `nucleo-pose`, `mm_pose` e o desenho, a grade inteira. No tamanho
+base (sem janela que estica, sem texto maior e com a caixa do tamanho da região), os cantos de fora são
+os da região sem fatias.
+
+**Quando refaz.** A grade não é refeita a cada quadro: na leitura, quando a correção da tela é
+refeita (janela nova, setup mudado) e quando a medida de um texto acompanhado muda.
+
+**Erros de leitura:** margem negativa, eixo desconhecido, `acompanha` com slot desconhecido ou sem
+parte de texto. Ainda não: a linha e o brilho dos efeitos não crescem a região fatiada (ela não tem
+contorno), e as fatias de uma malha.
+
+**No wasm:** `mm_texto_medida(inst, k, tl, ta)` (o texto k usa `tl × ta` da caixa; `TextosBoneco`
+entrega junto com a imagem). **Na web e no editor:** nada a mais (o desenho é o do núcleo). **No
+Godot:** o `BonecoSprite` entrega a medida da diagramação dele (seção "No Godot").
+
+Conferência própria (o oráculo não tem fatias): `npx tsx tools/nucleo-fatias.ts` lê
+`tests/nucleo/fatias` e confere, refazendo a conta por esta especificação, as posições e os uvs da grade
+em vários tamanhos (o painel ancorado esticando em x e em y em várias janelas, a barra esticando só em
+x), os cantos de tamanho constante, os modos `repetir` e `repetir_caber`, a imagem cortada e girada no
+atlas, o botão que acompanha a medida do texto, a ida e volta pelo binário e o wasm igual ao nativo.
+
+## Papeis
+
+O que cada elemento da tela é para o código do jogo (docs/BACKEND.md, "Papéis"): o código acha pelo
+nome que a pessoa deu no editor (`tela.botao("jogar").aoTocar(...)`). `papeis` no `.boneco` (`roles`
+no JSON do editor; o Spine não tem, e a exportação para ele os tira e avisa; as animações dos estados
+ficam):
+
+| campo | padrão | o quê |
+|---|---|---|
+| `nome` | (obrigatório) | o nome que o código usa; um só por papel |
+| `tipo` | (obrigatório) | `botao` (área de toque com estados), `toque` (só a área) ou `texto` (a parte de texto que o jogo troca) |
+| `osso` | | botão e toque: o osso do grupo (ele e os filhos) |
+| `slot` | | texto: o slot da parte de texto (a do setup, se é texto; senão a primeira do slot) |
+| `area` | as partes do grupo | `{slot}`: só a parte desse slot (do grupo); `{caixa: [x, y, largura, altura]}`: um retângulo no osso, com o meio em `x, y` |
+| `estados` | nenhum | botão: `{normal, em_cima, apertado, desligado}`, cada um o nome de uma animação |
+| `mix` | 0,1 | segundos de emenda entre os estados |
+| `trilha` | 10 + a ordem entre os botões | a trilha em que os estados tocam (por cima das do jogo) |
+| `desligado` | falso | o botão começa desligado |
+
+**Onde mora o toque (decisão de 2026-11-10).** No núcleo, e não em quem mostra: a área é conta sobre
+o mundo que só o núcleo tem (a caixa de cada parte no osso animado e ancorado, a grade da nove-fatias
+que cresce com o texto medido, a ordem de desenho, a cor do slot), e o Godot, a web e o editor têm de
+dar o mesmo papel no mesmo ponto. Quem mostra só leva o ponteiro da janela ao mundo (a vista) e
+recebe os toques. A máquina dos estados (normal, em cima, apertado, desligado) também mora no núcleo
+(`Interface`, `nucleo/include/mamulengo/papeis.h`), para o Godot não precisar de outra.
+
+**A área** de um papel (`area_papel`), com o mundo atual, em triângulos: para cada slot da área (o
+`slot` dado, ou os slots do osso e dos filhos dele), se a parte do slot aparece (alfa da cor do slot
+maior que 0, osso ativo): a região com nove-fatias, os 4 cantos de fora da grade (o tamanho em que
+ela está: a janela e o texto acompanhado inclusive) em dois triângulos; a região e o texto, os 4
+cantos (o texto, só se o grupo não tem região nem malha: a caixa do texto do botão é a largura máxima
+dele, não o botão); a malha, os triângulos dela. Com `caixa`, o retângulo no osso, em dois triângulos
+(e as partes do grupo não contam). A posição da área na ordem de desenho é a do slot mais alto que
+contou (com `caixa`, a do slot mais alto do grupo que aparece). Os papéis de texto não têm área.
+
+**O papel no ponto** (`papel_no_ponto(x, y)`, no mundo, y para cima): entre os papéis com um
+triângulo que tem o ponto (a borda conta), o de posição mais alta na ordem de desenho; empatando, o
+que vem depois na lista. Um botão desligado ainda é achado (ele cobre o que está atrás).
+
+**Os estados dos botões** (`Interface`, um ponteiro só: o mouse ou o primeiro dedo). Guarda o papel
+sob o ponteiro (`sobre`), o apertado e o desligado de cada um. O estado de cada botão é: desligado,
+se desligado; apertado, se foi apertado nele e o ponteiro está nele; normal, se foi apertado e o
+ponteiro saiu; em cima, se nada está apertado e o ponteiro está nele; senão normal. A cada mudança,
+a animação do estado toca na trilha do botão (`tocar`, com o `mix` do papel; sem mix ao iniciar),
+em laço no normal e no desligado (o botão que pulsa) e parando no fim no em cima e no apertado. Um
+estado sem animação cai no mais perto: o em cima e o desligado no normal, o apertado no em cima;
+mesma animação, não toca de novo. Os eventos:
+- `iniciar`: cada botão no estado inicial (normal ou desligado), sem mix;
+- `mover(x, y)`: o `sobre` muda;
+- `apertar(x, y)`: o papel sob o ponteiro fica apertado (se ligado);
+- `soltar(x, y, dedo)`: se soltou no papel apertado e ele está ligado, um **toque** (o índice entra
+  em `toques`, que quem lê esvazia); com `dedo` o `sobre` some (no celular não há em cima);
+- `sair`: nada sob o ponteiro, nada apertado;
+- `desligar(k, d)`: o desligado do papel (desligar o apertado o solta);
+- `mostrar(k, estado)`: força um estado (o editor mostra cada um; o jogo, um atalho de teclado).
+
+O toque (sem estados) passa pela mesma máquina e só dá toques. **Erros de leitura:** papel sem nome,
+nome repetido, tipo desconhecido, osso ou slot desconhecido, texto sem slot ou com um slot sem parte de
+texto, slot da área fora do grupo, caixa sem largura ou altura, estado com animação desconhecida,
+mix ou trilha negativos.
+
+**No wasm:** `mm_info` lista os `papeis` (nome, tipo, osso, slot, texto, estados com o índice da
+animação, trilha, mix, desligado); `mm_papel_no_ponto(inst, x, y)`, `mm_papel_area(inst, k)` (os
+triângulos em `mm_saida`); `mm_papeis_iniciar(inst)` (depois de `mm_reiniciar`, que os esquece),
+`mm_papeis_ponteiro(inst, tipo, x, y)` (0 anda, 1 aperta, 2 solta, 3 solta com o dedo, 4 sai; devolve o
+papel sob o ponteiro), `mm_papeis_toques(inst)`, `mm_papel_desligar`, `mm_papel_desligado`,
+`mm_papel_estado`, `mm_papel_mostrar`; e, para o jogo, `mm_estado_atual(inst, trilha)` (a animação,
+o laço, o mix e o relógio da trilha), `mm_estado_ritmo(inst, trilha, escala)` (a `escala_tempo` da
+entrada atual, das que ela ainda mistura e da fila: 0 pausa a trilha, como a pausa do jogo que deixa
+os botões andando; devolve 0 com a trilha vazia), `mm_estado_vazio(inst, trilha, mix)` (o `vazio` do
+Estado: solta a trilha) e `mm_eventos_ligar` / `mm_eventos` (os eventos de cada
+`mm_passo`: início, interrompida, fim, completa e os de usuário). **Na web:** `src/tela/tela-boneco.ts`
+(docs/BACKEND.md, "Papéis"). **No Godot:** seção "No Godot". **Nativo:** `nucleo-pose --papeis` e
+`--toque X,Y` escrevem as áreas e o papel em cada ponto.
+
+**Pelo nome** (o import de PSD; `role.auto`, `src/core/papeis.ts`): um osso `btn_jogar` (ou `bt_`,
+`botao_`, `button_`) propõe o botão `jogar`; `toque_x`, `area_x`, `hit_x`, um toque; `txt_saldo`,
+`texto_saldo`, o texto do código `saldo` (o slot com parte de texto, ou o primeiro do osso). Num slot
+com esse nome, o botão usa o slot como área.
+
+Conferência própria (o oráculo não tem papéis): `npx tsx tools/nucleo-papeis.ts` lê `tests/nucleo/papeis`
+(um botão com nove-fatias que cresce com o texto, num osso girado e ancorado; um toque desenhado por
+cima dele; um botão girado com um filho e uma área só do filho; uma área em caixa num osso girado; um
+botão invisível; uma malha; um texto do código) em 5 casos de janela e medida do texto, refaz cada
+área e o papel em ~6.200 pontos pela especificação e compara com o nativo, o binário e o wasm; depois
+os estados pelo ponteiro no wasm, o ritmo e o soltar das trilhas e os erros de leitura (186
+conferências). Exemplo: `exemplos/coelho` (o JOGAR, a pausa, o "de novo", o toque "pular" e os textos
+do código) e o joguinho, `exemplos/coelho/jogo`.
+
 ## Instâncias
 
 Um `.boneco` dentro de outro: o que se repete (uma letra, um vagalume, uma multidão) fica num
@@ -921,6 +1262,21 @@ acima dela, menos a do topo, passam a manter o bit de segurar que tinham (o orá
 `keepHold`); sem isso, um vazio de um quadro no meio de um mix devolvia o setup onde o oráculo
 segura a animação de baixo por mais um quadro (90 graus de diferença num osso sintético).
 
+**Regra de mistura do spine-godot** _(descrito a partir da leitura do runtime de referência, 2026-11-09)_ (`Estado::mix_spine_godot`, desligada por padrão). O binário
+do spine-godot que os jogos usam hoje é um 4.3 mais antigo que o oráculo e decide quem já anima
+cada propriedade **por entrada**, não por trilha: na conta dos modos, uma propriedade que uma
+entrada **mais antiga** (da mesma trilha ou de outra) já anima é `SEGUINTE` com a mistura
+`Substitui` (`Soma` se a entrada soma), também na trilha 0, onde o 4.3 atual usa `Primeira`; só
+fica com a mistura da trilha a propriedade que a própria entrada já animou (timeline repetida).
+Efeito: na animação que entra, antes da primeira chave dela, a propriedade que a que sai anima
+fica inteira com o valor da que sai (o 4.3 atual a puxa para o setup na proporção do mix);
+depois da primeira chave as contas são iguais. Medido num personagem de jogo com penas (troca
+de uma animação de repouso para um gesto com mix 0,1 s): com a regra desligada as penas ficam até 7,7 px
+(roteiro do jogo no `nucleo-estado`) de onde o spine-godot as põe, por uns 15 quadros. O oráculo
+da regra é o AnimationState do spine-core com `likeSpineGodot` (`src/core/sim.ts`):
+`tools/nucleo-estado.ts --regra-mix spine-godot`, ou `"regra_mix": "spine-godot"` no roteiro.
+No Godot, `BonecoSprite.spine_godot_mix`.
+
 **Eventos.** Ordem e quadro iguais aos do oráculo: `inicio` (tocar, ou quando a da fila
 entra), `interrompida` (a que sai, também na troca natural da fila), `fim` (quando é retirada,
 no `avancar`), `completa` (no `aplicar`: em loop a cada volta, `floor(tempo/dur) >
@@ -1004,6 +1360,31 @@ jogos tratar os dois igual. O que o nó acrescenta ao núcleo:
   mesmo caminho devolve o mesmo `BonecoData` enquanto ele vive (cópias de um molde não releem o
   arquivo). `preview` toca em laço só no editor; no jogo o nó nasce na pose de setup.
 - `float_clock`: o relógio em float32 (acima, "Relógio").
+- `spine_godot_mix`: a regra de mistura do binário do spine-godot dos jogos (acima, "Regra de
+  mistura do spine-godot"); desligada, o 4.3 atual. Vale a partir da próxima troca de animação.
+- **Desenho:** um canvas item por lote, cada um com uma malha que fica de um quadro para o
+  outro. O comando de malha do item também fica (só é refeito quando a malha é refeita, a
+  textura muda ou o item é de ajuste ou de blend que lê a tela); os índices crus iguais aos do
+  quadro anterior não são renumerados; das posições e das cores e uvs só vai o que mudou, e
+  peça parada não custa nada. Numa bancada com 7 personagens de um jogo de produção
+  o desenho ficou mais barato que o do nó C++ antigo.
+- **Tela** (seção "Tela"): `window` (Vector2, a janela em pixels; zero é a arte base) e
+  `fit_window` (a janela é a da viewport a cada quadro, e o nó fica com a escala da vista e o canto
+  de cima e da esquerda dela em (0, 0): o nó direto na viewport, sem câmera); `get_view()` (a vista
+  no espaço do nó, y para baixo) e `get_view_scale()`. Conferido no `teste_boneco.gd` com o
+  `tests/nucleo/tela`, os mesmos números do nativo.
+- **Texto** (a parte `texto`, acima "Texto"): o nó desenha as letras pelo TextServer do Godot (TextLine, na ordem sombra, contorno e preenchimento), com as fontes do projeto ao lado do `.boneco` (as outras de reserva) e a mesma diagramação do `src/core/texto.ts` (encolher, quebrar, cortar, direita para a esquerda). API: `language` (vazio segue o TranslationServer; `pt_BR` acha `pt`), `get_languages()`, `set_text(nome, valor)`, `set_text_params(nome, Dictionary)`, `clear_text(nome)`, `get_text_shown(nome)`, `get_text_overflows()`. Conferido no teste headless (36 ok, sem pixels). Ainda não: o recorte não corta as letras, cortar é aproximado (o TextServer apara a linha), blends e efeitos do slot não valem para o texto, e texto dentro de instância filha não aparece.
+- **Nove-fatias** (seção "Nove-fatias"): a grade sai do núcleo como as outras malhas; antes de cada
+  desenho o nó entrega a medida dos textos que uma região fatiada acompanha (a diagramação dele, pelo
+  TextServer). `get_slice_info(slot)`: o tamanho da grade, o esticar da janela, os pontos por eixo e os 4
+  cantos de fora no espaço do nó. Conferido no `teste_boneco.gd` com o `tests/nucleo/fatias` (39 ok).
+- **Papéis** (seção "Papeis"): o nó lê o mouse e o dedo (`roles_input`, ligado; `_input` com
+  `make_input_local`), troca os estados dos botões pela `Interface` do núcleo e emite
+  `role_touched(nome)`. `get_roles()`, `role_pointer(tipo, posição)` (o ponteiro na mão: 0 anda, 1
+  aperta, 2 solta, 3 solta com o dedo, 4 sai), `get_role_at(posição)`, `set_role_disabled(nome, d)`,
+  `is_role_disabled`, `get_role_state`, `show_role_state` e `get_role_area` (os triângulos no espaço do
+  nó, y para baixo). Os estados começam no `_montar` (fora do editor). Conferido no `teste_boneco.gd`
+  com o `tests/nucleo/papeis` (48 ok).
 - `get_bones_world()`: todos os ossos, `nome -> [x, y, a, b, c, d]` com o eixo y para baixo
   (`x, -y, a, b, -c, -d` do núcleo), para comparar com o jogo de antes.
 

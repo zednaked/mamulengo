@@ -174,6 +174,7 @@ TipoParte ler_tipo_parte(const std::string& s) {
   if (s == "caminho") return TipoParte::Caminho;
   if (s == "ponto") return TipoParte::Ponto;
   if (s == "caixa") return TipoParte::Caixa;
+  if (s == "texto") return TipoParte::Texto;
   if (s == "regiao" || s.empty()) return TipoParte::Regiao;
   falha("tipo de parte desconhecido: " + s);
 }
@@ -272,6 +273,8 @@ class Leitor {
     ler_luzes(r["luzes"], r["ambiente"]);
     ler_instancias(r["instancias"]);
     ler_palco(r["palco"]);
+    ler_tela(r["tela"], r["esqueleto"]);
+    ler_fontes_traducoes(r["fontes"], r["traducoes"]);
     for (const auto& [nome, d] : r["eventos"].campos()) {
       DadosEvento e;
       e.nome = nome;
@@ -301,6 +304,8 @@ class Leitor {
       m.mix_pares.push_back(pm);
     }
     preparar_desenho();
+    preparar_fatias();
+    ler_papeis(r["papeis"]);
     paginas_do_desenho();
     // a pose so depende da animacao e do tempo? (docs/NUCLEO.md "Instancias")
     bool memoria = !m.emissores.empty() || !m.instancias.empty();
@@ -537,7 +542,134 @@ class Leitor {
     }
   }
 
+  // ---- texto (docs/NUCLEO.md "Texto")
+
+  // a parte de texto: a caixa (largura e altura) no osso, como uma regiao, e o que o texto e
+  void ler_texto(Parte& p, const Json& j, int idx) {
+    DadosTexto t;
+    t.parte = idx;
+    t.nome = p.nome;
+    t.texto = j.str("texto", "");
+    t.chave = j.str("chave", "");
+    t.familia = j.str("familia", "");
+    t.tamanho = j.num("tamanho", 32);
+    t.minimo = j.num("minimo", 0);
+    if (!(t.tamanho > 0)) falha("texto " + p.nome + ": tamanho da letra tem de ser positivo");
+    if (const Json* c = j.acha("cor"); c && c->texto()) t.cor = cor_hex(c->str());
+    t.largura = j.num("largura", 0);
+    t.altura = j.num("altura", 0);
+    if (!(t.largura > 0) || !(t.altura > 0)) falha("texto " + p.nome + ": a caixa precisa de largura e altura");
+    const std::string al = j.str("alinhar", "centro"), av = j.str("alinhar_v", "meio"), es = j.str("estouro", "encolher");
+    if (al == "esquerda") t.alinhar = 0;
+    else if (al == "centro") t.alinhar = 1;
+    else if (al == "direita") t.alinhar = 2;
+    else falha("texto " + p.nome + ": alinhar desconhecido " + al);
+    if (av == "cima") t.alinhar_v = 0;
+    else if (av == "meio") t.alinhar_v = 1;
+    else if (av == "baixo") t.alinhar_v = 2;
+    else falha("texto " + p.nome + ": alinhar_v desconhecido " + av);
+    if (es == "encolher") t.estouro = Estouro::Encolher;
+    else if (es == "quebrar") t.estouro = Estouro::Quebrar;
+    else if (es == "cortar") t.estouro = Estouro::Cortar;
+    else if (es == "nada") t.estouro = Estouro::Nada;
+    else falha("texto " + p.nome + ": estouro desconhecido " + es);
+    if (const Json* l = j.acha("linha"); l && l->objeto()) {
+      t.linha = std::max(0.0, l->num("largura", 0));
+      t.cor_linha = cor_hex(l->str("cor", "000000ff"));
+    }
+    if (const Json* s = j.acha("sombra"); s && s->objeto()) {
+      t.sombra = true;
+      t.cor_sombra = cor_hex(s->str("cor", "00000080"));
+      t.sombra_x = s->num("x", 0);
+      t.sombra_y = s->num("y", 0);
+    }
+    t.x = j.num("x", 0);
+    t.y = j.num("y", 0);
+    t.rotacao = j.num("rotacao", 0);
+    t.escala_x = j.num("escala_x", 1);
+    t.escala_y = j.num("escala_y", 1);
+    // os cantos: a caixa, como uma regiao do mesmo tamanho (o clique e a caixa do editor)
+    const double w = t.largura / 2 * t.escala_x, h = t.altura / 2 * t.escala_y;
+    const double rot = t.rotacao * GRAU, cs = std::cos(rot), sn = std::sin(rot);
+    const double px[4] = {-w, -w, w, w}, py[4] = {-h, h, h, -h};
+    for (int i = 0; i < 4; ++i) {
+      p.cantos[i * 2] = t.x + px[i] * cs - py[i] * sn;
+      p.cantos[i * 2 + 1] = t.y + px[i] * sn + py[i] * cs;
+    }
+    p.texto = int(m.textos.size());
+    m.textos.push_back(std::move(t));
+  }
+
+  // as fontes do projeto e a tabela de idiomas (docs/NUCLEO.md "Texto"); uma traducao que falta
+  // fica vazia (vale o texto livre da parte)
+  void ler_fontes_traducoes(const Json& fontes, const Json& tr) {
+    for (const Json& f : fontes.itens()) {
+      DadosFonte d;
+      d.nome = f.str("nome", "");
+      d.arquivo = f.str("arquivo", "");
+      if (d.nome.empty() || d.arquivo.empty()) falha("fontes: cada fonte precisa de nome e arquivo");
+      for (const DadosFonte& o : m.fontes)
+        if (o.nome == d.nome) falha("fontes: nome repetido " + d.nome);
+      m.fontes.push_back(std::move(d));
+    }
+    if (!tr.objeto()) return;
+    DadosTraducoes& t = m.traducoes;
+    for (const Json& i : tr["idiomas"].itens()) t.idiomas.push_back(i.str());
+    for (const auto& [chave, linha] : tr["textos"].campos()) {
+      std::vector<std::string> v;
+      for (const Json& x : linha.itens()) v.push_back(x.texto() ? x.str() : std::string());
+      if (v.size() > t.idiomas.size()) falha("traducoes: a chave " + chave + " tem mais textos que idiomas");
+      v.resize(t.idiomas.size());
+      t.chaves.push_back(chave);
+      t.textos.push_back(std::move(v));
+    }
+  }
+
   // ---- palco (docs/PALCO.md)
+
+  // tela (docs/NUCLEO.md "Tela"): a arte base (sem ela, a caixa do esqueleto), o encaixe e as
+  // ancoras, uma por osso
+  void ler_tela(const Json& j, const Json& esq) {
+    DadosTela& t = m.tela;
+    t.x = esq.num("x", 0);
+    t.y = esq.num("y", 0);
+    t.largura = esq.num("largura", 0);
+    t.altura = esq.num("altura", 0);
+    if (!j.objeto()) return;
+    t.existe = true;
+    if (const Json* a = j.acha("arte"); a && a->lista()) {
+      if (a->tamanho() != 4) falha("tela: arte e [x, y, largura, altura]");
+      t.x = (*a)[0].num(0), t.y = (*a)[1].num(0), t.largura = (*a)[2].num(0), t.altura = (*a)[3].num(0);
+    }
+    if (!(t.largura > 0) || !(t.altura > 0)) falha("tela: a arte base precisa de largura e altura (tela.arte ou esqueleto.largura e altura)");
+    const std::string enc = j.str("encaixe", "caber");
+    if (enc == "caber") t.encaixe = Encaixe::Caber;
+    else if (enc == "cobrir") t.encaixe = Encaixe::Cobrir;
+    else if (enc == "largura") t.encaixe = Encaixe::Largura;
+    else if (enc == "altura") t.encaixe = Encaixe::Altura;
+    else falha("tela: encaixe desconhecido " + enc);
+    for (const Json& a : j["ancoras"].itens()) {
+      DadosAncora d;
+      d.osso = osso(a["osso"], "tela.ancoras");
+      for (const DadosAncora& o : t.ancoras)
+        if (o.osso == d.osso) falha("tela.ancoras: osso repetido " + m.ossos[size_t(d.osso)].nome);
+      d.x = a["ancora"][0].num(0);
+      d.y = a["ancora"][1].num(0);
+      const std::string e = a.str("estica", "");
+      d.estica_x = e.find('x') != std::string::npos;
+      d.estica_y = e.find('y') != std::string::npos;
+      if (const Json* c = a.acha("cobre"); c && !c->nulo()) {
+        if (!c->lista() || c->tamanho() != 4) falha("tela.ancoras: cobre e [x, y, largura, altura] (" + m.ossos[size_t(d.osso)].nome + ")");
+        d.cobre = true;
+        d.cobre_x = (*c)[0].num(0), d.cobre_y = (*c)[1].num(0), d.cobre_largura = (*c)[2].num(0), d.cobre_altura = (*c)[3].num(0);
+        if (!(d.cobre_largura > 0) || !(d.cobre_altura > 0)) falha("tela.ancoras: cobre sem largura ou altura (" + m.ossos[size_t(d.osso)].nome + ")");
+        if (d.estica_x || d.estica_y) falha("tela.ancoras: cobre nao estica (" + m.ossos[size_t(d.osso)].nome + ")");
+      }
+      t.ancoras.push_back(d);
+    }
+    // na ordem dos ossos (pais antes de filhos): a correcao de um filho conta com a do pai
+    std::sort(t.ancoras.begin(), t.ancoras.end(), [](const DadosAncora& a, const DadosAncora& b) { return a.osso < b.osso; });
+  }
 
   void ler_palco(const Json& j) {
     if (!j.objeto()) return;
@@ -725,6 +857,8 @@ class Leitor {
 
   void ler_desenho(int idx, const Json& j) {
     Parte& p = m.partes[size_t(idx)];
+    // no texto, `cor` e a cor das letras (DadosTexto::cor), nao a tinta da parte
+    if (p.tipo == TipoParte::Texto) return;
     if (const Json* c = j.acha("cor"); c && c->texto()) p.cor = cor_hex(c->str());
     if (p.tipo == TipoParte::Recorte) {
       if (const Json* f = j.acha("fim"); f && f->texto()) p.fim = m.slot(f->str());
@@ -866,6 +1000,157 @@ class Leitor {
     }
   }
 
+  // ---- nove-fatias (docs/NUCLEO.md "Nove-fatias")
+
+  ModoFatia ler_modo_fatia(const std::string& nome, const std::string& v) {
+    if (v == "esticar" || v.empty()) return ModoFatia::Esticar;
+    if (v == "repetir") return ModoFatia::Repetir;
+    if (v == "repetir_caber") return ModoFatia::RepetirCaber;
+    falha("fatias de " + nome + ": eixo desconhecido " + v);
+  }
+
+  // as margens e os eixos; a regiao (tamanho, transformacao e o retangulo com pixels) como em
+  // cantos_regiao. O uv e o texto acompanhado vem depois (preparar_fatias)
+  void ler_fatias(Parte& p, const Json& j, const Json& f, int idx) {
+    DadosFatias d;
+    d.parte = idx;
+    d.esquerda = f.num("esquerda", 0);
+    d.cima = f.num("cima", 0);
+    d.direita = f.num("direita", 0);
+    d.baixo = f.num("baixo", 0);
+    if (!(d.esquerda >= 0 && d.cima >= 0 && d.direita >= 0 && d.baixo >= 0)) falha("fatias de " + p.nome + ": margem negativa");
+    d.eixo_x = ler_modo_fatia(p.nome, f.str("eixo_x", "esticar"));
+    d.eixo_y = ler_modo_fatia(p.nome, f.str("eixo_y", "esticar"));
+    d.largura = j.num("largura", 32);
+    d.altura = j.num("altura", 32);
+    d.x = j.num("x", 0);
+    d.y = j.num("y", 0);
+    d.rotacao = j.num("rotacao", 0);
+    d.escala_x = j.num("escala_x", 1);
+    d.escala_y = j.num("escala_y", 1);
+    d.p1x = d.largura;
+    d.p1y = d.altura;
+    d.caixa_l = f.num("largura", d.largura);
+    d.caixa_a = f.num("altura", d.altura);
+    if (!(d.caixa_l > 0) || !(d.caixa_a > 0)) falha("fatias de " + p.nome + ": a caixa precisa de largura e altura positivas");
+    auto it = imagens.find(j.str("caminho", p.nome));
+    if (it != imagens.end() && it->second.cortada && it->second.ow > 0 && it->second.oh > 0) {
+      const Imagem& g = it->second;
+      const double fx = d.largura / g.ow, fy = d.altura / g.oh;
+      d.p0x = g.ox * fx;
+      d.p0y = g.oy * fy;
+      d.p1x = d.p0x + g.rw * fx;
+      d.p1y = d.p0y + g.rh * fy;
+    }
+    if (const Json* a = f.acha("acompanha"); a && a->objeto()) {
+      const std::string sl = a->str("slot", "");
+      d.slot_texto = m.slot(sl);
+      if (d.slot_texto < 0) falha("fatias de " + p.nome + ": acompanha slot desconhecido " + sl);
+      const Json& r = (*a)["respiro"];
+      d.respiro_x = r.lista() ? r[size_t(0)].num(0) : 0;
+      d.respiro_y = r.lista() && r.tamanho() > 1 ? r[1].num(0) : d.respiro_x;
+    }
+    p.fatias = int(m.fatias.size());
+    m.fatias.push_back(d);
+  }
+
+  // depois das skins: o texto do slot acompanhado (a parte do setup, se e texto; senao a primeira
+  // parte de texto do slot)
+  void preparar_fatias() {
+    for (DadosFatias& d : m.fatias) {
+      if (d.slot_texto < 0) continue;
+      const DadosSlot& sl = m.slots[size_t(d.slot_texto)];
+      const std::string* setup = sl.parte_setup >= 0 ? &m.nomes_partes[size_t(sl.parte_setup)] : nullptr;
+      for (size_t k = 0; k < m.textos.size(); ++k) {
+        const Parte& pt = m.partes[size_t(m.textos[k].parte)];
+        if (pt.slot != d.slot_texto) continue;
+        if (d.texto < 0 || (setup && pt.nome == *setup)) d.texto = int(k);
+      }
+      if (d.texto < 0) falha("fatias de " + m.partes[size_t(d.parte)].nome + ": o slot acompanhado " + sl.nome + " nao tem parte de texto");
+    }
+  }
+
+  // ---- papeis (docs/NUCLEO.md "Papeis"): depois das animacoes (os estados) e dos textos
+  int texto_do_slot(int slot) const {
+    const DadosSlot& sl = m.slots[size_t(slot)];
+    const std::string* setup = sl.parte_setup >= 0 ? &m.nomes_partes[size_t(sl.parte_setup)] : nullptr;
+    int t = -1;
+    for (size_t k = 0; k < m.textos.size(); ++k) {
+      const Parte& pt = m.partes[size_t(m.textos[k].parte)];
+      if (pt.slot != slot) continue;
+      if (t < 0 || (setup && pt.nome == *setup)) t = int(k);
+    }
+    return t;
+  }
+  bool desce_de(int osso, int raiz) const {
+    for (int o = osso; o >= 0; o = m.ossos[size_t(o)].pai)
+      if (o == raiz) return true;
+    return false;
+  }
+  void ler_papeis(const Json& lista) {
+    static const char* const ESTADOS[4] = {"normal", "em_cima", "apertado", "desligado"};
+    int botoes = 0;
+    for (const Json& j : lista.itens()) {
+      DadosPapel d;
+      d.nome = j.str("nome", "");
+      if (d.nome.empty()) falha("papeis: papel sem nome");
+      if (m.papel(d.nome) >= 0) falha("papeis: nome repetido " + d.nome);
+      const std::string onde = "papel " + d.nome;
+      const std::string tipo = j.str("tipo", "");
+      if (tipo == "botao") d.tipo = TipoPapel::Botao;
+      else if (tipo == "toque") d.tipo = TipoPapel::Toque;
+      else if (tipo == "texto") d.tipo = TipoPapel::Texto;
+      else falha(onde + ": tipo desconhecido " + tipo);
+      if (const Json* sl = j.acha("slot"); sl && !sl->nulo()) d.slot = slot(*sl, onde.c_str());
+      if (d.tipo == TipoPapel::Texto) {
+        if (d.slot < 0) falha(onde + ": o texto precisa do slot");
+        d.texto = texto_do_slot(d.slot);
+        if (d.texto < 0) falha(onde + ": o slot " + m.slots[size_t(d.slot)].nome + " nao tem parte de texto");
+        m.papeis.push_back(std::move(d));
+        continue;
+      }
+      d.osso = osso(j["osso"], onde.c_str());
+      if (d.slot >= 0 && !desce_de(m.slots[size_t(d.slot)].osso, d.osso)) falha(onde + ": o slot " + m.slots[size_t(d.slot)].nome + " nao e do osso " + m.ossos[size_t(d.osso)].nome);
+      if (const Json* a = j.acha("area"); a && a->objeto()) {
+        if (const Json* c = a->acha("caixa"); c && c->lista()) {
+          if (c->tamanho() != 4) falha(onde + ": area.caixa e [x, y, largura, altura]");
+          d.tem_caixa = true;
+          d.caixa_x = (*c)[0].num(0), d.caixa_y = (*c)[1].num(0), d.caixa_l = (*c)[2].num(0), d.caixa_a = (*c)[3].num(0);
+          if (!(d.caixa_l > 0) || !(d.caixa_a > 0)) falha(onde + ": a caixa da area precisa de largura e altura positivas");
+        }
+        if (const Json* sl = a->acha("slot"); sl && !sl->nulo()) {
+          d.slot = slot(*sl, onde.c_str());
+          if (!desce_de(m.slots[size_t(d.slot)].osso, d.osso)) falha(onde + ": o slot " + m.slots[size_t(d.slot)].nome + " nao e do osso " + m.ossos[size_t(d.osso)].nome);
+        }
+      }
+      // a area: o slot dado, ou os slots do osso e dos filhos; as partes de texto so contam se o
+      // grupo nao tem outra (a caixa do texto do botao e a largura maxima dele, nao o botao)
+      if (d.slot >= 0) d.slots_area.push_back(d.slot);
+      else
+        for (int s = 0; s < int(m.slots.size()); ++s)
+          if (desce_de(m.slots[size_t(s)].osso, d.osso)) d.slots_area.push_back(s);
+      d.area_texto = true;
+      for (int s : d.slots_area)
+        for (const Parte& p : m.partes)
+          if (p.slot == s && (p.tipo == TipoParte::Regiao || p.tipo == TipoParte::Malha || p.tipo == TipoParte::MalhaLigada)) d.area_texto = false;
+      if (d.tipo == TipoPapel::Botao) {
+        if (const Json* es = j.acha("estados"); es && es->objeto())
+          for (int k = 0; k < 4; ++k)
+            if (const Json* a = es->acha(ESTADOS[k]); a && a->texto()) {
+              d.estados[k] = m.animacao(a->str());
+              if (d.estados[k] < 0) falha(onde + ": o estado " + ESTADOS[k] + " pede a animacao desconhecida " + a->str());
+            }
+        d.mix = j.num("mix", 0.1);
+        if (!(d.mix >= 0)) falha(onde + ": mix negativo");
+        d.trilha = int(j.num("trilha", 10 + botoes));
+        if (d.trilha < 0) falha(onde + ": trilha negativa");
+        ++botoes;
+      }
+      d.desligado = j.sim("desligado", false);
+      m.papeis.push_back(std::move(d));
+    }
+  }
+
   struct Ligacao {
     int parte, skin_fonte_nome, slot;
     std::string skin_fonte, fonte;
@@ -900,7 +1185,10 @@ class Leitor {
           p.slot = si;
           p.tipo = ler_tipo_parte(j.str("tipo", "regiao"));
           switch (p.tipo) {
-            case TipoParte::Regiao: cantos_regiao(p, j); break;
+            case TipoParte::Regiao:
+              cantos_regiao(p, j);
+              if (const Json* f = j.acha("fatias"); f && f->objeto()) ler_fatias(p, j, *f, int(m.partes.size()));
+              break;
             case TipoParte::Malha:
               ler_geometria(p, j, int(j["uvs"].tamanho() / 2));
               p.contorno = int(j.num("contorno", 0));
@@ -941,6 +1229,7 @@ class Leitor {
               p.py = j.num("y", 0);
               p.prot = j.num("rotacao", 0);
               break;
+            case TipoParte::Texto: ler_texto(p, j, int(m.partes.size())); break;
           }
           const int idx = int(m.partes.size());
           m.partes.push_back(std::move(p));
@@ -1499,6 +1788,21 @@ int Modelo::osso(std::string_view n) const {
   return -1;
 }
 
+int DadosTraducoes::chave(std::string_view c) const {
+  for (size_t i = 0; i < chaves.size(); ++i)
+    if (chaves[i] == c) return int(i);
+  return -1;
+}
+
+// o idioma pelo codigo: igual, ou so a lingua ("pt_BR" acha "pt")
+int DadosTraducoes::idioma(std::string_view c) const {
+  for (size_t i = 0; i < idiomas.size(); ++i)
+    if (idiomas[i] == c) return int(i);
+  const size_t corte = c.find_first_of("_-");
+  if (corte != std::string_view::npos) return idioma(c.substr(0, corte));
+  return -1;
+}
+
 int Modelo::slot(std::string_view n) const {
   for (size_t i = 0; i < slots.size(); ++i)
     if (slots[i].nome == n) return int(i);
@@ -1514,6 +1818,12 @@ int Modelo::animacao(std::string_view n) const {
 int Modelo::instancia(std::string_view n) const {
   for (size_t i = 0; i < instancias.size(); ++i)
     if (instancias[i].nome == n) return int(i);
+  return -1;
+}
+
+int Modelo::papel(std::string_view n) const {
+  for (size_t i = 0; i < papeis.size(); ++i)
+    if (papeis[i].nome == n) return int(i);
   return -1;
 }
 

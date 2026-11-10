@@ -92,6 +92,81 @@ dois lados são retos. `hd` (padrão 2) é quantos pixels de textura por pixel d
   { "nome": "brilho", "escondida": true, ... } ] } }
 ```
 
+Tela (o boneco inteiro como a tela de um jogo; a conta em docs/NUCLEO.md, "Tela"):
+
+```jsonc
+"tela": { "arte": [-350, 0, 700, 1370], "encaixe": "caber",          // caber, cobrir, largura, altura
+          "ancoras": [ { "osso": "placar", "ancora": [0.5, 0] },       // x: 0 esquerda, 1 direita; y: 0 em cima, 1 embaixo
+                       { "osso": "barra", "ancora": [0.5, 0], "estica": "x" },     // estica: x, y ou xy
+                       { "osso": "cenario", "ancora": [0.5, 1], "cobre": [-1103, 0, 2205, 2975] } ] }
+                       // cobre: a caixa (mundo da arte base) que o osso escala por igual, em volta dele, ate
+                       // cobrir a janela (nunca menos que 1); nao combina com estica
+```
+
+No JSON do editor: `screen: { art, fit: contain|cover|width|height, anchors: [{ bone, anchor, stretch }] }`.
+A ida e volta pelo texto, pelo binário (`tools/nucleo-tela.ts`) e pelo JSON do editor
+(`tests/features.ts`) devolvem o mesmo bloco.
+
+Texto (a parte de texto, as fontes e a tabela de idiomas; a conta e o desenho em docs/NUCLEO.md,
+"Texto"):
+
+```jsonc
+"skins": [ { "nome": "default", "partes": { "jogar": { "jogar": {
+    "tipo": "texto", "x": 0, "y": 6, "largura": 250, "altura": 60,        // a caixa no osso do slot (o meio em x, y)
+    "chave": "JOGAR", "texto": "JOGAR",                                  // a chave na tabela; o texto livre vale sem ela
+    "familia": "kenney", "tamanho": 40, "minimo": 24, "cor": "ffffffff",
+    "alinhar": "centro", "alinhar_v": "meio", "estouro": "encolher",     // esquerda|centro|direita; cima|meio|baixo; encolher|quebrar|cortar|nada
+    "linha": { "largura": 3, "cor": "1d7a4aff" }, "sombra": { "cor": "1d7a4aff", "x": 0, "y": 3 } } } } } ],
+"fontes": [ { "nome": "kenney", "arquivo": "kenney/kenney-future.ttf" },      // ao lado do .boneco; a primeira e a padrao,
+            { "nome": "arabe", "arquivo": "fontes/NotoSansArabic-Bold.ttf" } ], // as outras sao reserva das letras que faltam
+"traducoes": { "idiomas": ["pt", "en", "ar", "hi"],
+               "textos": { "JOGAR": ["JOGAR", "PLAY", "العب", "खेलें"], "MOEDAS": ["{n} moedas", "{n} coins", "{n} عملات", "{n} सिक्के"] } }
+```
+
+No JSON do editor: a parte `{type: "text", width, height, string, key, font, size, minSize, color,
+align: left|center|right, valign: top|middle|bottom, overflow: shrink|wrap|clip|none, outline: {width,
+color}, shadow: {color, x, y}}`, `fonts: [{name, file}]` e `translations: {languages, strings}`. A tabela
+importa e exporta o `translations.csv` do Godot (`keys,pt,en,...`). Na parte de texto, `cor` é a cor das
+letras (não a tinta da parte; a do slot continua multiplicando). A exportação para o Spine tira as partes
+de texto (o slot fica sem a parte), as fontes e a tabela, com aviso. A ida e volta pelo texto, pelo
+binário e pelo JSON do editor: `tests/features.ts` e `tools/nucleo-texto.ts`.
+
+Nove-fatias (a região cortada por 4 margens em 9 pedaços: os cantos não esticam; a conta em
+docs/NUCLEO.md, "Nove-fatias"):
+
+```jsonc
+"painel": { "painel": { "largura": 200, "altura": 160,
+    "fatias": { "esquerda": 40, "cima": 30, "direita": 50, "baixo": 20,     // nas unidades da parte
+                "eixo_x": "esticar", "eixo_y": "repetir" } } },              // esticar|repetir|repetir_caber
+"fundo_botao": { "botao": { "largura": 192, "altura": 64,                // a imagem
+    "fatias": { "largura": 260, "altura": 90,                                 // a caixa (padrao: a imagem)
+                "esquerda": 16, "cima": 14, "direita": 16, "baixo": 20,
+                "acompanha": { "slot": "jogar", "respiro": [36, 14] } } } }  // cresce com o texto do slot
+```
+
+No JSON do editor: `slice: {width, height, left, top, right, bottom, axisX, axisY: stretch|tile|tileFit, fitText: {slot,
+padding}}` na região. A exportação para o Spine tira as `fatias`, com aviso: a região sai inteira, esticada para a
+caixa. A ida e volta pelo texto e pelo binário: `tools/nucleo-fatias.ts`; pelo JSON do editor:
+`tests/features.ts`.
+
+Papéis (o que cada elemento é para o código do jogo; docs/NUCLEO.md, "Papeis"), no topo:
+
+```jsonc
+"papeis": [
+  { "nome": "jogar", "tipo": "botao", "osso": "botao", "area": { "slot": "botao" },
+    "estados": { "normal": "jogar/normal", "em_cima": "jogar/em_cima",
+                 "apertado": "jogar/apertado", "desligado": "jogar/desligado" },
+    "mix": 0.12 },                                                  // trilha: 10 + a ordem
+  { "nome": "fundo", "tipo": "toque", "osso": "fundo", "area": { "caixa": [0, 685, 700, 1370] } },
+  { "nome": "placar", "tipo": "texto", "slot": "pontos" }
+]
+```
+
+No JSON do editor: `roles: [{name, type: button|touch|text, bone, slot, area: {slot, box}, states: {normal,
+hover, pressed, disabled}, mix, track, disabled}]`. A exportação para o Spine tira os papéis, com aviso (as
+animações dos estados ficam). A ida e volta pelo texto, pelo binário e pelo JSON do editor:
+`tests/features.ts`; o núcleo: `tools/nucleo-papeis.ts`.
+
 Malha mole: a parte `malha` pode ter `geleia` (`rigidez`, `contagio`, `amortecimento`,
 `gravidade`, `massa`, `moleza` por vértice e os slots que `seguem`); a conta está em
 docs/NUCLEO.md, "Geleia". A exportação para o Spine a tira, com aviso (a malha fica dura).
@@ -121,6 +196,10 @@ descobre se há pesos comparando tamanhos. Sem pesos: `vertices` como no Spine.
 | Partículas | não existem | `particulas` (emissores presos a ossos) e `particulas` na animação (taxa e rajadas); docs/NUCLEO.md, "Partículas" | brilho de prêmio, moedas, faíscas, sem vídeo nem nó à parte no jogo; a exportação para o Spine as tira e avisa |
 | Instâncias | não existem | `instancias` (um `.boneco` dentro de outro, preso a slot e osso) e `instancias` na animação (troca animação e tempo); docs/NUCLEO.md, "Instâncias" | repetir uma peça animada (letras, multidão), compor cenas; o filho é lido uma vez e dividido; a exportação para o Spine as tira e avisa |
 | Mosaico | não existe | `mosaicos`: grade de imagens do atlas presa a um slot (grade, iso ou perspectiva forçada), com cor, altura, giro, espelho e efeitos por célula; docs/NUCLEO.md, "Mosaico" | mapas, chão e paredes sem uma parte por ladrilho; a exportação para o Spine os tira e avisa |
+| Tela | não existe | `tela`: a arte base, o encaixe numa janela de outro tamanho (caber, cobrir, largura, altura) e os ossos presos a pontos da janela, com esticar; docs/NUCLEO.md, "Tela" | montar a tela de um jogo (placar no topo, botão no rodapé, painel ao lado no desktop) sem Godot; a exportação para o Spine a tira e avisa (os ossos ficam no lugar da arte base) |
+| Texto | não existe | parte `texto` (caixa no osso, chave de tradução ou texto livre, fonte, tamanho, cor, alinhamento, estouro), `fontes` e `traducoes` (a tabela de idiomas, o `translations.csv` do Godot); docs/NUCLEO.md, "Texto" | placar, botões e painéis em 12 idiomas sem uma imagem por idioma; o jogo troca o texto pelo nome; a exportação para o Spine o tira e avisa |
+| Nove-fatias | não existe | `fatias` na região: 4 margens, esticar ou repetir o miolo, e `acompanha` (a caixa cresce com o texto de um slot); docs/NUCLEO.md, "Nove-fatias" | painel, barra e botão que esticam com a janela ou com o texto sem deformar as bordas; a exportação para o Spine as tira e avisa (a região inteira, igual no tamanho base) |
+| Papéis | não existe | `papeis`: botão (área de toque com os estados normal, em cima, apertado e desligado, cada um uma animação), toque e texto do código, pelo nome; docs/NUCLEO.md, "Papeis" | o código do jogo acha cada elemento pelo nome e o toque é o mesmo no Godot e na web; a exportação para o Spine os tira e avisa |
 | Binário | `.skel` fechado | `.bonecob`, especificado aqui | carregar rápido no jogo |
 
 Fora do v0, por não aparecerem em nenhum dos 102 assets: slider, sequência de imagens, cor

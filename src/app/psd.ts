@@ -40,7 +40,8 @@ export function suggestDir(name: string): string {
 }
 
 // mapa: caminho de um .json (ou o objeto) com tags e ossos que o PSD nao traz (docs/RIGAR.md)
-export async function createFromPsd(p: { psd: string; dir: string; name: string; ignoreHidden?: boolean; mapa?: string | object }): Promise<PsdImportResult> {
+// tela (docs/LAYOUT-PSD.md): true, ou as escolhas sobre a proposta ({off, on, change, art, fit})
+export async function createFromPsd(p: { psd: string; dir: string; name: string; ignoreHidden?: boolean; mapa?: string | object; tela?: boolean | object }): Promise<PsdImportResult> {
   if (app.doc?.dirty) throw new Error(`${app.asset?.name} tem alterações não salvas. Salve (Ctrl+S) ou descarte antes de importar.`);
   const j = await post("/api/psd/create", p);
   await app.loadAssets(true);
@@ -48,7 +49,7 @@ export async function createFromPsd(p: { psd: string; dir: string; name: string;
   if (!a) throw new Error(`Personagem criado em ${j.tres}, mas essa pasta não está entre as que o editor procura. Crie dentro de uma delas, ou acrescente a pasta em MAMULENGO_ROOTS e reinicie o editor.`);
   await app.open(a);
   app.viewer?.frameAll();
-  app.log({ label: `PSD: personagem ${a.name} criado (${j.report.added.length} imagens)`, source: "ui", kind: "info", ops: 0 });
+  app.log({ label: `PSD: ${p.tela ? "tela" : "personagem"} ${a.name} criado (${j.report.added.length} imagens)`, source: "ui", kind: "info", ops: 0 });
   return { mode: "create", summary: j.summary, report: j.report, plan: j.plan, asset: `${a.project}/${a.name}`, saved: true };
 }
 
@@ -76,4 +77,15 @@ export async function updateFromPsd(p: { psd: string; ignoreHidden?: boolean; ma
   if (doc.dirty) await app.save();
   app.log({ label: `PSD: ${app.asset?.name} atualizado`, source, kind: "info", ops: 0 });
   return { mode: "update", summary: psdSummary(j.plan, report, "update"), report, plan: j.plan, asset: app.asset ? `${app.asset.project}/${app.asset.name}` : undefined, saved: changed };
+}
+
+// A proposta da tela (sem mudar nada): o que cada camada vira, com o porque
+export interface PropostaResult {
+  proposta: import("../core/psd-tela.ts").PropostaTela;
+  linhas: string[];
+  mapa: object;
+  mapaArquivo: string | null;
+}
+export async function proposeScreen(p: { psd: string; mapa?: string | object; escolhas?: object }): Promise<PropostaResult> {
+  return post("/api/psd/tela", p);
 }

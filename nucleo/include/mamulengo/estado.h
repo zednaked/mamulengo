@@ -118,6 +118,11 @@ class Estado {
   // a cada conta), como um runtime que guarda o tempo em float; o oraculo usa double
   bool relogio_float = false;
   double f32(double x) const { return relogio_float ? double(float(x)) : x; }
+  // regra de mistura do spine-godot (um 4.3 mais antigo que o oraculo): a propriedade que uma
+  // entrada mais antiga (de qualquer trilha) ja anima mistura com Substitui (Soma se a entrada
+  // soma), tambem na trilha 0; desligada, a mistura da trilha (docs/NUCLEO.md "Estado").
+  // Mudar no meio de um mix so vale no proximo recalculo dos modos (inicio ou fim de entrada)
+  bool mix_spine_godot = false;
 
   // corta o que a trilha toca e toca a animacao (com o mix de-para)
   Entrada* tocar(int trilha, int animacao, bool loop);

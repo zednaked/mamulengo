@@ -2,7 +2,7 @@
 // zero exercitando os comandos e confere, a cada etapa, que o runtime oficial le e
 // toca o resultado. Desfazer tudo volta ao documento inicial.
 //   npx tsx tests/features.ts
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import sharp from "sharp";
@@ -829,6 +829,244 @@ runtimeOk("constraints");
       `luzes: light.set, key.set (chave completa), ambient.set, osso renomeado, light.delete ${JSON.stringify({ kl, ka })}${erroSpine ? ` (spine-core: ${erroSpine})` : ""}`,
     );
     await run("animation.delete", { name: "t.luzes" });
+  }
+
+  // tela: screen.set (arte base e encaixe), anchor.set (ponto, esticar e deslocamento que muda o
+  // setup), query.screen, o osso renomeado acompanha, a ida e volta pelo .boneco e a saida para o
+  // Spine (fica de fora com aviso); o spine-core segue lendo
+  {
+    const osso = doc.json.bones[1].name;
+    const antes = structuredClone(doc.json.bones[1]);
+    await run("screen.set", { size: [700, 1370], fit: "cover" });
+    await run("anchor.set", { bone: osso, anchor: "top", offset: [0, 40] });
+    const w = boneWorld(skeletonAt(doc.json, null, 0), osso);
+    const q1 = await run("query.screen");
+    await run("anchor.set", { bone: osso, stretch: "x" });
+    const q2 = await run("query.screen");
+    await run("bone.rename", { bone: osso, to: "t.osso" });
+    const seguiu = doc.json.screen.anchors[0].bone === "t.osso";
+    await run("bone.rename", { bone: "t.osso", to: osso });
+    const sp = await import("../src/boneco/spine.ts");
+    const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+    const t = bo.tela;
+    const volta = sp.exportarSpine(bo).json;
+    const so = sp.exportarSpine(bo, { soSpine: true });
+    runtimeOk("tela e ancoras");
+    await run("anchor.set", { bone: osso, off: true });
+    const solto = !doc.json.screen.anchors;
+    await run("screen.set", { off: true });
+    await run("bone.set", { bone: osso, x: antes.x ?? 0, y: antes.y ?? 0 });
+    check(
+      Math.abs(w.x) < 1e-3 && Math.abs(w.y - 1330) < 1e-3 && q1.anchors[0].name === "top" && q1.anchors[0].offset[0] === 0 && q1.anchors[0].offset[1] === 40 &&
+        q2.anchors[0].offset[0] === null && q2.anchors[0].stretch === "x" && seguiu &&
+        t?.encaixe === "cobrir" && JSON.stringify(t?.arte) === "[-350,0,700,1370]" && t?.ancoras?.[0]?.osso === osso && JSON.stringify(t?.ancoras?.[0]?.ancora) === "[0.5,0]" && t?.ancoras?.[0]?.estica === "x" &&
+        JSON.stringify(volta.screen) === JSON.stringify({ art: [-350, 0, 700, 1370], fit: "cover", anchors: [{ bone: osso, anchor: [0.5, 0], stretch: "x" }] }) &&
+        !so.json.screen && so.avisos.some((a) => a.includes("tela")) && solto && !doc.json.screen,
+      `tela: screen.set, anchor.set (ponto, offset, stretch), query.screen, osso renomeado, ida e volta no .boneco, Spine sem a tela ${JSON.stringify({ w: [w.x, w.y], q1: q1.anchors, t })}`,
+    );
+  }
+
+  // cobrir sem deformar (docs/NUCLEO.md "Tela", `cobre`): anchor.set cover true (a caixa das partes
+  // do grupo no setup), cover [x, y, l, a], cover com stretch e erro, stretch depois tira o cover,
+  // query.screen, a ida e volta pelo .boneco (`cobre`) e o nucleo escalando por igual numa janela 16:9
+  {
+    const raiz = doc.json.bones[0].name;
+    await run("screen.set", { size: [700, 1370], fit: "contain" });
+    const r1 = await run("anchor.set", { bone: raiz, anchor: "bottom", cover: true });
+    const q = await run("query.screen");
+    const r2 = await run("anchor.set", { bone: raiz, cover: [-400, 0, 800, 1500] });
+    let erro = "";
+    try {
+      await run("anchor.set", { bone: raiz, cover: [-400, 0, 800, 1500], stretch: "x" });
+    } catch (e: any) {
+      erro = String(e.message ?? e);
+    }
+    const sp = await import("../src/boneco/spine.ts");
+    const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+    const volta = sp.exportarSpine(bo).json;
+    const r3 = await run("anchor.set", { bone: raiz, stretch: "x" });
+    await run("anchor.set", { bone: raiz, off: true });
+    await run("screen.set", { off: true });
+    check(
+      Array.isArray(r1.cover) && r1.cover[2] > 0 && r1.cover[3] > 0 && JSON.stringify(q.anchors[0].cover) === JSON.stringify(r1.cover) &&
+        JSON.stringify(r2.cover) === "[-400,0,800,1500]" && erro.includes("nao estica") &&
+        JSON.stringify(bo.tela?.ancoras?.[0]?.cobre) === "[-400,0,800,1500]" && JSON.stringify(volta.screen.anchors[0].cover) === "[-400,0,800,1500]" &&
+        r3.cover === null && r3.stretch === "x" && !doc.json.screen,
+      `tela: cobrir sem deformar (anchor.set cover) ${JSON.stringify({ r1, r2, erro, t: bo.tela, r3 })}`,
+    );
+  }
+
+  // texto com traducao (docs/NUCLEO.md "Texto"): font.add, i18n.set (idiomas, chave, renomear),
+  // i18n.import (o translations.csv do Godot, com aspas e virgulas), text.set (cria o slot no osso,
+  // chave, parametros, estouro), query.texts (o estouro medido pela fonte, por idioma), i18n.export,
+  // a ida e volta pelo .boneco (texto e binario pelo nucleo) e a saida para o Spine (sem o texto, com
+  // aviso); o spine-core segue lendo
+  {
+    const n0 = doc.history().length;
+    const osso = doc.json.bones[1].name;
+    const fonte = resolve("exemplos/ui/fontes/kenney-future.ttf");
+    await run("font.add", { name: "kenney", file: fonte });
+    await run("i18n.set", { languages: ["pt", "en", "ar"] });
+    await run("i18n.set", { key: "JOGAR", values: { pt: "JOGAR", en: "PLAY", ar: "العب" } });
+    await run("i18n.set", { key: "SALDO", values: { pt: "Saldo {valor}", en: "Balance {valor}" } });
+    const imp = await run("i18n.import", { csv: 'keys,pt,en,hi\nMISSOES,"MISSÕES, hoje",MISSIONS,मिशन\nLONGO,ESTE TEXTO E COMPRIDO DEMAIS PARA A CAIXA,short,\n' });
+    await run("i18n.set", { key: "LONGO", rename: "LONGA" });
+    const t1 = await run("text.set", { slot: "t.jogar", bone: osso, key: "JOGAR", text: "JOGAR", font: "kenney", size: 40, width: 300, height: 60, color: "ffffff", outline: { width: 3, color: "1d7a4a" } });
+    await run("text.set", { slot: "t.longo", bone: osso, key: "LONGA", size: 40, width: 200, height: 50, overflow: "shrink", minSize: 30, align: "left" });
+    await run("text.set", { slot: "t.livre", bone: osso, text: "1250", size: 30, width: 120, height: 40, overflow: "wrap", valign: "top" });
+    let erroChave = "";
+    try {
+      await run("text.set", { slot: "t.livre", key: "NAO_HA" });
+    } catch (e: any) {
+      erroChave = String(e.message);
+    }
+    const q = await run("query.texts", {});
+    const exp = await run("i18n.export");
+    const tab = doc.json.translations;
+    const longo = q.texts.find((x: any) => x.slot === "t.longo");
+    const jogar = q.texts.find((x: any) => x.slot === "t.jogar");
+    const { textoNoIdioma } = await import("../src/core/texto.ts");
+    const param = textoNoIdioma({ key: "SALDO" }, tab, "en", { valor: "$ 5" });
+    const falta = textoNoIdioma({ key: "SALDO", string: "Saldo" }, tab, "ar", { valor: 7 });
+    runtimeOk("textos");
+    const sp = await import("../src/boneco/spine.ts");
+    const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+    const pt = bo.skins[0].partes["t.jogar"]["t.jogar"];
+    const volta = sp.exportarSpine(bo).json;
+    const so = sp.exportarSpine(bo, { soSpine: true });
+    // o nucleo le o .boneco com textos, em texto e em binario (a mesma arvore)
+    const { spawnSync } = await import("node:child_process");
+    const arq = join(dir, "textos.boneco");
+    writeFileSync(arq, JSON.stringify(bo));
+    const bin = spawnSync(resolve("nucleo/build/nucleo-binario"), [arq, join(dir, "textos.bin.boneco")], { encoding: "utf8" });
+    const pose = spawnSync(resolve("nucleo/build/nucleo-pose"), [join(dir, "textos.bin.boneco"), "-", "0"], { encoding: "utf8" });
+    while (doc.history().length > n0) doc.undo();
+    check(
+      t1.bone === osso && pt.tipo === "texto" && pt.chave === "JOGAR" && pt.familia === "kenney" && pt.linha?.largura === 3 && pt.linha?.cor === "1d7a4aff" && pt.cor === undefined &&
+        bo.traducoes?.idiomas?.join() === "pt,en,ar,hi" && bo.traducoes.textos.JOGAR[2] === "العب" && bo.fontes?.[0]?.nome === "kenney" &&
+        JSON.stringify(volta.skins) === JSON.stringify(sp.exportarSpine(sp.importarSpine(volta, atlasText, "t")).json.skins) &&
+        JSON.stringify(volta.translations) === JSON.stringify(tab) && JSON.stringify(volta.fonts) === JSON.stringify([{ name: "kenney", file: fonte }]) &&
+        imp.imported === 2 && tab.strings.MISSOES[0] === "MISSÕES, hoje" && tab.strings.MISSOES[3] === "मिशन" && "LONGA" in tab.strings && !("LONGO" in tab.strings) &&
+        exp.csv.startsWith("keys,pt,en,ar,hi\n") && exp.csv.includes('"MISSÕES, hoje"') &&
+        erroChave.includes("chave desconhecida") && param === "Balance $ 5" && falta === "Saldo" &&
+        longo.languages.pt.overflows && longo.languages.pt.size === 30 && !longo.languages.en.overflows && !jogar.languages.pt.overflows && q.overflowing.includes("t.longo:pt") &&
+        q.missing.includes("SALDO:ar") && q.measured.startsWith("aproximada") &&
+        !JSON.stringify(so.json.skins).includes('"text"') && so.avisos.some((a) => a.includes("textos")) && !so.json.translations &&
+        bin.status === 0 && pose.status === 0 && !doc.json.translations && !doc.json.fonts && !doc.json.slots.some((x: any) => x.name === "t.jogar"),
+      `textos: font.add, i18n.set/import/export (CSV do Godot), text.set (chave, contorno, estouro), query.texts, ida e volta no .boneco e no nucleo, Spine sem os textos ${JSON.stringify({ longo: longo?.languages, imp, bin: bin.stderr, pose: pose.stderr?.slice(0, 200) })}`,
+    );
+  }
+
+  // nove-fatias (docs/NUCLEO.md "Nove-fatias"): slice.set (margens, eixos, acompanhar o texto de um
+  // slot), os erros (parte que nao e regiao, slot sem texto), query.slices, renomear e apagar o slot do
+  // texto acompanham, a ida e volta pelo .boneco (texto e binario pelo nucleo, que faz a grade) e a
+  // saida para o Spine (a regiao inteira, com aviso); o spine-core segue lendo
+  {
+    const n0 = doc.history().length;
+    const sk = doc.json.skins[0];
+    const alvo = doc.json.slots.find((x: any) => x.attachment && (sk.attachments?.[x.name]?.[x.attachment]?.type ?? "region") === "region");
+    const reg = sk.attachments[alvo.name][alvo.attachment];
+    await run("text.set", { slot: "t.rotulo", bone: alvo.bone, text: "JOGAR", size: 30, width: 300, height: 50 });
+    const r1 = await run("slice.set", { slot: alvo.name, margins: 4, right: 6, axisX: "tile", fitText: { slot: "t.rotulo", padding: [10, 4] } });
+    const r2 = await run("slice.set", { slot: alvo.name, axisY: "tileFit", size: [(reg.width ?? 32) * 2, reg.height ?? 32] });
+    const erros: string[] = [];
+    for (const args of [{ slot: "t.rotulo", margins: 2 }, { slot: alvo.name, fitText: { slot: alvo.name } }, { slot: alvo.name, fitText: { slot: doc.json.slots[0].name === alvo.name ? doc.json.slots[1].name : doc.json.slots[0].name } }])
+      try {
+        await run("slice.set", args);
+      } catch (err: any) {
+        erros.push(String(err.message));
+      }
+    const q = await run("query.slices");
+    await run("slot.rename", { slot: "t.rotulo", to: "t.rotulo2" });
+    const seguiu = reg.slice?.fitText?.slot === "t.rotulo2" || doc.json.skins[0].attachments[alvo.name][alvo.attachment].slice.fitText.slot === "t.rotulo2";
+    runtimeOk("nove-fatias");
+    const sp = await import("../src/boneco/spine.ts");
+    const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+    const pb = bo.skins[0].partes[alvo.name][alvo.attachment];
+    const volta = sp.exportarSpine(bo).json;
+    const so = sp.exportarSpine(bo, { soSpine: true });
+    const { spawnSync } = await import("node:child_process");
+    const arq = join(dir, "fatias.boneco");
+    writeFileSync(arq, JSON.stringify(bo));
+    const bin = spawnSync(resolve("nucleo/build/nucleo-binario"), [arq, join(dir, "fatias.bin.boneco")], { encoding: "utf8" });
+    const pose = spawnSync(resolve("nucleo/build/nucleo-pose"), [join(dir, "fatias.bin.boneco"), "-", "0", "--fatias", "--texto", "0:400x40"], { encoding: "utf8" });
+    const grade = JSON.parse(/^fatias (.*)$/m.exec(pose.stderr ?? "")?.[1] ?? "{}")[alvo.name];
+    await run("slot.delete", { slot: "t.rotulo2" });
+    const solto = !doc.json.skins[0].attachments[alvo.name][alvo.attachment].slice.fitText;
+    await run("slice.set", { slot: alvo.name, off: true });
+    const tirou = !doc.json.skins[0].attachments[alvo.name][alvo.attachment].slice;
+    while (doc.history().length > n0) doc.undo();
+    check(
+      JSON.stringify(r1.slice) === JSON.stringify({ left: 4, top: 4, right: 6, bottom: 4, axisX: "tile", fitText: { slot: "t.rotulo", padding: [10, 4] } }) && r2.slice.axisY === "tileFit" && r2.slice.axisX === "tile" && r2.slice.width === (reg.width ?? 32) * 2 && r2.slice.height === (reg.height ?? 32) &&
+        erros.length === 3 && erros[0].includes("so em regiao") && erros[1].includes("noutro slot") && erros[2].includes("nao tem parte de texto") &&
+        q.slices.length === 1 && q.slices[0].slot === alvo.name && q.slices[0].axis.join() === "tile,tileFit" && seguiu &&
+        JSON.stringify(pb.fatias) === JSON.stringify({ largura: (reg.width ?? 32) * 2, altura: reg.height ?? 32, esquerda: 4, cima: 4, direita: 6, baixo: 4, eixo_x: "repetir", eixo_y: "repetir_caber", acompanha: { slot: "t.rotulo2", respiro: [10, 4] } }) &&
+        JSON.stringify(volta.skins) === JSON.stringify(sp.exportarSpine(sp.importarSpine(volta, atlasText, "t")).json.skins) &&
+        !JSON.stringify(so.json.skins).includes('"slice"') && so.avisos.some((a) => a.includes("nove-fatias")) &&
+        bin.status === 0 && pose.status === 0 && grade?.largura === Math.max(420, (reg.width ?? 32) * 2) && grade.nx >= 4 && solto && tirou && !doc.json.slots.some((x: any) => x.name === "t.rotulo"),
+      `nove-fatias: slice.set (margens, eixos, fitText), erros, query.slices, slot renomeado e apagado, ida e volta no .boneco e no nucleo (a caixa acompanha o texto), Spine sem as fatias ${JSON.stringify({ r1: r1.slice, erros, pb: pb?.fatias, grade: grade && { ...grade, uvs: undefined, triangulos: undefined }, pose: pose.stderr?.slice(0, 200) })}`,
+    );
+  }
+
+  // papeis (docs/NUCLEO.md "Papeis"): role.set (botao com os estados padrao, toque com caixa, texto do
+  // codigo), os erros, role.auto pelos nomes, query.roles (o manifesto), renomear a animacao e o slot
+  // acompanham, a ida e volta pelo .boneco (texto e binario pelo nucleo, que acha o papel no ponto) e o
+  // Spine sem os papeis
+  {
+    const n0 = doc.history().length;
+    const sk = doc.json.skins[0];
+    const alvo = doc.json.slots.find((x: any) => x.attachment && (sk.attachments?.[x.name]?.[x.attachment]?.type ?? "region") === "region");
+    await run("text.set", { slot: "t.rotulo", bone: alvo.bone, text: "1250", size: 30, width: 300, height: 50 });
+    await run("text.set", { slot: "txt_saldo", bone: alvo.bone, text: "Saldo {valor}", size: 20, width: 200, height: 30 });
+    const b1 = await run("role.set", { name: "t.jogar", type: "button", bone: alvo.bone, area: { slot: alvo.name }, defaultStates: true, mix: 0.2 });
+    const b2 = await run("role.set", { name: "t.area", type: "touch", bone: alvo.bone, area: { box: [0, 0, 40, 30] } });
+    const b3 = await run("role.set", { name: "t.placar", type: "text", slot: "t.rotulo" });
+    const erros: string[] = [];
+    for (const args of [{ name: "t.x", type: "text", slot: alvo.name }, { name: "t.jogar", states: { hover: "nao.ha" } }, { name: "t.y" }, { name: "t.z", type: "button", bone: doc.json.bones[0].name, area: { box: [0, 0, 0, 4] } }])
+      try {
+        await run("role.set", args);
+      } catch (err: any) {
+        erros.push(String(err.message));
+      }
+    const auto = await run("role.auto", {});
+    const man = (await run("query.roles", {})).manifest;
+    await run("animation.rename", { name: "t.jogar/em_cima", to: "t.jogar/hover" });
+    await run("slot.rename", { slot: "t.rotulo", to: "t.rotulo2" });
+    const roles = structuredClone(doc.json.roles);
+    runtimeOk("papeis");
+    const sp = await import("../src/boneco/spine.ts");
+    const bo = sp.importarSpine(structuredClone(doc.json), atlasText, "t");
+    const volta = sp.exportarSpine(bo).json;
+    const so = sp.exportarSpine(bo, { soSpine: true });
+    const { spawnSync } = await import("node:child_process");
+    const arq = join(dir, "papeis.boneco");
+    writeFileSync(arq, JSON.stringify(bo));
+    const bin = spawnSync(resolve("nucleo/build/nucleo-binario"), [arq, join(dir, "papeis.bin.boneco")], { encoding: "utf8" });
+    const ler = (extra: string[]) => {
+      const r = spawnSync(resolve("nucleo/build/nucleo-pose"), [join(dir, "papeis.bin.boneco"), "-", "0", "--papeis", ...extra], { encoding: "utf8" });
+      return JSON.parse(/^papeis (.*)$/m.exec(r.stderr ?? "")?.[1] ?? "null");
+    };
+    const areas = ler([])?.areas ?? {};
+    const tri = areas["t.jogar"] ?? [];
+    const meio = tri.length >= 6 ? [(tri[0] + tri[2] + tri[4]) / 3, (tri[1] + tri[3] + tri[5]) / 3] : [0, 0];
+    const toques = ler(["--toque", `${meio[0]},${meio[1]}`, "--toque", "1e6,1e6"])?.toques;
+    await run("slot.delete", { slot: "t.rotulo2" });
+    const apagou = !(doc.json.roles ?? []).some((r: any) => r.name === "t.placar") && doc.json.roles.length === 2;
+    while (doc.history().length > n0) doc.undo();
+    const pa = bo.papeis ?? [];
+    check(
+      b1.role.states.hover === "t.jogar/em_cima" && b1.role.mix === 0.2 && b2.role.area.box.join() === "0,0,40,30" && b3.role.slot === "t.rotulo" &&
+        erros.length === 4 && erros[0].includes("nao tem parte de texto") && erros[1].includes("animacao desconhecida") && erros[2].includes("diga o type") && erros[3].includes("largura e altura") &&
+        auto.proposed.some((r: any) => r.name === "saldo" && r.type === "text" && r.slot === "txt_saldo") &&
+        man.botoes[0].nome === "t.jogar" && man.botoes[0].estados.em_cima === "t.jogar/em_cima" && man.botoes[0].trilha === 10 && man.toques[0].nome === "t.area" &&
+        man.textos.some((t: any) => t.nome === "t.placar" && t.doCodigo && t.texto === "1250") && man.textos.some((t: any) => t.slot === "txt_saldo" && t.parametros.join() === "valor") &&
+        !man.estados.some((e: any) => e.nome.startsWith("t.jogar/")) &&
+        roles[0].states.hover === "t.jogar/hover" && roles[2].slot === "t.rotulo2" &&
+        pa[0]?.tipo === "botao" && pa[0].estados?.em_cima === "t.jogar/hover" && pa[1]?.area?.caixa?.length === 4 && pa[2]?.tipo === "texto" &&
+        JSON.stringify(volta.roles) === JSON.stringify(roles) && !so.json.papeis && !so.json.roles && so.avisos.some((a) => a.includes("papeis")) &&
+        bin.status === 0 && tri.length >= 6 && areas["t.area"]?.length === 12 && toques?.[0] >= 0 && toques?.[1] === -1 && apagou,
+      `papeis: role.set (botao, toque, texto), erros, role.auto, query.roles, renomear acompanha, ida e volta no .boneco e no nucleo (toque), Spine sem os papeis ${JSON.stringify({ b1: b1.role, erros, auto: auto.proposed, roles, pa, toques, bin: bin.stderr })}`,
+    );
   }
 
   // instancias: instance.set cria e muda, key.set (chave em degrau com animacao, inicio,
@@ -2491,6 +2729,88 @@ runtimeOk("remocoes (slot, osso com pesos)");
     check(r.status === 0 && faixas.includes("audio") && Math.abs(fim - ab) < 0.05, `vinheta: o post leva o som do video (${faixas.join("+")}), comecando no fim da abertura (${fim.toFixed(3)} s, abertura ${ab.toFixed(3)} s)`);
     rmSync(vd, { recursive: true, force: true });
   }
+}
+
+// o PSD como tela (docs/LAYOUT-PSD.md; tests/assets/psd/tela.psd, a tela de exemplos/coelho em camadas, o menu,
+// gerada por tools/psd-tela-fixture.ts): psd.layout propoe (dryRun) e a importacao como tela aplica a
+// arte base, as ancoras, os papeis com os estados pelas camadas, os textos e as nove-fatias
+{
+  const { createScreenFromPsd } = await import("../server/psd.ts");
+  const PSD = new URL("./assets/psd/tela.psd", import.meta.url).pathname;
+  const ler = { image: async () => null, region: () => null, bytes: async (f: string) => new Uint8Array(readFileSync(f)), text: async (f: string) => readFileSync(f, "utf8") };
+  const vazio = () => Document.fromText(JSON.stringify({ skeleton: { spine: "4.3.23" }, bones: [{ name: "root" }], slots: [], skins: [{ name: "default", attachments: {} }], animations: {} }), { text: "", pages: {} });
+  const d0 = vazio();
+  const [pr] = await executeAsync(d0, { cmd: "psd.layout", args: { psd: PSD, dryRun: true } }, "teste", undefined, {}, ler);
+  const anc = Object.fromEntries(pr.proposal.itens.filter((i: any) => i.tipo === "ancora").map((i: any) => [i.osso, i.ancora + (i.esticar !== "none" ? "/" + i.esticar : "")]));
+  // as mesmas 9 do exemplos/coelho/gerar.ts (o botao e a pausa com o prefixo btn_)
+  const esperado = { fundo: "center/xy", nuvens: "top", chao: "bottom/x", heroi: "center", topo: "top/x", placar: "top-left", btn_pausa: "top-right", btn_jogar: "bottom", painel: "right" };
+  check(JSON.stringify(anc) === JSON.stringify(esperado), `psd.layout dryRun: as ancoras pela posicao iguais as do exemplos/coelho (${JSON.stringify(anc)})`);
+  const it = (id: string) => pr.proposal.itens.find((i: any) => i.id === id);
+  check(
+    it("botao:jogar")?.slot === "btn_jogar" && JSON.stringify(it("botao:jogar").estados) === JSON.stringify({ disabled: "desligado", pressed: "apertado", normal: "normal" }) && !!it("botao:pausa") && it("texto:txt_placar")?.doCodigo === "placar",
+    "psd.layout dryRun: btn_jogar com os estados pelas camadas, btn_pausa com as poses padrao, txt_placar texto do codigo",
+  );
+  check(
+    it("texto:jogar")?.chave === "JOGAR" && it("texto:missoes")?.chave === "MISSOES" && it("texto:missoes").texto === "MISSÕES" && it("texto:jogar").tamanho === 40 && it("texto:moedas").alinhar === "left" && it("texto:moedas").cor === "4a3f78" && it("texto:jogar").sombra?.y === 3,
+    "psd.layout dryRun: camadas de texto viram partes de texto (chave pelo nome ou pelo texto, tamanho, cor, alinhamento, sombra)",
+  );
+  check(pr.proposal.avisos.some((a: string) => a.includes("Kenney-Future nao encontrada")) && d0.serialize() === vazio().serialize(), "psd.layout dryRun: fonte que falta avisa, e o documento nao muda");
+  const fat = pr.proposal.itens.filter((i: any) => i.tipo === "fatias" && i.ligado).map((i: any) => i.slot + (i.acompanha ? ">" + i.acompanha.slot : "")).sort();
+  check(JSON.stringify(fat) === JSON.stringify(["9_barra", "9_painel", "9_titulo>missoes", "btn_jogar>jogar"]), `psd.layout dryRun: nove-fatias pelo nome 9_ e o fundo do botao acompanhando o texto (${fat.join(", ")})`);
+  // mapa externo: renomeia sem regravar, tira ancora, margens e arte pelo mapa
+  const mapa = { nomes: { nuvem_1: "toque_nuvem" }, ancoras: { nuvens: null, painel: { ancora: "left", esticar: "y" } }, fatias: { ilha: [10] }, arte: [0, 0, 700, 1300], encaixe: "cover" };
+  const [pm] = await executeAsync(vazio(), { cmd: "psd.layout", args: { psd: PSD, dryRun: true, map: mapa, off: ["botao:pausa"], change: { "ancora:heroi": { ancora: "bottom" } } } }, "teste", undefined, {}, ler);
+  const im = (id: string) => pm.proposal.itens.find((i: any) => i.id === id);
+  check(
+    !!im("toque:nuvem") && im("ancora:nuvens").ligado === false && im("ancora:painel").ancora === "left" && im("ancora:painel").esticar === "y" && JSON.stringify(im("fatias:ilha")?.margens) === "[10,10,10,10]" && pm.proposal.arte.rect[3] === 1300 && pm.proposal.arte.encaixe === "cover" && im("botao:pausa").ligado === false && im("ancora:heroi").ancora === "bottom",
+    "psd.layout: o mapa externo (nomes, ancoras, fatias, arte) e as escolhas (off, change)",
+  );
+  // a tela importada de verdade: .boneco, fontes copiadas, manifesto
+  const tdir = join(dir, "psd-tela");
+  const t = await createScreenFromPsd({ psd: PSD, dir: tdir, name: "tela", fontes: [resolve("exemplos/coelho/kenney")] });
+  const { lerVirtual } = await import("../server/boneco.ts");
+  const tj = JSON.parse(lerVirtual(t.skeleton)!);
+  const tdoc = Document.fromText(JSON.stringify(tj), { text: lerVirtual(t.atlas)!, pages: {} });
+  const scr = tj.screen;
+  const anc2 = Object.fromEntries(scr.anchors.map((a: any) => [a.bone, a.anchor.join(",") + (a.stretch ? "/" + a.stretch : "")]));
+  check(JSON.stringify(scr.art) === JSON.stringify([-350, 0, 700, 1370]) && scr.fit === "contain" && Object.keys(anc2).length === 9 && anc2.placar === "0,0" && anc2.chao === "0.5,1/x", `tela pelo PSD: arte base do tamanho do PSD, caber, 9 ancoras (${JSON.stringify(anc2)})`);
+  const man = JSON.parse(readFileSync(t.manifesto, "utf8"));
+  const jogar = man.botoes.find((b: any) => b.nome === "jogar");
+  check(
+    jogar?.estados.apertado === "jogar/apertado" && tj.animations["jogar/apertado"].slots.btn_jogar.attachment[0].name === "apertado" && tj.animations["jogar/em_cima"].slots.btn_jogar.attachment[0].name === "normal" && !!man.botoes.find((b: any) => b.nome === "pausa") && man.textos.some((x: any) => x.nome === "placar" && x.doCodigo),
+    "tela pelo PSD: o manifesto com o botao jogar (estados pelas imagens; em cima, que nao veio, a pose padrao com a imagem normal), a pausa e o texto do codigo placar",
+  );
+  const [qt] = await executeAsync(tdoc, { cmd: "query.texts", args: {} }, "teste");
+  const [qs] = await executeAsync(tdoc, { cmd: "query.slices", args: {} }, "teste");
+  check(
+    (tj.fonts ?? []).length === 1 && tj.fonts[0].file === "fontes/kenney-future.ttf" && existsSync(join(tdir, "fontes", "kenney-future.ttf")) && JSON.stringify(qt).includes("MISSOES") && (qs.slices ?? qs).length === 6 && tj.translations.strings.JOGAR[0] === "JOGAR",
+    `tela pelo PSD: a fonte copiada e ligada, os textos com chave na tabela, ${(qs.slices ?? qs).length} nove-fatias (barra, painel, titulo e os 3 estados do botao)`,
+  );
+  // a ordem de desenho: o texto do botao logo acima das imagens dele
+  const ordem = tj.slots.map((x: any) => x.name);
+  check(ordem.indexOf("jogar") === ordem.indexOf("btn_jogar") + 1 && ordem.indexOf("missoes") > ordem.indexOf("9_titulo") && ordem.indexOf("txt_placar") > ordem.indexOf("moeda"), "tela pelo PSD: os textos entram na ordem das camadas");
+  // o mapa com bloco (o palco: os elementos de baixo andam juntos num osso novo ancorado; os com ancora
+  // propria no mapa ficam fora), cobrir sem deformar (o fundo cresce por igual) e a imagem de texto que
+  // vira texto (a moeda vira o texto do codigo "contador", com a fonte, o tamanho e a caixa do mapa)
+  const mapaB = {
+    ancoras: { fundo: { ancora: "center", cobrir: true }, placar: "top-left" },
+    blocos: { palco: { ancora: "bottom", camadas: ["heroi", "chao", "btn_jogar"] } },
+    textos: { moeda: { texto: "0", tamanho: 30, cor: "#ffcc00", papel: "contador", caixa: [40, 40, 120, 50], contorno: { largura: 3, cor: "000000" } } },
+  };
+  const [pb] = await executeAsync(vazio(), { cmd: "psd.layout", args: { psd: PSD, dryRun: true, map: mapaB } }, "teste", undefined, {}, ler);
+  const ib = (id: string) => pb.proposal.itens.find((i: any) => i.id === id);
+  const tb = await createScreenFromPsd({ psd: PSD, dir: join(dir, "psd-tela-bloco"), name: "tela", mapa: mapaB, fontes: [resolve("exemplos/coelho/kenney")] });
+  const tjb = JSON.parse(lerVirtual(tb.skeleton)!);
+  const ancB = Object.fromEntries(tjb.screen.anchors.map((a: any) => [a.bone, a]));
+  const pai = (b: string) => tjb.bones.find((x: any) => x.name === b)?.parent;
+  const manB = JSON.parse(readFileSync(tb.manifesto, "utf8"));
+  check(
+    ib("ancora:palco")?.bloco?.membros.length === 3 && !ib("ancora:heroi") && !ib("ancora:chao") && ib("ancora:fundo")?.cobre === true &&
+      ib("texto:moeda")?.doCodigo === "contador" && ib("texto:moeda").tamanho === 30 && ib("texto:moeda").cor === "ffcc00" &&
+      ancB.palco?.anchor.join(",") === "0.5,1" && !ancB.heroi && !ancB.btn_jogar && pai("heroi") === "palco" && pai("btn_jogar") === "palco" && Array.isArray(ancB.fundo?.cover) &&
+      manB.textos.some((x: any) => x.nome === "contador" && x.doCodigo) && tjb.skins[0].attachments.moeda?.moeda?.type === "text",
+    `tela pelo PSD: o mapa com bloco (palco), cobrir e imagem de texto ${JSON.stringify({ palco: ib("ancora:palco"), fundo: ancB.fundo, moeda: ib("texto:moeda"), pais: [pai("heroi"), pai("btn_jogar")] })}`,
+  );
 }
 
 // formato: salva e relê; desfazer tudo volta ao inicio

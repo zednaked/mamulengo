@@ -151,6 +151,12 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   coluna centrada no desktop). Um jogo de produção portado assim baixa 7x menos até
   a primeira tela que o export do Godot. [docs/BACKEND.md](docs/BACKEND.md).
 
+![Um joguinho: o coelho pula na ilha para pegar moedas que passam flutuando, uma missão marca sozinha e a pausa escurece a tela](exemplos/coelho/coelho.gif)
+
+*[exemplos/coelho](exemplos/coelho): o modo de layout num joguinho (âncoras, texto
+traduzido em 12 idiomas, nove-fatias e papéis), com a lógica escrita só pelo
+manifesto da tela. Arte e sons da Kenney (CC0).*
+
 ![O robô olhando em 2,5D, voando com jatos, brilho e um anel de estrelas, dissolvendo os braços e soltando um raio entre as mãos](exemplos/vitrine/vitrine.gif)
 
 *[exemplos/vitrine](exemplos/vitrine): o robô CC0 passando por cada recurso num
@@ -439,14 +445,23 @@ Funcionando: o editor (desenho, pose e medidas pelo núcleo no modo "núcleo"), 
 servidor MCP, a bancada de agentes, o `.boneco` com efeitos e partículas, o
 núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
 o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
-O núcleo já é o modo padrão do editor para todo projeto, o `.boneco` binário
-está pronto e o editor abre por um link, sem instalar. Um primeiro jogo web de
+O núcleo é o modo padrão do editor para todo projeto, o `.boneco` binário está
+pronto e o editor abre por um link, sem instalar. Um primeiro jogo web de
 produção roda inteiro no runtime do Mamulengo, com as telas geradas do projeto do
-Godot no deploy. Próximos: um editor de layout que salva em `.tscn` ou direto na
-tela, o addon na Godot
-Asset Library, PSD e reempacotar o atlas também no editor pelo navegador, e a
-física refeita mais rápido depois de cada edição. Plano:
-[docs/ROADMAP.md](docs/ROADMAP.md).
+Godot no deploy; num perfil de celular médio ele fica pronto umas nove vezes
+antes que o export do Godot.
+
+**Modo de layout (telas sem Godot):** uma tela é um `.boneco` montado no editor.
+Os ossos se prendem à janela (cantos, bordas, centro, esticar), as partes de
+texto têm chave de tradução nos 12 idiomas (direita para a esquerda e devanágari
+inclusive), as imagens podem ter nove-fatias e os ossos ganham papéis (botão com
+os estados normal, em cima, apertado e desligado, área de toque, texto trocado
+pelo código). Um PSD em camadas já chega proposto como tela
+([docs/LAYOUT-PSD.md](docs/LAYOUT-PSD.md)). A tela grava um manifesto, e a lógica
+do jogo é escrita sobre ele pelos nomes (`tela.botao("jogar").aoTocar(...)`): veja
+[exemplos/coelho](exemplos/coelho). Próximos: cópias em tempo de jogo (listas),
+mover um osso pelo código, âncora com margem fixa e um primeiro jogo de produção
+convertido por esse caminho. Plano: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licença
 

@@ -8,6 +8,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -30,6 +31,24 @@ if (bin.status !== 0) throw new Error(`nucleo-binario: ${bin.stderr || bin.error
 // a fase do palco (exemplos/palco): o .boneco, os filhos e as paginas
 mkdirSync(join(pasta, "palco"), { recursive: true });
 for (const f of readdirSync(join(RAIZ, "exemplos", "palco"))) if (/\.(boneco|png)$/.test(f)) copyFileSync(join(RAIZ, "exemplos", "palco", f), join(pasta, "palco", f));
+// a tela (docs/NUCLEO.md "Tela")
+mkdirSync(join(pasta, "tela"), { recursive: true });
+copyFileSync(join(RAIZ, "tests", "nucleo", "tela", "tela.boneco"), join(pasta, "tela", "tela.boneco"));
+// os textos (docs/NUCLEO.md "Texto"): tests/nucleo/texto com duas fontes (Kenney Future, CC0, e a
+// Noto Sans Arabic, OFL) e a pagina de 64 x 64 que ele pede
+mkdirSync(join(pasta, "texto", "fontes"), { recursive: true });
+copyFileSync(join(RAIZ, "tests", "nucleo", "texto", "texto.boneco"), join(pasta, "texto", "texto.boneco"));
+copyFileSync(join(RAIZ, "exemplos", "coelho", "kenney", "kenney-future.ttf"), join(pasta, "texto", "fontes", "titulo.ttf"));
+copyFileSync(join(RAIZ, "exemplos", "coelho", "fontes", "NotoSansArabic-Bold.ttf"), join(pasta, "texto", "fontes", "arabe.ttf"));
+await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 200, g: 80, b: 80, alpha: 1 } } }).png().toFile(join(pasta, "texto", "texto.png"));
+// as nove-fatias (docs/NUCLEO.md "Nove-fatias"): tests/nucleo/fatias e a pagina de 256 x 256 que ele pede
+mkdirSync(join(pasta, "fatias"), { recursive: true });
+copyFileSync(join(RAIZ, "tests", "nucleo", "fatias", "fatias.boneco"), join(pasta, "fatias", "fatias.boneco"));
+await sharp({ create: { width: 256, height: 256, channels: 4, background: { r: 80, g: 120, b: 200, alpha: 1 } } }).png().toFile(join(pasta, "fatias", "fatias.png"));
+// os papeis (docs/NUCLEO.md "Papeis"): tests/nucleo/papeis e a pagina de 256 x 256 que ele pede
+mkdirSync(join(pasta, "papeis"), { recursive: true });
+copyFileSync(join(RAIZ, "tests", "nucleo", "papeis", "papeis.boneco"), join(pasta, "papeis", "papeis.boneco"));
+await sharp({ create: { width: 256, height: 256, channels: 4, background: { r: 200, g: 160, b: 60, alpha: 1 } } }).png().toFile(join(pasta, "papeis", "papeis.png"));
 copyFileSync(join(RAIZ, "nucleo", "godot", "teste", "teste_boneco.gd"), join(pasta, "teste_boneco.gd"));
 
 // a primeira abertura importa a pagina e registra a extensao

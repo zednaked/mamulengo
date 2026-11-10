@@ -3,7 +3,7 @@
 // setAnimation, addAnimation, setEmptyAnimation, update, apply e os eventos do listener).
 //
 //   npx tsx tools/nucleo-estado.ts <x.boneco | pasta> ... [--mix 0.2] [--roteiro r.json] [--so nome]
-//       [--nucleo nucleo/build/nucleo-estado] [--detalhe]
+//       [--nucleo nucleo/build/nucleo-estado] [--detalhe] [--regra-mix spine-godot]
 //
 // Um ROTEIRO e uma lista de acoes com o quadro em que acontecem e o numero de quadros de
 // `passo` segundos (padrao 1/60). Por quadro q, o oraculo faz:
@@ -26,6 +26,7 @@ import { spawnSync } from "node:child_process";
 import { AnimationState, AnimationStateData, AtlasAttachmentLoader, MeshAttachment, Physics, RegionAttachment, Skeleton, SkeletonJson, TextureAtlas } from "@esotericsoftware/spine-core";
 import { exportarSpine } from "../src/boneco/spine.ts";
 import { godotGravity } from "../src/core/pose.ts";
+import { likeSpineGodot } from "../src/core/sim.ts";
 
 export interface Acao {
   quadro: number;
@@ -54,6 +55,9 @@ export interface Roteiro {
   // quadros [de, ate) em que o personagem esta escondido: so o relogio das trilhas anda
   // (state.update), sem aplicar, sem o relogio do esqueleto e sem atualizar o mundo
   escondido?: [number, number];
+  // "spine-godot": a regra de mistura do binario do spine-godot dos jogos (docs/NUCLEO.md, "Regra
+  // de mistura do spine-godot"); o oraculo vira o AnimationState com `likeSpineGodot`
+  regra_mix?: "spine-godot";
   acoes: Acao[];
 }
 
@@ -88,6 +92,7 @@ export function oraculoEstado(boneco: any, r: Roteiro) {
   sd.defaultMix = mix.padrao;
   for (const p of mix.pares) sd.setMix(p.de, p.para, p.tempo);
   const st = new AnimationState(sd);
+  if (r.regra_mix === "spine-godot") likeSpineGodot(st);
   const eventos: Evento[] = [];
   let quadro = 0;
   const nomeAnim = (en: any) => (en.animation.name === VAZIA ? null : en.animation.name);
@@ -443,6 +448,8 @@ if (process.argv[1]?.endsWith("nucleo-estado.ts")) {
   const so = opt("so");
   const bin = resolve(opt("nucleo", "nucleo/build/nucleo-estado")!);
   const detalhe = flag("detalhe");
+  // --regra-mix spine-godot: todos os roteiros com a regra de mistura do spine-godot
+  const regraMix = opt("regra-mix");
   const arquivos = args.flatMap((a) => (statSync(a).isDirectory() ? readdirSync(a, { recursive: true }).map(String).filter((f) => f.endsWith(".boneco")).map((f) => join(a, f)) : [a]));
   const tmp = mkdtempSync(join(tmpdir(), "nucleo-estado-"));
   const f = (x: number) => (x === 0 ? "0" : x.toExponential(1));
@@ -455,6 +462,7 @@ if (process.argv[1]?.endsWith("nucleo-estado.ts")) {
     const nome = arq.split("/").pop();
     for (const r of roteiros) {
       if (so && !r.nome.includes(so)) continue;
+      if (regraMix === "spine-godot") r.regra_mix = "spine-godot";
       total++;
       const ref = oraculoEstado(b, r);
       const rarq = join(tmp, "roteiro.json");

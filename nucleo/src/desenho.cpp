@@ -307,7 +307,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
   }
   // o slot e iluminado: ha grupo, a pagina tem relevo e o blend nao e de luz (aditivo, tela)
   auto iluminado = [&](int pagina, Blend blend) {
-    return grupo >= 0 && pagina >= 0 && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela && !le_tela(blend) ? grupo : -1;
+    return grupo >= 0 && pagina >= 0 && size_t(pagina) < m.paginas.size() && !m.paginas[size_t(pagina)].relevo.empty() && blend != Blend::Aditivo && blend != Blend::Tela && !le_tela(blend) ? grupo : -1;
   };
   // a camada do slot sendo desenhado (os lotes de camadas diferentes nao se juntam)
   float prof = float(ctx.profundidade);
@@ -651,6 +651,8 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       desenhar_em(*e.instancias()[size_t(ii)].e, d, c);
     }
   };
+  // sem mosaicos, instancias ou emissores no modelo, nem chama o que os desenha (por slot)
+  const bool tem_mosaicos = !m.mosaicos.empty(), tem_instancias = !m.instancias.empty(), tem_emissores = !m.emissores.empty();
   for (int si : e.ordem()) {
     const EstadoSlot& s = e.slots()[size_t(si)];
     const DadosSlot& ds = m.slots[size_t(si)];
@@ -669,7 +671,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
         l.profundidade = prof;
         l.inicio = uint32_t(d.indices.size());
         d.ajustes.push_back(al);
-        const Parte* p = s.parte >= 0 ? &m.partes[size_t(s.parte)] : nullptr;
+        const Parte* p = s.parte >= 0 ? &e.parte_desenho(s.parte) : nullptr;
         const size_t n = p && p->pagina >= 0 && !p->uvs.empty() ? e.vertices(si, mundo) : 0;
         if (n && p->uvs.size() == n) {
           const Cor cs = s.cor, cp = p->cor;
@@ -684,13 +686,13 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
         }
         d.lotes.push_back(l);
       }
-      instancias(si);
-      particulas(si);
+      if (tem_instancias) instancias(si);
+      if (tem_emissores) particulas(si);
       if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
       continue;
     }
     if (s.parte >= 0) {
-      const Parte& p = m.partes[size_t(s.parte)];
+      const Parte& p = e.parte_desenho(s.parte);
       if (p.tipo == TipoParte::Recorte) {
         if (recorte_fim != -2) fecha_recorte();
         mundo.assign(size_t(p.num_vertices) * 2, 0);
@@ -731,9 +733,9 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
       const float r = cs.r * cp.r, g = cs.g * cp.g, b = cs.b * cp.b, a = cs.a * cp.a;
       // invisivel ou sem imagem: nem calcula os vertices (os brilhos apagados sao muitos)
       if (a <= 0 || p.pagina < 0 || p.uvs.empty()) {
-        mosaicos(si);
-        instancias(si);
-        particulas(si);
+        if (tem_mosaicos) mosaicos(si);
+        if (tem_instancias) instancias(si);
+        if (tem_emissores) particulas(si);
         if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
         continue;
       }
@@ -781,7 +783,7 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
               el.caixa[1] = std::min(el.caixa[1], p.uvs[i + 1]), el.caixa[3] = std::max(el.caixa[3], p.uvs[i + 1]);
             }
             const float margem = ef->margem();
-            const Pagina& pg = m.paginas[size_t(p.pagina)];
+            const Pagina& pg = e.pagina(p.pagina);
             if (p.tipo == TipoParte::Regiao && margem > 0 && pg.largura > 0 && pg.altura > 0) {
               // cantos: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita; ex vai do
               // primeiro ao ultimo, ey do primeiro ao segundo (posicao e uv juntos)
@@ -869,7 +871,11 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
           } else if (recorte_peca == 0 && p.tipo == TipoParte::Regiao) {
             d.indices.insert(d.indices.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
           } else if (recorte_peca == 0) {
-            for (uint16_t t : p.triangulos) d.indices.push_back(base + t);
+            // de uma vez (o push_back por indice era a maior parte do custo desta peca)
+            const size_t i0 = d.indices.size();
+            d.indices.resize(i0 + p.triangulos.size());
+            uint32_t* o = d.indices.data() + i0;
+            for (uint16_t t : p.triangulos) *o++ = base + t;
           }
           d.lotes[li].quantos = uint32_t(d.indices.size()) - d.lotes[li].inicio;
         };
@@ -885,9 +891,9 @@ void desenhar_em(const Esqueleto& e, Desenho& d, const Contexto& ctx) {
         geometria(mundo.data(), a, true);
       }
     }
-    mosaicos(si);
-    instancias(si);
-    particulas(si);
+    if (tem_mosaicos) mosaicos(si);
+    if (tem_instancias) instancias(si);
+    if (tem_emissores) particulas(si);
     if (recorte_fim >= 0 && si == recorte_fim) fecha_recorte();
   }
   if (recorte_fim != -2) fecha_recorte();

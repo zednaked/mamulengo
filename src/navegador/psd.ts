@@ -24,6 +24,11 @@ export function ioNavegador(o: { gravarBoneco: (arquivo: string, b: any, binario
       const lista = await fs.percorrer(raiz, (n) => IMAGEM.test(n)).catch(() => [] as string[]);
       return lista.map((file) => ({ name: file.slice(raiz.length + 1).replace(/\.[^.]+$/, ""), file })).sort((a, b) => a.name.localeCompare(b.name));
     },
+    async listar(dir) {
+      const raiz = fs.normalizar(dir);
+      const lista = await fs.percorrer(raiz, () => true).catch(() => [] as string[]);
+      return lista.filter((f) => f.slice(raiz.length + 1).indexOf("/") < 0);
+    },
     async bruto(p) {
       const b = await bytes(p);
       return b ? decodificar(b) : null;

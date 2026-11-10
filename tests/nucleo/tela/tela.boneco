@@ -1,0 +1,29 @@
+{
+  "boneco": 0,
+  "nome": "tela",
+  "esqueleto": { "x": -350, "y": 0, "largura": 700, "altura": 1370 },
+  "ossos": [
+    { "nome": "root" },
+    { "nome": "placar", "pai": "root", "x": 0, "y": 1300 },
+    { "nome": "placar_texto", "pai": "placar", "x": 40, "y": -10 },
+    { "nome": "barra", "pai": "root", "x": 0, "y": 1340 },
+    { "nome": "fechar", "pai": "barra", "x": 330, "y": 0 },
+    { "nome": "botao", "pai": "root", "x": 0, "y": 80, "rotacao": 10 },
+    { "nome": "painel", "pai": "root", "x": 300, "y": 685, "escala_x": 0.5 },
+    { "nome": "fundo", "pai": "root", "x": 0, "y": 685 },
+    { "nome": "heroi", "pai": "root", "x": 0, "y": 600 }
+  ],
+  "tela": {
+    "arte": [-350, 0, 700, 1370],
+    "encaixe": "caber",
+    "ancoras": [
+      { "osso": "placar", "ancora": [0.5, 0] },
+      { "osso": "barra", "ancora": [0.5, 0], "estica": "x" },
+      { "osso": "fechar", "ancora": [1, 0] },
+      { "osso": "botao", "ancora": [0.5, 1] },
+      { "osso": "painel", "ancora": [1, 0.5] },
+      { "osso": "fundo", "ancora": [0.5, 0.5], "estica": "xy" }
+    ]
+  },
+  "animacoes": { "sobe": { "ossos": { "botao": { "mover": [ { "y": 0 }, { "tempo": 1, "y": 50 } ] } } } }
+}

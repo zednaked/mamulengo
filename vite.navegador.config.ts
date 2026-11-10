@@ -8,7 +8,8 @@
 //
 // O que precisa de programa de fora (PSD, empacotar atlas, Godot, arte HD, relevo...) responde que
 // precisa do Mamulengo instalado (npm run dev). O wasm vem de nucleo/build-web (docs/NUCLEO.md).
-// Na primeira visita, os personagens CC0 de tests/boneco entram em /navegador/exemplos/.
+// Na primeira visita, os personagens CC0 de tests/boneco e a tela do coelho (exemplos/coelho) entram
+// em /navegador/exemplos/.
 import { defineConfig, type Plugin } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -16,6 +17,7 @@ import { join, resolve } from "node:path";
 
 const WASM = resolve("nucleo/build-web");
 const BONECOS = resolve("tests/boneco");
+const COELHO = resolve("exemplos/coelho");
 // a biblioteca de efeitos (texturas CC0 e presets), lida pelo service worker
 const EFEITOS = resolve("biblioteca/efeitos");
 const LISTA = "__LISTA_PRECACHE__";
@@ -26,6 +28,9 @@ function arquivos(): Map<string, string> {
   for (const f of ["nucleo.mjs", "nucleo.wasm"]) m.set(`nucleo/${f}`, join(WASM, f));
   for (const f of readdirSync(EFEITOS)) m.set(`biblioteca/efeitos/${f}`, join(EFEITOS, f));
   for (const pasta of readdirSync(BONECOS)) for (const f of readdirSync(join(BONECOS, pasta))) if (/\.(boneco|webp|png|md)$/.test(f)) m.set(`exemplos/${pasta}/${f}`, join(BONECOS, pasta, f));
+  // a vitrine do modo de layout (o joguinho do coelho, exemplos/coelho): a tela, as fontes e as licencas
+  for (const f of ["coelho-jogo.boneco", "coelho-jogo.png", "README.md", "README.pt-BR.md", "kenney/kenney-future.ttf", "kenney/License.txt", "fontes/NotoSansArabic-Bold.ttf", "fontes/NotoSansDevanagari-Bold.ttf", "fontes/OFL.txt"])
+    m.set(`exemplos/coelho/${f}`, join(COELHO, f));
   return m;
 }
 

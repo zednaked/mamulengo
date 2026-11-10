@@ -133,7 +133,10 @@ struct DadosSlot {
   double profundidade = 0;
 };
 
-enum class TipoParte : uint8_t { Regiao, Malha, MalhaLigada, Recorte, Caminho, Ponto, Caixa };
+// Texto (docs/NUCLEO.md "Texto"): o nucleo guarda o que o texto e e onde fica (a caixa no osso), mas
+// nao desenha letras: quem mostra (o navegador, o Godot) monta a imagem e a entrega a instancia
+// (Esqueleto::imagem_texto); dai em diante ela e uma regiao como as outras
+enum class TipoParte : uint8_t { Regiao, Malha, MalhaLigada, Recorte, Caminho, Ponto, Caixa, Texto };
 
 // geleia (docs/NUCLEO.md "Geleia"): a malha mole. Cada vertice tem massa e e puxado por uma
 // mola para onde o rig o poe (`rigidez`) e pelos vizinhos (`contagio`: a forma entre eles volta
@@ -195,6 +198,10 @@ struct Parte {
   Cor cor;
   // recorte: o slot em que o recorte acaba (-1: vale ate o fim do desenho)
   int fim = -1;
+  // texto: o indice em Modelo::textos
+  int texto = -1;
+  // nove-fatias (regiao): o indice em Modelo::fatias
+  int fatias = -1;
   // malha mole
   Geleia geleia;
 };
@@ -367,6 +374,111 @@ struct DadosPalco {
   std::vector<uint8_t> solido;     // por imagem da paleta dele (vazio: todas)
   bool pixel = false;              // desenha os atores em pixel inteiro (a simulacao segue fracionaria)
   std::vector<DadosAtor> atores;
+};
+
+// ---- tela (docs/NUCLEO.md "Tela"): a arte base, como ela encaixa numa janela de outro tamanho e
+// os ossos presos a pontos da janela
+
+enum class Encaixe : uint8_t { Caber, Cobrir, Largura, Altura };
+
+struct DadosAncora {
+  int osso = -1;
+  double x = 0, y = 0;  // o ponto da janela: 0 esquerda e 1 direita; 0 em cima e 1 embaixo
+  bool estica_x = false, estica_y = false;
+  // cobrir sem deformar: a caixa (no mundo da arte base, y para cima, canto de baixo e da
+  // esquerda) que o osso escala por igual, em volta do proprio ponto, ate cobrir a vista
+  bool cobre = false;
+  double cobre_x = 0, cobre_y = 0, cobre_largura = 0, cobre_altura = 0;
+};
+
+struct DadosTela {
+  bool existe = false;
+  // a arte base no mundo (y para cima): o canto de baixo e da esquerda e o tamanho
+  double x = 0, y = 0, largura = 0, altura = 0;
+  Encaixe encaixe = Encaixe::Caber;
+  std::vector<DadosAncora> ancoras;
+};
+
+// ---- texto (docs/NUCLEO.md "Texto")
+
+// o que fazer quando o texto nao cabe na caixa: encolher a letra ate o minimo, quebrar a linha
+// nas palavras, cortar o que passa, ou nada (passa da caixa)
+enum class Estouro : uint8_t { Encolher, Quebrar, Cortar, Nada };
+struct DadosTexto {
+  int parte = -1;  // indice em Modelo::partes
+  std::string nome;
+  std::string texto;    // o texto livre (e o que vale sem traducao para a chave)
+  std::string chave;    // a chave na tabela de traducoes (vazia: texto livre)
+  std::string familia;  // o nome de uma fonte de Modelo::fontes (vazia: a primeira)
+  double tamanho = 32, minimo = 0;  // a letra em pixels do mundo; o minimo ao encolher (0: metade)
+  Cor cor;
+  int alinhar = 1, alinhar_v = 1;  // 0 esquerda / cima, 1 centro / meio, 2 direita / baixo
+  Estouro estouro = Estouro::Encolher;
+  double largura = 0, altura = 0;  // a caixa
+  double linha = 0;                // contorno (largura em pixels do mundo; 0: sem)
+  Cor cor_linha;
+  bool sombra = false;
+  Cor cor_sombra;
+  double sombra_x = 0, sombra_y = 0;  // deslocamento da sombra (x para a direita, y para baixo)
+  // a transformacao da parte no osso (como a de uma regiao)
+  double x = 0, y = 0, rotacao = 0, escala_x = 1, escala_y = 1;
+};
+struct DadosFonte {
+  std::string nome, arquivo;  // o arquivo ao lado do .boneco (TTF, OTF ou WOFF2)
+};
+// a tabela de idiomas: por chave, um texto por idioma (vazio: falta a traducao)
+struct DadosTraducoes {
+  std::vector<std::string> idiomas;
+  std::vector<std::string> chaves;
+  std::vector<std::vector<std::string>> textos;
+  int chave(std::string_view c) const;
+  int idioma(std::string_view i) const;
+};
+
+// ---- nove-fatias (docs/NUCLEO.md "Nove-fatias")
+
+// o miolo e as bordas num eixo: esticar, repetir (pedacos do tamanho original, o ultimo cortado)
+// ou repetir_caber (o numero inteiro de pedacos mais perto, esticados para caber)
+enum class ModoFatia : uint8_t { Esticar, Repetir, RepetirCaber };
+struct DadosFatias {
+  int parte = -1;  // indice em Modelo::partes (uma regiao)
+  // as margens, nas unidades da parte
+  double esquerda = 0, cima = 0, direita = 0, baixo = 0;
+  ModoFatia eixo_x = ModoFatia::Esticar, eixo_y = ModoFatia::Esticar;
+  // a regiao: o tamanho base, a transformacao no osso e o retangulo com pixels na origem (de 0 a
+  // largura a partir da esquerda, de 0 a altura a partir de baixo, nas unidades da parte)
+  double largura = 0, altura = 0, x = 0, y = 0, rotacao = 0, escala_x = 1, escala_y = 1;
+  double p0x = 0, p0y = 0, p1x = 0, p1y = 0;
+  // a caixa: o tamanho em que a regiao aparece (padrao: largura x altura, a imagem)
+  double caixa_l = 0, caixa_a = 0;
+  // acompanha: o slot do texto (-1: nao acompanha), o texto (indice em Modelo::textos) e o respiro
+  int slot_texto = -1, texto = -1;
+  double respiro_x = 0, respiro_y = 0;
+};
+
+// ---- papeis (docs/NUCLEO.md "Papeis"): o que um osso (ou um slot de texto) e para o codigo do jogo
+
+// botao (area de toque com estados), toque (so a area) e texto (a parte de texto que o jogo troca)
+enum class TipoPapel : uint8_t { Botao, Toque, Texto };
+// os estados de um botao, na ordem de DadosPapel::estados
+enum EstadoBotao : int { BotaoNormal = 0, BotaoEmCima = 1, BotaoApertado = 2, BotaoDesligado = 3 };
+struct DadosPapel {
+  std::string nome;
+  TipoPapel tipo = TipoPapel::Botao;
+  int osso = -1;   // botao e toque: o osso (o grupo)
+  int slot = -1;   // texto: o slot da parte de texto; botao e toque: a area e so este slot (-1: o grupo)
+  int texto = -1;  // texto: o indice em Modelo::textos
+  // a area como um retangulo no osso: o meio (x, y), a largura e a altura (sem: as partes)
+  bool tem_caixa = false;
+  double caixa_x = 0, caixa_y = 0, caixa_l = 0, caixa_a = 0;
+  // preparado na leitura: os slots cuja parte e a area (o do `slot`, ou os do osso e dos filhos
+  // dele) e se a area e so de texto (o grupo nao tem outra parte: senao as de texto nao contam)
+  std::vector<int> slots_area;
+  bool area_texto = false;
+  int estados[4] = {-1, -1, -1, -1};  // botao: a animacao de cada estado (-1: nenhuma)
+  double mix = 0.1;                   // segundos de emenda entre os estados
+  int trilha = -1;                    // a trilha dos estados (padrao: 10 + a ordem entre os botoes)
+  bool desligado = false;             // comeca desligado
 };
 
 // ---- particulas (docs/NUCLEO.md "Particulas")
@@ -574,6 +686,12 @@ struct Modelo {
   std::vector<std::vector<int>> orbitas_atras;      // por slot, as orbitas cujas de tras desenham nele
   std::vector<DadosMosaico> mosaicos;
   DadosPalco palco;
+  DadosTela tela;
+  std::vector<DadosTexto> textos;
+  std::vector<DadosFatias> fatias;
+  std::vector<DadosPapel> papeis;
+  std::vector<DadosFonte> fontes;
+  DadosTraducoes traducoes;
   std::vector<std::vector<int>> mosaicos_do_slot;  // por slot, os mosaicos que desenham nele
   std::vector<Animacao> animacoes;
   // instancias: os modelos filhos (um por arquivo, divididos), as instancias e, por slot, as que
@@ -599,6 +717,7 @@ struct Modelo {
   int id_parte(std::string_view nome) const;
   int evento(std::string_view nome) const;
   int instancia(std::string_view nome) const;
+  int papel(std::string_view nome) const;
   // mix de `de` para `para` (indices de animacao; -1 e a vazia): o par, ou o padrao
   double mix(int de, int para) const;
   // parte (indice em `partes`) do slot com o nome dado, procurando na skin e na default

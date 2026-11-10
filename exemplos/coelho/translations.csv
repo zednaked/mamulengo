@@ -1,0 +1,12 @@
+keys,pt,en,es,hi,ru,fr,it,ne,ar,fil,de,nl
+JOGAR,JOGAR,PLAY,JUGAR,खेलें,ИГРАТЬ,JOUER,GIOCA,खेल्नुहोस्,العب,MAGLARO,SPIELEN,SPELEN
+MISSOES,MISSÕES,MISSIONS,MISIONES,मिशन,ЗАДАНИЯ,MISSIONS,MISSIONI,मिसनहरू,المهام,MGA MISYON,MISSIONEN,MISSIES
+MOEDAS,{n} moedas,{n} coins,{n} monedas,{n} सिक्के,{n} монет,{n} pièces,{n} monete,{n} सिक्का,{n} عملات,{n} barya,{n} Münzen,{n} munten
+PULOS,10 pulos,10 jumps,10 saltos,10 छलांगें,10 прыжков,10 sauts,10 salti,10 उफ्राइ,10 قفزات,10 talon,10 Sprünge,10 sprongen
+CENOURA,a cenoura,the carrot,la zanahoria,गाजर,морковка,la carotte,la carota,गाजर,الجزرة,ang karot,die Karotte,de wortel
+PAUSA,PAUSA,PAUSED,PAUSA,विराम,ПАУЗА,PAUSE,PAUSA,विश्राम,إيقاف مؤقت,NAKAHINTO,PAUSE,PAUZE
+FIM,ACABOU!,TIME'S UP!,¡TIEMPO!,समय खत्म!,ВРЕМЯ!,TERMINÉ !,TEMPO!,समय सकियो!,انتهى الوقت!,TAPOS NA!,ZEIT UM!,TIJD OM!
+RECORDE,recorde: {n},best: {n},récord: {n},सर्वश्रेष्ठ: {n},рекорд: {n},record : {n},record: {n},उत्कृष्ट: {n},أفضل نتيجة: {n},pinakamataas: {n},Rekord: {n},record: {n}
+NOVO,novo recorde!,new best!,¡nuevo récord!,नया रिकॉर्ड!,новый рекорд!,nouveau record !,nuovo record!,नयाँ रेकर्ड!,رقم قياسي جديد!,bagong rekord!,neuer Rekord!,nieuw record!
+DENOVO,DE NOVO,AGAIN,OTRA VEZ,फिर से,ЕЩЁ РАЗ,REJOUER,ANCORA,फेरि,مرة أخرى,ULIT,NOCHMAL,OPNIEUW
+DICA,toque para pular,tap to jump,toca para saltar,कूदने के लिए टैप करें,"нажми, чтобы прыгнуть",touche pour sauter,tocca per saltare,उफ्रन ट्याप गर्नुहोस्,المس للقفز,pindutin para tumalon,tippen zum Springen,tik om te springen

@@ -29,6 +29,10 @@ defineCommand({
   run({ e }, p) {
     requireAnimation(e.json, p.name);
     e.set(["animations", p.name], undefined);
+    // os estados de botao que tocavam esta animacao (docs/NUCLEO.md "Papeis")
+    ((e.json as any).roles ?? []).forEach((r: any, k: number) => {
+      for (const [s, a] of Object.entries(r.states ?? {})) if (a === p.name) e.set(["roles", k, "states", s], undefined);
+    });
     return { deleted: p.name };
   },
 });
@@ -43,6 +47,9 @@ defineCommand({
     requireAnimation(e.json, p.name);
     if (animations(e.json)[p.to]) throw new Error(`animação já existe: ${p.to}`);
     e.apply({ op: "rename", path: ["animations"], from: p.name, to: p.to });
+    ((e.json as any).roles ?? []).forEach((r: any, k: number) => {
+      for (const [s, a] of Object.entries(r.states ?? {})) if (a === p.name) e.set(["roles", k, "states", s], p.to);
+    });
     return { renamed: p.to };
   },
 });

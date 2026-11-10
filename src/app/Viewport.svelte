@@ -16,6 +16,9 @@
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
   import { drawDown, drawDragging, drawDrawEdit, drawHelp, drawKey, drawMove, drawUp, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
+  import JanelaBar from "./JanelaBar.svelte";
+  import Idiomas from "./Idiomas.svelte";
+  import LadoALado from "./LadoALado.svelte";
   import { drawMosaicEdit, mosaicDown, mosaicDragging, mosaicMove, mosaicUp, stopMosaicEdit } from "./mosaicedit.ts";
   import { mosaics } from "../core/commands/mosaic.ts";
   import { auditoriaPixel } from "../core/commands/pixel.ts";
@@ -48,6 +51,88 @@
   function pararJogo() {
     app.jogando = false;
     app.viewer?.pararJogo();
+  }
+  // jogar a tela (docs/NUCLEO.md "Papeis"): os botoes respondem ao mouse com os estados (em cima,
+  // apertado, desligado) e cada toque aparece com o nome, como o codigo do jogo o recebe
+  const temPapeis = $derived.by(() => {
+    app.version;
+    return !!(app.doc?.json as any)?.roles?.length;
+  });
+  let telaOn = $state(false);
+  let telaToques = $state<string[]>([]);
+  let telaBotoes = $state<{ k: number; nome: string; desligado: boolean; estado: string }[]>([]);
+  const NOMES_ESTADO = ["normal", "em cima", "apertado", "desligado"];
+  function lerBotoes() {
+    const n = app.viewer?.nucleo;
+    if (!n) return;
+    telaBotoes = n
+      .papeis()
+      .map((p, k) => ({ p, k }))
+      .filter(({ p }) => p.tipo === "botao")
+      .map(({ p, k }) => ({ k, nome: p.nome, desligado: n.papelDesligado(k), estado: NOMES_ESTADO[n.papelEstado(k)] ?? "" }));
+  }
+  function jogarTela() {
+    const v = app.viewer;
+    if (!v) return;
+    if (telaOn) return pararTela();
+    if (app.runtime !== "nucleo") return app.toast("Jogar a tela roda no modo núcleo (ver → núcleo).");
+    // a animação escolhida em laço por baixo (o "parado" da tela), menos se for estado de botão
+    const estados = new Set(((app.doc?.json as any)?.roles ?? []).flatMap((r: any) => Object.values(r.states ?? {})));
+    const anim = app.play.animation && !estados.has(app.play.animation) ? app.play.animation : null;
+    if (!v.comecarTela(anim)) return app.toast("Esta tela não tem papéis (botão, toque): marque no inspetor do osso.");
+    telaOn = true;
+    telaToques = [];
+    lerBotoes();
+  }
+  function pararTela() {
+    telaOn = false;
+    app.viewer?.pararTela();
+  }
+  function telaPonteiro(tipo: number, e: PointerEvent) {
+    const v = app.viewer;
+    if (!v?.tela) return false;
+    const r = v.telaPonteiro(tipo, e.clientX, e.clientY);
+    canvas.style.cursor = r.sobre ? "pointer" : "";
+    if (r.toques.length) telaToques = [...telaToques, ...r.toques].slice(-6);
+    lerBotoes();
+    return true;
+  }
+  function desligarBotao(k: number, d: boolean) {
+    app.viewer?.nucleo?.papelDesligar(k, d);
+    lerBotoes();
+  }
+  // a area de toque do papel do osso escolhido (fora do jogo), ou a de baixo do ponteiro (jogando):
+  // o contorno dos triangulos (as arestas que nao sao compartilhadas)
+  function drawPapeis(v: V) {
+    const n = v.runtime === "nucleo" ? v.nucleo : null;
+    if (!n) return;
+    const ps = n.papeis();
+    const alvo = v.tela ? (v.tela.sobre ? [n.papel(v.tela.sobre)] : []) : ps.map((p, k) => ({ p, k })).filter(({ p }) => p.tipo !== "texto" && app.selection.bone && (app.doc?.json as any)?.bones?.[p.osso]?.name === app.selection.bone).map(({ k }) => k);
+    const s = v.scene;
+    const k = 1 / v.cam.zoom;
+    const ciano = new Color(0.3, 0.85, 1, v.tela ? 0.6 : 0.95);
+    for (const i of alvo) {
+      const t = n.papelArea(i);
+      const arestas = new Map<string, number[]>();
+      const chave = (a: number, b: number) => `${a.toFixed(3)},${b.toFixed(3)}`;
+      for (let o = 0; o + 6 <= t.length; o += 6)
+        for (const [a, b] of [
+          [0, 1],
+          [1, 2],
+          [2, 0],
+        ]) {
+          const p = [t[o + a * 2], t[o + a * 2 + 1], t[o + b * 2], t[o + b * 2 + 1]];
+          const c1 = chave(p[0], p[1]),
+            c2 = chave(p[2], p[3]);
+          const id = c1 < c2 ? c1 + "|" + c2 : c2 + "|" + c1;
+          if (arestas.has(id)) arestas.delete(id);
+          else arestas.set(id, p);
+        }
+      for (const [a, b, c, d] of arestas.values()) {
+        const m = Math.max(1, Math.round(Math.hypot(c - a, d - b) / (6 * k)));
+        for (let j = 0; j < m; j += 2) s.rectLine(true, a + ((c - a) * j) / m, b + ((d - b) * j) / m, a + ((c - a) * (j + 1)) / m, b + ((d - b) * (j + 1)) / m, 1.5 * k, ciano);
+      }
+    }
   }
   // o placar acompanha o jogo, quem quer que jogue (o botao ou a ponte)
   $effect(() => {
@@ -128,6 +213,154 @@
     return null;
   }
   let arrastoCaixa: { ator: any; borda: "w" | "h"; merge: string } | null = null;
+
+  // nove-fatias (docs/NUCLEO.md "Nove-fatias"): na regiao fatiada do slot escolhido, as 4 linhas do
+  // corte sobre a imagem, arrastaveis. A caixa e a dos 4 cantos de fora (a grade do nucleo, no
+  // tamanho em que ela esta, com o texto acompanhado e o esticar da janela); a linha fica a margem
+  // dividida pelo esticar, como os cantos que o nucleo desenha
+  type Fatia = { slot: string; a: any; bl: [number, number]; u: [number, number]; w: [number, number]; L: number; A: number; ex: number; ey: number };
+  function fatiaEscolhida(v: V): Fatia | null {
+    const j: any = app.doc?.json;
+    const sl = app.selection.slot;
+    if (!sl || !j || !v.pose) return null;
+    const s = j.slots?.find((x: any) => x.name === sl);
+    const nome = s?.attachment;
+    const a = nome ? j.skins?.find((k: any) => k.attachments?.[sl]?.[nome])?.attachments[sl][nome] : null;
+    if (!a?.slice) return null;
+    const ps = v.pose.findSlot(sl);
+    const vs: number[] = [];
+    if (!ps || v.pose.vertices(ps, vs) !== 8) return null;
+    const g = v.runtime === "nucleo" ? v.nucleo?.fatiaDoSlot(ps.index) : null;
+    return {
+      slot: sl,
+      a,
+      bl: [vs[0], vs[1]],
+      u: [vs[6] - vs[0], vs[7] - vs[1]],
+      w: [vs[2] - vs[0], vs[3] - vs[1]],
+      L: g?.largura ?? a.slice.width ?? a.width ?? 32,
+      A: g?.altura ?? a.slice.height ?? a.height ?? 32,
+      ex: g?.ex ?? 1,
+      ey: g?.ey ?? 1,
+    };
+  }
+  // as 4 linhas: [lado, fracao ao longo de u (esquerda, direita) ou de w (baixo, cima)]
+  function linhasFatia(f: Fatia): ["left" | "right" | "bottom" | "top", number][] {
+    const m = f.a.slice;
+    return [
+      ["left", (m.left ?? 0) / f.ex / f.L],
+      ["right", 1 - (m.right ?? 0) / f.ex / f.L],
+      ["bottom", (m.bottom ?? 0) / f.ey / f.A],
+      ["top", 1 - (m.top ?? 0) / f.ey / f.A],
+    ];
+  }
+  const pontaLinha = (f: Fatia, lado: string, t: number): [number, number, number, number] => {
+    const [x, y] = f.bl;
+    if (lado === "left" || lado === "right") return [x + f.u[0] * t, y + f.u[1] * t, x + f.u[0] * t + f.w[0], y + f.u[1] * t + f.w[1]];
+    return [x + f.w[0] * t, y + f.w[1] * t, x + f.w[0] * t + f.u[0], y + f.w[1] * t + f.u[1]];
+  };
+  function drawFatias(v: V) {
+    const f = fatiaEscolhida(v);
+    if (!f) return;
+    const s = v.scene;
+    const k = 1 / v.cam.zoom;
+    const rosa = new Color(1, 0.3, 0.75, 0.95);
+    const quente = new Color(1, 0.9, 0.3, 1);
+    for (const [lado, t] of linhasFatia(f)) {
+      const [a, b, c, d] = pontaLinha(f, lado, t);
+      const n = Math.max(1, Math.round(Math.hypot(c - a, d - b) / (8 * k)));
+      const cor = arrastoFatia?.lado === lado ? quente : rosa;
+      for (let i = 0; i < n; i += 2) s.rectLine(true, a + ((c - a) * i) / n, b + ((d - b) * i) / n, a + ((c - a) * (i + 1)) / n, b + ((d - b) * (i + 1)) / n, 1.5 * k, cor);
+      s.circle(true, (a + c) / 2, (b + d) / 2, 4 * k, cor, 12);
+    }
+  }
+  // a linha perto do ponteiro (10 px de tela da alca no meio, ou 5 px da linha)
+  function linhaFatiaEm(v: V, sx: number, sy: number): { f: Fatia; lado: "left" | "right" | "bottom" | "top" } | null {
+    const f = fatiaEscolhida(v);
+    if (!f) return null;
+    const fy = v.flip ? -1 : 1;
+    let melhor: { f: Fatia; lado: "left" | "right" | "bottom" | "top" } | null = null,
+      dist = 6;
+    for (const [lado, t] of linhasFatia(f)) {
+      const [a, b, c, d] = pontaLinha(f, lado, t);
+      const p = v.worldToScreen(a, b * fy),
+        q = v.worldToScreen(c, d * fy);
+      const dx = q.x - p.x,
+        dy = q.y - p.y;
+      const l2 = dx * dx + dy * dy || 1;
+      const r = Math.max(0, Math.min(1, ((sx - p.x) * dx + (sy - p.y) * dy) / l2));
+      const dd = Math.hypot(p.x + dx * r - sx, p.y + dy * r - sy);
+      const meio = Math.hypot((p.x + q.x) / 2 - sx, (p.y + q.y) / 2 - sy) < 10;
+      if (meio || dd < dist) (melhor = { f, lado }), (dist = meio ? 0 : dd);
+    }
+    return melhor;
+  }
+  let arrastoFatia: { lado: "left" | "right" | "bottom" | "top"; merge: string } | null = null;
+  function moverFatia(v: V, e: PointerEvent) {
+    const f = fatiaEscolhida(v);
+    if (!f || !arrastoFatia) return;
+    const p = v.screenToSkel(e.clientX, e.clientY);
+    const rx = p.x - f.bl[0],
+      ry = p.y - f.bl[1];
+    const tu = (rx * f.u[0] + ry * f.u[1]) / (f.u[0] ** 2 + f.u[1] ** 2 || 1);
+    const tw = (rx * f.w[0] + ry * f.w[1]) / (f.w[0] ** 2 + f.w[1] ** 2 || 1);
+    const lado = arrastoFatia.lado;
+    const t = lado === "left" ? tu : lado === "right" ? 1 - tu : lado === "bottom" ? tw : 1 - tw;
+    const total = lado === "left" || lado === "right" ? f.L * f.ex : f.A * f.ey;
+    const m = Math.max(0, Math.round(Math.min(1, t) * total));
+    app.run({ cmd: "slice.set", args: { slot: f.slot, [lado]: m } }, `nove-fatias de ${f.slot}`, arrastoFatia.merge, true);
+    const r = canvas.getBoundingClientRect();
+    const nomes = { left: "esquerda", right: "direita", bottom: "baixo", top: "cima" };
+    leitura = { t: `${nomes[lado]} ${m}`, x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  // a janela da tela (docs/NUCLEO.md "Tela"): fora dela escurece, a moldura em branco, a arte base
+  // tracejada e, de cada osso ancorado, uma linha ate o ponto da janela em que ele se prende
+  function drawJanela(v: V) {
+    const r = v.vistaJanela();
+    if (!r || !(r[2] > 0 && r[3] > 0)) return;
+    const s = v.scene;
+    const [x, y, w, h] = r;
+    const L = 1e6;
+    const fora = new Color(0.04, 0.04, 0.07, 0.62);
+    s.rect(true, x - L, y + h, 2 * L + w, L, fora);
+    s.rect(true, x - L, y - L, 2 * L + w, L, fora);
+    s.rect(true, x - L, y, L, h, fora);
+    s.rect(true, x + w, y, L, h, fora);
+    const k = 1 / v.cam.zoom;
+    const branco = new Color(1, 1, 1, 0.95);
+    for (const [a, b, c, d] of [
+      [x, y, x + w, y],
+      [x + w, y, x + w, y + h],
+      [x + w, y + h, x, y + h],
+      [x, y + h, x, y],
+    ])
+      s.rectLine(true, a, b, c, d, 2 * k, branco);
+    const j: any = app.doc?.json;
+    const art: number[] | undefined = j?.screen?.art ?? (j?.skeleton?.width ? [j.skeleton.x ?? 0, j.skeleton.y ?? 0, j.skeleton.width, j.skeleton.height] : undefined);
+    if (art) {
+      const cinza = new Color(1, 0.85, 0.4, 0.7);
+      const tr = (a: number, b: number, c: number, d: number) => {
+        const n = Math.max(1, Math.round(Math.hypot(c - a, d - b) / (12 * k)));
+        for (let i = 0; i < n; i += 2) s.line(a + ((c - a) * i) / n, b + ((d - b) * i) / n, a + ((c - a) * (i + 1)) / n, b + ((d - b) * (i + 1)) / n, cinza);
+      };
+      tr(art[0], art[1], art[0] + art[2], art[1]);
+      tr(art[0] + art[2], art[1], art[0] + art[2], art[1] + art[3]);
+      tr(art[0] + art[2], art[1] + art[3], art[0], art[1] + art[3]);
+      tr(art[0], art[1] + art[3], art[0], art[1]);
+    }
+    const azul = new Color(0.35, 0.8, 1, 0.9);
+    for (const a of j?.screen?.anchors ?? []) {
+      const b = v.pose?.findBone(a.bone);
+      if (!b) continue;
+      const st: string = a.stretch ?? "";
+      const px = st.includes("x") ? b.worldX : x + a.anchor[0] * w;
+      const py = st.includes("y") ? b.worldY : y + (1 - a.anchor[1]) * h;
+      s.line(px, py, b.worldX, b.worldY, azul);
+      s.circle(true, px, py, 5 * k, azul, 12);
+      s.circle(false, b.worldX, b.worldY, 4 * k, azul, 12);
+    }
+  }
+
   function drawPalco(v: V) {
     const j: any = app.doc?.json;
     if (!j?.stage?.actors?.length || v.jogo) return;
@@ -239,6 +472,9 @@
       if (app.captura) return drawCaptura(v);
       if (app.drawEdit) return drawDrawEdit(v);
       if (app.mosaicEdit) return drawMosaicEdit(v);
+      drawJanela(v);
+      drawFatias(v);
+      drawPapeis(v);
       drawPalco(v);
       drawLigacoes(v);
       drawHover(v);
@@ -265,6 +501,11 @@
     if (app.doc) app.attachViewer(v);
     else app.viewer = v;
     const keyDown = (e: KeyboardEvent) => {
+      if (telaOn && e.code === "Escape") {
+        pararTela();
+        e.preventDefault();
+        return;
+      }
       if (!(e.target instanceof HTMLInputElement) && teclaJogo(e, true)) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -352,6 +593,7 @@
     const v = app.viewer;
     if (!v) return;
     canvas.setPointerCapture(e.pointerId);
+    if (e.button === 0 && !space && telaPonteiro(1, e)) return;
     if (e.button === 1 || e.button === 2 || space || app.tool === "pan") {
       panning = { x: e.clientX, y: e.clientY, cx: v.cam.x, cy: v.cam.y };
       return;
@@ -369,6 +611,12 @@
     }
     if (app.mosaicEdit) {
       if (!mosaicDown(v, w)) downAt = null;
+      return;
+    }
+    // uma linha do corte da regiao fatiada escolhida (nove-fatias)
+    const lf = !v.jogo ? linhaFatiaEm(v, e.clientX, e.clientY) : null;
+    if (lf) {
+      arrastoFatia = { lado: lf.lado, merge: `fatia-${lf.f.slot}-${Date.now()}` };
       return;
     }
     // a alca da caixa do ator escolhido (o palco)
@@ -458,6 +706,7 @@
     cursor.x = vis.x;
     cursor.y = vis.y;
     cursor.inside = true;
+    if (!panning && telaPonteiro(0, e)) return;
     if (meshDragging()) {
       meshMove(v, vis);
       return;
@@ -468,6 +717,10 @@
     }
     if (mosaicDragging()) {
       mosaicMove(v, v.screenToSkel(e.clientX, e.clientY));
+      return;
+    }
+    if (arrastoFatia) {
+      moverFatia(v, e);
       return;
     }
     if (arrastoCaixa) {
@@ -538,7 +791,8 @@
     if (r) app.select({ bone, slot });
   }
 
-  function up() {
+  function up(e?: PointerEvent) {
+    if (e && !panning && e.button === 0 && telaPonteiro(e.pointerType === "touch" ? 3 : 2, e)) return;
     leitura = null;
     panning = null;
     downAt = null;
@@ -548,6 +802,7 @@
     drawUp();
     mosaicUp();
     arrastoCaixa = null;
+    arrastoFatia = null;
   }
 </script>
 
@@ -560,12 +815,28 @@
       <div class="placar">🪙 {placar.pontos}{placar.venceu ? " · venceu! (R recomeça)" : placar.morreu ? " · morreu (R recomeça)" : ""}</div>
     {/if}
   {/if}
+  {#if temPapeis && !app.spectator}
+    <button class="tela-tag" class:on={telaOn} onclick={jogarTela} title={telaOn ? "parar (Esc)" : "jogar a tela: clique nos botões e veja os estados (em cima, apertado, desligado) e os toques, como o jogo recebe"}>{telaOn ? "■ parar a tela" : "▶ jogar a tela"}</button>
+    {#if telaOn}
+      <div class="tela-painel">
+        {#each telaBotoes as b}
+          <div><b>{b.nome}</b> <span class="dim">{b.estado}</span> · <label title="desligar pelo código: tela.botao('{b.nome}').desligar()"><input type="checkbox" checked={b.desligado} onchange={(e) => desligarBotao(b.k, (e.target as HTMLInputElement).checked)} /> desligado</label></div>
+        {/each}
+        {#each telaToques as t, i (i + t)}<div class="toque">toque: <b>{t}</b></div>{/each}
+      </div>
+    {/if}
+  {/if}
   {#if pixelAvisos}
     <button class="pixel-tag" title={"Fora da grade de pixel inteiro (pixel art: docs/ANIMAR.md, seção 6):\n" + pixelAvisos.lista.slice(0, 30).join("\n") + (pixelAvisos.lista.length > 30 ? `\n(+${pixelAvisos.lista.length - 30})` : "") + (pixelAvisos.consertaveis ? "\n\nClique para encaixar." : "")} onclick={encaixarPixel} disabled={!pixelAvisos.consertaveis}>
       ▦ {pixelAvisos.total} fora da grade{pixelAvisos.consertaveis ? " · encaixar" : ""}
     </button>
   {/if}
-  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={dblclick} onpointerleave={() => ((cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={dblclick} onpointerleave={(e) => (telaPonteiro(4, e), (cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
+  {#if app.doc && ((app.doc.json as any).screen || (app.doc.json as any).translations || app.asset?.tres?.endsWith(".boneco") || app.janela)}
+    <JanelaBar />
+    {#if app.tabelaIdiomas}<Idiomas />{/if}
+    <LadoALado />
+  {/if}
   {#if ajuda}<div class="ajuda" role="status">{ajuda}</div>{/if}
   {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
   {#if leitura}<div class="leitura" style:left="{leitura.x + 16}px" style:top="{leitura.y + 16}px">{leitura.t}</div>{/if}
@@ -831,6 +1102,43 @@
     padding: 3px 12px;
     border-radius: 6px;
     cursor: pointer;
+  }
+  .tela-tag {
+    position: absolute;
+    top: 36px;
+    left: 10px;
+    z-index: 6;
+    background: #2a2533;
+    color: #7fd4ff;
+    border: 1px solid #7fd4ff66;
+    font-size: 12px;
+    padding: 3px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .tela-tag.on {
+    background: #1d7fb0;
+    color: #fff;
+  }
+  .tela-painel {
+    position: absolute;
+    top: 66px;
+    left: 10px;
+    z-index: 6;
+    background: #000b;
+    color: #e8eaf2;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .tela-painel .dim {
+    color: #9aa0b4;
+  }
+  .tela-painel .toque {
+    color: #b8f5c8;
   }
   .jogar-tag.on {
     background: #ff3d8b;

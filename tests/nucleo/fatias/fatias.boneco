@@ -1,0 +1,45 @@
+{
+  "boneco": 0,
+  "nome": "fatias",
+  "paginas": [ { "arquivo": "fatias.png", "tamanho": [256, 256] } ],
+  "imagens": [
+    { "nome": "painel", "pagina": 0, "ret": [0, 0, 100, 80] },
+    { "nome": "barra", "pagina": 0, "ret": [110, 0, 40, 12], "girada": 90, "corte": [2, 1, 46, 16] },
+    { "nome": "botao", "pagina": 0, "ret": [0, 100, 60, 40] },
+    { "nome": "ladrilho", "pagina": 0, "ret": [70, 100, 50, 50] }
+  ],
+  "esqueleto": { "x": -300, "y": 0, "largura": 600, "altura": 1000 },
+  "ossos": [
+    { "nome": "root" },
+    { "nome": "painel", "pai": "root", "y": 500 },
+    { "nome": "ladrilhos", "pai": "painel", "y": -200 },
+    { "nome": "barra", "pai": "root", "y": 980 },
+    { "nome": "botao", "pai": "root", "y": 100, "rotacao": 10 }
+  ],
+  "slots": [
+    { "nome": "painel", "osso": "painel", "parte": "painel" },
+    { "nome": "ladrilhos", "osso": "ladrilhos", "parte": "ladrilho" },
+    { "nome": "barra", "osso": "barra", "parte": "barra" },
+    { "nome": "lateral", "osso": "barra", "parte": "lateral" },
+    { "nome": "fundo_botao", "osso": "botao", "parte": "botao" },
+    { "nome": "rotulo", "osso": "botao", "parte": "rotulo" }
+  ],
+  "skins": [ { "nome": "default", "partes": {
+    "painel": { "painel": { "largura": 200, "altura": 160,
+                            "fatias": { "esquerda": 40, "cima": 30, "direita": 50, "baixo": 20 } } },
+    "ladrilhos": { "ladrilho": { "x": 20, "y": -10, "largura": 50, "altura": 50,
+                                 "fatias": { "esquerda": 10, "cima": 10, "direita": 10, "baixo": 10, "eixo_x": "repetir", "eixo_y": "repetir_caber" } } },
+    "barra": { "barra": { "largura": 92, "altura": 32,
+                          "fatias": { "esquerda": 8, "cima": 6, "direita": 12, "baixo": 6 } } },
+    "lateral": { "lateral": { "caminho": "painel", "x": -200, "y": -60, "rotacao": 90, "largura": 100, "altura": 80,
+                              "fatias": { "esquerda": 10, "cima": 10, "direita": 10, "baixo": 10 } } },
+    "fundo_botao": { "botao": { "largura": 120, "altura": 80,
+                                "fatias": { "largura": 240, "altura": 90, "esquerda": 30, "cima": 20, "direita": 30, "baixo": 20, "acompanha": { "slot": "rotulo", "respiro": [20, 8] } } } },
+    "rotulo": { "rotulo": { "tipo": "texto", "largura": 400, "altura": 60, "escala_x": 1.25, "escala_y": 1.25, "texto": "JOGAR", "tamanho": 40 } }
+  } } ],
+  "tela": { "arte": [-300, 0, 600, 1000], "encaixe": "caber",
+            "ancoras": [ { "osso": "painel", "ancora": [0.5, 0.5], "estica": "xy" },
+                         { "osso": "barra", "ancora": [0.5, 0], "estica": "x" },
+                         { "osso": "botao", "ancora": [0.5, 1] } ] },
+  "animacoes": { "pulsa": { "ossos": { "botao": { "escalar": [ { "x": 1, "y": 1 }, { "tempo": 0.5, "x": 1.2, "y": 1.2 }, { "tempo": 1, "x": 1.2, "y": 1.2 } ] } } } }
+}

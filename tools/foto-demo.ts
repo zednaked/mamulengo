@@ -48,7 +48,7 @@ const perfil = mkdtempSync(join(tmpdir(), "foto-demo-"));
 // SwiftShader: o mesmo resultado em qualquer maquina (a previa sai igual); --gpu usa a placa de
 // video, para medir o fps de verdade (o SwiftShader desenha na CPU)
 const gl = gpu ? ["--enable-gpu", "--ignore-gpu-blocklist", "--use-angle=gl"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-const chrome = spawn("chromium", ["--headless=new", `--user-data-dir=${perfil}`, "--remote-debugging-port=0", ...gl, "--hide-scrollbars", `--window-size=${w},${h}`, "--font-render-hinting=none", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn("setpriv", ["--pdeathsig", "KILL", "chromium", "--headless=new", `--user-data-dir=${perfil}`, "--remote-debugging-port=0", ...gl, "--hide-scrollbars", `--window-size=${w},${h}`, "--font-render-hinting=none", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const wsUrl = await new Promise<string>((ok, falha) => {
   let b = "";
   chrome.stderr.on("data", (d) => {

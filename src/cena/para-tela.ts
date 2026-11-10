@@ -69,7 +69,8 @@ export function telaDaCena(raiz: NoCena, caixas: Map<string, Caixa>, tamanho: [n
       const k = nomeArq(v.ext.caminho);
       const tam = o.textura?.(v.ext.caminho);
       if (!tam) return null;
-      imagens[k] = { arquivo: o.arquivo(v.ext.caminho) };
+      // o tamanho logico vai junto: o arquivo do pacote pode ter sido reduzido
+      imagens[k] = { arquivo: o.arquivo(v.ext.caminho), tam: [tam[0], tam[1]] };
       return { chave: k, tam };
     }
     // textura gerada: o gradiente, desenhado pela tela ao carregar

@@ -35,6 +35,34 @@ Esqueleto::Esqueleto(std::shared_ptr<const Modelo> modelo) : m_(std::move(modelo
   }
   local.resize(m.ossos.size());
   mundo_.resize(m.ossos.size());
+  // texto: a regiao de cada parte de texto, ainda sem imagem (os cantos sao a caixa)
+  textos_.reserve(m.textos.size());
+  for (const DadosTexto& t : m.textos) {
+    const Parte& o = m.partes[size_t(t.parte)];
+    Parte p;
+    p.tipo = TipoParte::Regiao;
+    p.nome = o.nome;
+    p.slot = o.slot;
+    p.texto = o.texto;
+    std::copy(o.cantos, o.cantos + 8, p.cantos);
+    textos_.push_back(std::move(p));
+  }
+  // nove-fatias: a malha de cada regiao fatiada, feita ja no tamanho base
+  medidas_.assign(m.textos.size() * 2, 0);
+  fatiadas_.resize(m.fatias.size());
+  fatiadas_info_.resize(m.fatias.size());
+  for (size_t i = 0; i < m.fatias.size(); ++i) {
+    const Parte& o = m.partes[size_t(m.fatias[i].parte)];
+    Parte& p = fatiadas_[i];
+    p.tipo = TipoParte::Malha;
+    p.nome = o.nome;
+    p.slot = o.slot;
+    p.fatias = int(i);
+    p.cor = o.cor;
+    p.pagina = o.pagina;
+  }
+  refazer_fatias();
+  calcular_vista();
   slots_.resize(m.slots.size());
   rest_.resize(m.restricoes.size());
   emis_.resize(m.emissores.size());
@@ -282,7 +310,7 @@ inline double absoluto(double atual, double setup, double v, bool antes, double 
   return atual + (v - atual) * alfa;
 }
 
-inline bool tem_vertices(TipoParte t) { return t != TipoParte::Regiao && t != TipoParte::Ponto; }
+inline bool tem_vertices(TipoParte t) { return t != TipoParte::Regiao && t != TipoParte::Ponto && t != TipoParte::Texto; }
 
 }  // namespace
 
@@ -983,14 +1011,157 @@ void Esqueleto::mundo_osso(int i) {
   w.d = p.c * lb + p.d * ld;
 }
 
+// ---- tela (docs/NUCLEO.md "Tela")
+
+void Esqueleto::janela(double largura, double altura) {
+  if (largura == janela_w_ && altura == janela_h_) return;
+  janela_w_ = largura > 0 ? largura : 0;
+  janela_h_ = altura > 0 ? altura : 0;
+  calcular_vista();
+  tela_sujo_ = true;
+}
+
+void Esqueleto::calcular_vista() {
+  const DadosTela& t = m_->tela;
+  const double bw = t.largura, bh = t.altura;
+  if (!(janela_w_ > 0 && janela_h_ > 0) || !(bw > 0 && bh > 0)) {
+    // sem janela (ou sem arte base): a arte inteira, 1 pixel por unidade
+    vista_ = Vista{1, t.x, t.y, bw, bh};
+    return;
+  }
+  const double sx = janela_w_ / bw, sy = janela_h_ / bh;
+  double s = 1;
+  switch (t.encaixe) {
+    case Encaixe::Caber: s = std::min(sx, sy); break;
+    case Encaixe::Cobrir: s = std::max(sx, sy); break;
+    case Encaixe::Largura: s = sx; break;
+    case Encaixe::Altura: s = sy; break;
+  }
+  // a janela inteira, em unidades do mundo, com o meio dela no meio da arte
+  vista_.escala = s;
+  vista_.largura = janela_w_ / s;
+  vista_.altura = janela_h_ / s;
+  vista_.x = t.x + (bw - vista_.largura) / 2;
+  vista_.y = t.y + (bh - vista_.altura) / 2;
+}
+
+void Esqueleto::calcular_tela() {
+  tela_sujo_ = false;
+  correcao_.clear();
+  lin0_.clear();
+  lin1_.clear();
+  const Modelo& m = *m_;
+  const DadosTela& t = m.tela;
+  // so o boneco de cima: o filho de uma instancia segue o osso do pai
+  if (t.ancoras.empty() || tem_base || !(t.largura > 0 && t.altura > 0)) return;
+  const Vista& v = vista_;
+  if (v.largura == t.largura && v.altura == t.altura && v.x == t.x && v.y == t.y) return;
+  const int n = int(m.ossos.size());
+  // o mundo do setup (sem animacao nem restricoes) com a arte base: onde cada osso esta nela
+  std::vector<Local> guardado = local;
+  for (int i = 0; i < n; ++i) {
+    const DadosOsso& d = m.ossos[size_t(i)];
+    local[size_t(i)] = Local{d.x, d.y, d.rotacao, d.escala_x, d.escala_y, d.cisalha_x, d.cisalha_y};
+  }
+  for (int i = 0; i < n; ++i) mundo_osso(i);
+  const std::vector<Matriz> base0 = mundo_;
+  const double kx = v.largura / t.largura, ky = v.altura / t.altura;
+  // em ordem de hierarquia: o osso ancorado vai para o alvo; o resto acompanha o pai
+  size_t k = 0;
+  for (int i = 0; i < n; ++i) {
+    if (k >= t.ancoras.size() || t.ancoras[k].osso != i) {
+      mundo_osso(i);
+      continue;
+    }
+    const DadosAncora& a = t.ancoras[k++];
+    const Matriz& w0 = base0[size_t(i)];
+    // a fracao da janela onde o osso se prende (x da esquerda, y de cima); esticando, a do proprio
+    // osso na arte
+    const double fx = a.estica_x ? (w0.x - t.x) / t.largura : a.x;
+    const double fy = a.estica_y ? (t.y + t.altura - w0.y) / t.altura : a.y;
+    // o ponto da ancora na vista menos o mesmo ponto na arte: o deslocamento ate ele nao muda
+    Matriz alvo = w0;
+    alvo.x = w0.x + (v.x - t.x) + fx * (v.largura - t.largura);
+    alvo.y = w0.y + (v.y - t.y) + (1 - fy) * (v.altura - t.altura);
+    if (a.estica_x) alvo.a *= kx, alvo.b *= kx;
+    if (a.estica_y) alvo.c *= ky, alvo.d *= ky;
+    // cobrir sem deformar: a caixa em volta do alvo, escalada por igual (nunca menos que a arte)
+    // ate cobrir a vista; um lado em que o ponto do osso nao fica dentro da caixa nao conta
+    double cobre = 1;
+    if (a.cobre) {
+      const double esq = w0.x - a.cobre_x, dir = a.cobre_x + a.cobre_largura - w0.x;
+      const double baixo = w0.y - a.cobre_y, cima = a.cobre_y + a.cobre_altura - w0.y;
+      if (esq > 0) cobre = std::max(cobre, (alvo.x - v.x) / esq);
+      if (dir > 0) cobre = std::max(cobre, (v.x + v.largura - alvo.x) / dir);
+      if (baixo > 0) cobre = std::max(cobre, (alvo.y - v.y) / baixo);
+      if (cima > 0) cobre = std::max(cobre, (v.y + v.altura - alvo.y) / cima);
+      alvo.a *= cobre, alvo.b *= cobre, alvo.c *= cobre, alvo.d *= cobre;
+    }
+    const DadosOsso& d = m.ossos[size_t(i)];
+    Local nl = local[size_t(i)];
+    const int pai = d.pai;
+    const bool pai_igual = pai < 0 || (mundo_[size_t(pai)].a == base0[size_t(pai)].a && mundo_[size_t(pai)].b == base0[size_t(pai)].b &&
+                                       mundo_[size_t(pai)].c == base0[size_t(pai)].c && mundo_[size_t(pai)].d == base0[size_t(pai)].d);
+    if (!a.estica_x && !a.estica_y && cobre == 1 && pai_igual) {
+      // so a posicao: o ponto no espaco do pai
+      if (pai < 0) nl.x = alvo.x, nl.y = alvo.y;
+      else {
+        const Matriz& p = mundo_[size_t(pai)];
+        const double det = p.a * p.d - p.b * p.c;
+        const double dx = alvo.x - p.x, dy = alvo.y - p.y;
+        nl.x = (p.d * dx - p.b * dy) / det;
+        nl.y = (-p.c * dx + p.a * dy) / det;
+      }
+    } else if (d.heranca == Heranca::Normal) {
+      mundo_[size_t(i)] = alvo;
+      nl = local_de_mundo(i);
+    } else {
+      // heranca diferente da normal: a decomposicao nao inverte o mundo; so a posicao
+      mundo_[size_t(i)] = alvo;
+      const Local q = local_de_mundo(i);
+      nl.x = q.x, nl.y = q.y;
+    }
+    const Local& s0 = local[size_t(i)];
+    Correcao c{i, Local{nl.x - s0.x, nl.y - s0.y, nl.rotacao - s0.rotacao, s0.escala_x != 0 ? nl.escala_x / s0.escala_x : 1,
+                        s0.escala_y != 0 ? nl.escala_y / s0.escala_y : 1, nl.cisalha_x - s0.cisalha_x, nl.cisalha_y - s0.cisalha_y}};
+    correcao_.push_back(c);
+    local[size_t(i)] = nl;
+    mundo_osso(i);
+  }
+  local.swap(guardado);
+  // nove-fatias: a parte linear do mundo de setup na arte base e corrigido (o esticar da janela)
+  if (!m.fatias.empty()) {
+    lin0_.resize(size_t(n) * 4);
+    lin1_.resize(size_t(n) * 4);
+    for (int i = 0; i < n; ++i) {
+      const Matriz &a = base0[size_t(i)], &b = mundo_[size_t(i)];
+      double* l0 = &lin0_[size_t(i) * 4];
+      double* l1 = &lin1_[size_t(i) * 4];
+      l0[0] = a.a, l0[1] = a.b, l0[2] = a.c, l0[3] = a.d;
+      l1[0] = b.a, l1[1] = b.b, l1[2] = b.c, l1[3] = b.d;
+    }
+  }
+}
+
 void Esqueleto::atualizar_mundo() {
   const Modelo& m = *m_;
   const int n = int(m.ossos.size());
+  if (tela_sujo_) {
+    calcular_tela();
+    if (!m.fatias.empty()) refazer_fatias();
+  }
   // as restricoes de IK e de transformacao (alvo local) mexem na pose local para recalcular o
   // mundo; no fim a pose local volta a de antes delas (a animada). Sem isso, com o Estado (que
   // nao volta ao setup a cada quadro), o que a restricao fez num quadro ficava para o seguinte
   // e somava: IK com mix 0,5 chegava ao alvo inteiro em poucos quadros
   antes_ = local;
+  // a correcao da tela (calculada no setup) vale por cima da pose animada, so neste calculo
+  for (const Correcao& c : correcao_) {
+    Local& l = local[size_t(c.osso)];
+    l.x += c.d.x, l.y += c.d.y, l.rotacao += c.d.rotacao;
+    l.escala_x *= c.d.escala_x, l.escala_y *= c.d.escala_y;
+    l.cisalha_x += c.d.cisalha_x, l.cisalha_y += c.d.cisalha_y;
+  }
   for (int i = 0; i < n; ++i) mundo_osso(i);
   for (size_t r = 0; r < m.restricoes.size(); ++r) {
     const DadosRestricao& d = m.restricoes[r];
@@ -1181,10 +1352,221 @@ void Esqueleto::vertices_geometria(int si, const Parte& p, double* out) const {
   }
 }
 
+void Esqueleto::imagem_texto(int k, const double ret[4], const float uv[4]) {
+  if (k < 0 || size_t(k) >= textos_.size()) return;
+  const DadosTexto& t = m_->textos[size_t(k)];
+  Parte& p = textos_[size_t(k)];
+  // o retangulo pela transformacao da parte (escala, rotacao, posicao), na ordem dos cantos da
+  // regiao: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita
+  const double rot = t.rotacao * GRAU, cs = std::cos(rot), sn = std::sin(rot);
+  const double px[4] = {ret[0], ret[0], ret[2], ret[2]}, py[4] = {ret[1], ret[3], ret[3], ret[1]};
+  for (int i = 0; i < 4; ++i) {
+    const double x = px[i] * t.escala_x, y = py[i] * t.escala_y;
+    p.cantos[i * 2] = t.x + x * cs - y * sn;
+    p.cantos[i * 2 + 1] = t.y + x * sn + y * cs;
+  }
+  // uv dos cantos: o de baixo e o v1
+  p.uvs = {uv[0], uv[3], uv[0], uv[1], uv[2], uv[1], uv[2], uv[3]};
+  p.pagina = int(m_->paginas_desenho.size());
+}
+
+void Esqueleto::sem_imagem_texto(int k) {
+  if (k < 0 || size_t(k) >= textos_.size()) return;
+  Parte& p = textos_[size_t(k)];
+  const Parte& o = m_->partes[size_t(m_->textos[size_t(k)].parte)];
+  std::copy(o.cantos, o.cantos + 8, p.cantos);
+  p.uvs.clear();
+  p.pagina = -1;
+}
+
+// ---- nove-fatias (docs/NUCLEO.md "Nove-fatias")
+
+namespace {
+
+// os pontos (destino d na parte, origem s na imagem) e os pedacos (pares de pontos) de um eixo
+struct EixoFatias {
+  std::vector<double> d, s;
+  std::vector<int> pedacos;
+};
+
+void eixo_fatias(double tam, double mE, double mD, double L, double e, ModoFatia modo, double p0, double p1, EixoFatias& out) {
+  out.d.clear(), out.s.clear(), out.pedacos.clear();
+  if (!(L > 0) || !(tam > 0)) return;
+  struct Pedaco {
+    double d0, d1, s0, s1;
+  };
+  Pedaco pc[2 * 64 + 4];
+  int np = 0;
+  double cE = e > 0 ? mE / e : mE, cD = e > 0 ? mD / e : mD;
+  if (cE + cD > L) {
+    const double k = L / (cE + cD);
+    cE *= k, cD *= k;
+  }
+  const double dl = -L / 2, dr = L / 2;
+  if (mE > 0 && cE > 0) pc[np++] = {dl, dl + cE, 0, std::min(mE, tam)};
+  const double a = dl + cE, b = dr - cD, vao = b - a;
+  const double s0 = std::min(mE, tam), s1 = std::max(s0, tam - mD), mo = s1 - s0;
+  if (vao > 0) {
+    if (!(mo > 0) || modo == ModoFatia::Esticar) {
+      pc[np++] = {a, b, s0, s1};
+    } else {
+      const double peca = e > 0 ? mo / e : mo;
+      bool caber = modo == ModoFatia::RepetirCaber;
+      long n = caber ? std::max(1L, std::lround(vao / peca)) : long(std::ceil(vao / peca - 1e-9));
+      if (n < 1) n = 1;
+      if (n > 64) n = 64, caber = true;
+      for (long k = 0; k < n; ++k) {
+        if (caber) {
+          pc[np++] = {a + vao * double(k) / double(n), k + 1 == n ? b : a + vao * double(k + 1) / double(n), s0, s1};
+        } else {
+          const double d0 = a + double(k) * peca, d1 = k + 1 == n ? b : d0 + peca;
+          pc[np++] = {d0, d1, s0, k + 1 == n ? s0 + (d1 - d0) / peca * mo : s1};
+        }
+      }
+    }
+  }
+  if (mD > 0 && cD > 0) pc[np++] = {b, dr, std::max(0.0, tam - mD), tam};
+  // o corte do atlas: so ha pixels em [p0, p1] da origem
+  for (int k = 0; k < np; ++k) {
+    Pedaco q = pc[k];
+    const double c0 = std::max(q.s0, p0), c1 = std::min(q.s1, p1);
+    if (q.s1 > q.s0) {
+      if (!(c1 > c0)) continue;
+      const double f = (q.d1 - q.d0) / (q.s1 - q.s0);
+      if (c0 != q.s0) q.d0 = q.d0 + (c0 - q.s0) * f;
+      if (c1 != q.s1) q.d1 = pc[k].d0 + (c1 - pc[k].s0) * f;
+      q.s0 = c0, q.s1 = c1;
+    } else if (q.s0 < p0 || q.s0 > p1) {
+      continue;
+    }
+    if (!(q.d1 > q.d0)) continue;
+    int i0;
+    if (!out.d.empty() && out.d.back() == q.d0 && out.s.back() == q.s0) i0 = int(out.d.size()) - 1;
+    else {
+      i0 = int(out.d.size());
+      out.d.push_back(q.d0), out.s.push_back(q.s0);
+    }
+    out.d.push_back(q.d1), out.s.push_back(q.s1);
+    out.pedacos.push_back(i0), out.pedacos.push_back(int(out.d.size()) - 1);
+  }
+}
+
+}  // namespace
+
+void Esqueleto::medida_texto(int k, double largura, double altura) {
+  if (k < 0 || size_t(k) * 2 + 1 >= medidas_.size()) return;
+  largura = largura > 0 ? largura : 0, altura = altura > 0 ? altura : 0;
+  if (medidas_[size_t(k) * 2] == largura && medidas_[size_t(k) * 2 + 1] == altura) return;
+  medidas_[size_t(k) * 2] = largura;
+  medidas_[size_t(k) * 2 + 1] = altura;
+  for (size_t i = 0; i < m_->fatias.size(); ++i)
+    if (m_->fatias[i].texto == k) refazer_fatia(i);
+}
+
+void Esqueleto::refazer_fatias() {
+  for (size_t i = 0; i < fatiadas_.size(); ++i) refazer_fatia(i);
+}
+
+void Esqueleto::refazer_fatia(size_t i) {
+  const Modelo& m = *m_;
+  const DadosFatias& d = m.fatias[i];
+  const Parte& o = m.partes[size_t(d.parte)];
+  Parte& p = fatiadas_[i];
+  Fatiada& fi = fatiadas_info_[i];
+  // o tamanho: o base, ou o do texto acompanhado mais o respiro
+  double L = d.caixa_l, A = d.caixa_a;
+  if (d.texto >= 0) {
+    const DadosTexto& t = m.textos[size_t(d.texto)];
+    const double tl = medidas_[size_t(d.texto) * 2], ta = medidas_[size_t(d.texto) * 2 + 1];
+    if (tl > 0 && d.escala_x != 0) L = std::max(L, tl * std::abs(t.escala_x / d.escala_x) + 2 * d.respiro_x);
+    if (ta > 0 && d.escala_y != 0) A = std::max(A, ta * std::abs(t.escala_y / d.escala_y) + 2 * d.respiro_y);
+  }
+  // o esticar da janela: os eixos da regiao no osso pelo mundo corrigido e pelo da arte base
+  const double rot = d.rotacao * GRAU, cs = std::cos(rot), sn = std::sin(rot);
+  double ex = 1, ey = 1;
+  if (!lin0_.empty()) {
+    const size_t b = size_t(m.slots[size_t(o.slot)].osso) * 4;
+    const double* l0 = &lin0_[b];
+    const double* l1 = &lin1_[b];
+    auto comp = [](const double* l, double x, double y) { return std::hypot(l[0] * x + l[1] * y, l[2] * x + l[3] * y); };
+    const double ux = cs * d.escala_x, uy = sn * d.escala_x, vx = -sn * d.escala_y, vy = cs * d.escala_y;
+    const double a0 = comp(l0, ux, uy), b0 = comp(l0, vx, vy);
+    if (a0 > 0) ex = comp(l1, ux, uy) / a0;
+    if (b0 > 0) ey = comp(l1, vx, vy) / b0;
+  }
+  fi.largura = L, fi.altura = A, fi.ex = ex, fi.ey = ey;
+  EixoFatias X, Y;
+  eixo_fatias(d.largura, d.esquerda, d.direita, L, ex, d.eixo_x, d.p0x, d.p1x, X);
+  eixo_fatias(d.altura, d.baixo, d.cima, A, ey, d.eixo_y, d.p0y, d.p1y, Y);
+  const int nx = int(X.d.size()), ny = int(Y.d.size());
+  if (nx < 2 || ny < 2) {
+    fi.nx = fi.ny = 0;
+    p.num_vertices = 0;
+    p.vertices.clear(), p.uvs.clear(), p.triangulos.clear();
+    return;
+  }
+  fi.nx = nx, fi.ny = ny;
+  p.num_vertices = nx * ny;
+  p.vertices.resize(size_t(nx * ny) * 2);
+  const bool com_uv = o.uvs.size() == 8;
+  p.uvs.resize(com_uv ? size_t(nx * ny) * 2 : 0);
+  const double pw = d.p1x - d.p0x, ph = d.p1y - d.p0y;
+  for (int iy = 0; iy < ny; ++iy)
+    for (int ix = 0; ix < nx; ++ix) {
+      const size_t v = size_t(iy * nx + ix) * 2;
+      const double lx = X.d[size_t(ix)] * d.escala_x, ly = Y.d[size_t(iy)] * d.escala_y;
+      p.vertices[v] = d.x + lx * cs - ly * sn;
+      p.vertices[v + 1] = d.y + lx * sn + ly * cs;
+      if (!com_uv) continue;
+      const double fu = pw > 0 ? (X.s[size_t(ix)] - d.p0x) / pw : 0, fv = ph > 0 ? (Y.s[size_t(iy)] - d.p0y) / ph : 0;
+      // os uvs da regiao: baixo-esquerda, cima-esquerda, cima-direita, baixo-direita
+      const float* u = o.uvs.data();
+      p.uvs[v] = float(u[0] + fu * (u[6] - u[0]) + fv * (u[2] - u[0]));
+      p.uvs[v + 1] = float(u[1] + fu * (u[7] - u[1]) + fv * (u[3] - u[1]));
+    }
+  p.triangulos.clear();
+  for (size_t j = 0; j + 1 < Y.pedacos.size(); j += 2)
+    for (size_t k = 0; k + 1 < X.pedacos.size(); k += 2) {
+      const int ya = Y.pedacos[j], yb = Y.pedacos[j + 1], xa = X.pedacos[k], xb = X.pedacos[k + 1];
+      const uint16_t be = uint16_t(ya * nx + xa), ce = uint16_t(yb * nx + xa), cd = uint16_t(yb * nx + xb), bd = uint16_t(ya * nx + xb);
+      p.triangulos.insert(p.triangulos.end(), {be, ce, cd, cd, bd, be});
+    }
+}
+
+size_t Esqueleto::cantos_fatias(int si, std::vector<double>& out) const {
+  const EstadoSlot& s = slots_[size_t(si)];
+  if (s.parte < 0) return 0;
+  const int f = m_->partes[size_t(s.parte)].fatias;
+  if (f < 0) return 0;
+  const Fatiada& fi = fatiadas_info_[size_t(f)];
+  if (fi.nx < 2 || fi.ny < 2) return 0;
+  const Parte& p = fatiadas_[size_t(f)];
+  const Matriz& w = mundo_[size_t(m_->slots[size_t(si)].osso)];
+  const int idx[4] = {0, (fi.ny - 1) * fi.nx, fi.ny * fi.nx - 1, fi.nx - 1};
+  out.resize(8);
+  for (int c = 0; c < 4; ++c) {
+    const double x = p.vertices[size_t(idx[c]) * 2], y = p.vertices[size_t(idx[c]) * 2 + 1];
+    out[size_t(c) * 2] = w.a * x + w.b * y + w.x + s.segue_dx;
+    out[size_t(c) * 2 + 1] = w.c * x + w.d * y + w.y + s.segue_dy;
+  }
+  return 8;
+}
+
 size_t Esqueleto::vertices(int si, std::vector<double>& out) const {
   const EstadoSlot& s = slots_[size_t(si)];
   if (s.parte < 0) return 0;
-  const Parte& p = m_->partes[size_t(s.parte)];
+  const Parte& p = parte_desenho(s.parte);
+  if (p.fatias >= 0 && p.tipo == TipoParte::Malha) {
+    // a grade da regiao fatiada: no osso, sem deformar
+    out.resize(size_t(p.num_vertices) * 2);
+    const Matriz& w = mundo_[size_t(m_->slots[size_t(si)].osso)];
+    for (size_t k = 0; k < out.size(); k += 2) {
+      const double x = p.vertices[k], y = p.vertices[k + 1];
+      out[k] = w.a * x + w.b * y + w.x + s.segue_dx;
+      out[k + 1] = w.c * x + w.d * y + w.y + s.segue_dy;
+    }
+    return out.size();
+  }
   if (p.tipo == TipoParte::Regiao) {
     out.resize(8);
     const Matriz& w = mundo_[size_t(m_->slots[size_t(si)].osso)];

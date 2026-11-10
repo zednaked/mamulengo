@@ -30,6 +30,7 @@
 #include "mamulengo/json.h"
 #include "mamulengo/modelo.h"
 #include "mamulengo/palco.h"
+#include "mamulengo/papeis.h"
 #include "mamulengo/pose.h"
 
 using namespace mamulengo;
@@ -44,6 +45,7 @@ struct Instancia {
   std::vector<uint8_t> com_tinta, escondido;
   Esqueleto e;
   std::unique_ptr<Estado> estado;  // so no uso com trilhas (mm_reiniciar)
+  bool mix_spine_godot = false;    // regra de mistura do spine-godot (mm_estado_regra_mix)
   int anim = -1;
   bool loop = true;
   double tempo = 0;
@@ -66,6 +68,11 @@ struct Instancia {
     posto_y = py;
     posto_r = pr;
   }
+  // papeis (docs/NUCLEO.md "Papeis"): os estados dos botoes pelo ponteiro (mm_papeis_iniciar) e os
+  // eventos do ultimo mm_passo guardados para o jogo (mm_eventos_ligar)
+  std::unique_ptr<Interface> ui;
+  bool guardar_eventos = false;
+  std::vector<double> eventos_guardados;
   // checkpoint (mm_guardar): o esqueleto, o Estado e o relogio de um quadro
   struct Guardado {
     Esqueleto e;
@@ -113,6 +120,13 @@ void texto_json(std::string& s, const std::string& t) {
   s += '"';
   for (char c : t) {
     if (c == '"' || c == '\\') s += '\\';
+    if (uint8_t(c) < 0x20) {
+      // os de controle (a quebra de linha de um texto) como \u00XX
+      char b[8];
+      std::snprintf(b, sizeof b, "\\u%04x", unsigned(uint8_t(c)));
+      s += b;
+      continue;
+    }
     s += c;
   }
   s += '"';
@@ -190,6 +204,9 @@ EMSCRIPTEN_KEEPALIVE void mm_osso_setup(int modelo, int osso, double x, double y
   d.cisalha_x = cisalha_x;
   d.cisalha_y = cisalha_y;
   d.comprimento = comprimento;
+  // a correcao das ancoras parte do setup (docs/NUCLEO.md "Tela")
+  for (auto& in : instancias)
+    if (in && in->modelo == modelos[size_t(modelo)]) in->e.tela_mudou();
 }
 
 // setup de um slot: cor e parte (nome vazio: sem parte). Devolve 0 sem mudar nada se o nome
@@ -269,7 +286,7 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
     const Parte& p = m.partes[i];
     info += i ? ",{\"nome\":" : "{\"nome\":";
     texto_json(info, p.nome);
-    info += ",\"tipo\":" + std::to_string(int(p.tipo)) + ",\"slot\":" + std::to_string(p.slot) + ",\"vertices\":" + std::to_string(p.tipo == TipoParte::Regiao ? 4 : p.num_vertices) +
+    info += ",\"tipo\":" + std::to_string(int(p.tipo)) + ",\"slot\":" + std::to_string(p.slot) + ",\"vertices\":" + std::to_string(p.tipo == TipoParte::Regiao || p.tipo == TipoParte::Texto ? 4 : p.num_vertices) +
             ",\"contorno\":" + std::to_string(p.contorno) + ",\"pesada\":" + (p.pesada() ? "true" : "false") + ",\"fechado\":" + (p.fechado ? "true" : "false") + "}";
   }
   info += "],\"animacoes\":[";
@@ -284,8 +301,140 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
     if (i) info += ",";
     texto_json(info, m.eventos[i].nome);
   }
+  // os textos (docs/NUCLEO.md "Texto"): a parte e o slot de cada um (o resto em mm_textos)
+  info += "],\"textos\":[";
+  for (size_t i = 0; i < m.textos.size(); ++i) {
+    info += i ? ",{\"nome\":" : "{\"nome\":";
+    texto_json(info, m.textos[i].nome);
+    info += ",\"parte\":" + std::to_string(m.textos[i].parte) + ",\"slot\":" + std::to_string(m.partes[size_t(m.textos[i].parte)].slot) + "}";
+  }
+  // os papeis (docs/NUCLEO.md "Papeis"): tipo, osso e slot pelo indice (-1: nenhum), os estados
+  // (normal, em cima, apertado, desligado: indice da animacao, -1 nenhuma), a trilha, o mix e
+  // se comeca desligado
+  info += "],\"papeis\":[";
+  for (size_t i = 0; i < m.papeis.size(); ++i) {
+    static const char* const TIPO[] = {"botao", "toque", "texto"};
+    const DadosPapel& d = m.papeis[i];
+    info += i ? ",{\"nome\":" : "{\"nome\":";
+    texto_json(info, d.nome);
+    info += std::string(",\"tipo\":\"") + TIPO[int(d.tipo)] + "\",\"osso\":" + std::to_string(d.osso) + ",\"slot\":" + std::to_string(d.slot) + ",\"texto\":" + std::to_string(d.texto) + ",\"estados\":[" +
+            std::to_string(d.estados[0]) + "," + std::to_string(d.estados[1]) + "," + std::to_string(d.estados[2]) + "," + std::to_string(d.estados[3]) + "],\"trilha\":" + std::to_string(d.trilha) +
+            ",\"mix\":" + numero(d.mix) + ",\"desligado\":" + (d.desligado ? "true" : "false") + "}";
+  }
+  // a tela (docs/NUCLEO.md "Tela"): a arte base, o encaixe e as ancoras (osso pelo indice)
+  info += "]";
+  if (m.tela.existe) {
+    static const char* const ENC[] = {"caber", "cobrir", "largura", "altura"};
+    const DadosTela& t = m.tela;
+    info += ",\"tela\":{\"arte\":[" + numero(t.x) + "," + numero(t.y) + "," + numero(t.largura) + "," + numero(t.altura) + "],\"encaixe\":\"" + ENC[int(t.encaixe)] + "\",\"ancoras\":[";
+    for (size_t i = 0; i < t.ancoras.size(); ++i) {
+      const DadosAncora& a = t.ancoras[i];
+      info += (i ? ",{\"osso\":" : "{\"osso\":") + std::to_string(a.osso) + ",\"ancora\":[" + numero(a.x) + "," + numero(a.y) + "],\"estica\":\"" + (a.estica_x ? "x" : "") + (a.estica_y ? "y" : "") + "\"" +
+              (a.cobre ? ",\"cobre\":[" + numero(a.cobre_x) + "," + numero(a.cobre_y) + "," + numero(a.cobre_largura) + "," + numero(a.cobre_altura) + "]" : "") + "}";
+    }
+    info += "]}";
+  }
+  info += "}";
+  return info.c_str();
+}
+
+// os textos (docs/NUCLEO.md "Texto"), para quem desenha as letras: { fontes: [{nome, arquivo}],
+// idiomas: [...], traducoes: {chave: [um por idioma]}, textos: [{nome, parte, slot, texto, chave,
+// familia, tamanho, minimo, cor, alinhar, alinhar_v, estouro, largura, altura, linha, cor_linha,
+// sombra: [cor, x, y] ou null}] } (alinhar 0 a 2; estouro: 0 encolher, 1 quebrar, 2 cortar, 3 nada)
+EMSCRIPTEN_KEEPALIVE const char* mm_textos(int modelo) {
+  const Modelo& m = *modelos[size_t(modelo)];
+  auto cor = [](const Cor& c) {
+    char b[16];
+    std::snprintf(b, sizeof b, "\"%02x%02x%02x%02x\"", int(std::lround(c.r * 255)), int(std::lround(c.g * 255)), int(std::lround(c.b * 255)), int(std::lround(c.a * 255)));
+    return std::string(b);
+  };
+  info = "{\"fontes\":[";
+  for (size_t i = 0; i < m.fontes.size(); ++i) {
+    info += i ? ",{\"nome\":" : "{\"nome\":";
+    texto_json(info, m.fontes[i].nome);
+    info += ",\"arquivo\":";
+    texto_json(info, m.fontes[i].arquivo);
+    info += "}";
+  }
+  info += "],\"idiomas\":[";
+  for (size_t i = 0; i < m.traducoes.idiomas.size(); ++i) {
+    if (i) info += ",";
+    texto_json(info, m.traducoes.idiomas[i]);
+  }
+  info += "],\"traducoes\":{";
+  for (size_t i = 0; i < m.traducoes.chaves.size(); ++i) {
+    if (i) info += ",";
+    texto_json(info, m.traducoes.chaves[i]);
+    info += ":[";
+    for (size_t k = 0; k < m.traducoes.textos[i].size(); ++k) {
+      if (k) info += ",";
+      texto_json(info, m.traducoes.textos[i][k]);
+    }
+    info += "]";
+  }
+  info += "},\"textos\":[";
+  for (size_t i = 0; i < m.textos.size(); ++i) {
+    const DadosTexto& t = m.textos[i];
+    info += i ? ",{\"nome\":" : "{\"nome\":";
+    texto_json(info, t.nome);
+    info += ",\"parte\":" + std::to_string(t.parte) + ",\"slot\":" + std::to_string(m.partes[size_t(t.parte)].slot) + ",\"texto\":";
+    texto_json(info, t.texto);
+    info += ",\"chave\":";
+    texto_json(info, t.chave);
+    info += ",\"familia\":";
+    texto_json(info, t.familia);
+    info += ",\"tamanho\":" + numero(t.tamanho) + ",\"minimo\":" + numero(t.minimo) + ",\"cor\":" + cor(t.cor) + ",\"alinhar\":" + std::to_string(t.alinhar) +
+            ",\"alinhar_v\":" + std::to_string(t.alinhar_v) + ",\"estouro\":" + std::to_string(int(t.estouro)) + ",\"largura\":" + numero(t.largura) +
+            ",\"altura\":" + numero(t.altura) + ",\"linha\":" + numero(t.linha) + ",\"cor_linha\":" + cor(t.cor_linha) + ",\"sombra\":" +
+            (t.sombra ? "[" + cor(t.cor_sombra) + "," + numero(t.sombra_x) + "," + numero(t.sombra_y) + "]" : std::string("null")) + "}";
+  }
   info += "]}";
   return info.c_str();
+}
+
+// a imagem do texto k (docs/NUCLEO.md "Texto"): o retangulo dela na caixa (esquerda, baixo,
+// direita, cima; o meio da caixa na origem, y para cima) e o uv na pagina dos textos (u0, v0 do
+// canto de cima e da esquerda, u1, v1). Sem largura (l >= r): a parte deixa de desenhar
+EMSCRIPTEN_KEEPALIVE void mm_texto_imagem(int inst, int k, double l, double b, double r, double t, float u0, float v0, float u1, float v1) {
+  Esqueleto& e = instancias[size_t(inst)]->e;
+  if (!(l < r)) return e.sem_imagem_texto(k);
+  const double ret[4] = {l, b, r, t};
+  const float uv[4] = {u0, v0, u1, v1};
+  e.imagem_texto(k, ret, uv);
+}
+// quanto o texto k ocupa depois do estouro (largura e altura usadas, nas unidades da caixa): a
+// regiao com nove-fatias que acompanha o slot dele cresce junto (docs/NUCLEO.md "Nove-fatias")
+EMSCRIPTEN_KEEPALIVE void mm_texto_medida(int inst, int k, double largura, double altura) { instancias[size_t(inst)]->e.medida_texto(k, largura, altura); }
+// as regioes com nove-fatias, por instancia: [parte, nx, ny, largura, altura, ex, ey] cada uma, em
+// mm_saida (o tamanho em que a grade foi feita e o esticar da janela); devolve quantos numeros
+EMSCRIPTEN_KEEPALIVE int mm_fatias(int inst) {
+  const Instancia& i = *instancias[size_t(inst)];
+  saida.clear();
+  const auto& fs = i.e.fatiadas();
+  for (size_t k = 0; k < fs.size(); ++k)
+    saida.insert(saida.end(), {double(i.modelo->fatias[k].parte), double(fs[k].nx), double(fs[k].ny), fs[k].largura, fs[k].altura, fs[k].ex, fs[k].ey});
+  return int(saida.size());
+}
+// o tamanho da pagina dos textos em pixels (a margem dos efeitos e medida nela)
+EMSCRIPTEN_KEEPALIVE void mm_pagina_textos(int inst, int largura, int altura) { instancias[size_t(inst)]->e.pagina_textos(largura, altura); }
+
+// a janela em pixels de quem mostra o boneco inteiro (docs/NUCLEO.md "Tela"): a vista sai na hora
+// e os ossos ancorados se corrigem no proximo calculo do mundo; 0 x 0 volta a arte base. Os
+// checkpoints guardados ficam com a janela velha: sao esquecidos
+EMSCRIPTEN_KEEPALIVE void mm_janela(int inst, double largura, double altura) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (largura == i.e.janela_largura() && altura == i.e.janela_altura()) return;
+  i.e.janela(largura, altura);
+  i.guardado.reset();
+  i.vagas.clear();
+}
+// a vista em mm_saida: escala (pixels por unidade), x, y (canto de baixo e da esquerda), largura e
+// altura no mundo
+EMSCRIPTEN_KEEPALIVE const double* mm_vista(int inst) {
+  const Esqueleto::Vista& v = instancias[size_t(inst)]->e.vista();
+  saida.assign({v.escala, v.x, v.y, v.largura, v.altura});
+  return saida.data();
 }
 
 // nova instancia do modelo (reaproveita o lugar de uma liberada)
@@ -312,6 +461,81 @@ EMSCRIPTEN_KEEPALIVE int mm_skin(int inst, const char* nome) {
       return int(i);
     }
   return -1;
+}
+
+// ---- papeis (docs/NUCLEO.md "Papeis"): o teste de toque e os estados dos botoes. As coordenadas
+// sao do mundo do boneco (y para cima); quem mostra converte da janela pela vista
+
+// os estados dos botoes ligados nesta instancia (depois de mm_reiniciar): cada botao no estado
+// inicial (normal ou desligado), sem mix
+EMSCRIPTEN_KEEPALIVE void mm_papeis_iniciar(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  i.ui = std::make_unique<Interface>(i.modelo);
+  i.ui->iniciar(*i.estado);
+}
+// o ponteiro: tipo 0 andou, 1 apertou, 2 soltou (mouse), 3 soltou (dedo), 4 saiu; devolve o papel
+// sob o ponteiro (-1 nenhum)
+EMSCRIPTEN_KEEPALIVE int mm_papeis_ponteiro(int inst, int tipo, double x, double y) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (!i.ui) return -1;
+  switch (tipo) {
+    case 0: i.ui->mover(i.e, *i.estado, x, y); break;
+    case 1: i.ui->apertar(i.e, *i.estado, x, y); break;
+    case 2: i.ui->soltar(i.e, *i.estado, x, y, false); break;
+    case 3: i.ui->soltar(i.e, *i.estado, x, y, true); break;
+    default: i.ui->sair(*i.estado);
+  }
+  return i.ui->sobre();
+}
+// os papeis tocados desde a ultima leitura (em mm_saida, um indice cada); devolve quantos
+EMSCRIPTEN_KEEPALIVE int mm_papeis_toques(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  saida.clear();
+  if (i.ui) {
+    for (int k : i.ui->toques) saida.push_back(double(k));
+    i.ui->toques.clear();
+  }
+  return int(saida.size());
+}
+EMSCRIPTEN_KEEPALIVE void mm_papel_desligar(int inst, int k, int desligado) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (i.ui) i.ui->desligar(*i.estado, k, desligado != 0);
+}
+// o estado mostrado do papel k (0 normal, 1 em cima, 2 apertado, 3 desligado; -1 sem iniciar)
+EMSCRIPTEN_KEEPALIVE int mm_papel_estado(int inst, int k) {
+  const Instancia& i = *instancias[size_t(inst)];
+  return i.ui ? i.ui->estado(k) : -1;
+}
+EMSCRIPTEN_KEEPALIVE int mm_papel_desligado(int inst, int k) {
+  const Instancia& i = *instancias[size_t(inst)];
+  return i.ui ? int(i.ui->desligado(k)) : int(i.modelo->papeis[size_t(k)].desligado);
+}
+// forca o estado mostrado do papel k (o editor mostra cada estado; o jogo, um atalho de teclado)
+EMSCRIPTEN_KEEPALIVE void mm_papel_mostrar(int inst, int k, int estado) {
+  Instancia& i = *instancias[size_t(inst)];
+  if (i.ui) i.ui->mostrar(*i.estado, k, estado);
+}
+// o papel no ponto do mundo (o de cima; -1 nenhum), sem mudar estado
+EMSCRIPTEN_KEEPALIVE int mm_papel_no_ponto(int inst, double x, double y) { return papel_no_ponto(instancias[size_t(inst)]->e, x, y); }
+// a area do papel k: os triangulos em mm_saida (6 numeros cada, no mundo); devolve quantos numeros
+EMSCRIPTEN_KEEPALIVE int mm_papel_area(int inst, int k) {
+  area_papel(instancias[size_t(inst)]->e, k, saida);
+  return int(saida.size());
+}
+// guarda os eventos de cada mm_passo para o jogo ler (mm_eventos)
+EMSCRIPTEN_KEEPALIVE void mm_eventos_ligar(int inst, int ligar) {
+  Instancia& i = *instancias[size_t(inst)];
+  i.guardar_eventos = ligar != 0;
+  i.eventos_guardados.clear();
+}
+// os eventos guardados desde a ultima leitura, em mm_saida: [tipo, trilha, animacao, evento]
+// cada (tipo 0 inicio, 1 interrompida, 2 fim, 3 completa, 4 usuario; evento: indice em `eventos`
+// do mm_info, -1 se nao e de usuario); devolve quantos numeros
+EMSCRIPTEN_KEEPALIVE int mm_eventos(int inst) {
+  Instancia& i = *instancias[size_t(inst)];
+  saida.swap(i.eventos_guardados);
+  i.eventos_guardados.clear();
+  return int(saida.size());
 }
 
 // solta uma instancia so (as medidas abrem e fecham a delas sem mexer nas do editor)
@@ -352,6 +576,16 @@ EMSCRIPTEN_KEEPALIVE void mm_reiniciar(int inst) {
   i.por_posicao();
   i.e.atualizar_mundo();
   i.estado = std::make_unique<Estado>(i.modelo);
+  i.estado->mix_spine_godot = i.mix_spine_godot;
+  i.ui.reset();  // os botoes voltam a mm_papeis_iniciar
+}
+
+// regra de mistura do spine-godot (docs/NUCLEO.md "Estado"): 1 liga, 0 desliga; vale tambem
+// depois de mm_reiniciar
+EMSCRIPTEN_KEEPALIVE void mm_estado_regra_mix(int inst, int spine_godot) {
+  Instancia& i = *instancias[size_t(inst)];
+  i.mix_spine_godot = spine_godot != 0;
+  if (i.estado) i.estado->mix_spine_godot = i.mix_spine_godot;
 }
 
 // set_animation com o mix dado (o PoseSim sempre diz o mix)
@@ -365,6 +599,33 @@ EMSCRIPTEN_KEEPALIVE void mm_estado_tocar_reverso(int inst, int trilha, int anim
   Entrada* e = instancias[size_t(inst)]->estado->tocar(trilha, anim, false);
   e->reverso = true;
   e->mix_duracao = mix;
+}
+
+// o que a trilha toca: a animacao (-1 nada ou a vazia), e em mm_saida [animacao, loop, mix, tempo]
+EMSCRIPTEN_KEEPALIVE int mm_estado_atual(int inst, int trilha) {
+  const Instancia& i = *instancias[size_t(inst)];
+  saida.clear();
+  const Entrada* en = i.estado ? i.estado->entrada(trilha) : nullptr;
+  if (!en) return -1;
+  saida.insert(saida.end(), {double(en->animacao), en->loop ? 1.0 : 0.0, en->mix_duracao, en->tempo});
+  return en->animacao;
+}
+
+// o ritmo de uma trilha (docs/NUCLEO.md "Estado", escala_tempo da entrada): 0 pausa, 1 normal. Vale
+// para a entrada atual, as que ela ainda mistura (saindo) e a fila; uma animacao tocada depois na
+// trilha comeca no ritmo 1. Devolve 0 se a trilha esta vazia
+EMSCRIPTEN_KEEPALIVE int mm_estado_ritmo(int inst, int trilha, double escala) {
+  Entrada* en = instancias[size_t(inst)]->estado->entrada(trilha);
+  if (!en) return 0;
+  for (Entrada* e = en; e; e = e->de) e->escala_tempo = escala;
+  for (Entrada* e = en->proxima; e; e = e->proxima) e->escala_tempo = escala;
+  return 1;
+}
+
+// solta a trilha: a animacao vazia com o mix dado (set_empty_animation); o que ela animava volta
+// ao que as trilhas de baixo (ou o setup) dizem
+EMSCRIPTEN_KEEPALIVE void mm_estado_vazio(int inst, int trilha, double mix) {
+  instancias[size_t(inst)]->estado->vazio(trilha, mix);
 }
 
 // add_animation com o atraso ja calculado e o mix dado
@@ -395,6 +656,11 @@ EMSCRIPTEN_KEEPALIVE void mm_passo(int inst, double dt) {
   i.e.avancar(dt);
   i.e.atualizar_mundo();
   i.estado->ler_eventos(lidos);
+  if (i.guardar_eventos) {
+    // [tipo (0 inicio, 1 interrompida, 2 fim, 3 completa, 4 usuario), trilha, animacao, evento]
+    if (i.eventos_guardados.size() > 4096) i.eventos_guardados.clear();
+    for (const Evento& ev : lidos) i.eventos_guardados.insert(i.eventos_guardados.end(), {double(int(ev.tipo)), double(ev.trilha), double(ev.animacao), double(ev.evento)});
+  }
   if (colher)
     for (const Evento& ev : lidos)
       if (ev.tipo == TipoEvento::Usuario) colhidos.insert(colhidos.end(), {double(ev.evento), ev.tempo, i.tempo, double(ev.animacao)});
@@ -426,6 +692,27 @@ EMSCRIPTEN_KEEPALIVE void mm_desenhar(int inst) {
   desenhar(e, desenho);
   for (auto [s, p] : partes) e.slot(s).parte = p;
   for (auto& [s, c] : cores) e.slot(s).cor = c;
+}
+// o jogo troca a parte de um slot (os algarismos de um placar de imagens): nome vazio tira; uma
+// animacao que mexe na parte do slot manda por cima. Devolve 0 se o slot nao tem essa parte
+EMSCRIPTEN_KEEPALIVE int mm_slot_parte(int inst, int slot, const char* nome) {
+  Esqueleto& e = instancias[size_t(inst)]->e;
+  if (slot < 0 || slot >= int(e.slots().size())) return 0;
+  int p = -1;
+  if (nome && *nome) {
+    p = e.parte(slot, nome);
+    if (p < 0) return 0;
+  }
+  e.mudar_parte(slot, p);
+  return 1;
+}
+// o jogo poe um osso na pose local (x, y, rotacao, escalas) como uma chave de animacao poria: fica
+// ate uma animacao mexer no osso (a correcao da tela soma por cima). O mundo, no proximo mm_passo
+EMSCRIPTEN_KEEPALIVE void mm_osso_local(int inst, int osso, double x, double y, double rotacao, double escala_x, double escala_y) {
+  Esqueleto& e = instancias[size_t(inst)]->e;
+  if (osso < 0 || osso >= int(e.local.size())) return;
+  Local& l = e.local[size_t(osso)];
+  l.x = x, l.y = y, l.rotacao = rotacao, l.escala_x = escala_x, l.escala_y = escala_y;
 }
 // tinta de um slot no desenho (a < 0 tira); esconder um slot no desenho
 EMSCRIPTEN_KEEPALIVE void mm_slot_tinta(int inst, int slot, float r, float g, float b, float a) {
@@ -563,10 +850,14 @@ EMSCRIPTEN_KEEPALIVE int mm_vertices_slot(int inst, int slot) {
   saida.clear();
   if (s.parte < 0) return 0;
   const Parte& p = i.modelo->partes[size_t(s.parte)];
+  // a regiao com nove-fatias: so os 4 cantos de fora da grade (a caixa da parte, para o clique);
+  // a grade inteira vai pelo desenho e pelo mm_pose
+  if (p.fatias >= 0) return int(i.e.cantos_fatias(slot, saida));
   switch (p.tipo) {
     case TipoParte::Regiao:
     case TipoParte::Malha:
-    case TipoParte::MalhaLigada: return int(i.e.vertices(slot, saida));
+    case TipoParte::MalhaLigada:
+    case TipoParte::Texto: return int(i.e.vertices(slot, saida));
     case TipoParte::Recorte:
     case TipoParte::Caminho:
     case TipoParte::Caixa:
@@ -629,7 +920,7 @@ EMSCRIPTEN_KEEPALIVE int mm_caixa_instancia(int inst, int i) {
 EMSCRIPTEN_KEEPALIVE int mm_parte_triangulos(int modelo, int parte) {
   const Parte& p = modelos[size_t(modelo)]->partes[size_t(parte)];
   saida.clear();
-  if (p.tipo == TipoParte::Regiao) saida = {0, 1, 2, 2, 3, 0};
+  if (p.tipo == TipoParte::Regiao || p.tipo == TipoParte::Texto) saida = {0, 1, 2, 2, 3, 0};
   else
     for (uint16_t t : p.triangulos) saida.push_back(t);
   return int(saida.size());

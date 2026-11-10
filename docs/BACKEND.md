@@ -13,7 +13,7 @@ O alvo principal é a web, com integração JS, compilado.
 - **Por isso a interface é pequena:** em vez de reproduzir os `Control` do Godot, um layout em dados
   no `.boneco` com poucos elementos (imagem, texto com chave de tradução, área de toque, nove-fatias,
   âncora na tela), cada um com nome; o código acha pelo nome (`tela.texto("saldo")`,
-  `tela.botao("girar").aoTocar(...)`).
+  `tela.botao("girar").aoTocar(...)`), pelo manifesto (seção "Papéis").
 
 ## A escolha da linguagem (2026-11-09)
 
@@ -124,6 +124,103 @@ trilhas e fila como o Spine (reverso, slots escondidos e tingidos, osso no mundo
 que começa escondido, fontes de uma escrita só no idioma dela. O atlas de textos sobe cada pedaço
 com uma moldura transparente (sem sangria de pedaços antigos) e faz numa escala menor o que não
 cabe nele.
+
+**Imagens maiores do que a tela mostra (2026-11-09).** A arte de produção costuma vir em resolução
+de impressão (num jogo de mesa medido, três camadas de 16 Mpx cada: ~180 MB de RGBA na GPU e ~1,8 s
+de decodificação e subida). `tools/reduzir-imagens.ts` monta a cena em várias janelas (com os ajustes e
+os estados do jogo), mede quantos texels de cada imagem caem numa unidade da tela
+(`src/tela/densidade.ts`) e reduz as imagens grandes (padrão: acima de 2 Mpx) que passam do limite
+(padrão 1,6 texel por unidade; um celular de 1080 px numa tela de 700 de largura tem 1,55 px por
+unidade), sem tocar na arte-fonte. O manifesto diz o tamanho lógico e o real; a tela recebe o
+lógico em `Imagem.tam` (vindo de `medidas.texturas`) e divide os recortes por ele, então os
+`region_rect`, o esticar e a repetição da cena continuam nas coordenadas do original. Imagem pequena
+fica de fora porque o código do jogo pode ampliá-la (tween de escala), o que a medida não vê. A
+redução é por amostra de ponto (padrão; `--filtro gpu|lanczos3` para outras): a GPU desenha essas
+texturas sem mipmap, quase uma amostra por pixel, e o grão fino da arte aparece; um filtro suave o
+apaga (num feltro medido, o desvio do grão caía de 2,78 para 1,6 com lanczos e ficou em 2,65 por ponto).
+Na mesma entrega: `tools/comprimir-imagens.ts` regrava com perda (q95, alfa sem perda) os WebP sem
+perda quando, nos pixels visíveis e com a cor pré-multiplicada, o percentil 99 do erro fica até
+10/255 e o arquivo diminui (num jogo medido: uma pintura de mesa 2,15 -> 0,60 MB e o personagem 0,64 ->
+0,23 MB;
+números e brilhos recusados), e `tools/binario-web.ts` grava os `.boneco` em binário pelo núcleo
+em wasm, conferido na volta (o mesmo byte a byte que o nativo; 738 -> 145 KB). A tela lê o
+`.boneco` texto ou binário pela mágica `BNCB`. Teste: `npm run test:imagens`.
+
+## A tela feita no Mamulengo: âncoras (2026-11-09)
+
+O primeiro passo do modo de layout: uma tela feita só no Mamulengo, sem `.tscn`. O `.boneco` ganha
+o bloco `tela` (arte base, encaixe e ossos ancorados aos cantos, ao meio das bordas ou ao centro
+da janela, esticando ou não); a conta mora no núcleo (docs/NUCLEO.md "Tela") para dar o mesmo
+número no editor, na web e no Godot (`BonecoSprite.fit_window`). É a mesma regra das âncoras e
+offsets do `Control` (`src/cena/layout.ts`), aplicada a ossos: o offset é a distância do osso ao
+ponto na arte base. Na web, `src/tela/tela-boneco.ts` mostra o boneco na janela inteira, troca a
+janela ao redimensionar e acha os ossos pelo nome (`tela.ponto("botao")`); os estados são
+animações (`tela.tocar("desktop", false, 1)`). Exemplo: `exemplos/coelho`.
+
+## Papéis: o contrato entre quem monta a tela e quem escreve a lógica (2026-11-10)
+
+A pessoa monta a tela no editor e marca o papel de cada elemento (docs/NUCLEO.md, "Papeis"): **botão**
+(área de toque com os estados normal, em cima, apertado e desligado, cada um uma animação), **toque**
+(só a área) ou **texto do código** (a parte de texto que o jogo troca). O Claude escreve a lógica pelos
+nomes, sem abrir o editor, a partir do **manifesto**.
+
+**O manifesto** (`query.roles`, ou o arquivo `<tela>.manifesto.json` ao lado do `.boneco`; o
+`exemplos/coelho/gerar.ts` escreve o dele): o que o código pode chamar, cada item com a chamada pronta.
+
+| campo | o quê |
+|---|---|
+| `botoes` | `nome`, `osso`, `area` (em palavras), `estados` (`normal`, `em_cima`, `apertado`, `desligado` → a animação, ou null), `desligado` (começa), `trilha`, `codigo` |
+| `toques` | `nome`, `osso`, `area`, `codigo` |
+| `textos` | todos os textos, pelo nome (o do papel, ou o do slot): `doCodigo` (o jogo troca), `chave` ou `texto` (o livre), `parametros` (os `{n}` da chave em qualquer idioma), `exemplo`, `codigo` |
+| `estados` | os estados da tela: as animações que não são estado de botão, com `duracao` e `eventos` |
+| `eventos`, `idiomas`, `avisos` | os eventos de animação, os idiomas da tabela, o que falta (botão sem normal, osso que sumiu) |
+
+O `.boneco` é a fonte (o bloco `papeis`); o manifesto é derivado, para ler. Quem muda a tela gera de novo.
+
+**Do PSD ao manifesto** (docs/LAYOUT-PSD.md): importado como tela, o PSD já chega com os papéis pelos
+nomes das camadas (`btn_jogar` com as camadas `normal`, `apertado`, `desligado` vira o botão com os
+estados; `txt_placar`, o texto do código) e a importação grava `<tela>.manifesto.json` ao lado.
+
+**A API do jogo na web** (`src/tela/tela-boneco.ts`; o Godot tem a mesma no `BonecoSprite`, docs/NUCLEO.md
+"No Godot"):
+
+```ts
+const tela = await TelaBoneco.abrir(gl, N, desenhista, "tela.boneco");
+tela.ligarPonteiro(canvas);                          // mouse e dedo -> estados e toques
+tela.estado("parado", { loop: true, trilha: 0 });   // um estado da tela (trilha 1 e sem laço por padrão)
+tela.botao("jogar").aoTocar(() => { ... });         // apertou e soltou no botão ligado
+tela.botao("jogar").desligar();  .ligar();  .desligado;  .estado;  .mostrar("apertado")
+tela.toque("fundo", () => { ... });                  // a área de toque
+tela.texto("placar", "1.300");  tela.texto("m1_texto", { n: 3 });  tela.textoMostrado("placar")
+tela.estado("desktop", { reverso: true });
+tela.estado("coelho/pula", { trilha: 2, depois: "coelho/respira" });  // e, no fim, a outra em laço
+tela.soltar(2);                                      // a trilha volta ao de baixo (a animação vazia, com mix)
+tela.ritmo([0, 2, 20], 0);  tela.ritmo([0, 2, 20], 1); // a pausa do jogo: só essas trilhas param
+tela.aoEvento("pisca", (e) => ...);  tela.aoTerminar("entra", () => ...);
+tela.aoApertar("pular", () => { ... });              // na hora do apertar (o toque de aoTocar é no soltar)
+tela.posicao("moeda1");  tela.distancia("corpo", "moeda1")   // na arte base, sem depender da janela
+tela.areaDe("jogar");  tela.papelEm(x, y);           // pixels da janela (testes, dicas)
+tela.mexer("copo", { x: 120, rotacao: -10 });       // a pose local do osso pelo codigo (ate uma animacao mexer nele)
+tela.parte("valor_0", "valor_0_7");  tela.parte("valor_1", null)   // troca a parte do slot (algarismos de imagem)
+```
+
+Os nomes saem do `.boneco` (um nome errado dá erro com a lista dos que existem). O toque e os estados
+são do núcleo (o mesmo papel no mesmo ponto no Godot e na web); a página só liga o ponteiro.
+
+A tela com instâncias (o personagem como outro `.boneco`) abre igual: `TelaBoneco.abrir` busca os
+`.boneco` dos filhos pelo caminho do pai antes de carregar.
+
+**A prova** (`exemplos/coelho/jogo`, 2026-11-10): o joguinho do coelho, uma página escrita só pelo
+manifesto e pela API, sem olhar o gerador. JOGAR começa uma rodada de 30 s; tocar a tela pula; moedas,
+uma cenoura e espinhos passam flutuando (6 moedas e 2 espinhos pré-montados, ligados e desligados pelas
+animações: ainda não há lista); as missões marcam sozinhas com um aviso; a pausa congela só as trilhas
+do jogo; o fim mostra o resultado, o recorde do navegador e "de novo". Os itens são achados pelo nome e
+a altura de cada um pela posição (`tela.posicao`); pegar é `tela.distancia` contra um raio. O som vem
+dos eventos das animações. `npx tsx tools/tela-jogo-teste.ts` sobe o Vite numa porta própria e joga
+rodadas inteiras com semente fixa e o relógio na mão (`?manual`), clicando com o mouse de verdade num
+Chromium sem tela, em pt e ar num celular e em pt e hi num desktop (70 conferências); grava as capturas
+(`exemplos/coelho/capturas/jogo`) e, com `--video`, a rodada em WebM e GIF. O que a API não deu e foi
+acrescentado, e o que ficou para depois: docs/ROADMAP.md, seção 10, "o joguinho do coelho".
 
 ## O primeiro jogo de produção portado (2026-11-09)
 

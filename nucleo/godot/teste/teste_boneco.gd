@@ -175,6 +175,10 @@ func _rodar() -> void:
 	_confere(wt.size() == wb.size() and dbin == 0.0, "binario e texto: os mesmos ossos depois de 1,5 s com fila e mix (dif %s)" % str(dbin))
 
 	_palco()
+	_tela()
+	_textos()
+	_fatias()
+	_papeis()
 	print("\n%d ok, FAILURES: %d" % [oks, falhas])
 	quit(1 if falhas else 0)
 
@@ -195,3 +199,114 @@ func _palco() -> void:
 	_confere(e["won"] and not e["died"] and e["points"] == 2 and e["tick"] == 222 and is_equal_approx(c["position"].x, 1021.0) and is_equal_approx(c["position"].y, -564.0), "palco: a rota vence igual ao nucleo web (%s)" % [str(c["position"])])
 	var p := _novo()
 	_confere(not p.stage_start(), "stage_start sem palco devolve false")
+
+
+# a tela (docs/NUCLEO.md "Tela"): tests/nucleo/tela (arte 700 x 1370, caber). Numa janela 16:9 de
+# 1920 x 1080 a vista tem 2435,56 de largura; o "fechar" (canto de cima e da direita) vai a
+# 1197,78 e a barra estica 3,479 vezes, como no nucleo nativo (tools/nucleo-tela.ts). Com
+# fit_window, a janela e a viewport e o no fica com a escala da vista e o canto dela em (0, 0)
+func _tela() -> void:
+	var s := _novo("res://tela/tela.boneco")
+	s.window = Vector2(1920, 1080)
+	s.update_skeleton(0.0)
+	var f := _osso(s, "fechar")
+	var b := _osso(s, "barra")
+	var v: Rect2 = s.get_view()
+	_confere(absf(f[0] - 1197.7778) < 0.01 and absf(f[1] + 1340.0) < 0.01 and absf(b[2] - 3.4794) < 0.001, "tela: o osso ancorado e o que estica na janela 16:9 (fechar %s, barra %s)" % [str(f[0]), str(b[2])])
+	_confere(absf(s.get_view_scale() - 0.788321) < 1e-5 and absf(v.size.x - 2435.5556) < 0.01 and absf(v.position.y + 1370.0) < 0.01, "tela: a vista (%s, escala %s)" % [str(v), str(s.get_view_scale())])
+	s.window = Vector2(0, 0)
+	s.update_skeleton(0.0)
+	_confere(absf(_osso(s, "fechar")[0] - 330.0) < 0.01, "tela: sem janela, a arte base")
+	s.fit_window = true
+	s.update_skeleton(0.0)
+	var t: Vector2 = s.get_viewport_rect().size
+	var e: float = s.get_view_scale()
+	_confere(s.window == t and absf(s.scale.x - e) < 1e-6 and absf(s.position.x + s.get_view().position.x * e) < 0.01 and absf(s.position.y + s.get_view().position.y * e) < 0.01, "tela: fit_window segue a viewport %s (escala %s, posicao %s)" % [str(t), str(e), str(s.position)])
+
+
+# os textos (docs/NUCLEO.md "Texto"): tests/nucleo/texto com a tabela pt, en, ar. O idioma acha a
+# traducao da chave (pt_BR acha pt), set_text troca pelo texto livre, os parametros "{nome}"
+# trocam, e o quadro desenha as letras pelo TextServer sem erro
+func _textos() -> void:
+	var s := _novo("res://texto/texto.boneco")
+	_confere(Array(s.get_languages()) == ["pt", "en", "ar"], "textos: os idiomas da tabela %s" % [str(s.get_languages())])
+	s.language = "en"
+	_confere(s.get_text_shown("jogar") == "PLAY", "textos: en (%s)" % s.get_text_shown("jogar"))
+	s.language = "ar"
+	_confere(s.get_text_shown("jogar") == "العب", "textos: ar (%s)" % s.get_text_shown("jogar"))
+	s.language = "pt_BR"
+	_confere(s.get_text_shown("jogar") == "JOGAR", "textos: pt_BR acha pt (%s)" % s.get_text_shown("jogar"))
+	s.update_skeleton(0.016)
+	s.set_text("pontos", "Saldo {valor}")
+	s.set_text_params("pontos", {"valor": "R$ 100,00"})
+	_confere(s.get_text_shown("pontos") == "Saldo {valor}", "textos: set_text e livre (os parametros so na chave e no arquivo): %s" % s.get_text_shown("pontos"))
+	s.clear_text("pontos")
+	s.set_text_params("pontos", {"x": 1})
+	_confere(s.get_text_shown("pontos") == "linha 1\nlinha \"2\"", "textos: clear_text volta ao do arquivo (%s)" % s.get_text_shown("pontos"))
+	s.set_text("jogar", "um texto bem comprido que nao cabe de jeito nenhum na caixa do botao")
+	s.update_skeleton(0.016)
+	var est: Array = s.get_text_overflows()
+	_confere(est.has("jogar"), "textos: o estouro do texto comprido (%s)" % str(est))
+	s.set_text("jogar", "OK")
+	_confere(not s.get_text_overflows().has("jogar"), "textos: curto nao estoura")
+
+
+# as nove-fatias (docs/NUCLEO.md "Nove-fatias"): tests/nucleo/fatias. Na janela 16:9 (1920 x 1080) o
+# painel estica 2,963 vezes em x e os cantos ficam com 40 de largura (como no nucleo nativo,
+# tools/nucleo-fatias.ts); o fundo do botao acompanha o texto do TextServer: o curto deixa o tamanho
+# caixa (240) na largura, o comprido a alarga (a medida vezes 1,25 mais 2 x 20 de respiro); a altura e a
+# da linha vezes 1,25 mais 2 x 8 nos dois (a mesma linha)
+func _fatias() -> void:
+	var s := _novo("res://fatias/fatias.boneco")
+	s.window = Vector2(1920, 1080)
+	s.update_skeleton(0.0)
+	var p: Dictionary = s.get_slice_info("painel")
+	var c: PackedVector2Array = p.get("corners", PackedVector2Array())
+	_confere(p.has("size") and absf(p["stretch"].x - 2.962963) < 1e-5 and absf(p["stretch"].y - 1.0) < 1e-5 and p["grid"] == Vector2i(4, 4) and c.size() == 4 and absf((c[2].x - c[1].x) - 592.5926) < 0.01, "fatias: o painel esticando na janela 16:9 (%s)" % str(p))
+	_confere(s.get_slice_info("rotulo").is_empty() and s.get_slice_info("nada").is_empty(), "fatias: slot sem regiao fatiada")
+	s.set_text("rotulo", "OK")
+	s.update_skeleton(0.016)
+	var curto: Dictionary = s.get_slice_info("fundo_botao")
+	s.set_text("rotulo", "SPIELEN SPIELEN")
+	s.update_skeleton(0.016)
+	var longo: Dictionary = s.get_slice_info("fundo_botao")
+	_confere(absf(curto["size"].x - 240.0) < 1e-3 and longo["size"].x > 300.0 and longo["size"].y >= 80.0 and absf(longo["size"].y - curto["size"].y) < 1e-3, "fatias: o botao acompanha o texto (curto %s, comprido %s)" % [str(curto["size"]), str(longo["size"])])
+
+
+# os papeis (docs/NUCLEO.md "Papeis"): tests/nucleo/papeis. O no le os papeis, comeca cada botao no
+# estado inicial (a pausa desligada), acha o papel no ponto como o nucleo nativo (tools/nucleo-papeis.ts:
+# a tampa desenhada por cima ganha do botao), troca os estados pelo ponteiro e emite role_touched
+var tocados: Array = []
+func _tocou(nome: String) -> void:
+	tocados.append(nome)
+
+
+func _papeis() -> void:
+	var s := _novo("res://papeis/papeis.boneco")
+	s.update_skeleton(0.0)
+	s.role_touched.connect(_tocou)
+	var r: Array = s.get_roles()
+	_confere(r.size() == 8 and r[0]["name"] == "jogar" and r[0]["type"] == "botao" and r[0]["track"] == 10 and r[0]["states"].get("em_cima", "") == "jogar/em_cima" and r[2]["disabled"] == true and r[7]["type"] == "texto", "papeis: get_roles (%d)" % r.size())
+	_confere(s.get_role_state("jogar") == "normal" and s.get_role_state("pausa") == "desligado" and s.get_current(10).get_animation_name() == "jogar/normal", "papeis: o estado inicial")
+	# no espaco do no o y e para baixo: o ponto (-60, 150) do mundo e (-60, -150)
+	var sobre := Vector2(-60, -150)
+	_confere(s.get_role_at(sobre) == "jogar" and s.get_role_at(Vector2(110, -150)) == "tampa" and s.get_role_at(Vector2(276, -930)) == "so_icone" and s.get_role_at(Vector2(200, -500)) == "", "papeis: o papel no ponto (a ordem de desenho, o invisivel)")
+	_confere(s.role_pointer(0, sobre) == "jogar" and s.get_role_state("jogar") == "em_cima" and s.get_current(10).get_animation_name() == "jogar/em_cima", "papeis: em cima")
+	s.role_pointer(1, sobre)
+	_confere(s.get_role_state("jogar") == "apertado", "papeis: apertado")
+	s.role_pointer(2, sobre)
+	_confere(tocados == ["jogar"] and s.get_role_state("jogar") == "em_cima", "papeis: soltou no botao, role_touched (%s)" % str(tocados))
+	s.set_role_disabled("jogar", true)
+	s.role_pointer(1, sobre)
+	s.role_pointer(3, sobre)
+	_confere(tocados.size() == 1 and s.get_role_state("jogar") == "desligado" and s.is_role_disabled("jogar") and s.get_current(10).get_animation_name() == "jogar/desligado", "papeis: desligado nao toca")
+	s.set_role_disabled("jogar", false)
+	var a: PackedVector2Array = s.get_role_area("jogar")
+	_confere(a.size() == 6 and s.get_role_area("pontos").is_empty(), "papeis: a area em triangulos (%d pontos)" % a.size())
+	# o botao acompanha o texto do TextServer: a area cresce com ele
+	# os pontos: (baixo-esq, cima-esq, cima-dir) e (cima-dir, baixo-dir, baixo-esq): a largura e de 1 a 2
+	var x0 := (a[2] - a[1]).length()
+	s.set_text("rotulo", "SPIELEN SPIELEN SPIELEN")
+	s.update_skeleton(0.016)
+	var b: PackedVector2Array = s.get_role_area("jogar")
+	_confere(b.size() == 6 and absf(x0 - 240.0) < 1.0 and (b[2] - b[1]).length() > x0 + 100.0, "papeis: a area cresce com o texto (%.1f -> %.1f)" % [x0, (b[2] - b[1]).length()])

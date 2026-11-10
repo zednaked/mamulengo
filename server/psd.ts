@@ -6,7 +6,7 @@
 // O que e "assado" na imagem (como o script oficial, que salva cada camada pelo
 // Photoshop): opacidade da camada e das pastas, mascara de camada, camadas presas
 // (clipping) e [overlay]. Efeitos de camada e camadas de ajuste nao entram (avisa).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { bonecoVirtual, lerVirtual, gravarVirtual } from "./boneco.ts";
 import { dirname, join } from "node:path";
 import sharp from "sharp";
@@ -18,7 +18,8 @@ import { gravarBonecoArquivo } from "./boneco-binario.ts";
 import { Document } from "../src/core/document.ts";
 import { executeAsync } from "../src/core/commands/index.ts";
 import { checkMapa, readPsdPlan, type PsdImage, type PsdMapa, type Raster, type ReadOptions } from "../src/core/psd-ler.ts";
-import { assetsDe, atualizarDePsd, criarBonecoDePsd, manifestPath, type PsdIO, type PsdManifest, type PsdResult } from "../src/core/psd-importar.ts";
+import { aplicarEscolhas, mapaDaTela, resumoTela, type EscolhasTela } from "../src/core/psd-tela.ts";
+import { assetsDe, atualizarDePsd, criarBonecoDePsd, criarTelaDePsd, proporTela, manifestPath, type PsdIO, type PsdManifest, type PsdResult } from "../src/core/psd-importar.ts";
 export { checkMapa, manifestPath, readPsdPlan, type PsdImage, type PsdManifest, type PsdMapa, type PsdResult, type ReadOptions };
 
 async function toPng(r: Raster, scale: number): Promise<Buffer> {
@@ -47,6 +48,9 @@ export function nodeIO(backup?: (file: string) => void): PsdIO {
     },
     async imagens(dir) {
       return listImages(dir);
+    },
+    async listar(dir) {
+      return existsSync(dir) ? readdirSync(dir).map((f) => join(dir, f)).filter((f) => statSync(f).isFile()) : [];
     },
     async bruto(p) {
       return existsSync(p) ? sharpRaw(p) : null;
@@ -137,4 +141,15 @@ export async function updateDocFromPsd(doc: Document, opts: { psd: string; atlas
   const { calls, report } = psdCalls(doc.json, plan);
   if (calls.length) await executeAsync(doc, calls, "psd", `PSD ${plan.file}`, {}, fileAssets(dirname(opts.atlas), atlasText));
   return { plan, report, summary: psdSummary(plan, report, "update"), atlasText };
+}
+
+// A tela (docs/LAYOUT-PSD.md): a proposta (dryRun) e a tela nova, sempre .boneco
+export async function proposeScreenFromPsd(opts: { psd: string; mapa?: any; escolhas?: EscolhasTela; fontes?: string[] }) {
+  const r = await proporTela(nodeIO(), { psd: new Uint8Array(readFileSync(opts.psd)), arquivoPsd: opts.psd, mapa: opts.mapa, fontes: opts.fontes });
+  const proposta = aplicarEscolhas(r.proposta, opts.escolhas);
+  return { proposta, linhas: resumoTela(proposta), mapa: mapaDaTela(proposta), mapaArquivo: r.mapaArquivo };
+}
+export async function createScreenFromPsd(opts: { psd: string; dir: string; name: string; mapa?: any; escolhas?: any; fontes?: string[]; ignoreHidden?: boolean }) {
+  if (!/^[\w.-]+$/.test(opts.name)) throw new Error(`nome invalido "${opts.name}": use letras, numeros, - e _ (sem espacos)`);
+  return criarTelaDePsd(nodeIO(), { psd: new Uint8Array(readFileSync(opts.psd)), arquivoPsd: opts.psd, dir: opts.dir, name: opts.name, mapa: opts.mapa, escolhas: opts.escolhas, fontes: opts.fontes, ignoreHidden: opts.ignoreHidden });
 }

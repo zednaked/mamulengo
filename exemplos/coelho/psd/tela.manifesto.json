@@ -1,0 +1,96 @@
+{
+ "boneco": "tela",
+ "api": "src/tela/tela-boneco.ts (docs/BACKEND.md, \"Papeis\"): const tela = await TelaBoneco.abrir(gl, N, desenhista, url); tela.ligarPonteiro(canvas)",
+ "botoes": [
+  {
+   "nome": "pausa",
+   "osso": "btn_pausa",
+   "area": "as partes do osso btn_pausa e dos filhos",
+   "estados": {
+    "normal": "pausa/normal",
+    "em_cima": "pausa/em_cima",
+    "apertado": "pausa/apertado",
+    "desligado": "pausa/desligado"
+   },
+   "desligado": false,
+   "trilha": 10,
+   "codigo": "tela.botao(\"pausa\").aoTocar(() => { ... })"
+  },
+  {
+   "nome": "jogar",
+   "osso": "btn_jogar",
+   "area": "as partes do osso btn_jogar e dos filhos",
+   "estados": {
+    "normal": "jogar/normal",
+    "em_cima": "jogar/em_cima",
+    "apertado": "jogar/apertado",
+    "desligado": "jogar/desligado"
+   },
+   "desligado": false,
+   "trilha": 11,
+   "codigo": "tela.botao(\"jogar\").aoTocar(() => { ... })"
+  }
+ ],
+ "toques": [],
+ "textos": [
+  {
+   "nome": "placar",
+   "slot": "txt_placar",
+   "doCodigo": true,
+   "texto": "1250",
+   "parametros": [],
+   "codigo": "tela.texto(\"placar\", \"...\")"
+  },
+  {
+   "nome": "jogar",
+   "slot": "jogar",
+   "doCodigo": false,
+   "chave": "JOGAR",
+   "parametros": [],
+   "exemplo": "JOGAR",
+   "codigo": "tela.texto(\"jogar\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "missoes",
+   "slot": "missoes",
+   "doCodigo": false,
+   "chave": "MISSOES",
+   "parametros": [],
+   "exemplo": "MISSÕES",
+   "codigo": "tela.texto(\"missoes\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "moedas",
+   "slot": "moedas",
+   "doCodigo": false,
+   "chave": "MOEDAS",
+   "parametros": [],
+   "exemplo": "3 moedas",
+   "codigo": "tela.texto(\"moedas\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "pulos",
+   "slot": "pulos",
+   "doCodigo": false,
+   "chave": "PULOS",
+   "parametros": [],
+   "exemplo": "10 pulos",
+   "codigo": "tela.texto(\"pulos\", \"...\")  // troca a chave por texto livre"
+  },
+  {
+   "nome": "cenoura",
+   "slot": "cenoura",
+   "doCodigo": false,
+   "chave": "CENOURA",
+   "parametros": [],
+   "exemplo": "a cenoura",
+   "codigo": "tela.texto(\"cenoura\", \"...\")  // troca a chave por texto livre"
+  }
+ ],
+ "estados": [],
+ "eventos": [],
+ "idiomas": [
+  "pt"
+ ],
+ "avisos": []
+}

@@ -73,6 +73,8 @@ Quando o PSD vem chato, sem grupos nem tags, e não se pode regravar o arquivo d
 - **`esconder`:** camadas que entram escondidas, como trocas.
 - Chave que não casa com nenhuma camada vira aviso no resumo.
 
+Para uma **tela de jogo** (não um personagem) o mapa tem campos a mais (arte base, nomes, âncoras, fatias, textos) e pode morar ao lado do PSD como `<psd>.tela.json`: docs/LAYOUT-PSD.md, "Mapa externo".
+
 O mapa fica guardado em `images/psd-import.json`: a atualização sem mapa reaplica o da importação anterior. Sem mapa, nada muda na leitura do PSD.
 
 Exemplo com todas as tags: `tests/assets/psd/aventureiro.psd` (arte CC0, gerado por `tools/psd-fixture.ts`; `aventureiro-v2.psd` é a mesma arte depois de retocada, para testar a atualização).

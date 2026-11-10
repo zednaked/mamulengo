@@ -9,7 +9,7 @@
 // - blend multiply vira "multiplica" (com transparencia, o que o artista ve no editor) ou
 //   "multiplica_motor" (o do Godot, que ignora a transparencia), conforme o jogo.
 // Os efeitos, as particulas e as luzes (que o Spine nao tem) vao e voltam como `effects` (no slot
-// e na animacao), `particles`, `instances`, `lights` e `ambient` (no topo e na animacao), onde o spine-core nao
+// e na animacao), `particles`, `instances`, `lights` e `ambient` (no topo e na animacao) e `screen` e `roles` (no topo), onde o spine-core nao
 // le, e o relevo da pagina como a linha `relevo:<arquivo>` do atlas; so a exportacao para o Spine
 // de verdade (`soSpine`) os tira.
 import { CAMPOS, CAMPOS_VOLTA, VALORES, VALORES_VOLTA } from "./dicionario.ts";
@@ -18,7 +18,7 @@ import { parseAtlas } from "../core/atlas-text.ts";
 export const VERSAO = 0;
 
 // caminhos (so as chaves do esquema, sem indices) cujas chaves sao nomes do artista
-const MAPA_DE_NOMES = /^(events|drawings|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*(\/\*)?|skins\/attachments|skins\/attachments\/\*)$/;
+const MAPA_DE_NOMES = /^(events|drawings|translations\/strings|animations|animations\/\*\/(bones|slots|ik|transform|path|physics|slider|attachments|effects|particles|lights|instances)|animations\/\*\/attachments\/\*(\/\*)?|skins\/attachments|skins\/attachments\/\*)$/;
 
 function traduz(n: any, campos: Record<string, string>, valores: Record<string, Record<string, string>>, eNome: (p: string) => boolean, p: string[] = []): any {
   if (Array.isArray(n)) return n.map((x) => traduz(x, campos, valores, eNome, p));
@@ -239,6 +239,51 @@ export function exportarSpine(b: Boneco, opts: OpcoesExportar = {}): Exportado {
     if (resto.mosaicos?.length) {
       avisos.push(`mosaicos (${resto.mosaicos.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);
       delete resto.mosaicos;
+    }
+    if (resto.tela) {
+      const n = resto.tela.ancoras?.length ?? 0;
+      avisos.push(`a tela (arte base, encaixe${n ? ` e ${n} ancora${n > 1 ? "s" : ""}: ${resto.tela.ancoras.map((a: any) => a.osso).join(", ")}` : ""}) nao existe no Spine e ficou de fora: os ossos ficam no lugar da arte base`);
+      delete resto.tela;
+    }
+    // papeis (docs/NUCLEO.md "Papeis"): o Spine nao tem; as animacoes dos estados ficam
+    if (resto.papeis?.length) {
+      avisos.push(`os papeis (${resto.papeis.map((p: any) => `${p.nome}: ${p.tipo}`).join(", ")}) nao existem no Spine e ficaram de fora: as animacoes dos estados dos botoes ficam`);
+      delete resto.papeis;
+    }
+    // nove-fatias (docs/NUCLEO.md "Nove-fatias"): o Spine nao tem; a regiao fica inteira, igual no
+    // tamanho base (o unico em que o Spine a mostra: sem tela, sem texto que a acompanhe)
+    const fatiadas: string[] = [];
+    for (const sk of resto.skins ?? [])
+      for (const [sl, ps] of Object.entries<any>(sk.partes ?? {}))
+        for (const [n, a] of Object.entries<any>(ps))
+          if (a?.fatias) {
+            fatiadas.push(`${sl}/${n}`);
+            // a regiao sai esticada para a caixa (igual quando a caixa e do tamanho da imagem)
+            if (a.fatias.largura) a.largura = a.fatias.largura;
+            if (a.fatias.altura) a.altura = a.fatias.altura;
+            delete a.fatias;
+          }
+    if (fatiadas.length) avisos.push(`as nove-fatias (${fatiadas.join(", ")}) nao existem no Spine e ficaram de fora: a regiao sai inteira, esticada para a caixa (as bordas deformam)`);
+    // texto (docs/NUCLEO.md "Texto"): o Spine nao tem; a parte sai e o slot fica vazio
+    const textos: string[] = [];
+    for (const sk of resto.skins ?? [])
+      for (const [sl, ps] of Object.entries<any>(sk.partes ?? {}))
+        for (const [n, a] of Object.entries<any>(ps))
+          if (a.tipo === "texto") {
+            textos.push(`${sl}/${n}`);
+            delete ps[n];
+          }
+    if (textos.length) {
+      avisos.push(`os textos (${textos.join(", ")}) nao existem no Spine e ficaram de fora: os slots ficam sem a parte (para levar as letras, troque por uma imagem do texto antes)`);
+      for (const s of resto.slots ?? []) if (s.parte && textos.includes(`${s.nome}/${s.parte}`)) delete s.parte;
+      for (const a of Object.values<any>(resto.animacoes ?? {}))
+        for (const [sl, tl] of Object.entries<any>(a.slots ?? {}))
+          for (const k of tl.parte ?? []) if (k.nome && textos.includes(`${sl}/${k.nome}`)) k.nome = null;
+    }
+    if (resto.fontes || resto.traducoes) {
+      avisos.push(`as fontes e a tabela de idiomas nao existem no Spine e ficaram de fora`);
+      delete resto.fontes;
+      delete resto.traducoes;
     }
     if (resto.particulas?.length) {
       avisos.push(`particulas (${resto.particulas.map((p: any) => p.nome).join(", ")}) nao existem no Spine e ficaram de fora`);

@@ -544,6 +544,13 @@ void Esqueleto::restricao_fisica(int ri) {
   }
 }
 
+// medido (transformacao no mundo): uma volta so para dentro de [-pi, pi], nao o modulo
+inline double uma_volta(double r) {
+  if (r > PI) return r - 2 * PI;
+  if (r < -PI) return r + 2 * PI;
+  return r;
+}
+
 void Esqueleto::restricao_transformacao(int ri) {
   const Modelo& m = *m_;
   const DadosTransformacao& d = m.restricoes[size_t(ri)].transf;
@@ -603,54 +610,68 @@ void Esqueleto::restricao_transformacao(int ri) {
         double t = pa.deslocamento + v * pa.escala;
         if (d.limitar) t = std::clamp(t, std::min(pa.deslocamento, pa.maximo), std::max(pa.deslocamento, pa.maximo));
         if (d.alvo_local) {
-          auto vai = [&](double& x, bool angulo) {
-            x += d.somar ? t * mix : (angulo ? embrulha_graus(t - x) : t - x) * mix;
-          };
+          // medido: girar e cisalha locais sem levar t - v a [-180, 180] (com `limitar` e
+          // `escalar` a diferenca passa de 360 e o giro da a volta inteira)
+          auto vai = [&](double& x) { x += (d.somar ? t : t - x) * mix; };
           switch (pa.prop) {
-            case PropTransf::Girar: vai(l.rotacao, true); break;
-            case PropTransf::X: vai(l.x, false); break;
-            case PropTransf::Y: vai(l.y, false); break;
+            case PropTransf::Girar: vai(l.rotacao); break;
+            case PropTransf::X: vai(l.x); break;
+            case PropTransf::Y: vai(l.y); break;
+            // medido: somando, a escala multiplica; substituindo, so se a escala nao e 0 exato
             case PropTransf::EscalaX:
-              l.escala_x += (d.somar ? t - 1 : t - l.escala_x) * mix;
+              if (d.somar) l.escala_x *= 1 + (t - 1) * mix;
+              else if (l.escala_x != 0) l.escala_x += (t - l.escala_x) * mix;
               break;
             case PropTransf::EscalaY:
-              l.escala_y += (d.somar ? t - 1 : t - l.escala_y) * mix;
+              if (d.somar) l.escala_y *= 1 + (t - 1) * mix;
+              else if (l.escala_y != 0) l.escala_y += (t - l.escala_y) * mix;
               break;
-            case PropTransf::CisalhaY: vai(l.cisalha_y, true); break;
+            case PropTransf::CisalhaY: vai(l.cisalha_y); break;
           }
           continue;
         }
         switch (pa.prop) {
           case PropTransf::Girar: {
-            const double atual = std::atan2(w.c, w.a);
-            gira(w, (d.somar ? t * GRAU : embrulha(t * GRAU - atual)) * mix);
+            // medido: uma volta so para [-pi, pi], tambem somando (um t grande fica fora)
+            double r = t * GRAU;
+            if (!d.somar) r -= std::atan2(w.c, w.a);
+            r = uma_volta(r);
+            gira(w, r * mix);
             break;
           }
           case PropTransf::X: w.x += (d.somar ? t : t - w.x) * mix; break;
           case PropTransf::Y: w.y += (d.somar ? t : t - w.y) * mix; break;
+          // medido: somando, a coluna inteira vezes 1 + (t - 1) m; substituindo, so com o
+          // comprimento != 0 exato (um comprimento pequeno ainda conta)
           case PropTransf::EscalaX: {
-            const double s = std::hypot(w.a, w.c);
-            if (s > 1e-5) {
-              const double ns = s + (d.somar ? t - 1 : t - s) * mix;
-              w.a *= ns / s;
-              w.c *= ns / s;
+            double f = 1 + (t - 1) * mix;
+            if (!d.somar) {
+              const double s = std::hypot(w.a, w.c);
+              if (s == 0) break;
+              f = 1 + (t - s) * mix / s;
             }
+            w.a *= f;
+            w.c *= f;
             break;
           }
           case PropTransf::EscalaY: {
-            const double s = std::hypot(w.b, w.d);
-            if (s > 1e-5) {
-              const double ns = s + (d.somar ? t - 1 : t - s) * mix;
-              w.b *= ns / s;
-              w.d *= ns / s;
+            double f = 1 + (t - 1) * mix;
+            if (!d.somar) {
+              const double s = std::hypot(w.b, w.d);
+              if (s == 0) break;
+              f = 1 + (t - s) * mix / s;
             }
+            w.b *= f;
+            w.d *= f;
             break;
           }
           case PropTransf::CisalhaY: {
-            const double ax = std::atan2(w.c, w.a), ay = std::atan2(w.d, w.b);
-            const double atual = embrulha(ay - ax);
-            const double quer = d.somar ? atual + t * GRAU : (t + 90) * GRAU;
-            const double novo = ax + atual + embrulha(quer - atual) * mix;
+            // medido: somando, t em radianos sem volta; substituindo, o alvo menos a cisalha
+            // atual com uma volta so; a coluna y gira para by + r m com o mesmo comprimento
+            const double by = std::atan2(w.d, w.b);
+            double r = t * GRAU;
+            if (!d.somar) r = uma_volta((t + 90) * GRAU - (by - std::atan2(w.c, w.a)));
+            const double novo = by + r * mix;
             const double s = std::hypot(w.b, w.d);
             w.b = std::cos(novo) * s;
             w.d = std::sin(novo) * s;
