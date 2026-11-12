@@ -14,7 +14,7 @@
 // --ajustes: um modulo do jogo que exporta `ajustes` (os do montarTela: ajustar, estados,
 // aoRedimensionar), para medir a tela como o jogo a monta. O manifesto sai em <saida>/manifesto.json
 // e no stdout.
-import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { mkdirSync, realpathSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -114,7 +114,7 @@ export async function reduzirImagens(arqCena: string, saida: string, o: OpcoesRe
   return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2);
   const opt = (n: string) => {
     const i = args.indexOf(`--${n}`);

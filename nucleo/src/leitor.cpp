@@ -242,7 +242,9 @@ class Leitor {
       p.largura = int(pg["tamanho"][0].num(0));
       p.altura = int(pg["tamanho"][1].num(0));
       p.pma = pg.sim("pma", false);
-      p.perto = pg.str("filtro", "").rfind("Nearest", 0) == 0;
+      const std::string filtro = pg.str("filtro", "");
+      p.perto = filtro.rfind("Nearest", 0) == 0;
+      p.mip = filtro.rfind("MipMap", 0) == 0;
       p.relevo = pg.str("relevo", "");
       m.paginas.push_back(std::move(p));
     }

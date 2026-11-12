@@ -667,6 +667,7 @@ struct Pagina {
   int largura = 0, altura = 0;
   bool pma = false;  // cores ja multiplicadas pelo alfa
   bool perto = false;  // filtro Nearest (pixel art): sem suavizar entre texels
+  bool mip = false;    // filtro MipMap*: a textura com mipmaps (o que aparece bem menor que a arte nao serrilha)
   std::string relevo;  // o mapa de normais ao lado (docs/NUCLEO.md "Luzes"); vazio: sem relevo
 };
 

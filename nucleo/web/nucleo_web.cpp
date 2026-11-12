@@ -236,7 +236,7 @@ EMSCRIPTEN_KEEPALIVE double mm_trocar_timeline_osso(int modelo, const char* anim
   return trocar_timeline_osso(mutavel(modelo), anim, osso, tipo, json, &erro);
 }
 
-// JSON: { nome, paginas: [{arquivo, largura, altura, pma}], animacoes: [{nome, duracao}] }. As
+// JSON: { nome, paginas: [{arquivo, largura, altura, pma, perto?, mip?}], animacoes: [{nome, duracao}] }. As
 // paginas sao as do desenho: as do modelo e depois as dos filhos das instancias (caminho relativo
 // ao pai)
 EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
@@ -249,6 +249,9 @@ EMSCRIPTEN_KEEPALIVE const char* mm_info(int modelo) {
     info += i ? ",{\"arquivo\":" : "{\"arquivo\":";
     texto_json(info, p.arquivo);
     info += ",\"largura\":" + std::to_string(p.largura) + ",\"altura\":" + std::to_string(p.altura) + ",\"pma\":" + (p.pma ? "true" : "false");
+    // o filtro da pagina: perto (Nearest, pixel art) e mip (MipMap*: a textura com mipmaps)
+    if (p.perto) info += ",\"perto\":true";
+    if (p.mip) info += ",\"mip\":true";
     if (!p.relevo.empty()) {
       info += ",\"relevo\":";
       texto_json(info, p.relevo);

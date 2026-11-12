@@ -238,6 +238,25 @@ mudar o shell. Contra o export do Godot:
 O mesmo projeto do Godot continua sendo a fonte: o workflow escolhe o motor, e voltar ao Godot é
 rodar o deploy com o outro. Falta medir a fluidez no celular.
 
+## O motor no jogo: um pacote baixado, não uma cópia (2026-11-12)
+
+O jogo não leva o motor dentro do repositório dele. Cada versão do motor sai como um `.tgz` numa
+release (`motor-<versão>`), e o jogo o declara como dependência pela URL:
+
+```json
+"devDependencies": {
+  "mamulengo-motor": "https://github.com/zednaked/mamulengo/releases/download/motor-0.1.0/mamulengo-motor-0.1.0.tgz"
+}
+```
+
+O `npm ci` baixa e confere (o `package-lock.json` guarda o hash), na máquina e no deploy, e o motor
+fica em `node_modules/mamulengo-motor`: `src/` (a tela, a cena e o que elas importam), `nucleo/`
+(`nucleo.mjs` e `nucleo.wasm`), `tools/` (imagens reduzidas e comprimidas, bonecos em binário) e
+`VERSAO`. Trocar de motor é trocar a URL e rodar `npm install`.
+
+Para soltar uma versão: compilar o núcleo para a web, `node tools/motor-pacote.mjs <versão>` (o
+`.tgz` sai igual byte a byte para as mesmas fontes) e anexá-lo à release `motor-<versão>`.
+
 ## Ordem
 
 Portar os jogos de produção dirige a ordem:

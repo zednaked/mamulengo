@@ -4,13 +4,15 @@
 // tem de dar o mesmo documento que o texto (numero a numero); senao, erro.
 //
 //   npx tsx tools/binario-web.ts <entrada.boneco> <saida.boneco> [<entrada> <saida> ...] [--nucleo nucleo/build-web/nucleo.mjs]
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 export async function nucleoWeb(caminho?: string) {
-  const padrao = resolve(dirname(fileURLToPath(import.meta.url)), "../nucleo/build-web/nucleo.mjs");
+  // no checkout o nucleo da web fica em nucleo/build-web; no pacote do motor (tools/motor-pacote.mjs), em nucleo/
+  const aqui = dirname(fileURLToPath(import.meta.url));
+  const padrao = [resolve(aqui, "../nucleo/build-web/nucleo.mjs"), resolve(aqui, "../nucleo/nucleo.mjs")].find((c) => existsSync(c)) ?? resolve(aqui, "../nucleo/build-web/nucleo.mjs");
   return (await import(pathToFileURL(resolve(caminho ?? padrao)).href)).default();
 }
 
@@ -37,7 +39,7 @@ export function paraBinario(N: any, texto: string, nome = ""): Uint8Array {
   return bytes;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2);
   const k = args.indexOf("--nucleo");
   const nucleo = k >= 0 ? args.splice(k, 2)[1] : undefined;

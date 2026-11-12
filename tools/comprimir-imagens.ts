@@ -8,7 +8,7 @@
 //   npx tsx tools/comprimir-imagens.ts <saida/> <a.webp> [b.webp ...] [--lista arquivos.txt] [--qualidade 95] [--limite 10]
 //
 // Imprime no stdout o JSON { origem: { arquivo, aceita, p99, bytes: [antes, depois] } }.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, realpathSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -72,7 +72,7 @@ export async function comprimirImagem(origem: string, saida: string, o: OpcoesCo
   return r;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2);
   const opt = (n: string) => {
     const i = args.indexOf(`--${n}`);

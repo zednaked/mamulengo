@@ -147,12 +147,18 @@ export class TelaBoneco {
     // a mesma pagina pedida por mais de um boneco (o corpo e os bracos do personagem, duas instancias do
     // mesmo filho) baixa e sobe uma vez so
     const texturas = new Map<string, Promise<WebGLTexture>>();
-    const textura = (arquivo: string) => {
-      if (!texturas.has(arquivo))
-        texturas.set(arquivo, (async () => desenhista.textura(await createImageBitmap(await (await fetch(dir + arquivo)).blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" })))());
-      return texturas.get(arquivo)!;
+    // o filtro da pagina (paginas[].filtro do .boneco): Nearest para pixel art, MipMap* com mipmaps
+    // (algarismos pequenos, arte muito reduzida); o resto, linear
+    const GL = WebGL2RenderingContext;
+    const filtroDe = (pg: { perto?: boolean; mip?: boolean }) =>
+      pg.perto ? { min: pg.mip ? GL.NEAREST_MIPMAP_NEAREST : GL.NEAREST, mag: GL.NEAREST } : { min: pg.mip ? GL.LINEAR_MIPMAP_LINEAR : GL.LINEAR, mag: GL.LINEAR };
+    const textura = (pg: { arquivo: string; perto?: boolean; mip?: boolean }) => {
+      const chave = `${pg.arquivo}|${pg.perto ? 1 : 0}${pg.mip ? 1 : 0}`;
+      if (!texturas.has(chave))
+        texturas.set(chave, (async () => desenhista.textura(await createImageBitmap(await (await fetch(dir + pg.arquivo)).blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" }), filtroDe(pg)))());
+      return texturas.get(chave)!;
     };
-    const paginas: PaginaGL[] = await Promise.all(info.paginas.map(async (pg: { arquivo: string; pma: boolean }) => ({ tex: await textura(pg.arquivo), pma: pg.pma, relevo: null })));
+    const paginas: PaginaGL[] = await Promise.all(info.paginas.map(async (pg: { arquivo: string; pma: boolean; perto?: boolean; mip?: boolean }) => ({ tex: await textura(pg), pma: pg.pma, relevo: null })));
     const inst = N._mm_instancia(modelo);
     N._mm_reiniciar(inst);
     // os textos (docs/NUCLEO.md "Texto"): as fontes ao lado do .boneco, a pagina dos textos depois

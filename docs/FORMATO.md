@@ -276,6 +276,17 @@ saída do `nucleo-pose` igual byte a byte com o texto e com o binário, em todas
 voltar), ou direto `nucleo/build/nucleo-binario`, que confere a árvore número a número. O editor
 abre os dois e grava um binário de volta em binário.
 
+**Ler sem converter:** `npx tsx tools/boneco.ts mostrar <x.boneco>` dá o resumo (páginas com o
+filtro, âncoras da tela, papéis, animações); com nomes (`mostrar <x.boneco> win_flash bolad_0 bigwin`),
+cada um como osso (a cadeia até a raiz, filhos, slots, âncora), slot (o osso, as partes com o tamanho,
+as animações que o mexem) ou animação (o que ela mexe). Lê texto e binário.
+
+**Filtro da página** (`paginas[].filtro`, o `filter:` do atlas do Spine): `Nearest…` desenha sem
+suavizar (pixel art) e `MipMap…` (ex. `MipMapLinearLinear,Linear`) sobe a textura com mipmaps, para a
+arte que aparece bem menor que o tamanho dela não serrilhar (algarismos pequenos). O runtime web
+(`src/tela/tela-boneco.ts`) segue os dois pelo `mm_info`. Os mipmaps misturam regiões vizinhas nos
+níveis pequenos: ponha numa página `MipMap` só o que precisa, com folga entre as regiões.
+
 **Medido** (nos 24 personagens de dois jogos de produção, com malhas com pesos, física e 76
 animações num deles): 2.245 KB de texto viram 413 KB (5,4 vezes menos); com gzip, 154 contra
 123 KB; com brotli, 106 contra 98,5 KB; a carga até o modelo, 10,5 contra 6,4 ms. Nos 17 dos

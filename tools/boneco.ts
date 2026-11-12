@@ -3,6 +3,10 @@
 //   npx tsx tools/boneco.ts exportar <x.boneco> <pasta> [--nome n]
 //   npx tsx tools/boneco.ts binario <x.boneco> <saida.boneco>   (para entregar ao jogo)
 //   npx tsx tools/boneco.ts texto <x.boneco> <saida.boneco>     (de volta ao texto, para editar)
+//   npx tsx tools/boneco.ts mostrar <x.boneco> [nome...]        (texto ou binario, sem converter)
+// mostrar sem nome: o resumo (paginas com o filtro, ancoras da tela, animacoes, papeis); com nomes, cada
+// um como osso (a cadeia ate a raiz, filhos, slots, ancora), slot (o osso, as partes com tamanho, as
+// animacoes que o mexem) ou animacao (o que ela mexe). Para ler sem abrir o editor.
 // importar le o JSON 4.3 do Spine e o atlas (pelo -data.tres, ou o .atlas ao lado), e leva
 // junto o mix (-data.tres), a ficha (.ficha.md) e a compressao das paginas (.import do
 // Godot). As paginas sao copiadas para a pasta do .boneco. exportar faz o caminho de volta:
@@ -109,7 +113,61 @@ if (acao === "importar") {
   const antes = readFileSync(resolve(de)).length;
   gravarBonecoArquivo(resolve(para), lerBonecoArquivo(resolve(de)), acao === "binario");
   console.log(`${resolve(para)}: ${acao}, ${antes} -> ${readFileSync(resolve(para)).length} bytes`);
+} else if (acao === "mostrar") {
+  if (!de) throw new Error("mostrar <x.boneco> [nome...]");
+  mostrar(lerBonecoArquivo(resolve(de)), args.slice(2));
 } else {
-  console.error("uso: boneco.ts importar <x-data.tres | x.json> <saida.boneco> | exportar <x.boneco> <pasta> | binario|texto <x.boneco> <saida.boneco>");
+  console.error("uso: boneco.ts importar <x-data.tres | x.json> <saida.boneco> | exportar <x.boneco> <pasta> | binario|texto <x.boneco> <saida.boneco> | mostrar <x.boneco> [nome...]");
   process.exit(2);
+}
+
+function mostrar(b: any, nomes: string[]) {
+  const ossos: any[] = b.ossos ?? [];
+  const slots: any[] = b.slots ?? [];
+  const anims: Record<string, any> = b.animacoes ?? {};
+  const partesDo = (slot: string) => Object.assign({}, ...(b.skins ?? []).map((k: any) => k.partes?.[slot] ?? {}));
+  const ancora = (osso: string) => (b.tela?.ancoras ?? []).find((a: any) => a.osso === osso);
+  const cadeia = (n: string) => {
+    const c: string[] = [];
+    for (let o = ossos.find((x) => x.nome === n); o; o = o.pai ? ossos.find((x) => x.nome === o.pai) : null) c.push(o.nome);
+    return c.join(" < ");
+  };
+  const mexem = (slot: string) => Object.keys(anims).filter((a) => anims[a]?.slots?.[slot]);
+  const j = (v: unknown) => JSON.stringify(v);
+  if (!nomes.length) {
+    console.log(`${b.nome ?? "?"}: ${ossos.length} ossos, ${slots.length} slots, ${Object.keys(anims).length} animacoes, ${(b.papeis ?? []).length} papeis, ${(b.instancias ?? []).length} instancias`);
+    for (const p of b.paginas ?? []) console.log(`pagina ${p.arquivo} ${p.tamanho?.join("x")}${p.filtro ? " filtro " + p.filtro : ""}${p.pma ? " pma" : ""}`);
+    if (b.tela) {
+      console.log(`tela: arte ${j(b.tela.arte)} encaixe ${b.tela.encaixe ?? "-"}`);
+      for (const a of b.tela.ancoras ?? []) console.log(`  ancora ${j(a)}`);
+    }
+    for (const p of b.papeis ?? []) console.log(`papel ${j(p).slice(0, 160)}`);
+    console.log(`animacoes: ${Object.keys(anims).join(", ")}`);
+    return;
+  }
+  for (const n of nomes) {
+    const o = ossos.find((x) => x.nome === n);
+    const s = slots.find((x) => x.nome === n);
+    if (!o && !s && !anims[n]) console.log(`${n}: nao ha osso, slot nem animacao com esse nome`);
+    if (o) {
+      console.log(`osso ${n}: ${cadeia(n)}  ${j({ x: o.x, y: o.y, rotacao: o.rotacao, escala_x: o.escala_x, escala_y: o.escala_y })}`);
+      const f = ossos.filter((x) => x.pai === n).map((x) => x.nome);
+      if (f.length) console.log(`  filhos: ${f.join(", ")}`);
+      const ss = slots.filter((x) => x.osso === n).map((x) => x.nome);
+      if (ss.length) console.log(`  slots: ${ss.join(", ")}`);
+      const a = ancora(n);
+      if (a) console.log(`  ancora: ${j(a)}`);
+    }
+    if (s) {
+      console.log(`slot ${n}: osso ${cadeia(s.osso)}${s.parte ? ", parte " + s.parte : ""}${s.cor ? ", cor " + s.cor : ""}`);
+      for (const [nome, p] of Object.entries<any>(partesDo(n))) console.log(`  parte ${nome}: ${j(p).slice(0, 200)}`);
+      const m = mexem(n);
+      if (m.length) console.log(`  animacoes: ${m.join(", ")}`);
+    }
+    if (anims[n]) {
+      const a = anims[n];
+      console.log(`animacao ${n}: ${Object.keys(a).join(", ")}`);
+      for (const k of Object.keys(a)) if (a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) console.log(`  ${k}: ${Object.keys(a[k]).join(", ")}`);
+    }
+  }
 }
