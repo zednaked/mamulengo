@@ -12,7 +12,7 @@ A one-screen platformer using Kenney's Jumper Pack (CC0, in `kenney/`, plus the 
     npx tsx tools/palco.ts exemplos/palco/palco.boneco --roteiro "direita+pulo 50, pulo 2, direita 20, nada 40, direita 30, direita+pulo 50, direita 30"
     npx tsx tools/nucleo-palco.ts
 
-Play it in the browser: [zednaked.github.io/mamulengo/jogo](https://zednaked.github.io/mamulengo/jogo/) (one HTML page
+Play it in the browser: [mamulengo.zed.art.br/jogo](https://mamulengo.zed.art.br/jogo/) (one HTML page
 made by `npx tsx tools/exportar-jogo.ts exemplos/palco/palco.boneco jogo.html`), or open `palco.boneco` in the
 editor and press "🎮 jogar" (arrows or A/D, space to jump, R restarts).
 The level was tuned by measuring it with `tools/palco.ts`, not by eye.

@@ -4,9 +4,9 @@
 
 [Ver em HD: MP4, 1280x720, 60 fps](exemplos/vinheta/vinheta.mp4)
 
-**[Experimente ao vivo](https://zednaked.github.io/mamulengo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
+**[Experimente ao vivo](https://mamulengo.zed.art.br/demo/)**: seis personagens animados pelo núcleo no seu navegador; arraste e veja a física reagir.
 
-**[Abra o editor](https://zednaked.github.io/mamulengo/editor/)**: o editor inteiro pelo navegador, sem instalar nada e sem servidor. Funciona sem internet depois da primeira visita, abre os personagens de exemplo e, no Chrome e no Edge, uma pasta do seu computador com arquivos `.boneco`.
+**[Abra o editor](https://mamulengo.zed.art.br/)**: o editor inteiro pelo navegador, sem instalar nada e sem servidor. Funciona sem internet depois da primeira visita, abre os personagens de exemplo e, no Chrome e no Edge, uma pasta do seu computador com arquivos `.boneco`.
 
 ![Um robô, um zumbi e um monstro, rigados e animados pelo Claude Code no Mamulengo](docs/media/elenco.webp)
 
@@ -429,7 +429,7 @@ rede local, permita.
 
 ```sh
 npx tsx tools/ponte-servidor.ts 5199
-# e abra https://zednaked.github.io/mamulengo/editor/?ponte=5199
+# e abra https://mamulengo.zed.art.br/?ponte=5199
 ```
 
 Detalhes: [docs/EDITOR.md](docs/EDITOR.md) ("Pelo navegador").

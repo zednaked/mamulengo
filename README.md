@@ -4,9 +4,9 @@
 
 [Watch in HD: MP4, 1280x720, 60 fps](exemplos/vinheta/vinheta.mp4)
 
-**[Try it live](https://zednaked.github.io/mamulengo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
+**[Try it live](https://mamulengo.zed.art.br/demo/)**: six characters animated by the core in your browser; drag them and watch the physics react.
 
-**[Open the editor](https://zednaked.github.io/mamulengo/editor/)**: the whole editor in your browser, nothing to install and no server. It works offline after the first visit, opens the example characters and, in Chrome and Edge, a folder on your computer with `.boneco` files.
+**[Open the editor](https://mamulengo.zed.art.br/)**: the whole editor in your browser, nothing to install and no server. It works offline after the first visit, opens the example characters and, in Chrome and Edge, a folder on your computer with `.boneco` files.
 
 ![A robot, a zombie and a monster, rigged and animated by Claude Code in Mamulengo](docs/media/elenco.webp)
 
@@ -434,7 +434,7 @@ for local network access, allow it.
 
 ```sh
 npx tsx tools/ponte-servidor.ts 5199
-# then open https://zednaked.github.io/mamulengo/editor/?ponte=5199
+# then open https://mamulengo.zed.art.br/?ponte=5199
 ```
 
 Details (in Portuguese): [docs/EDITOR.md](docs/EDITOR.md) ("Pelo navegador").

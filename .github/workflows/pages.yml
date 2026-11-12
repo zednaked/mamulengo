@@ -1,7 +1,8 @@
-# A demo ao vivo no GitHub Pages (https://zednaked.github.io/mamulengo/) e o editor pelo
-# navegador (https://zednaked.github.io/mamulengo/editor/): compila o nucleo em wasm, gera
-# dist-demo (npm run build:demo) e dist-navegador (npm run build:navegador), que entra em
-# dist-demo/editor, e publica. So no repositorio publico.
+# O site no GitHub Pages, em https://mamulengo.zed.art.br: o editor pelo navegador na raiz, a
+# demo ao vivo em /demo/ e o jogo do palco em /jogo/. Compila o nucleo em wasm, gera
+# dist-navegador (npm run build:navegador, vira a raiz) e dist-demo (npm run build:demo, vira
+# demo/), e publica. /editor/ (o endereco antigo do editor) so redireciona para a raiz e troca o
+# service worker antigo, de escopo /editor/, por um que se desliga. So no repositorio publico.
 name: pages
 
 on:
@@ -37,14 +38,31 @@ jobs:
           emcmake cmake -S nucleo -B nucleo/build-web -G Ninja
           cmake --build nucleo/build-web --target nucleo
       - run: npm ci
-      - run: npm run build:demo
-      - run: npm run build:navegador && cp -r dist-navegador dist-demo/editor
+      - run: npm run build:navegador && npm run build:demo
+      - run: rm -rf site && cp -r dist-navegador site && cp -r dist-demo site/demo
       # o jogo do palco (docs/PALCO.md) numa pagina so: /jogo/
-      - run: mkdir -p dist-demo/jogo && npx tsx tools/exportar-jogo.ts exemplos/palco/palco.boneco dist-demo/jogo/index.html --titulo "O coelho e a cenoura"
+      - run: mkdir -p site/jogo && npx tsx tools/exportar-jogo.ts exemplos/palco/palco.boneco site/jogo/index.html --titulo "O coelho e a cenoura"
+      - name: /editor/ antigo -> raiz
+        run: |
+          mkdir -p site/editor
+          cat > site/editor/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Mamulengo</title>
+          <meta http-equiv="refresh" content="0; url=../">
+          <script>location.replace("../" + location.search + location.hash)</script>
+          <a href="../">Mamulengo</a>
+          HTML
+          cat > site/editor/sw.js <<'JS'
+          // substitui o service worker antigo do editor (escopo /editor/): se desliga e recarrega
+          self.addEventListener("install", () => self.skipWaiting());
+          self.addEventListener("activate", (e) => e.waitUntil((async () => {
+            await self.registration.unregister();
+            for (const c of await self.clients.matchAll({ type: "window" })) c.navigate(c.url);
+          })()));
+          JS
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist-demo
+          path: site
 
   deploy:
     needs: build
