@@ -27,9 +27,6 @@ export type CenaMamulengo = {
     limites: Record<string, [number, number, number, number]>; // .boneco -> retangulo do esqueleto
   };
   arquivos: Record<string, string>; // res:// -> caminho relativo a cena
-  // as imagens que o empacotador reduziu (tools/reduzir-imagens.ts): res:// -> tamanho real do arquivo.
-  // So informativo: a tela usa o tamanho logico (medidas.texturas) nos recortes e nos uvs
-  reduzidas?: Record<string, [number, number]>;
   chaves: string[];
   variantes?: Variante[];
 };

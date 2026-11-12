@@ -5,9 +5,10 @@
 //
 // O jogo passa a ter o motor em node_modules/mamulengo-motor (o package-lock.json guarda o hash, o
 // `npm ci` confere), em vez de uma copia dentro do repositorio dele. O que vai:
-//   src/      a tela e a cena (src/tela, src/cena) e o que elas importam
+//   src/      a tela, o som e a cena (src/tela, src/cena) e o que elas importam
 //   nucleo/   nucleo.mjs e nucleo.wasm (de nucleo/build-web; compile antes)
-//   tools/    as ferramentas do pacote (imagens reduzidas e comprimidas, bonecos em binario)
+//   tools/    as ferramentas do pacote (imagens reduzidas e comprimidas, bonecos em binario), os
+//             ajudantes do empacotador do jogo (pacote.mjs) e o navegador dos testes (navegador.ts)
 //   VERSAO    a versao e o commit de onde saiu
 //
 //   node tools/motor-pacote.mjs <versao> [pasta de saida, padrao dist-motor]
@@ -26,7 +27,7 @@ if (!/^\d+\.\d+\.\d+$/.test(versao ?? "")) {
   process.exit(1);
 }
 const SAIDA = resolve(process.argv[3] ?? join(RAIZ, "dist-motor"));
-const FERRAMENTAS = ["tools/binario-web.ts", "tools/comprimir-imagens.ts", "tools/reduzir-imagens.ts"];
+const FERRAMENTAS = ["tools/binario-web.ts", "tools/comprimir-imagens.ts", "tools/reduzir-imagens.ts", "tools/navegador.ts", "tools/pacote.mjs"];
 const NUCLEO = ["nucleo/build-web/nucleo.mjs", "nucleo/build-web/nucleo.wasm"];
 for (const f of NUCLEO) {
   if (!existsSync(join(RAIZ, f))) { console.error(`falta ${f}: compile o nucleo para a web antes (docs/NUCLEO.md)`); process.exit(1); }
