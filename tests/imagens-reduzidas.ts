@@ -122,13 +122,22 @@ check(Object.keys(await reduzirImagens(join(dir, "cena.json"), join(dir, "s3"), 
   check(ehSemPerda(suave) && !ehSemPerda(await sharp(suave).webp({ quality: 80 }).toBuffer()), "VP8L reconhecido; o com perda fica de fora");
   const a = await comprimirImagem(join(dir, "suave.webp"), join(dir, "comp"));
   check(!!a?.aceita && a.p99 <= 10 && a.bytes[1] < a.bytes[0], `gradiente aceito (p99 ${a?.p99}, ${a?.bytes[0]} -> ${a?.bytes[1]} bytes)`);
+  // o ruido de bordas duras nao passa com perda, mas foi gravado com pouco esforco: sai sem perda,
+  // menor e com todos os pixels iguais
   const b = await comprimirImagem(join(dir, "ruido.webp"), join(dir, "comp"));
-  check(!!b && !b.aceita && b.arquivo === join(dir, "ruido.webp"), `ruido recusado (p99 ${b?.p99}), fica o original`);
+  const crus = async (x: Buffer | string) => sharp(x).ensureAlpha().raw().toBuffer();
+  check(!!b?.aceita && !!b.semPerda && b.bytes[1] < b.bytes[0] && Buffer.compare(await crus(ruido), await crus(b.arquivo)) === 0, `ruido recusado com perda e regravado sem perda, identico (${b?.bytes[0]} -> ${b?.bytes[1]} bytes)`);
   const c = await comprimirImagem(join(dir, "suave.webp"), join(dir, "comp"));
   check(JSON.stringify(c) === JSON.stringify(a), "a segunda vez vem do cache");
-  writeFileSync(join(dir, "ruido2.webp"), ruido);
-  const d = await comprimirImagem(join(dir, "ruido2.webp"), join(dir, "comp"));
-  check(d?.arquivo === join(dir, "ruido2.webp"), "recusada igual a outra (cache) aponta para a propria origem");
+  // o que nao melhora de jeito nenhum (ruido de verdade, ja no esforco maximo) fica como esta
+  const byte = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) >> 16 & 255;
+  const cheio = await sharp(px(256, 256, () => [byte(), byte(), byte(), 255]), { raw: { width: 256, height: 256, channels: 4 } }).webp({ lossless: true, effort: 6, quality: 100 }).toBuffer();
+  writeFileSync(join(dir, "cheio.webp"), cheio);
+  const e = await comprimirImagem(join(dir, "cheio.webp"), join(dir, "comp"));
+  check(!!e && !e.aceita && e.arquivo === join(dir, "cheio.webp"), `ruido cheio recusado (p99 ${e?.p99}), fica o original`);
+  writeFileSync(join(dir, "cheio2.webp"), cheio);
+  const d = await comprimirImagem(join(dir, "cheio2.webp"), join(dir, "comp"));
+  check(d?.arquivo === join(dir, "cheio2.webp"), "recusada igual a outra (cache) aponta para a propria origem");
 }
 
 // --- .boneco binario pelo nucleo web (tools/binario-web.ts), para empacotar sem o nucleo nativo

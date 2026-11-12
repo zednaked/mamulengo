@@ -5,6 +5,10 @@
 // personagem) costuma passar com 3 a 4x menos bytes. A arte-fonte nao muda: as aceitas vao para a
 // pasta de saida, com cache por hash (do arquivo e das opcoes), recusas inclusive.
 //
+// A que e recusada com perda ainda e regravada SEM perda no esforco maximo: entra se a imagem fica
+// identica (todos os pixels, ate a cor dos transparentes) e o arquivo diminui pelo menos 3%. Um WebP
+// sem perda gravado com pouco esforco (o de um canvas, o de um editor) cai muito assim, sem mudar nada.
+//
 //   npx tsx tools/comprimir-imagens.ts <saida/> <a.webp> [b.webp ...] [--lista arquivos.txt] [--qualidade 95] [--limite 10]
 //
 // Imprime no stdout o JSON { origem: { arquivo, aceita, p99, bytes: [antes, depois] } }.
@@ -14,7 +18,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 
-export type Comprimida = { arquivo: string; aceita: boolean; p99: number; bytes: [number, number] };
+export type Comprimida = { arquivo: string; aceita: boolean; p99: number; bytes: [number, number]; semPerda?: boolean };
 export type OpcoesCompressao = { qualidade?: number; limite?: number };
 
 // o WebP tem um bloco VP8L (sem perda), direto ou dentro do VP8X?
@@ -54,7 +58,7 @@ export async function comprimirImagem(origem: string, saida: string, o: OpcoesCo
   const fonte = readFileSync(origem);
   if (!ehSemPerda(fonte)) return null;
   mkdirSync(saida, { recursive: true });
-  const chave = createHash("sha256").update(fonte).update(`q${qualidade}|l${limite}|v1`).digest("hex").slice(0, 16);
+  const chave = createHash("sha256").update(fonte).update(`q${qualidade}|l${limite}|v3`).digest("hex").slice(0, 16);
   const ficha = join(resolve(saida), `${chave}.json`);
   // a recusada aponta para a propria origem (duas origens iguais dividem a ficha do cache)
   if (existsSync(ficha)) {
@@ -64,10 +68,19 @@ export async function comprimirImagem(origem: string, saida: string, o: OpcoesCo
   const novo = await sharp(fonte).webp({ quality: qualidade, alphaQuality: 100, effort: 6 }).toBuffer();
   const [ra, rb] = await Promise.all([fonte, novo].map((x) => sharp(x).ensureAlpha().raw().toBuffer()));
   const p99 = erroVisivel(ra, rb);
-  const aceita = p99 <= limite && novo.length < fonte.length;
+  let aceita = p99 <= limite && novo.length < fonte.length;
+  let gravar = novo;
+  let semPerda = false;
+  if (!aceita) {
+    // sem perda, no esforco maximo (no WebP sem perda a qualidade 100 e o esforco de compressao; `exact`
+    // guarda ate a cor dos pixels transparentes): so vale com todos os bytes da imagem iguais e menor
+    const igual = await sharp(fonte).webp({ lossless: true, effort: 6, quality: 100, exact: true }).toBuffer();
+    const rc = await sharp(igual).ensureAlpha().raw().toBuffer();
+    if (igual.length < fonte.length * 0.97 && Buffer.compare(ra, rc) === 0) (aceita = true), (semPerda = true), (gravar = igual);
+  }
   const arquivo = aceita ? join(resolve(saida), `${chave}.webp`) : resolve(origem);
-  if (aceita) writeFileSync(arquivo, novo);
-  const r: Comprimida = { arquivo, aceita, p99, bytes: [fonte.length, aceita ? novo.length : fonte.length] };
+  if (aceita) writeFileSync(arquivo, gravar);
+  const r: Comprimida = { arquivo, aceita, p99: semPerda ? 0 : p99, bytes: [fonte.length, aceita ? gravar.length : fonte.length], ...(semPerda ? { semPerda } : {}) };
   writeFileSync(ficha, JSON.stringify(r));
   return r;
 }
@@ -86,14 +99,14 @@ if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
     process.exit(2);
   }
   const out: Record<string, Comprimida> = {};
-  let antes = 0, depois = 0, aceitas = 0, recusadas = 0;
+  let antes = 0, depois = 0, aceitas = 0, recusadas = 0, iguais = 0;
   for (const a of arquivos) {
     const r = await comprimirImagem(resolve(a), saida, { qualidade: q ? Number(q) : undefined, limite: l ? Number(l) : undefined });
     if (!r) continue;
     out[resolve(a)] = r;
     antes += r.bytes[0], depois += r.bytes[1];
-    r.aceita ? aceitas++ : recusadas++;
+    r.semPerda ? iguais++ : r.aceita ? aceitas++ : recusadas++;
   }
-  console.error(`comprimir-imagens: ${aceitas} aceitas, ${recusadas} recusadas (p99 acima do limite ou maior), ${(antes / 1048576).toFixed(2)} -> ${(depois / 1048576).toFixed(2)} MB`);
+  console.error(`comprimir-imagens: ${aceitas} aceitas com perda, ${iguais} regravadas sem perda, ${recusadas} como estavam, ${(antes / 1048576).toFixed(2)} -> ${(depois / 1048576).toFixed(2)} MB`);
   console.log(JSON.stringify(out));
 }
