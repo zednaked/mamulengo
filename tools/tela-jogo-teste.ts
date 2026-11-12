@@ -40,27 +40,31 @@ const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 // o Vite e o Chromium morrem junto com este processo (setpriv --pdeathsig); o perfil fica no worktree
 // (o /tmp tem cota)
-const vite = spawn("setpriv", ["--pdeathsig", "KILL", "node", "node_modules/vite/bin/vite.js", "--port", String(PORTA), "--strictPort"], { env: { ...process.env, MAMULENGO_PORT: String(PORTA) }, stdio: ["ignore", "pipe", "pipe"] });
+const vite = spawn("setpriv", ["--pdeathsig", "KILL", "node", "node_modules/vite/bin/vite.js", "--port", String(PORTA), "--strictPort"], { env: { ...process.env, MAMULENGO_PORT: String(PORTA), NO_COLOR: "1", FORCE_COLOR: "0" }, stdio: ["ignore", "pipe", "pipe"] });
 await new Promise<void>((ok, falha) => {
   let b = "";
   const ver = (d: any) => {
     b += d;
-    if (b.includes(`:${PORTA}`)) ok();
+    // no CI o Vite escreve a porta em negrito (codigos de cor no meio do endereco): sem eles
+    if (b.replace(/\x1b\[[0-9;]*m/g, "").includes(`:${PORTA}`)) ok();
   };
   vite.stdout!.on("data", ver);
   vite.stderr!.on("data", ver);
   vite.once("exit", () => falha(new Error("o vite nao subiu\n" + b)));
+  setTimeout(() => falha(new Error("o vite nao disse a porta em 60 s\n" + b)), 60000).unref();
 });
 mkdirSync(resolve(".tmp"), { recursive: true });
 const prof = mkdtempSync(join(resolve(".tmp"), "tela-jogo-"));
 const chrome = spawn("setpriv", ["--pdeathsig", "KILL", process.env.CHROMIUM ?? "chromium", `--user-data-dir=${prof}`, "--remote-debugging-port=0", "--no-first-run", "--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--hide-scrollbars", "--autoplay-policy=no-user-gesture-required", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
-const wsUrl = await new Promise<string>((ok) => {
+const wsUrl = await new Promise<string>((ok, falha) => {
   let b = "";
   chrome.stderr!.on("data", (d) => {
     b += d;
     const m = /DevTools listening on (ws:\/\/\S+)/.exec(b);
     if (m) ok(m[1]);
   });
+  chrome.once("exit", () => falha(new Error("o Chromium nao abriu\n" + b)));
+  setTimeout(() => falha(new Error("o Chromium nao abriu em 60 s\n" + b)), 60000).unref();
 });
 const ws = new WebSocket(wsUrl);
 await new Promise((ok) => ws.once("open", ok));
