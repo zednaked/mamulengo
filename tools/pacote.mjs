@@ -2,7 +2,7 @@
 // que a tela mostra, bonecos em binario, imagens comprimidas e reduzidas, o hash e a gravacao da pasta.
 // Em JavaScript puro para o `node empacotar.mjs` do jogo importar direto:
 //
-//   import { caracteresBase, recortarFonte, emBinario, comprimirImagens, gravarPacote } from "mamulengo-motor/tools/pacote.mjs";
+//   import { caracteresBase, recortarFonte, emBinario, comprimirImagens, recomprimirImagem, gravarPacote } from "mamulengo-motor/tools/pacote.mjs";
 //
 // Nenhum comando passa por shell (execFileSync com a lista de argumentos: um nome de arquivo com aspas
 // ou $() nao vira comando) e o pyftsubset roda com versoes fixas do fonttools e do brotli.
@@ -104,6 +104,25 @@ export function reduzirImagens(cena, pasta, { limite, ajustes } = {}) {
   if (limite !== undefined) args.push("--limite", String(limite));
   if (ajustes) args.push("--ajustes", ajustes);
   return ultimaLinha(ferramenta("reduzir-imagens.ts", args, { saida: true }));
+}
+// uma imagem regravada com perda numa qualidade escolhida por quem olhou (WebP, alfa sem perda). E a
+// decisao de arte que as ferramentas automaticas nao tomam: comprimir-imagens.ts so aceita o que fica
+// dentro do limite de erro. Devolve o arquivo novo (na pasta, com cache pelo conteudo e pela
+// qualidade) ou a propria origem, se nao diminuiu.
+export async function recomprimirImagem(origem, pasta, qualidade) {
+  let sharp;
+  for (const de of [join(process.cwd(), "package.json"), import.meta.url]) {
+    try {
+      sharp = createRequire(de)("sharp");
+      break;
+    } catch {}
+  }
+  if (!sharp) throw new Error("falta o sharp (devDependency do jogo) para regravar " + origem);
+  mkdirSync(pasta, { recursive: true });
+  const dados = readFileSync(origem);
+  const destino = join(pasta, createHash("sha256").update(dados).update(`q${qualidade}`).digest("hex").slice(0, 16) + ".webp");
+  if (!existsSync(destino)) writeFileSync(destino, await sharp(dados).webp({ quality: qualidade, alphaQuality: 100, effort: 6 }).toBuffer());
+  return statSync(destino).size < dados.length ? destino : origem;
 }
 // o nome da pasta do cliente sai do conteudo (um CDN guarda cada cliente para sempre): 12 hexadecimais
 // sobre a pagina e sobre cada arquivo (caminho no pacote e conteudo: o caminho da origem ou um Buffer), em ordem

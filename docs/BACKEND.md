@@ -259,7 +259,7 @@ Desde a 0.2.0 o pacote leva também o que os jogos repetiam:
 - `src/tela/som.ts`: o som do jogo (`Som`): Web Audio, laço, volume, de que segundo, as chaves de
   música e de efeitos, o laço pedido antes do primeiro toque começa no toque.
 - `tools/pacote.mjs`: os passos do empacotador do jogo (`recortarFonte`, `emBinario`,
-  `comprimirImagens`, `reduzirImagens`, `hashDoPacote`, `gravarPacote`). Nenhum comando passa por
+  `comprimirImagens`, `reduzirImagens`, `recomprimirImagem`, `hashDoPacote`, `gravarPacote`). Nenhum comando passa por
   shell e o recorte de fontes roda com versões fixas do fonttools e do brotli.
 - `tools/navegador.ts`: um Chromium sem tela e uma aba pelo CDP (`Aba`) para os testes de ponta a
   ponta e as capturas, com o WebSocket do Node.
