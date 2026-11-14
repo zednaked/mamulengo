@@ -204,6 +204,10 @@ export const CAMPOS: Record<string, string> = {
   hidden: "escondida",
   holes: "furos",
   rule: "regra",
+  press: "pressao",
+  taper: "afinar",
+  raster: "pintura",
+  rev: "estado",
   // geleia (so do Mamulengo; docs/NUCLEO.md "Geleia"): a malha mole; amortecimento, gravidade e
   // massa ja estao acima
   jelly: "geleia",

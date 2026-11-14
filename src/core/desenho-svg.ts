@@ -3,6 +3,7 @@
 // forma, com o dobro da largura) e por fora (o dobro da largura, com o miolo apagado). Serve para
 // rasterizar a pagina dos desenhos fora do navegador (server/desenhos.ts, com o sharp).
 import { svgPath, type Drawing } from "./desenho.ts";
+import { segsDoTraco, tracoVariavel } from "./lapis.ts";
 
 const cor = (c: string) => ({ hex: "#" + c.slice(0, 6), a: c.length >= 8 ? parseInt(c.slice(6, 8), 16) / 255 : 1 });
 
@@ -21,6 +22,11 @@ export function desenhoEmSvg(d: Drawing, escala = 1): string {
     const st = s.stroke;
     if (!st || st.width <= 0) return;
     const k = cor(st.color);
+    if (tracoVariavel(s)) {
+      const d = segsDoTraco(s, Math.max(0.25, 1 / escala)).map((g) => g[0] + g.slice(1).join(" ")).join(" ");
+      if (d) corpo.push(`<path d="${d}" fill="${k.hex}" fill-opacity="${k.a}" fill-rule="nonzero"/>`);
+      return;
+    }
     const align = s.closed ? (st.align ?? "center") : "center";
     const estilo = (w: number) => `fill="none" stroke="${k.hex}" stroke-opacity="${k.a}" stroke-width="${w}" stroke-linejoin="${st.join ?? "miter"}" stroke-linecap="${st.cap ?? "butt"}" stroke-miterlimit="4"`;
     if (align === "center") corpo.push(`<path d="${p}" ${estilo(st.width)}/>`);

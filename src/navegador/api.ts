@@ -6,7 +6,7 @@
 // comum de src/core/psd-importar.ts), trocar imagens e efeitos (imagens-atlas.ts), relevo
 // (relevo.ts), versao leve (leve.ts), arte HD (atlas-hd.ts, o SVG rasterizado na pagina), .zip
 // (pacote.ts) e projetos Godot (godot.ts). So o render no Godot de verdade precisa do servidor.
-import { atlasTexto, exportarSpine, importarSpine, type Boneco } from "../boneco/spine.ts";
+import { atlasTexto, bonecoNovo, exportarSpine, importarSpine, nomeDeBoneco, type Boneco } from "../boneco/spine.ts";
 import { parseAtlas, type AtlasRegion } from "../core/atlas-text.ts";
 import { serializeSpineJson } from "../core/format.ts";
 import { diffSpine } from "../core/versions.ts";
@@ -449,6 +449,17 @@ export async function responder(req: Request): Promise<Response> {
       const f = p.endsWith(".boneco") ? await fs.lerArquivo(p) : null;
       if (!f) return erro(404, `nao e um .boneco: ${p}`);
       return json({ binario: ehBinario(new Uint8Array(await f.slice(0, 5).arrayBuffer())), bytes: f.size });
+    }
+    if (rota === "/api/boneco/novo" && req.method === "POST") {
+      const b = await corpoJson();
+      const nome = nomeDeBoneco(b.name);
+      if (!nome) return erro(400, "o personagem precisa de um nome");
+      const raiz = (await fs.raizes())[0]?.caminho;
+      if (!b.dir && !raiz) return erro(400, "abra uma pasta antes");
+      const arquivo = `${fs.normalizar(b.dir || `${raiz}/${nome}`)}/${nome}.boneco`;
+      if (await fs.lerArquivo(arquivo)) return erro(409, `ja existe: ${arquivo}`);
+      await gravarBoneco(arquivo, bonecoNovo(nome), false);
+      return json({ boneco: arquivo });
     }
     if (rota === "/api/boneco/formato" && req.method === "POST") {
       const b = await corpoJson();

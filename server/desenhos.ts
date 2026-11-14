@@ -2,10 +2,10 @@
 // <base>-desenhos.png com o sharp (src/core/desenho-svg.ts), no mesmo arranjo que o editor usa
 // (layoutDrawings), e o atlas ganha a pagina. Com isto um gerador desenha pelo sistema de desenho
 // (draw.* e draw.text) e grava o .boneco pronto, sem abrir o editor.
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { atlasWithDrawings, drawingPageName, layoutDrawings, type Drawing } from "../src/core/desenho.ts";
+import { atlasWithDrawings, drawingPageName, layoutDrawings, pinturaArquivo, pinturasPasta, type Drawing } from "../src/core/desenho.ts";
 import { desenhoEmSvg } from "../src/core/desenho-svg.ts";
 
 // grava a pagina em `dir` e devolve o atlas com ela; atlasArquivo da o nome (x.atlas -> x-desenhos.png)
@@ -21,9 +21,18 @@ export async function gravarPaginaDesenhos(drawings: Record<string, Drawing>, at
     const maiores = layout.regions.map((r) => ({ n: r.name, a: r.w * r.h, hd: r.hd })).sort((a, b) => b.a - a.a).slice(0, 5);
     throw new Error(`a pagina dos desenhos ficou com ${layout.width}x${layout.height} pixels (o limite das placas e 16384): baixe o hd dos desenhos grandes (fundo chapado aguenta 0,1; silhueta ao longe 0,5). Os maiores: ${maiores.map((m) => `${m.n} (hd ${m.hd})`).join(", ")}`);
   }
-  const partes = await Promise.all(
-    layout.regions.map(async (r) => ({ input: await sharp(Buffer.from(desenhoEmSvg(drawings[r.name], r.hd))).resize(r.w, r.h, { fit: "fill" }).png().toBuffer(), left: r.x, top: r.y })),
-  );
+  // a pintura de um desenho (o PNG na pasta das pinturas) vai por baixo das formas
+  const pasta = join(dir, pinturasPasta(atlasArquivo));
+  const partes = (
+    await Promise.all(
+      layout.regions.map(async (r) => {
+        const formas = { input: await sharp(Buffer.from(desenhoEmSvg(drawings[r.name], r.hd))).resize(r.w, r.h, { fit: "fill" }).png().toBuffer(), left: r.x, top: r.y };
+        const tinta = drawings[r.name].raster ? join(pasta, pinturaArquivo(r.name)) : "";
+        if (!tinta || !existsSync(tinta)) return [formas];
+        return [{ input: await sharp(tinta).resize(r.w, r.h, { fit: "fill" }).png().toBuffer(), left: r.x, top: r.y }, formas];
+      }),
+    )
+  ).flat();
   const png = await sharp({ create: { width: layout.width, height: layout.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite(partes)
     .png()

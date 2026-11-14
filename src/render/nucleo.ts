@@ -137,6 +137,20 @@ export class NucleoCena {
     this.ligaPaginas();
   }
 
+  // troca so um retangulo de uma pagina ja carregada (a pintura ao vivo: um remendo por quadro em
+  // vez da pagina inteira); false se a pagina nao tem textura aqui
+  remendaTextura(arquivo: string, x: number, y: number, w: number, h: number, rgba: Uint8ClampedArray): boolean {
+    const gl = this.desenhista.gl;
+    const t = this.texturas.get(arquivo);
+    if (!t) return false;
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+    return true;
+  }
+
   limparTexturas() {
     for (const t of this.texturas.values()) this.desenhista.gl.deleteTexture(t);
     this.texturas.clear();

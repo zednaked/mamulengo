@@ -1,0 +1,20 @@
+# O pintor: o renderer do ProCraft (MIT OR Apache-2.0) rodando ao lado do editor, sem janela, para
+# a pintura raster do Atelie. O editor manda as amostras da caneta e recebe os pixels que mudaram.
+# Modelo: tools/pintor.sh escreve o Cargo.toml (fora do repo) com o caminho do clone local do
+# ProCraft no lugar de @PROCRAFT@.
+[package]
+name = "mamulengo-pintor"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+procraft-core = { path = "@PROCRAFT@/crates/core" }
+serde_json = "1"
+
+[profile.release]
+debug = false
+opt-level = 3
+
+[workspace]

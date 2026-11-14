@@ -119,8 +119,9 @@ export class Viewer {
   // de onde veio cada pagina do atlas (godot-import ou source)
   textureInfo: Record<string, { origin: string; note: string | null }> = {};
   view: ViewState = { animation: null, time: 0, playing: true, loop: true, speed: 1, showBones: false, showMeshes: false, showBounds: false, background: [0.13, 0.12, 0.16], sequence: null };
-  // camera: centro em coordenadas do esqueleto e zoom (pixels por unidade)
-  cam = { x: 0, y: 0, zoom: 1 };
+  // camera: centro em coordenadas do esqueleto, zoom (pixels por unidade) e giro da tela (radianos,
+  // anti-horario; o mundo aparece girado em volta do centro da tela, como girar o papel na mesa)
+  cam = { x: 0, y: 0, zoom: 1, rot: 0 };
   private builtVersion = -1;
   private last = 0;
   private raf = 0;
@@ -200,6 +201,22 @@ export class Viewer {
     const update = cam.update.bind(cam);
     cam.update = () => {
       update();
+      // o giro da tela: o mundo gira em volta do centro da camera antes da projecao
+      // (projecao * T(cam) R T(-cam)), e so depois a inversao do modo godot
+      if (this.cam.rot) {
+        const m = cam.projectionView.values;
+        const c = Math.cos(this.cam.rot),
+          s = Math.sin(this.cam.rot);
+        const px = cam.position.x,
+          py = cam.position.y;
+        // K = T(p) R T(-p): colunas [c s 0 0], [-s c 0 0], [0 0 1 0], [tx ty 0 1]
+        const tx = px - (c * px - s * py),
+          ty = py - (s * px + c * py);
+        const K = [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1];
+        const o = new Array(16).fill(0);
+        for (let col = 0; col < 4; col++) for (let row = 0; row < 4; row++) for (let k = 0; k < 4; k++) o[col * 4 + row] += m[k * 4 + row] * K[col * 4 + k];
+        for (let i = 0; i < 16; i++) m[i] = o[i];
+      }
       if (this.flip) {
         const m = cam.projectionView.values;
         for (let i = 4; i < 8; i++) m[i] = -m[i];
@@ -243,6 +260,12 @@ export class Viewer {
       (p.texture as GLTexture | null)?.dispose();
       p.setTexture(new GLTexture(this.ctx, bmp, true, false));
     }
+  }
+
+  // troca so um retangulo da pagina (a pintura ao vivo). So no desenho do Mamulengo: false quando
+  // quem desenha e o spine-webgl, e ai a pagina inteira e trocada (trocarPagina)
+  remendarPagina(page: string, x: number, y: number, w: number, h: number, rgba: Uint8ClampedArray): boolean {
+    return !!this.nucleo && this.runtime === "nucleo" && this.nucleo.remendaTextura(page, x, y, w, h, rgba);
   }
 
   // Carrega texturas das paginas do atlas. urlFor resolve o nome da pagina.
@@ -1225,7 +1248,21 @@ export class Viewer {
   // tela (px CSS) -> coordenadas do esqueleto
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
     const r = this.canvas.getBoundingClientRect();
-    return { x: this.cam.x + (sx - r.left - r.width / 2) / this.cam.zoom, y: this.cam.y - (sy - r.top - r.height / 2) / this.cam.zoom };
+    const dx = (sx - r.left - r.width / 2) / this.cam.zoom,
+      dy = -(sy - r.top - r.height / 2) / this.cam.zoom;
+    if (!this.cam.rot) return { x: this.cam.x + dx, y: this.cam.y + dy };
+    // a tela girada: o deslocamento na tela volta ao mundo pelo giro contrario
+    const c = Math.cos(this.cam.rot),
+      s = Math.sin(this.cam.rot);
+    return { x: this.cam.x + c * dx + s * dy, y: this.cam.y - s * dx + c * dy };
+  }
+  // um deslocamento na tela (px CSS, y para baixo) em unidades do mundo (y para cima), com o giro
+  telaParaMundo(dx: number, dy: number): { x: number; y: number } {
+    const ux = dx / this.cam.zoom,
+      uy = -dy / this.cam.zoom;
+    const c = Math.cos(this.cam.rot),
+      s = Math.sin(this.cam.rot);
+    return { x: c * ux + s * uy, y: -s * ux + c * uy };
   }
 
   // tela -> espaco do esqueleto em runtime (onde estao bone.worldX/Y e os vertices)
@@ -1236,7 +1273,14 @@ export class Viewer {
 
   worldToScreen(x: number, y: number): { x: number; y: number } {
     const r = this.canvas.getBoundingClientRect();
-    return { x: r.left + r.width / 2 + (x - this.cam.x) * this.cam.zoom, y: r.top + r.height / 2 - (y - this.cam.y) * this.cam.zoom };
+    let dx = x - this.cam.x,
+      dy = y - this.cam.y;
+    if (this.cam.rot) {
+      const c = Math.cos(this.cam.rot),
+        s = Math.sin(this.cam.rot);
+      [dx, dy] = [c * dx - s * dy, s * dx + c * dy];
+    }
+    return { x: r.left + r.width / 2 + dx * this.cam.zoom, y: r.top + r.height / 2 - dy * this.cam.zoom };
   }
 
   // Renderiza o retangulo do mundo [x,y,w,h] (y para cima) num tamanho exato.
@@ -1246,6 +1290,8 @@ export class Viewer {
     this.cam.x = rect[0] + rect[2] / 2;
     this.cam.y = rect[1] + rect[3] / 2;
     this.cam.zoom = size[0] / rect[2];
+    // o que sai (foto, exportacao) nunca sai girado
+    this.cam.rot = 0;
     if (background) this.view.background = background as [number, number, number];
     this.draw();
     const out = document.createElement("canvas");

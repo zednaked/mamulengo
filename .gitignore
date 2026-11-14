@@ -35,3 +35,5 @@ dist-motor
 dist-navegador
 /.tmp/
 /.tmp-coelho/
+pintor/Cargo.toml
+pintor/Cargo.lock

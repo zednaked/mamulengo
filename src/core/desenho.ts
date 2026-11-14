@@ -16,6 +16,9 @@ export interface DrawPoint {
   in?: Vec;
   out?: Vec;
   radius?: number;
+  // traco de largura variavel (o lapis, src/core/lapis.ts): a largura aqui, em fracao da largura
+  // do traco (a pressao da caneta); sem ele vale 1
+  press?: number;
 }
 
 export interface DrawStroke {
@@ -24,6 +27,8 @@ export interface DrawStroke {
   align?: "inside" | "center" | "outside";
   join?: "miter" | "round" | "bevel";
   cap?: "butt" | "round" | "square";
+  // afina no comeco e no fim do traco aberto, em pixels de comprimento (o lapis)
+  taper?: [number, number];
 }
 
 export interface Contour {
@@ -51,6 +56,18 @@ export interface Drawing {
   // pixels de textura por pixel da imagem (a nitidez quando a peca aparece grande)
   hd?: number;
   shapes: DrawShape[];
+  // a pintura (raster) por baixo das formas: os pixels ficam fora do documento, num PNG ao lado
+  // do personagem (pinturaArquivo) e, no editor, na memoria (src/app/pintura.ts). `rev` nomeia o
+  // estado dos pixels: cada pincelada troca o rev, e desfazer volta ao rev de antes
+  raster?: { rev: string };
+}
+
+// a pasta das pinturas ao lado do atlas (x.atlas -> x-pinturas/) e o arquivo de uma imagem nela
+export function pinturasPasta(atlasFile: string): string {
+  return atlasFile.split("/").pop()!.replace(/\.atlas$/, "").replace(/\.boneco$/, "") + "-pinturas";
+}
+export function pinturaArquivo(image: string): string {
+  return image.replace(/[^A-Za-z0-9_.-]/g, (c) => "~" + c.charCodeAt(0).toString(16)) + ".png";
 }
 
 export const drawingsOf = (json: any): Record<string, Drawing> => json?.drawings ?? {};
@@ -274,6 +291,7 @@ export function splitSegment(s: Pick<DrawShape, "points" | "closed">, seg: numbe
     r1 = lerp(q1, q2, t);
   const m = lerp(r0, r1, t);
   const mid: DrawPoint = { x: round(m[0]), y: round(m[1]) };
+  if (a.press !== undefined || b.press !== undefined) mid.press = round((a.press ?? 1) + ((b.press ?? 1) - (a.press ?? 1)) * t);
   if (curve) {
     a.out = [round(q0[0] - p0[0]), round(q0[1] - p0[1])];
     mid.in = [round(r0[0] - m[0]), round(r0[1] - m[1])];

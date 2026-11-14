@@ -16,11 +16,15 @@
   import Images from "./app/Images.svelte";
   import GodotCheck from "./app/GodotCheck.svelte";
   import Onboarding from "./app/Onboarding.svelte";
+  import Guia from "./app/Guia.svelte";
+  import Novo from "./app/Novo.svelte";
   import Atalhos from "./app/Atalhos.svelte";
   import PsdImport from "./app/PsdImport.svelte";
   import { connectBridge } from "./bridge/client.ts";
   import { deleteVertex, stopMeshEdit } from "./app/meshedit.ts";
   import { abrirDesenhar } from "./app/drawedit.ts";
+  import { abrirAtelie } from "./app/atelie.ts";
+  import Atelie from "./app/Atelie.svelte";
 
   // quantas malhas o personagem tem (o botao "malhas" diz, e fica desligado sem nenhuma)
   const numMalhas = $derived.by(() => {
@@ -236,7 +240,8 @@
 
   $effect(() => {
     if (!app.viewer) return;
-    app.viewer.view.showBones = showBones;
+    // no atelie a tela fica limpa: sem os ossos por cima
+    app.viewer.view.showBones = showBones && !app.atelie;
     app.viewer.view.showMeshes = showMeshes;
     app.viewer.onion.enabled = app.onion;
   });
@@ -253,6 +258,8 @@
   }
 
   function keys(e: KeyboardEvent) {
+    // ja tratada por quem esta por cima (o viewport, o atelie)
+    if (e.defaultPrevented) return;
     // escrevendo (campo, lista, nota): as teclas sao do texto, nao atalhos
     const el = e.target as HTMLElement;
     if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement || el?.isContentEditable) return;
@@ -270,6 +277,10 @@
       e.preventDefault();
       alterna(e.code === "BracketLeft" ? "left" : e.code === "BracketRight" ? "right" : "foot");
     } else if (!mod && e.key === "?") atalhos = !atalhos;
+    else if (e.key === "F1") {
+      e.preventDefault();
+      app.guia = app.guia ? null : app.atelie ? "quadros" : app.doc ? "lapis" : "comecar";
+    }
     else if (!mod && e.key === "f") app.viewer?.frameAll();
     else if (!mod && (e.key === "PageUp" || e.key === "PageDown") && app.selection.slot) {
       // ordem de desenho da camada escolhida: passo inteligente; com Shift, topo ou fundo
@@ -284,6 +295,7 @@
     else if (!mod && e.key === "5") (app.tool = "bone"), (app.mode = "setup");
     else if (!mod && (e.key === "6" || e.key === "h")) app.tool = "pan";
     else if (!mod && e.key === "7") abrirDesenhar();
+    else if (!mod && e.key === "8") abrirAtelie();
     else if (!mod && e.key === "[") app.brushRadius = Math.max(15, app.brushRadius / 1.2);
     else if (!mod && e.key === "]") app.brushRadius = Math.min(250, app.brushRadius * 1.2);
     else if (app.meshEdit && (e.key === "Delete" || e.key === "Backspace")) {
@@ -311,6 +323,7 @@
   class:sem-esq={recolhe.left}
   class:sem-dir={recolhe.right}
   class:sem-pe={recolhe.foot}
+  class:atelie={!!app.atelie}
   style:grid-template-columns="{recolhe.left ? 0 : layout.left}px minmax(0, 1fr) {recolhe.right ? 0 : layout.right}px"
   style:grid-template-rows="auto minmax(0, 1fr) {recolhe.foot ? 0 : layout.foot}px"
 >
@@ -336,6 +349,7 @@
       <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animações">🦴 <span class="rot">Osso</span></button>
       <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a câmera arrastando (6 ou H). Também: botão do meio ou direito, ou segurar Espaço">✋ <span class="rot">Câmera</span></button>
       <button class:on={!!app.drawEdit} onclick={() => abrirDesenhar()} title="Desenhar em vetor, como no Figma (7): na peça escolhida (uma imagem em PNG vira desenho), ou uma peça nova no osso escolhido. Dois cliques numa peça desenhada também abrem">✒️ <span class="rot">Desenhar</span></button>
+      <button class:on={!!app.atelie} onclick={() => abrirAtelie()} title="Ateliê (8): tela limpa para desenhar à mão livre e animar quadro a quadro por cima da animação de ossos">🎨 <span class="rot">Ateliê</span></button>
 
     </div>
     <div class="seg">
@@ -373,7 +387,8 @@
       <div class="seg">{@render botoesVer()}</div>
     {/if}
     <div class="spacer"></div>
-    <button class="help" title="Atalhos do teclado e o guia (tecla ?)" onclick={() => (atalhos = true)}>?</button>
+    <button class="help guia-bt" title="Guia das ferramentas: como usar cada uma, passo a passo (F1)" onclick={() => (app.guia = app.doc ? "lapis" : "comecar")}>📖 <span class="rot">Guia</span></button>
+    <button class="help" title="Atalhos do teclado (tecla ?)" onclick={() => (atalhos = true)}>?</button>
     <div class="agent" class:on={app.agentConnected} title={app.agentConnected ? "Claude conectado: ele esta operando este editor" : "Claude: nenhuma instancia conectada a este editor"}>🤖{#if app.agentConnected}<span class="pontinho"></span>{/if}</div>
     {#if app.narration.text}<button class="talk" class:off={!app.showNarration} onclick={toggleNarration} title="Mostrar ou esconder a legenda com o que o Claude diz">💬</button>{/if}
     {#if app.spectator}
@@ -400,7 +415,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="grip col right-edge" title="Arraste para mudar a largura (clique duplo: padrão)" onpointerdown={(e) => resize(e, "left", 1, "x")} ondblclick={() => resetSize("left")}></div>
   </aside>
-  <main class="view"><Viewport /></main>
+  <main class="view"><Viewport />{#if app.atelie}<Atelie />{/if}</main>
   <aside class="right panel">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="grip col left-edge" title="Arraste para mudar a largura (clique duplo: padrão)" onpointerdown={(e) => resize(e, "right", -1, "x")} ondblclick={() => resetSize("right")}></div>
@@ -432,7 +447,9 @@
   </footer>
 
   {#if !app.spectator}<Onboarding bind:open={guide} />{/if}
-  <Atalhos bind:open={atalhos} guia={() => (guide = true)} />
+  <Atalhos bind:open={atalhos} guia={() => (app.guia = "comecar")} />
+  <Guia atalhos={() => (atalhos = true)} />
+  {#if !app.spectator}<Novo />{/if}
   {#if app.showNarration && app.narration.text && now - app.narration.at < 20000}
     <div class="caption">🤖 {app.narration.text.length > 280 ? app.narration.text.slice(0, 280) + "…" : app.narration.text}</div>
   {/if}
@@ -463,6 +480,18 @@
     gap: 8px;
     padding: 8px;
     height: 100vh;
+  }
+  /* o atelie: so a tela de desenho */
+  .app.atelie {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+    grid-template-rows: 0 minmax(0, 1fr) 0 !important;
+    gap: 0;
+    padding: 0;
+  }
+  .app.atelie > header,
+  .app.atelie > aside,
+  .app.atelie > footer {
+    display: none;
   }
   /* paineis recolhidos: a coluna vai a 0 e o painel sai do fluxo */
   .sem-esq aside.left,
@@ -657,6 +686,7 @@
     grid-area: left;
   }
   .view {
+    position: relative;
     grid-area: view;
     min-height: 0;
     min-width: 0;

@@ -4,11 +4,11 @@
   let step = $state(0);
 
   const STEPS = [
-    { icon: "🎭", title: "Escolha um personagem", text: "No seletor lá em cima aparecem os personagens das pastas do projeto. Sem nenhum ainda? Arraste um PSD em camadas para a janela: cada camada vira uma parte. Nada é gravado até você salvar." },
+    { icon: "🎭", title: "Escolha um personagem", text: "No seletor lá em cima aparecem os personagens das pastas do projeto. Para começar do zero, ＋ Novo em branco, ali mesmo: abre uma tela limpa para desenhar. Já tem arte? Arraste um PSD em camadas para a janela: cada camada vira uma parte. Nada é gravado até você salvar." },
     { icon: "👆", title: "Clique numa parte", text: "Clique na cabeça, no braço, no corpo. A parte fica marcada no desenho e no Esqueleto, à esquerda, e o painel da direita mostra o que dá para fazer com ela." },
     { icon: "🦴", title: "Pose base ou animação", text: "Embaixo, Pose base é o boneco parado: mexer ali muda todas as animações (é onde se monta o esqueleto). Escolha uma animação, ou + nova, para animar: cada coisa que você mexe vira uma chave no instante da régua." },
     { icon: "✨", title: "Faça ele se mexer", text: "Arraste a parte com Girar (2) ou Mover (1): puxar uma junta, como a mão, dobra o braço inteiro (Alt solta). Ou aperte um movimento pronto: Respirar, Balançar, Quicar. Espaço toca e pausa, as setas andam um quadro, Ctrl+Z desfaz. O pincel 🖌 deforma a imagem como massinha." },
-    { icon: "💾", title: "Salve e exporte", text: "Salvar (Ctrl+S) grava no projeto, com cópia de segurança. Exportar, embaixo à direita, gera GIF, WebP ou vídeo. O botão ? (ou a tecla ?) mostra todos os atalhos e traz este guia de volta." },
+    { icon: "💾", title: "Salve e exporte", text: "Salvar (Ctrl+S) grava no projeto, com cópia de segurança. Exportar, embaixo à direita, gera GIF, WebP ou vídeo. O botão 📖 Guia (F1) explica cada ferramenta passo a passo, e ? mostra todos os atalhos." },
   ];
   function close() {
     open = false;

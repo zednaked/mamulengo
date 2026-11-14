@@ -35,6 +35,9 @@ import sharp from "sharp";
 import { bonecoVirtual, gravarVirtual, lerVirtual } from "./boneco.ts";
 import { arquivoBinario, gravarBonecoArquivo, lerBonecoArquivo } from "./boneco-binario.ts";
 import { listarEfeitos, porEfeito } from "./efeitos.ts";
+import { bonecoNovo, nomeDeBoneco } from "../src/boneco/spine.ts";
+import { pintorWs } from "./pintor.ts";
+import { interpolar, pastaDoRife } from "./rife.ts";
 
 export const BRIDGE_PATH = "/__mamulengo";
 const EXPORTS = join(homedir(), ".cache", "mamulengo", "exports");
@@ -171,6 +174,29 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             const r = await createAsset({ dir: resolve(b.dir), name: b.name, imagesFrom: resolve(b.imagesFrom) });
             cache = null;
             return send(200, r);
+          }
+          // personagem em branco: um .boneco so com o osso raiz, numa pasta dentro das raizes
+          if (url.pathname === "/api/boneco/novo" && req.method === "POST") {
+            const b = await json();
+            const nome = nomeDeBoneco(b.name);
+            if (!nome) return send(400, { error: "o personagem precisa de um nome" });
+            const dir = resolve(b.dir || join(roots[0], nome));
+            guard(dir);
+            const arquivo = join(dir, `${nome}.boneco`);
+            if (existsSync(arquivo)) return send(409, { error: `ja existe: ${arquivo}` });
+            mkdirSync(dir, { recursive: true });
+            gravarBonecoArquivo(arquivo, bonecoNovo(nome), false);
+            cache = null;
+            return send(200, { boneco: arquivo });
+          }
+          // intermediarios do Atelie: o RIFE (server/rife.ts) entre dois quadros
+          if (url.pathname === "/api/rife" && req.method === "GET") return send(200, { disponivel: !!pastaDoRife() });
+          if (url.pathname === "/api/rife" && req.method === "POST") {
+            const t = Number(url.searchParams.get("t"));
+            const body = await readBody(req);
+            const na = body.length >= 4 ? body.readUInt32LE(0) : 0;
+            if (!(t > 0 && t < 1) || !na || 4 + na >= body.length) return send(400, { error: "rife: t entre 0 e 1 e as duas imagens ([u32 tamanho de a][a.png][b.png])" });
+            return send(200, await interpolar(body.subarray(4, 4 + na), body.subarray(4 + na), t), "image/png");
           }
           // PSD enviado pelo navegador: guarda em ~/.cache/mamulengo/psd e devolve o caminho
           if (url.pathname === "/api/psd/upload" && req.method === "POST") {
@@ -504,6 +530,7 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
       });
 
       bridge(server);
+      void pintorWs(server);
   };
 
   return {

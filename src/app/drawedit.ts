@@ -10,8 +10,11 @@ import type { Viewer } from "../render/viewer.ts";
 import { app, type DrawEdit } from "./state.svelte.ts";
 import { cursor } from "./interact.ts";
 import { contours, drawingsOf, flatten, nearestOnShape, type Contour, type DrawShape, type Drawing, type Vec } from "../core/desenho.ts";
-import { coverNeeded, drawingOfSlot } from "../core/commands/desenho.ts";
+import { caixaDasFormas, coverNeeded, drawingOfSlot } from "../core/commands/desenho.ts";
 import { shapePath } from "./desenho.ts";
+import { ESTILOS, Estabilizador, larguraDaPressao, type Amostra } from "../core/lapis.ts";
+import { pinceladaComeca, pinceladaSegue, pinceladaTermina, type AmostraPincel, type Ferramenta } from "./pintura.ts";
+import { apagarSelecao, balde, crescimento, deslocarSelecao, caixaDaSelecao, contornoDaSelecao, desistir, espelhar, ganchos, lacando, lacoDown, lacoMove, lacoUp, limparRetoque, retocando, selecao, selecionarTudo, semSelecao, soltar, temSolto } from "./retoque.ts";
 
 const HIT_POINT = 8; // px de tela
 const HIT_HANDLE = 7;
@@ -19,20 +22,21 @@ const HIT_EDGE = 6;
 
 // ---- entrar e sair
 
-export function startDrawEdit(slot: string): boolean {
+export function startDrawEdit(slot: string, quadro?: { attachment: string; tool?: DrawEdit["tool"] }): boolean {
   const j = app.doc?.json;
-  const found = j ? drawingOfSlot(j, slot) : null;
+  const found = j ? drawingOfSlot(j, slot, quadro?.attachment) : null;
   if (!j || !found) {
     app.toast("Esta parte não é uma imagem desenhada.");
     return false;
   }
   app.meshEdit = null;
-  app.mode = "setup";
+  // o quadro de uma camada de quadros se desenha no instante dele, com a animacao aberta
+  if (!quadro) app.mode = "setup";
   if (app.viewer) app.viewer.view.playing = false;
   const d = drawingsOf(j)[found.image];
   // os triangulos da malha a mostra atrapalham desenhar: somem ate sair do modo
   if (app.viewer?.view.showMeshes) (malhasAntes = true), (app.viewer.view.showMeshes = false);
-  app.drawEdit = { image: found.image, slot, skin: found.skin, attachment: found.attachment, tool: d.shapes.length ? "select" : "pen", shape: null, point: null, contour: 0, pen: null, penContour: 0, hole: false };
+  app.drawEdit = { image: found.image, slot, skin: found.skin, attachment: found.attachment, tool: quadro ? (quadro.tool ?? "pencil") : d.shapes.length ? "select" : "pen", shape: null, point: null, contour: 0, pen: null, penContour: 0, hole: false, ...(quadro ? { quadro: true } : {}) };
   app.select({ slot, bone: j.slots.find((s: any) => s.name === slot)?.bone });
   return true;
 }
@@ -40,8 +44,11 @@ export function startDrawEdit(slot: string): boolean {
 let malhasAntes = false;
 
 export function stopDrawEdit() {
+  limparRetoque();
   app.drawEdit = null;
   drag = null;
+  traco = null;
+  apagando = null;
   if (malhasAntes && app.viewer) app.viewer.view.showMeshes = true;
   malhasAntes = false;
 }
@@ -52,6 +59,17 @@ function cobrir() {
   const de = app.drawEdit;
   const j = app.doc?.json;
   if (!de || !j) return;
+  // com pintura, a folha cresce aqui (os pixels andam junto); o draw.cover nao mexe nos pixels
+  const d = drawingsOf(j)[de.image];
+  const cx = d?.raster ? caixaDasFormas(d) : null;
+  const cresce = d && cx ? crescimento(d.width, d.height, cx) : null;
+  if (d && cresce) {
+    const [l, t, r, b] = cresce;
+    const rev = app.pinturas.crescer(de.image, d, l, t, r, b);
+    deslocarSelecao(de.image, l, t);
+    app.run({ cmd: "paint.grow", args: { image: de.image, left: l, top: t, right: r, bottom: b, rev } }, `${de.image} cresce até o desenho`);
+    app.desenhos.pintar(app.doc!, app.viewer, de.image);
+  }
   const c = coverNeeded(j, de.image);
   if (!c.grow && !c.meshes.length) return;
   const r = app.run({ cmd: "draw.cover", args: { image: de.image } }, c.meshes.length ? `a malha de ${de.slot} cobre o desenho` : `${de.image} cresce até o desenho`);
@@ -229,6 +247,36 @@ export function mapperFor(v: Viewer, de: DrawEdit, d: Drawing): Mapper | null {
   };
 }
 
+// imagem (pixels, y para baixo) -> pixels CSS do canvas do viewport, para desenhar um quadro por
+// cima com o Canvas 2D (papel de cebola e o traco ao vivo). So para imagem simples (region).
+export function matrizDeTela(v: Viewer, slot: string, attachment: string, image: string): [number, number, number, number, number, number] | null {
+  const j = app.doc?.json;
+  const d = drawingsOf(j)[image];
+  const bn = j?.slots.find((s: any) => s.name === slot)?.bone;
+  const a = j?.skins.map((s: any) => s.attachments?.[slot]?.[attachment]).find(Boolean);
+  const b = bn ? v.pose?.findBone(bn) : null;
+  if (!d || !a || !b || (a.type ?? "region") !== "region") return null;
+  const m = regionMatrix(a, b, d);
+  const fy = v.flip ? -1 : 1;
+  const z = v.cam.zoom;
+  const cx = v.canvas.clientWidth / 2,
+    cy = v.canvas.clientHeight / 2;
+  // mundo (y para cima): W = A (u, v) + t; tela = centro + diag(z, -z) R(giro) (W - cam)
+  const c = Math.cos(v.cam.rot),
+    s = Math.sin(v.cam.rot);
+  const a00 = m[0],
+    a01 = m[1],
+    a10 = m[2] * fy,
+    a11 = m[3] * fy;
+  const t0 = m[4] - v.cam.x,
+    t1 = m[5] * fy - v.cam.y;
+  const r00 = c * a00 - s * a10,
+    r01 = c * a01 - s * a11,
+    r10 = s * a00 + c * a10,
+    r11 = s * a01 + c * a11;
+  return [r00 * z, -r10 * z, r01 * z, -r11 * z, cx + (c * t0 - s * t1) * z, cy - (s * t0 + c * t1) * z];
+}
+
 // ---- mira
 
 type Aim =
@@ -327,13 +375,198 @@ function toImage(v: Viewer, p: { x: number; y: number }): { u: number; w: number
 const img = (de: DrawEdit) => ({ image: de.image });
 const contourIn = (s: DrawShape | undefined, c: number): Contour | undefined => (s ? contours(s)[c] : undefined);
 
-export function drawDown(v: Viewer, p: { x: number; y: number }, mods: { shift: boolean; alt: boolean }): boolean {
+// ---- lapis e borracha
+
+// o traco sendo feito: as amostras ja estabilizadas, em pixels da imagem, com a pressao da caneta
+// (sem caneta, sem pressao: a largura fica inteira e o estilo so afina as pontas)
+interface Traco {
+  pontos: Amostra[];
+  est: Estabilizador;
+  pressao: boolean;
+  // amostras da caneta ainda em pixels de tela: o quadro acabou de ser criado e a pose so
+  // passa a ter a parte no proximo desenho do viewport
+  espera: Cru[];
+}
+type Cru = { clientX: number; clientY: number; pressure: number; pointerType: string; timeStamp: number };
+const cru = (e: Cru): Cru => ({ clientX: e.clientX, clientY: e.clientY, pressure: e.pressure, pointerType: e.pointerType, timeStamp: e.timeStamp });
+
+// passa as amostras para a imagem (as que esperavam primeiro); false = a pose ainda nao esta pronta
+function entra(v: Viewer, tr: Traco, novas: Cru[]) {
+  tr.espera.push(...novas.map(cru));
+  while (tr.espera.length) {
+    const a = amostra(v, tr.espera[0]);
+    if (!a) return;
+    tr.espera.shift();
+    tr.pontos.push(tr.est.mover(a));
+  }
+}
+let traco: Traco | null = null;
+let apagando: { merge: string } | null = null;
+
+// o traco ao vivo, para desenhar por cima (src/app/Atelie.svelte e drawDrawEdit)
+export function tracoVivo(): { image: string; pontos: Amostra[]; pressao: boolean } | null {
+  const de = app.drawEdit;
+  return traco && de ? { image: de.image, pontos: traco.pontos, pressao: traco.pressao } : null;
+}
+
+function amostra(v: Viewer, e: { clientX: number; clientY: number; pressure: number; pointerType: string; timeStamp: number }): Amostra | null {
+  const t = toImage(v, v.screenToSkel(e.clientX, e.clientY));
+  if (!t) return null;
+  return [t.u, t.w, e.pointerType === "pen" ? e.pressure : undefined, e.timeStamp];
+}
+
+// ---- pincel (raster): as amostras vao para o pintor (src/app/pintura.ts)
+
+export const RASTER: Record<string, Ferramenta> = { brush: "pintar", rubber: "apagar", smudge: "borrar" };
+type CruP = Cru & { altitudeAngle?: number; azimuthAngle?: number; tiltX?: number; tiltY?: number };
+const cruP = (e: CruP): CruP => ({ ...cru(e), altitudeAngle: e.altitudeAngle, azimuthAngle: e.azimuthAngle, tiltX: e.tiltX, tiltY: e.tiltY });
+interface Pincelada {
+  ferramenta: Ferramenta;
+  ponteiro: "caneta" | "borracha" | "mouse" | "dedo";
+  image: string;
+  comecou: boolean;
+  // amostras ainda em pixels de tela (o quadro recem-criado so entra na pose no proximo desenho)
+  espera: CruP[];
+}
+let pincelada: Pincelada | null = null;
+
+// a amostra da caneta em pixels da imagem, com a pressao e a inclinacao (radianos a partir de em pe)
+function amostraPincel(v: Viewer, e: CruP): AmostraPincel | null {
+  const t = toImage(v, v.screenToSkel(e.clientX, e.clientY));
+  if (!t) return null;
+  let inclina = 0,
+    direcao = 0;
+  if (e.pointerType === "pen") {
+    if (typeof e.altitudeAngle === "number" && typeof e.azimuthAngle === "number") {
+      inclina = Math.PI / 2 - e.altitudeAngle;
+      direcao = e.azimuthAngle;
+    } else if (e.tiltX || e.tiltY) {
+      const tx = Math.tan(((e.tiltX ?? 0) * Math.PI) / 180),
+        ty = Math.tan(((e.tiltY ?? 0) * Math.PI) / 180);
+      inclina = Math.atan(Math.hypot(tx, ty));
+      direcao = Math.atan2(ty, tx);
+    }
+  }
+  // a direcao da caneta e na tela; na imagem, conta o giro da tela
+  direcao += v.cam.rot;
+  return [rnd(t.u), rnd(t.w), e.pointerType === "pen" ? Math.round(e.pressure * 1000) / 1000 : 0.5, Math.round(e.timeStamp * 10) / 10, Math.round(inclina * 1000) / 1000, Math.round(direcao * 1000) / 1000];
+}
+
+function alimentar(v: Viewer, novas: CruP[]) {
+  const p = pincelada;
+  if (!p) return;
+  p.espera.push(...novas.map(cruP));
+  const prontas: AmostraPincel[] = [];
+  while (p.espera.length) {
+    const a = amostraPincel(v, p.espera[0]);
+    if (!a) break;
+    p.espera.shift();
+    prontas.push(a);
+  }
+  if (!prontas.length) return;
+  if (!p.comecou) {
+    if (!pinceladaComeca(p.image, p.ferramenta, p.ponteiro, prontas.splice(0, 1))) {
+      pincelada = null;
+      return;
+    }
+    p.comecou = true;
+  }
+  pinceladaSegue(prontas);
+}
+
+// o balde: em cima de uma forma vetorial troca a cor dela; fora, enche a tinta por baixo das linhas
+function baldeEm(image: string, u: number, w: number) {
+  const d = drawingsOf(app.doc?.json)[image];
+  if (!d) return;
+  const cor = app.lapis.color;
+  const i = shapeAt(d, u, w, 0.5);
+  const s = i >= 0 ? d.shapes[i] : null;
+  if (s) {
+    hitCtx ??= new OffscreenCanvas(1, 1).getContext("2d")!;
+    const noMiolo = !!s.fill && hitCtx.isPointInPath(shapePath(s), u, w, "evenodd");
+    app.run({ cmd: "draw.set", args: { image, shape: i, ...(noMiolo ? { fill: cor } : { stroke: { color: cor } }) } }, `balde em ${s.name}`);
+    return;
+  }
+  if (!balde(image, u, w, cor, app.lapis.limiar)) app.toast("O balde não achou o que encher aqui.");
+}
+ganchos.vetorMudou = () => cobrir();
+
+function apagarEm(de: DrawEdit, d: Drawing, u: number, w: number, k: number) {
+  const i = shapeAt(d, u, w, 4 / k);
+  if (i < 0 || !apagando) return;
+  app.run({ cmd: "draw.remove", args: { image: de.image, shape: i } }, `apaga ${d.shapes[i].name}`, undefined, true);
+  de.shape = de.point = de.pen = null;
+}
+
+function fecharTraco() {
+  const de = app.drawEdit;
+  const tr = traco;
+  traco = null;
+  if (!de || !tr) return;
+  const pontos = [...tr.pontos, ...tr.est.soltar()];
+  if (!pontos.length) return;
+  const l = app.lapis;
+  const args: any = { image: de.image, points: pontos.map((q) => (tr.pressao ? [rnd(q[0]), rnd(q[1]), Math.round((q[2] ?? 1) * 1000) / 1000] : [rnd(q[0]), rnd(q[1])])), width: l.width, color: l.color, style: l.estilo in ESTILOS ? l.estilo : "lapis", smooth: l.suavizar };
+  if (l.mancha) (args.fill = l.color), (args.stroke = false);
+  // o traco e o crescer da imagem ate ele num passo so de desfazer
+  app.run([{ cmd: "draw.freehand", args }, { cmd: "draw.cover", args: { image: de.image } }], l.mancha ? "mancha" : "traço");
+  // numa folha com pintura o draw.cover nao cresce: o cobrir cresce com os pixels
+  if (drawingsOf(app.doc?.json)[de.image]?.raster) cobrir();
+}
+
+export function drawDown(v: Viewer, p: { x: number; y: number }, mods: { shift: boolean; alt: boolean }, e?: PointerEvent): boolean {
   const c = current();
   const t = toImage(v, p);
+  // pincel, borracha de tinta e borrar: a pincelada vai para o pintor
+  if (c && e && RASTER[c.de.tool]) {
+    if (pincelada) return true;
+    v.view.playing = false;
+    const borr = e.pointerType === "pen" && (e.buttons & 32) !== 0;
+    pincelada = { ferramenta: borr ? "apagar" : RASTER[c.de.tool], ponteiro: e.pointerType === "pen" ? (borr ? "borracha" : "caneta") : e.pointerType === "touch" ? "dedo" : "mouse", image: c.de.image, comecou: false, espera: [] };
+    c.de.shape = c.de.point = c.de.pen = null;
+    alimentar(v, [e]);
+    return true;
+  }
+  // balde e laco (src/app/retoque.ts)
+  if (c && (c.de.tool === "bucket" || c.de.tool === "lasso")) {
+    v.view.playing = false;
+    c.de.shape = c.de.point = c.de.pen = null;
+    if (c.de.tool === "lasso") {
+      if (t) lacoDown(c.de.image, t.u, t.w, t.k);
+      return true;
+    }
+    // (o quadro recem-criado so entra na pose no proximo desenho: o balde espera por ele)
+    const image = c.de.image;
+    const enche = (falta: number) => {
+      const agora = app.drawEdit?.image === image ? toImage(v, p) : null;
+      if (agora) return void baldeEm(image, agora.u, agora.w);
+      if (falta > 0 && app.drawEdit?.image === image) requestAnimationFrame(() => enche(falta - 1));
+    };
+    enche(4);
+    return true;
+  }
+  if (c && !t && e && c.de.tool === "pencil" && c.de.quadro) {
+    traco = { pontos: [], est: new Estabilizador(app.lapis.estabilizar), pressao: e.pointerType === "pen", espera: [cru(e)] };
+    return true;
+  }
   if (!c || !t) return false;
   const { de, d } = c;
   const { u, w, k } = t;
   v.view.playing = false;
+  // a borracha da caneta (o botao de tras) apaga com qualquer ferramenta de desenhar
+  const borracha = de.tool === "eraser" || (!!e && e.pointerType === "pen" && (e.buttons & 32) !== 0);
+  if (borracha) {
+    apagando = { merge: `borracha${++seq}` };
+    apagarEm(de, d, u, w, k);
+    return true;
+  }
+  if (de.tool === "pencil") {
+    const a: Amostra = e ? (amostra(v, e) ?? [u, w]) : [u, w];
+    const est = new Estabilizador(app.lapis.estabilizar);
+    traco = { pontos: [est.mover(a)], est, pressao: a[2] !== undefined, espera: [] };
+    de.shape = de.point = de.pen = null;
+    return true;
+  }
   // a caneta perdida (desfazer, forma apagada, contorno ja fechado): recomeca
   if (de.pen !== null) {
     const ct = contourIn(d.shapes[de.pen], de.penContour);
@@ -463,9 +696,24 @@ export function drawDown(v: Viewer, p: { x: number; y: number }, mods: { shift: 
   return true;
 }
 
-export function drawMove(v: Viewer, p: { x: number; y: number }, mods: { shift: boolean; alt: boolean }) {
+export function drawMove(v: Viewer, p: { x: number; y: number }, mods: { shift: boolean; alt: boolean }, e?: PointerEvent) {
   const c = current();
   const t = toImage(v, p);
+  if (pincelada) {
+    if (e) alimentar(v, e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]);
+    return;
+  }
+  if (retocando()) {
+    if (t) lacoMove(t.u, t.w, t.k, mods.shift, mods.alt);
+    return;
+  }
+  if (traco && c) {
+    // todas as amostras da caneta desde o ultimo quadro (a mesa manda mais de uma por quadro)
+    if (e) entra(v, traco, e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]);
+    else if (t) traco.pontos.push(traco.est.mover([t.u, t.w]));
+    return;
+  }
+  if (apagando && c && t) return apagarEm(c.de, c.d, t.u, t.w, t.k);
   if (!drag || !c || !t) return;
   const { de } = c;
   let du = t.u - drag.start[0],
@@ -537,6 +785,26 @@ export function drawMove(v: Viewer, p: { x: number; y: number }, mods: { shift: 
 
 export function drawUp() {
   const de = app.drawEdit;
+  if (pincelada) {
+    if (app.viewer) alimentar(app.viewer, []);
+    const comecou = pincelada.comecou;
+    pincelada = null;
+    if (comecou) pinceladaTermina();
+    return;
+  }
+  if (retocando()) {
+    if (de) lacoUp(de.image);
+    return;
+  }
+  if (traco) {
+    if (traco.espera.length && app.viewer) entra(app.viewer, traco, []);
+    fecharTraco();
+    return;
+  }
+  if (apagando) {
+    apagando = null;
+    return;
+  }
   // retangulo ou elipse feitos: volta para selecionar, como no Figma
   if (drag?.kind === "box" && de && drag.moved) de.tool = "select";
   const gesto = drag !== null;
@@ -545,7 +813,7 @@ export function drawUp() {
 }
 
 export function drawDragging() {
-  return drag !== null;
+  return drag !== null || traco !== null || apagando !== null || pincelada !== null || retocando();
 }
 
 // ---- teclado
@@ -557,17 +825,59 @@ export function drawKey(e: KeyboardEvent): boolean {
   const k = e.key;
   const mod = e.ctrlKey || e.metaKey;
   if (mod) return false;
+  // no atelie, R e F14 giram a tela (src/app/atelie.ts), como no ProCraft
+  if (app.atelie && (k === "r" || k === "R" || k === "F14")) return false;
+  // o laco: Enter assenta o pedaco, Esc devolve (ou tira a selecao), Delete apaga o que esta dentro
+  if (selecao() && (k === "Enter" || k === "Escape")) {
+    if (k === "Enter") soltar();
+    else if (temSolto()) desistir();
+    else semSelecao();
+    return true;
+  }
+  if (selecao() && (k === "Delete" || k === "Backspace")) {
+    apagarSelecao();
+    return true;
+  }
+  // no atelie, Enter sem caminho aberto toca a animacao (src/app/Atelie.svelte)
+  if (k === "Enter" && de.pen === null && de.quadro) return false;
+  if ((k === "h" || k === "H") && selecao()) {
+    espelhar(e.shiftKey);
+    return true;
+  }
+  if (k === "t" || k === "T") {
+    if (selecionarTudo(de.image)) de.tool = "lasso";
+    else app.toast("Este quadro ainda está vazio.");
+    return true;
+  }
   if (k === "Escape" || k === "Enter") {
     if (de.pen !== null) de.pen = null;
     else if (k === "Escape" && de.hole) de.hole = false;
     else if (k === "Escape" && de.point !== null) de.point = null;
     else if (k === "Escape" && de.shape !== null) de.shape = null;
-    else if (k === "Escape") stopDrawEdit();
+    else if (k === "Escape" && !de.quadro) stopDrawEdit();
     return true;
   }
-  const tools: Record<string, DrawEdit["tool"]> = { v: "select", p: "pen", r: "rect", o: "ellipse" };
+  // B: o pincel (pintura); E: a borracha da familia em uso (tinta com o pincel, traco com o lapis)
+  const pintando = !!RASTER[de.tool];
+  const tools: Record<string, DrawEdit["tool"]> = { v: "select", p: "pen", r: "rect", o: "ellipse", l: "pencil", b: "brush", e: pintando ? "rubber" : "eraser", s: "smudge", g: "bucket", q: "lasso" };
+  // [ e ]: o tamanho do pincel ou a largura do lapis
+  if ((k === "[" || k === "]") && pintando) {
+    const f = RASTER[de.tool];
+    app.pincel.tamanho[f] = Math.max(0.01, Math.min(1, Math.round((app.pincel.tamanho[f] + (k === "]" ? 0.03 : -0.03)) * 100) / 100));
+    app.guardarPincel();
+    return true;
+  }
+  if (k === "[" || k === "]") {
+    const l = app.lapis;
+    const passo = l.width < 4 ? 0.5 : l.width < 12 ? 1 : l.width < 40 ? 2 : 5;
+    l.width = Math.max(0.5, Math.min(200, l.width + (k === "]" ? passo : -passo)));
+    app.guardarLapis();
+    return true;
+  }
   if (tools[k.toLowerCase()]) {
     de.tool = tools[k.toLowerCase()];
+    // a selecao continua nas ferramentas de pixels (o pincel e o balde respeitam o laco)
+    if (de.tool !== "lasso" && de.tool !== "bucket" && !RASTER[de.tool]) semSelecao();
     if (de.tool !== "pen") de.pen = null;
     return true;
   }
@@ -607,6 +917,13 @@ export function drawKey(e: KeyboardEvent): boolean {
 export function drawHelp(): string {
   const de = app.drawEdit;
   if (!de) return "";
+  if (de.tool === "pencil") return "arraste para desenhar · [ e ] mudam a largura · a pressão da caneta engrossa o traço · E: borracha · V: escolher e ajustar os pontos";
+  if (de.tool === "eraser") return "arraste por cima dos traços para apagar · L: lápis";
+  if (de.tool === "bucket") return "clique numa área fechada para encher de cor (por baixo das linhas) · em cima de uma forma vetorial, troca a cor dela · com laço, enche só dentro dele";
+  if (de.tool === "lasso") return selecao() ? "arraste dentro para mover · os cantos esticam (Shift: por igual; Alt: do centro) · os lados esticam numa direção · passar do outro lado espelha · H espelha, Shift+H de cabeça para baixo · a bolinha de cima gira (Shift: de 15 em 15°) · Enter assenta · Esc devolve · Delete apaga" : "contorne o que quer mexer · T escolhe o quadro inteiro";
+  if (de.tool === "brush") return "pinte com a caneta · [ e ] mudam o tamanho · E: borracha de tinta · S: borrar · L: lápis vetorial";
+  if (de.tool === "rubber") return "apague a tinta com a caneta · [ e ] mudam o tamanho · B: pincel";
+  if (de.tool === "smudge") return "arraste para borrar a tinta · [ e ] mudam o tamanho · B: pincel";
   if (de.hole && de.tool !== "select") return de.shape === null ? "modo furo: escolha antes a forma que vai ser furada" : "modo furo: o que você desenhar agora fura a forma escolhida · Esc sai do modo furo";
   if (de.tool === "pen")
     return de.pen !== null ? "clique põe ponto · arrastar faz curva (Alt: só um lado) · clique no primeiro ponto fecha · Enter ou Esc termina" : "clique começa um caminho · no lado da forma escolhida, põe um ponto · no fim de um caminho aberto, continua";
@@ -714,6 +1031,54 @@ export function drawDrawEdit(v: Viewer) {
         s.circle(false, p[0], p[1], 7 / z, C.pen, 18);
       }
     }
+  }
+  // o laco em andamento, a selecao e a caixa dela
+  if (selecao() && selecao()!.image !== de.image) limparRetoque();
+  if (temSolto() && de.tool !== "lasso") soltar();
+  const lc = lacando();
+  if (lc && lc.length > 1) poly(lc, C.pen, 2);
+  const cs = contornoDaSelecao();
+  if (cs && selecao()?.image === de.image) {
+    poly([...cs, cs[0]], C.white, 2);
+    const cx = de.tool === "lasso" ? caixaDaSelecao(k) : null;
+    if (cx) {
+      poly([...cx.cantos, cx.cantos[0]], C.sel);
+      const topo = W((cx.cantos[0][0] + cx.cantos[1][0]) / 2, (cx.cantos[0][1] + cx.cantos[1][1]) / 2);
+      const g = W(cx.gira[0], cx.gira[1]);
+      s.line(topo[0], topo[1], g[0], g[1], C.sel);
+      s.circle(true, g[0], g[1], 5.5 / z, C.sel, 16);
+      s.circle(true, g[0], g[1], 3.5 / z, C.white, 16);
+      for (const q of cx.cantos) {
+        const p = W(q[0], q[1]);
+        s.circle(true, p[0], p[1], 5.5 / z, C.sel, 16);
+        s.circle(true, p[0], p[1], 3.5 / z, C.white, 16);
+      }
+      // os meios dos lados esticam so numa direcao
+      for (const q of cx.lados) {
+        const p = W(q[0], q[1]);
+        s.circle(true, p[0], p[1], 4.5 / z, C.sel, 4);
+        s.circle(true, p[0], p[1], 2.8 / z, C.white, 4);
+      }
+    }
+  }
+  if (t && de.tool === "bucket") {
+    const p = W(t.u, t.w);
+    s.line(p[0] - 6 / z, p[1], p[0] + 6 / z, p[1], C.white);
+    s.line(p[0], p[1] - 6 / z, p[0], p[1] + 6 / z, C.white);
+    s.circle(false, p[0], p[1], 3 / z, C.pen, 12);
+  }
+  // o lapis: o circulo do tamanho da ponta; a borracha: um quadradinho
+  if (t && de.tool === "pencil") {
+    const p = W(t.u, t.w);
+    s.circle(false, p[0], p[1], Math.max(1.5, (app.lapis.width / 2) * k) / z, C.pen, 24);
+  }
+  if (t && de.tool === "eraser") {
+    const p = W(t.u, t.w);
+    const r = 5 / z;
+    s.line(p[0] - r, p[1] - r, p[0] + r, p[1] - r, C.white);
+    s.line(p[0] + r, p[1] - r, p[0] + r, p[1] + r, C.white);
+    s.line(p[0] + r, p[1] + r, p[0] - r, p[1] + r, C.white);
+    s.line(p[0] - r, p[1] + r, p[0] - r, p[1] - r, C.white);
   }
   // cursor da caneta e das formas (no modo furo, um circulo cortado)
   if (t && (de.tool === "rect" || de.tool === "ellipse" || (de.tool === "pen" && hover.kind !== "edge"))) {

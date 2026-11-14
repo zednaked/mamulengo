@@ -165,6 +165,23 @@ export function atlasTexto(b: Boneco): string {
 
 // ---- ida
 
+// o nome de arquivo de um personagem novo: sem barras, sem ponto na frente, sem a extensao
+export function nomeDeBoneco(nome: string): string {
+  return String(nome ?? "")
+    .trim()
+    .replace(/\.boneco$/i, "")
+    .replace(/[\\/:*?"<>|\x00-\x1f]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/^\.+/, "")
+    .slice(0, 60);
+}
+
+// um personagem em branco: so o osso raiz, sem imagens nem paginas (o que se desenha nele vira
+// pagina de desenhos ao lado, na primeira vez que salvar)
+export function bonecoNovo(nome: string): Boneco {
+  return importarSpine({ skeleton: { spine: "4.2" }, bones: [{ name: "root" }], slots: [], skins: [{ name: "default", attachments: {} }], animations: {} }, "", nome);
+}
+
 export function importarSpine(json: any, atlas: string, nome: string, opts: OpcoesImportar = {}): Boneco {
   const j = trocaGravidade(structuredClone(json));
   const ossos: string[] = (j.bones ?? []).map((b: any) => b.name);

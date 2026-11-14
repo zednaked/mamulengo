@@ -26,7 +26,7 @@
     <div class="card" role="dialog" tabindex="-1" aria-label="Atalhos do teclado" onclick={(e) => e.stopPropagation()}>
       <div class="topo">
         <b>Atalhos do teclado</b>
-        <button onclick={() => ((open = false), guia())}>rever o guia</button>
+        <button onclick={() => ((open = false), guia())}>📖 guia das ferramentas</button>
         <button class="x" onclick={() => (open = false)} aria-label="fechar">✕</button>
       </div>
       <div class="grupos">

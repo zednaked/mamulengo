@@ -14,6 +14,7 @@
   import { app } from "./state.svelte.ts";
   import { ajudaFerramenta, passoSeta, beginDrag, beginStroke, cursor, drawGizmo, drawHover, drawLigacoes, drawTools, endDrag, endStroke, hover, leituraArrasto, moveDrag, moveStroke, pickBone, pickPart } from "./interact.ts";
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
+  import { atelieGarante, giroDown, giroMove, giroUp } from "./atelie.ts";
   import { drawDown, drawDragging, drawDrawEdit, drawHelp, drawKey, drawMove, drawUp, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
   import JanelaBar from "./JanelaBar.svelte";
@@ -468,6 +469,8 @@
     v.runtime = app.runtime;
     // editando malha, os gizmos de osso saem e entra o desenho da malha
     v.overlays.push((v) => {
+      // atelie sem quadro aberto (vazio ou tocando): nada por cima
+      if (app.atelie && !app.drawEdit) return;
       if (app.meshEdit) return drawMeshEdit(v);
       if (app.captura) return drawCaptura(v);
       if (app.drawEdit) return drawDrawEdit(v);
@@ -559,7 +562,7 @@
   // editar malha mostra a setup pose; sai sozinho se a peca ou o modo mudarem
   $effect(() => {
     const v = app.viewer;
-    const on = !!app.meshEdit || !!app.drawEdit;
+    const on = !!app.meshEdit || (!!app.drawEdit && !app.drawEdit.quadro);
     if (v && v.setupOnly !== on) {
       v.setupOnly = on;
       v.poseAt(v.view.time);
@@ -571,7 +574,7 @@
     if (me && (app.mode !== "setup" || app.selection.slot !== me.slot || !currentMesh())) stopMeshEdit();
     // o desenho sai se a animacao abrir ou a parte deixar de mostrar o desenho (desfazer)
     const de = app.drawEdit;
-    if (de && (app.mode !== "setup" || !app.doc || drawingOfSlot(app.doc.json, de.slot)?.image !== de.image)) stopDrawEdit();
+    if (de && ((app.mode !== "setup" && !de.quadro) || !app.doc || drawingOfSlot(app.doc.json, de.slot, de.quadro ? de.attachment : undefined)?.image !== de.image)) stopDrawEdit();
     // o mosaico sai se deixar de existir (apagado, desfeito)
     const mo = app.mosaicEdit;
     if (mo && (!app.doc || !mosaics(app.doc.json).some((m) => m.name === mo.name))) stopMosaicEdit();
@@ -594,6 +597,8 @@
     if (!v) return;
     canvas.setPointerCapture(e.pointerId);
     if (e.button === 0 && !space && telaPonteiro(1, e)) return;
+    // no atelie, com o R segurado, o arrasto gira a tela (como no ProCraft)
+    if (app.atelie && e.button === 0 && giroDown(e.clientX, e.clientY)) return;
     if (e.button === 1 || e.button === 2 || space || app.tool === "pan") {
       panning = { x: e.clientX, y: e.clientY, cx: v.cam.x, cy: v.cam.y };
       return;
@@ -605,8 +610,10 @@
       if (!meshDown(v, v.screenToWorld(e.clientX, e.clientY), e.shiftKey)) downAt = null;
       return;
     }
+    // no atelie, desenhar onde nao ha quadro cria o quadro ali
+    if (app.atelie && !app.drawEdit && e.button === 0) atelieGarante();
     if (app.drawEdit) {
-      if (!drawDown(v, w, { shift: e.shiftKey, alt: e.altKey })) downAt = null;
+      if (!drawDown(v, w, { shift: e.shiftKey, alt: e.altKey }, e)) downAt = null;
       return;
     }
     if (app.mosaicEdit) {
@@ -706,13 +713,14 @@
     cursor.x = vis.x;
     cursor.y = vis.y;
     cursor.inside = true;
+    if (giroMove(e.clientX, e.clientY, e.shiftKey)) return;
     if (!panning && telaPonteiro(0, e)) return;
     if (meshDragging()) {
       meshMove(v, vis);
       return;
     }
     if (drawDragging()) {
-      drawMove(v, v.screenToSkel(e.clientX, e.clientY), { shift: e.shiftKey, alt: e.altKey });
+      drawMove(v, v.screenToSkel(e.clientX, e.clientY), { shift: e.shiftKey, alt: e.altKey }, e);
       return;
     }
     if (mosaicDragging()) {
@@ -744,8 +752,10 @@
       return;
     }
     if (panning) {
-      v.cam.x = panning.cx - (e.clientX - panning.x) / v.cam.zoom;
-      v.cam.y = panning.cy + (e.clientY - panning.y) / v.cam.zoom;
+      // (com a tela girada, o arrasto anda no sentido da tela)
+      const d = v.telaParaMundo(e.clientX - panning.x, e.clientY - panning.y);
+      v.cam.x = panning.cx - d.x;
+      v.cam.y = panning.cy - d.y;
       return;
     }
     if (!downAt) return mostraAlvo(e);
@@ -792,6 +802,7 @@
   }
 
   function up(e?: PointerEvent) {
+    if (giroUp()) return;
     if (e && !panning && e.button === 0 && telaPonteiro(e.pointerType === "touch" ? 3 : 2, e)) return;
     leitura = null;
     panning = null;
@@ -807,7 +818,7 @@
 </script>
 
 <div class="wrap" class:setup={app.doc && app.mode === "setup"}>
-  {#if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animações">POSE BASE</div>
+  {#if app.atelie}{:else if app.doc && app.mode === "setup"}<div class="base-tag" title="Mexer aqui muda o boneco em todas as animações">POSE BASE</div>
   {:else if app.doc && app.play.animation && !app.spectator}<div class="base-tag anima" title="Mexer numa parte grava uma chave no instante da régua">ANIMANDO {app.play.animation} · mexer grava chave</div>{/if}
   {#if temPalco && !app.spectator}
     <button class="jogar-tag" class:on={jogando} onclick={jogar} title={jogando ? "parar o jogo (Esc)" : "jogar a fase: setas ou A/D andam, espaço ou W pula, R recomeça, Esc sai"}>{jogando ? "■ parar" : "🎮 jogar"}</button>
@@ -832,12 +843,12 @@
     </button>
   {/if}
   <canvas bind:this={canvas} onmousedown={(e) => e.button === 1 && e.preventDefault()} onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={dblclick} onpointerleave={(e) => (telaPonteiro(4, e), (cursor.inside = false), limpaAlvo())} oncontextmenu={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()} ondrop={drop} class:pan={space || app.tool === "pan"} class:panning={!!panning}></canvas>
-  {#if app.doc && ((app.doc.json as any).screen || (app.doc.json as any).translations || app.asset?.tres?.endsWith(".boneco") || app.janela)}
+  {#if app.doc && !app.atelie && ((app.doc.json as any).screen || (app.doc.json as any).translations || app.asset?.tres?.endsWith(".boneco") || app.janela)}
     <JanelaBar />
     {#if app.tabelaIdiomas}<Idiomas />{/if}
     <LadoALado />
   {/if}
-  {#if ajuda}<div class="ajuda" role="status">{ajuda}</div>{/if}
+  {#if ajuda && !app.atelie}<div class="ajuda" role="status">{ajuda}</div>{/if}
   {#if dica && !leitura}<div class="leitura alvo" style:left="{dica.x + 16}px" style:top="{dica.y + 16}px">{dica.t}</div>{/if}
   {#if leitura}<div class="leitura" style:left="{leitura.x + 16}px" style:top="{leitura.y + 16}px">{leitura.t}</div>{/if}
   {#if app.referencia && refBox}
@@ -937,12 +948,14 @@
       <button onclick={() => (app.captura = null)}>Cancelar</button>
     </div>
   {/if}
-  {#if app.drawEdit}
+  {#if app.drawEdit && !app.atelie}
     {@const de = app.drawEdit}
     <div class="meshbar drawbar">
       <b>✏️ Desenhando {de.image}</b>
       <span class="ferr">
         <button class:on={de.tool === "select"} onclick={() => ((de.tool = "select"), (de.pen = null))} title="Selecionar (V)">↖</button>
+        <button class:on={de.tool === "pencil"} onclick={() => ((de.tool = "pencil"), (de.pen = null))} title="Lápis à mão livre (L)">✏️</button>
+        <button class:on={de.tool === "eraser"} onclick={() => ((de.tool = "eraser"), (de.pen = null))} title="Borracha (E)">🧽</button>
         <button class:on={de.tool === "pen"} onclick={() => (de.tool = "pen")} title="Caneta (P)">✒️</button>
         <button class:on={de.tool === "rect"} onclick={() => ((de.tool = "rect"), (de.pen = null))} title="Retângulo (R)">▭</button>
         <button class:on={de.tool === "ellipse"} onclick={() => ((de.tool = "ellipse"), (de.pen = null))} title="Elipse (O)">◯</button>
@@ -976,10 +989,16 @@
       {#if app.assetsLidos && !app.assets.length}
         <div class="big">Nenhum personagem encontrado</div>
         <div class="dim">O editor procura {app.roots.length > 1 ? "nestas pastas" : "nesta pasta"}: <code>{app.roots.join(", ")}</code></div>
-        <div class="dim">Arraste um PSD em camadas para a janela para montar um, ou abra o editor com <code>MAMULENGO_ROOTS=/sua/pasta npm run dev</code>.</div>
+        <div class="dim">Crie um em branco, arraste um PSD em camadas para a janela para montar um, ou abra o editor com <code>MAMULENGO_ROOTS=/sua/pasta npm run dev</code>.</div>
       {:else}
         <div class="big">Escolha um personagem ali em cima</div>
         <div class="dim">ou peça ao Claude: "abre o personagem do monstro"</div>
+      {/if}
+      {#if !app.spectator}
+        <div class="comeco">
+          <button class="go" onclick={() => (app.novoAberto = true)}>＋ Novo em branco</button>
+          <button onclick={() => (app.guia = "comecar")}>📖 Como começar</button>
+        </div>
       {/if}
     </div>
   {/if}
@@ -1324,6 +1343,19 @@
     text-align: center;
     gap: 6px;
     pointer-events: none;
+  }
+  .comeco {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 10px;
+    pointer-events: auto;
+  }
+  .comeco .go {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
   }
   .big {
     font-size: 22px;

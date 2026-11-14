@@ -12,6 +12,8 @@ import { NAVEGADOR } from "../navegador/pagina.ts";
 import { contextoDoJogo } from "../navegador/godot.ts";
 import { drawingsOf } from "../core/desenho.ts";
 import { Desenhos, drawingPixels } from "./desenho.ts";
+import { Pinturas } from "./pinturas.ts";
+import { pinturasPasta } from "../core/desenho.ts";
 import { VideoReferencia } from "../render/videoref.ts";
 import { RTL, registrarMedidor } from "../core/texto.ts";
 import { carregarFonte, medidorCanvas } from "../tela/textos.ts";
@@ -72,7 +74,12 @@ export interface DrawEdit {
   slot: string;
   skin: string;
   attachment: string;
-  tool: "select" | "pen" | "rect" | "ellipse";
+  // brush, rubber e smudge pintam em pixels (src/app/pintura.ts); as outras desenham formas
+  // bucket (balde) e lasso (laco) sao do retoque (src/app/retoque.ts)
+  tool: "select" | "pen" | "rect" | "ellipse" | "pencil" | "eraser" | "brush" | "rubber" | "smudge" | "bucket" | "lasso";
+  // quadro de uma camada de quadros (o atelie): a animacao continua aberta e a imagem em edicao e
+  // a que a timeline mostra neste instante
+  quadro?: boolean;
   // forma e ponto escolhidos (indices em drawings.<image>.shapes); contour: de qual contorno e o
   // ponto (0 = o principal, 1.. = os furos)
   shape: number | null;
@@ -83,6 +90,71 @@ export interface DrawEdit {
   penContour: number;
   // modo furo: caneta, retangulo e elipse furam a forma escolhida
   hole: boolean;
+}
+
+// o lapis do Desenhar (src/core/lapis.ts): guardado no navegador
+export interface Lapis {
+  width: number;
+  color: string;
+  estilo: string;
+  // 0 a 1: o atraso da ponta que tira o tremor
+  estabilizar: number;
+  // tolerancia do ajuste em pixels da imagem (maior = mais liso, menos pontos)
+  suavizar: number;
+  // o traco fecha e preenche com a cor (mancha)
+  mancha: boolean;
+  // o balde: 0 a 1, o quanto a cor pode variar para ainda ser a mesma regiao
+  limiar: number;
+}
+const LAPIS_PADRAO: Lapis = { width: 6, color: "ffffffff", estilo: "nanquim", estabilizar: 0.3, suavizar: 1, mancha: false, limiar: 0.25 };
+function lerLapis(): Lapis {
+  try {
+    return { ...LAPIS_PADRAO, ...JSON.parse(localStorage.getItem("mamulengo.lapis") ?? "{}") };
+  } catch {
+    return { ...LAPIS_PADRAO };
+  }
+}
+
+// os pinceis da pintura (raster): os do ProCraft, pelo pintor (src/app/pintura.ts). As escolhas
+// ficam guardadas no navegador pelos nomes (conjunto, pincel)
+export interface Pincel {
+  // falta: o pintor nao foi compilado nesta maquina; ligando: lendo a biblioteca (so na primeira vez)
+  estado: "parado" | "ligando" | "pronto" | "falta" | "erro";
+  erro: string;
+  // a biblioteca e a do ProCraft instalado (senao, os pinceis que vem com ele)
+  daBiblioteca: boolean;
+  conjuntos: { nome: string; pinceis: string[] }[];
+  escolha: Record<"pintar" | "apagar" | "borrar", [string, string] | null>;
+  // as reguas do ProCraft, 0 a 1
+  tamanho: Record<"pintar" | "apagar" | "borrar", number>;
+  opacidade: Record<"pintar" | "apagar" | "borrar", number>;
+  recentes: [string, string][];
+}
+function lerPincel(): Pincel {
+  const padrao: Pincel = { estado: "parado", erro: "", daBiblioteca: false, conjuntos: [], escolha: { pintar: null, apagar: null, borrar: null }, tamanho: { pintar: 0.3, apagar: 0.4, borrar: 0.4 }, opacidade: { pintar: 1, apagar: 1, borrar: 1 }, recentes: [] };
+  try {
+    const g = JSON.parse(localStorage.getItem("mamulengo.pincel") ?? "{}");
+    return { ...padrao, escolha: { ...padrao.escolha, ...g.escolha }, tamanho: { ...padrao.tamanho, ...g.tamanho }, opacidade: { ...padrao.opacidade, ...g.opacidade }, recentes: Array.isArray(g.recentes) ? g.recentes.slice(0, 12) : [] };
+  } catch {
+    return padrao;
+  }
+}
+
+// o atelie (src/app/Atelie.svelte): tela limpa para desenhar e animar quadro a quadro
+export interface AtelieEstado {
+  // a camada de quadros em edicao (um slot), ou null: a peca desenhada escolhida
+  layer: string | null;
+  // quadros por segundo da tira (o passo de cada celula)
+  fps: number;
+  cebola: boolean;
+  antes: number;
+  depois: number;
+  // o personagem por tras: 1 inteiro, 0 escondido
+  boneco: number;
+  // a ferramenta de desenhar (vale de um quadro para o outro)
+  tool: DrawEdit["tool"];
+  // intermediarios sendo gerados (o que falta, para a tira mostrar)
+  gerando?: string | null;
 }
 
 export const fileUrl =(p: string) => `/api/file?p=${encodeURIComponent(p)}`;
@@ -272,6 +344,27 @@ class AppState {
   meshEdit = $state<MeshEdit | null>(null);
   // desenhar uma imagem vetorial (na Pose base)
   drawEdit = $state<DrawEdit | null>(null);
+  lapis = $state<Lapis>(typeof localStorage !== "undefined" ? lerLapis() : { ...LAPIS_PADRAO });
+  guardarLapis() {
+    try {
+      localStorage.setItem("mamulengo.lapis", JSON.stringify(this.lapis));
+    } catch {}
+  }
+  atelie = $state<AtelieEstado | null>(null);
+  // o giro da tela no atelie, em graus no sentido do relogio (so para mostrar; o valor e cam.rot)
+  giro = $state(0);
+  pincel = $state<Pincel>(lerPincel());
+  guardarPincel() {
+    try {
+      const { escolha, tamanho, opacidade, recentes } = this.pincel;
+      localStorage.setItem("mamulengo.pincel", JSON.stringify({ escolha, tamanho, opacidade, recentes }));
+    } catch {}
+  }
+  // os pixels das pinturas (fora do documento)
+  pinturas = new Pinturas();
+  // o guia das ferramentas aberto num assunto (src/app/Guia.svelte) e o dialogo do personagem novo
+  guia = $state<string | null>(null);
+  novoAberto = $state(false);
   // a tela vista em varios tamanhos de janela lado a lado (src/app/LadoALado.svelte)
   ladoALado = $state(false);
   // os idiomas das fileiras do lado a lado (idioma x tamanho); vazio: so o mostrado
@@ -385,6 +478,24 @@ class AppState {
     this.assetsLidos = true;
   }
 
+  // personagem em branco (so o osso raiz) numa pasta dentro das raizes; abre e devolve o asset
+  async novoBoneco(nome: string, dir?: string): Promise<AssetInfo | null> {
+    const r = await fetch("/api/boneco/novo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: nome, dir }) });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      this.toast(r.status === 409 ? "Já existe um personagem com esse nome nessa pasta. Escolha outro nome." : `Não consegui criar: ${b.error ?? r.status}`);
+      return null;
+    }
+    await this.loadAssets(true);
+    const a = this.assets.find((x) => x.tres === b.boneco);
+    if (!a) {
+      this.toast(`Criei ${b.boneco}, mas ele não apareceu na lista.`);
+      return null;
+    }
+    await this.open(a);
+    return a;
+  }
+
   // o nome do personagem que esta abrindo (o desenho mostra enquanto carrega)
   abrindo = $state<string | null>(null);
 
@@ -402,6 +513,10 @@ class AppState {
       doc.file = { skeleton: asset.skeleton, atlas: asset.atlas, tres: asset.tres };
       this.atlasDisco = at;
       this.desenhosGravados = null;
+      // as pinturas (PNG ao lado) entram antes de a pagina dos desenhos ser feita
+      this.pinturas.avisar = (t) => this.toast(t);
+      this.desenhos.base = this.pinturas.base;
+      await this.pinturas.carregar(doc, (arq) => fileUrl(`${asset.atlas.slice(0, asset.atlas.lastIndexOf("/") + 1)}${pinturasPasta(asset.atlas)}/${arq}`));
       this.desenhos.preparar(doc);
       this.unsub?.();
       this.unsub = doc.onChange((e) => this.onChange(e));
@@ -454,6 +569,8 @@ class AppState {
     const desenho = (ops: Op[] | undefined) => !!ops?.some((o) => o.path[0] === "drawings");
     if (this.doc && (desenho(e.tx.ops) || desenho(e.tx.inverse) || desenho(e.replaced?.ops))) {
       const doc = this.doc;
+      // os pixels das pinturas acompanham o estado de cada desenho (desfazer, refazer, copia)
+      this.pinturas.sincronizar(doc);
       this.desenhos.agendar(doc, this.viewer, () => this.reloadAtlas(doc.atlas.text));
     }
     // rascunho (com folga para nao serializar a cada passo de um arraste)
@@ -669,6 +786,12 @@ class AppState {
     if (!atlas) return;
     const dir = atlas.slice(0, atlas.lastIndexOf("/") + 1);
     const agora = JSON.stringify(drawingsOf(doc.json));
+    // as pinturas que mudaram, cada uma no PNG dela
+    const pasta = dir + pinturasPasta(atlas) + "/";
+    await this.pinturas.gravar(doc, async (arq, png) => {
+      const r = await fetch(fileUrl(pasta + arq), { method: "PUT", body: png });
+      if (!r.ok) throw new Error(`Não consegui gravar a pintura ${arq}: ${(await r.json()).error}`);
+    });
     if (this.desenhos.layout && agora !== this.desenhosGravados) {
       // a pagina das formas de agora (o redesenho agendado pode nao ter rodado ainda)
       const png = await this.desenhos.png(doc);

@@ -64,7 +64,7 @@
     </div>
   {:else}
     <div class="linha">
-      <span class="dim small" title="a arte base: [x, y, largura, altura] no mundo">arte {tela.art[2]}×{tela.art[3]}</span>
+      {#if tela.art}<span class="dim small" title="a arte base: [x, y, largura, altura] no mundo">arte {tela.art[2]}×{tela.art[3]}</span>{/if}
       <select value={tela.fit} onchange={(e) => app.run({ cmd: "screen.set", args: { fit: (e.target as HTMLSelectElement).value } }, "tela: encaixe")} title="como a arte encaixa numa janela de outra proporção: caber (sobra janela), cobrir (corta), largura ou altura fixa">
         {#each FITS as f}<option value={f}>{NOMES_FIT[f]}</option>{/each}
       </select>

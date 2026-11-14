@@ -2813,6 +2813,165 @@ runtimeOk("remocoes (slot, osso com pesos)");
   );
 }
 
+// o lapis (draw.freehand): traco a mao livre vira forma de poucos pontos, com a pressao em cada
+// ponto e as pontas afinadas; e o quadro a quadro (frame.*): camada de quadros vazia na Pose base,
+// cada quadro um desenho que entra num instante da animacao pela troca de imagem
+{
+  const lap = await import("../src/core/lapis.ts");
+  const des = await import("../src/core/desenho.ts");
+  const { desenhoEmSvg } = await import("../src/core/desenho-svg.ts");
+  const osso = doc.json.bones[1].name;
+  await run("draw.create", { image: "t.lapis", width: 300, height: 200 });
+  // onda com tremor de 3 px e pressao subindo e descendo
+  let sem = 11;
+  const rnd = () => ((sem = (sem * 16807) % 2147483647) / 2147483647 - 0.5) * 6;
+  const onda = Array.from({ length: 120 }, (_, i) => [20 + i * 2 + rnd(), 100 + Math.sin(i / 12) * 50 + rnd(), Math.sin((i / 119) * Math.PI), i * 8]);
+  const cru = await run("draw.freehand", { image: "t.lapis", points: onda, width: 10, style: "nanquim", smooth: 1 });
+  const liso = await run("draw.freehand", { image: "t.lapis", points: onda, width: 10, style: "nanquim", smooth: 1, stabilize: 0.6 });
+  const uni = await run("draw.freehand", { image: "t.lapis", points: onda, width: 6, style: "uniforme", stabilize: 0.6 });
+  const canto = await run("draw.freehand", { image: "t.lapis", points: [[10, 10], [60, 10], [110, 10], [110, 60], [110, 110]], width: 4, style: "uniforme", smooth: 0.5 });
+  const mancha = await run("draw.freehand", { image: "t.lapis", points: Array.from({ length: 40 }, (_, i) => [200 + Math.cos(i / 6.4) * 30, 150 + Math.sin(i / 6.4) * 30]), fill: "#33aa55", stroke: false });
+  const d = doc.json.drawings["t.lapis"];
+  const sL = d.shapes[liso.index],
+    sU = d.shapes[uni.index],
+    sC = d.shapes[canto.index],
+    sM = d.shapes[mancha.index];
+  // o contorno do traco: fechado, dentro da largura, e fino nas pontas
+  const anel = lap.contornoDoTraco(sL)[0];
+  const meio = des.flatten(sL, 1);
+  // distancia de um ponto ao caminho (os trechos retos do flatten so trazem as pontas)
+  const aoTrecho = (x: number, y: number, a: number[], b: number[]) => {
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
+  };
+  const longe = Math.max(...anel.map(([x, y]) => Math.min(...meio.slice(1).map((b, i) => aoTrecho(x, y, meio[i], b)))));
+  const svg = desenhoEmSvg(d, 1);
+  const bo = (await import("../src/boneco/spine.ts")).importarSpine(structuredClone(doc.json), "", "t");
+  const volta = (await import("../src/boneco/spine.ts")).exportarSpine(bo);
+  const fL = bo.desenhos["t.lapis"].formas[liso.index];
+  check(
+    liso.points < cru.points && liso.points <= 12 && cru.from === 120 &&
+      sL.points.some((q: any) => q.press < 0.5) && sL.points.some((q: any) => q.press > 0.9) && sL.stroke.taper[0] === 40 && sL.stroke.taper[1] === 70 &&
+      anel.length > 50 && longe <= 5.01 &&
+      !sU.points.some((q: any) => q.press !== undefined) && !sU.stroke.taper && !lap.tracoVariavel(sU) && lap.tracoVariavel(sL) &&
+      sC.points.length === 3 && !sC.points[1].in && Math.abs(sC.points[1].x - 110) < 0.01 && Math.abs(sC.points[1].y - 10) < 0.01 &&
+      sM.closed && sM.fill === "33aa55ff" && !sM.stroke &&
+      (svg.match(/fill-rule="nonzero"/g) ?? []).length === 2 &&
+      fL.traco.afinar?.[0] === 40 && fL.pontos.some((q: any) => q.pressao !== undefined) && JSON.stringify(volta.json.drawings) === JSON.stringify(doc.json.drawings),
+    `lapis: 120 amostras com tremor viram ${cru.points} pontos, ${liso.points} estabilizado; pressao e afinar no arquivo; canto vivo fica; mancha fechada ${JSON.stringify({ longe: +longe.toFixed(2), canto: sC.points.length, nz: (svg.match(/nonzero/g) ?? []).length })}`,
+  );
+  // quadro a quadro
+  await run("animation.create", { name: "t.quadros" });
+  await run("key.set", { anim: "t.quadros", target: { bone: osso }, timeline: "rotate", time: 1, value: 10 });
+  let semOsso = false;
+  await run("frame.add", { layer: "t.fx", anim: "t.quadros", time: 0.25 }).catch(() => (semOsso = true));
+  const q1 = await run("frame.add", { layer: "t.fx", anim: "t.quadros", time: 0.25, bone: osso, width: 120, height: 90, world: { center: [30, 40] } });
+  await run("draw.freehand", { image: q1.frame, points: [[10, 10], [60, 50], [110, 20]], width: 5 });
+  const q2 = await run("frame.add", { layer: "t.fx", anim: "t.quadros", time: 0.375, copy: "previous", until: 0.5 });
+  const q3 = await run("frame.add", { layer: "t.fx", anim: "t.quadros", time: 0.75 });
+  let dobrou = false;
+  await run("frame.add", { layer: "t.fx", anim: "t.quadros", time: 0.75 }).catch(() => (dobrou = true));
+  await run("frame.move", { layer: "t.fx", anim: "t.quadros", time: 0.75, to: 0.625 });
+  await run("frame.show", { layer: "t.fx", anim: "t.quadros", time: 0.875, frame: q1.frame });
+  const ficha = (await run("query.frames", { anim: "t.quadros" })).layers.find((l: any) => l.layer === "t.fx");
+  const qd = await import("../src/core/commands/quadros.ts");
+  const ks = qd.chavesDoSlot(doc.json, "t.quadros", "t.fx");
+  const a1 = doc.json.skins[0].attachments["t.fx"][q1.frame],
+    a3 = doc.json.skins[0].attachments["t.fx"][q3.frame];
+  // tirar o quadro 2 apaga o desenho; tirar a segunda mostra do quadro 1 guarda (ainda ha a primeira)
+  const r2 = await run("frame.remove", { layer: "t.fx", anim: "t.quadros", time: 0.375 });
+  const r1b = await run("frame.remove", { layer: "t.fx", anim: "t.quadros", time: 0.875 });
+  check(
+    semOsso && dobrou && q1.created === "t.fx" && q2.copied === q1.frame && q1.frame === "t.fx_1" && q3.frame === "t.fx_3" &&
+      !doc.json.slots.find((s: any) => s.name === "t.fx").attachment &&
+      a3.x === a1.x && a3.y === a1.y && a3.width === 120 &&
+      JSON.stringify(ks.map((k: any) => [k.time, k.name])) === JSON.stringify([[0.25, "t.fx_1"], [0.375, "t.fx_2"], [0.5, null], [0.625, "t.fx_3"], [0.875, "t.fx_1"]]) &&
+      ficha.frames[1].shapes === 1 && ficha.frames[1].until === 0.5 && ficha.frames[3].shapes === 0 && JSON.stringify(ficha.size) === "[120,90]" &&
+      qd.quadroEm(ks, 0.3)?.name === "t.fx_1" && qd.quadroEm(ks, 0.55)?.name === null && qd.quadroEm(ks, 0.1) === null &&
+      qd.camadasDeQuadros(doc.json).includes("t.fx") &&
+      r2.drawing === "deleted" && !doc.json.drawings["t.fx_2"] && r1b.drawing === "kept" && !!doc.json.drawings["t.fx_1"],
+    `quadro a quadro: camada nova pede osso, quadros herdam tamanho e lugar, copia do anterior, fim, mover, mostrar de novo, ficha ${JSON.stringify(ficha.frames.map((f: any) => [f.time, f.frame]))}`,
+  );
+}
+
+// personagem em branco (o "Novo em branco" do editor): abre, ganha quadros desenhados e regrava
+{
+  const { bonecoNovo, nomeDeBoneco } = await import("../src/boneco/spine.ts");
+  const { bonecoAsset, lerVirtual, gravarVirtual } = await import("../server/boneco.ts");
+  const { gravarBonecoArquivo, lerBonecoArquivo } = await import("../server/boneco-binario.ts");
+  check(nomeDeBoneco("  ../meu gato.boneco ") === "meu-gato" && nomeDeBoneco("///") === "" && nomeDeBoneco(".oculto") === "oculto", "nome de personagem novo sem barras, pontos na frente ou extensao");
+  const arq = join(dir, "branco.boneco");
+  gravarBonecoArquivo(arq, bonecoNovo("branco"), false);
+  const as = bonecoAsset(arq)!;
+  const ndoc = Document.fromText(lerVirtual(as.skeleton)!, { text: lerVirtual(as.atlas)!, pages: {} });
+  const nrun = async (cmd: string, args: any) => (await executeAsync(ndoc, { cmd, args }, "teste", undefined, {}, assets))[0];
+  await nrun("animation.create", { name: "desenho" });
+  const q1 = await nrun("frame.add", { layer: "quadros", anim: "desenho", time: 0, bone: "root", width: 256, height: 256, until: 1 / 12 });
+  const tr = await nrun("draw.freehand", { image: q1.frame, points: [[20, 20, 0.2], [80, 60, 0.9], [140, 40, 0.6], [200, 120, 0.1]], width: 8, style: "nanquim" });
+  const q2 = await nrun("frame.add", { layer: "quadros", anim: "desenho", time: 1 / 12, copy: q1.frame, until: 2 / 12 });
+  // pintura (raster): o estado dos pixels entra no desenho, a copia do quadro leva junto, desfaz e
+  // vai e volta no .boneco (os pixels ficam fora: um PNG na pasta das pinturas)
+  const p1 = await nrun("paint.set", { image: q1.frame, rev: "abc123" });
+  const q3 = await nrun("frame.add", { layer: "quadros", anim: "desenho", time: 2 / 12, copy: q1.frame });
+  const p3 = await nrun("paint.set", { image: q3.frame, rev: "def456" });
+  const semCrescer = await nrun("draw.cover", { image: q1.frame });
+  const dsN = () => (ndoc.json as any).drawings;
+  const { pinturaArquivo, pinturasPasta } = await import("../src/core/desenho.ts");
+  check(
+    p1.before === null && dsN()[q1.frame].raster.rev === "abc123" && p3.before === "abc123" && dsN()[q3.frame].raster.rev === "def456" && dsN()[q2.frame].raster === undefined && dsN()[q1.frame].width === 256 && semCrescer !== undefined && pinturasPasta("/x/gato.boneco.atlas") === "gato-pinturas" && pinturaArquivo("t.fx/1") === "t.fx~2f1.png",
+    `pintura: paint.set guarda o estado (${dsN()[q1.frame].raster.rev}), a copia do quadro leva (${p3.before}), a pasta e ${pinturasPasta("/x/gato.boneco.atlas")}`,
+  );
+  ndoc.undo();
+  check(dsN()[q3.frame].raster.rev === "abc123", "pintura: desfazer volta ao estado de antes");
+  ndoc.redo();
+  // a folha cresce para a esquerda e para baixo: a parte fica no mesmo lugar da tela
+  {
+    const at = () => (ndoc.json as any).skins[0].attachments.quadros[q3.frame];
+    const x0 = at().x ?? 0,
+      w0 = dsN()[q3.frame].width;
+    const g = await nrun("paint.grow", { image: q3.frame, left: 100, bottom: 50, rev: "maior1" });
+    const anda = (at().x ?? 0) - x0;
+    check(g.width === w0 + 100 && g.height === 306 && g.before === "def456" && dsN()[q3.frame].raster.rev === "maior1" && Math.abs(Math.abs(anda) - 50) < 0.6 && at().width === w0 + 100,
+      `paint.grow: ${w0} -> ${g.width} x ${g.height}, a parte anda ${anda.toFixed(1)} (meio do que cresceu de um lado so)`);
+    ndoc.undo();
+    check(dsN()[q3.frame].width === w0 && dsN()[q3.frame].raster.rev === "def456", "paint.grow: desfazer volta o tamanho e o estado");
+  }
+  gravarVirtual(as.skeleton, Buffer.from(ndoc.serialize()));
+  const lido = lerBonecoArquivo(arq);
+  check(lido.desenhos[q3.frame].pintura.estado === "def456" && JSON.parse(lerVirtual(as.skeleton)!).drawings[q3.frame].raster.rev === "def456", "pintura: o estado vai e volta no .boneco (pintura.estado)");
+  // arrastar um quadro para cima de outro na tira: os dois trocam de lugar
+  let ocupado = false;
+  await nrun("frame.move", { layer: "quadros", anim: "desenho", time: 0, to: 1 / 12 }).catch(() => (ocupado = true));
+  const tr2 = await nrun("frame.move", { layer: "quadros", anim: "desenho", time: 0, to: 1 / 12, swap: true });
+  const ksN = (await import("../src/core/commands/quadros.ts")).chavesDoSlot(ndoc.json, "desenho", "quadros");
+  check(ocupado && tr2.swapped === q2.frame && ksN[0].name === q2.frame && ksN[1].name === q1.frame && ksN.length === 3, `frame.move com swap troca os quadros de lugar (${ksN.map((k: any) => k.name).join(", ")})`);
+  check(
+    ndoc.json.bones.length === 1 && q1.frame === "quadros_1" && q2.frame === "quadros_2" && tr.points >= 2 && lido.ossos.length === 1 && Object.keys(lido.animacoes ?? {}).includes("desenho") && JSON.stringify(lido).includes("quadros_2"),
+    `personagem em branco: ${ndoc.json.bones.length} osso, quadros ${q1.frame} e ${q2.frame} desenhados e regravados no .boneco`,
+  );
+}
+
+// intermediarios: a conta dos pixels em volta do RIFE (a mascara e a cor voltam ao RGBA)
+{
+  const ib = await import("../src/core/intermediarios.ts");
+  const W = 32;
+  const q = (x0: number, cor: number[]) => {
+    const p = new Uint8ClampedArray(W * W * 4);
+    for (let y = 8; y < 24; y++) for (let x = x0; x < x0 + 10; x++) p.set([...cor, 255], (y * W + x) * 4);
+    return p;
+  };
+  const A = q(4, [255, 255, 255]),
+    B = q(16, [255, 255, 255]);
+  // com o RIFE de mentira (devolve a chave A), o que volta e a chave A: branco cheio, sem perder o claro
+  const de = ib.juntar(ib.mascara(A), ib.corEspalhada(A, W, W), A, B, 0.5);
+  const esp = ib.corEspalhada(A, W, W);
+  const iguais = A.every((v, i) => Math.abs(v - de[i]) <= 1);
+  const ts = ib.instantes(3, "sai");
+  check(iguais && esp[(16 * W + 15) * 4] === 255 && esp[(16 * W + 31) * 4] === 128 && ts.length === 3 && ts[0] < 0.25 && ts[2] < 0.75 && ib.instantes(1)[0] === 0.5, `intermediarios: mascara e cor espalhada voltam ao RGBA (traco branco inteiro, a cor escorre para fora da borda), curvas ${ts.map((t) => t.toFixed(2)).join(" ")}`);
+}
+
 // formato: salva e relê; desfazer tudo volta ao inicio
 const text = doc.serialize();
 check(JSON.parse(text) && text.length > raw0.length, `serializa ${text.length} bytes`);

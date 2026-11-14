@@ -9,6 +9,7 @@ import { slotIndex, skins } from "../model.ts";
 import { usesOfImage } from "../psd.ts";
 import { meshView } from "./meshedit.ts";
 import { pointInPolygon, type Pt } from "../geometry.ts";
+import { ESTILOS, ajustar, estabilizar, larguraDaPressao, type Amostra } from "../lapis.ts";
 import {
   drawingsOf,
   ellipsePoints,
@@ -38,6 +39,7 @@ const Point = z.object({
   in: Vec.optional().describe("alca de chegada, relativa ao ponto"),
   out: Vec.optional().describe("alca de saida, relativa ao ponto"),
   radius: z.number().min(0).optional().describe("arredonda o canto (ponto sem alcas, com os dois lados retos)"),
+  press: z.number().min(0).max(4).optional().describe("traco de largura variavel: a largura neste ponto, em fracao da largura do traco"),
 });
 const Stroke = z.object({
   color: Color.optional(),
@@ -45,6 +47,7 @@ const Stroke = z.object({
   align: z.enum(["inside", "center", "outside"]).optional().describe("traco por dentro, no centro ou por fora do contorno"),
   join: z.enum(["miter", "round", "bevel"]).optional().describe("quina do traco: viva, redonda ou chanfrada"),
   cap: z.enum(["butt", "round", "square"]).optional().describe("ponta do traco aberto"),
+  taper: z.tuple([z.number().min(0), z.number().min(0)]).optional().describe("afina o traco aberto no comeco e no fim: [comeco, fim] em pixels de comprimento ([0, 0] tira)"),
 });
 const ShapeRef = z.union([z.string(), z.number().int().min(0)]).describe("nome ou indice da forma (0 = mais atras)");
 const Image = z.string().min(1).describe("nome da imagem desenhada (a regiao do atlas)");
@@ -55,6 +58,7 @@ const cleanPoint = (p: any): DrawPoint => {
   if (p.in && (p.in[0] || p.in[1])) o.in = [round(p.in[0]), round(p.in[1])];
   if (p.out && (p.out[0] || p.out[1])) o.out = [round(p.out[0]), round(p.out[1])];
   if (p.radius) o.radius = round(p.radius);
+  if (p.press !== undefined && p.press !== null) o.press = round(Math.max(0, p.press));
   return o;
 };
 
@@ -70,6 +74,7 @@ function cleanShape(s: DrawShape): DrawShape {
     if (s.stroke.align && s.stroke.align !== "center") st.align = s.stroke.align;
     if (s.stroke.join && s.stroke.join !== "miter") st.join = s.stroke.join;
     if (s.stroke.cap && s.stroke.cap !== "butt") st.cap = s.stroke.cap;
+    if (s.stroke.taper?.some((x) => x > 0)) st.taper = [round(s.stroke.taper[0]), round(s.stroke.taper[1])];
     o.stroke = st;
   }
   if (s.hidden) o.hidden = true;
@@ -188,7 +193,7 @@ defineCommand({
       const s: DrawShape = { name, points: g.points, closed: g.closed };
       if (g.holes) s.holes = g.holes;
       if (p.fill) s.fill = p.fill;
-      if (p.stroke) s.stroke = { color: p.stroke.color ?? "000000ff", width: p.stroke.width ?? 2, align: p.stroke.align, join: p.stroke.join, cap: p.stroke.cap };
+      if (p.stroke) s.stroke = { color: p.stroke.color ?? "000000ff", width: p.stroke.width ?? 2, align: p.stroke.align, join: p.stroke.join, cap: p.stroke.cap, taper: p.stroke.taper };
       if (!p.fill && !p.stroke) {
         if (g.closed) s.fill = "d9d9d9ff";
         else s.stroke = { color: "000000ff", width: 2 };
@@ -199,6 +204,57 @@ defineCommand({
       at++;
     }
     return { added };
+  },
+});
+
+defineCommand({
+  name: "draw.freehand",
+  group: "drawing",
+  summary:
+    "O lapis: um traco a mao livre vira uma forma vetorial de poucos pontos e largura variavel. points = [[x, y, pressao?, tempo_ms?], ...] em pixels da imagem (pressao 0 a 1). stabilize (0 a 1) tira o tremor da mao (a ponta segue com atraso e chega na caneta no fim); smooth e a tolerancia do ajuste em pixels (maior = mais liso, menos pontos; cantos vivos ficam). style: uniforme, lapis, nanquim, pincel ou marcador (o quanto a pressao muda a largura e o quanto afina nas pontas); pressure, min, taper [comeco, fim] (em multiplos da largura) e curve mudam o estilo. fill: fecha o caminho e preenche (mancha a mao livre), com ou sem traco (stroke: false).",
+  params: z.object({
+    image: Image,
+    name: z.string().optional(),
+    index: z.number().int().min(0).optional(),
+    points: z.array(z.union([z.tuple([z.number(), z.number()]), z.tuple([z.number(), z.number(), z.number()]), z.tuple([z.number(), z.number(), z.number(), z.number()])])).min(1),
+    color: Color.optional(),
+    width: z.number().positive().default(4),
+    style: z.enum(Object.keys(ESTILOS) as [string, ...string[]]).default("lapis"),
+    stabilize: z.number().min(0).max(1).default(0),
+    smooth: z.number().min(0.05).max(50).default(1),
+    pressure: z.number().min(0).max(1).optional().describe("o quanto a pressao muda a largura"),
+    min: z.number().min(0).max(1).optional().describe("largura com pressao zero, em fracao"),
+    curve: z.number().min(0.2).max(5).optional().describe("pressao -> largura: acima de 1 pede mais forca"),
+    taper: z.tuple([z.number().min(0), z.number().min(0)]).optional().describe("afinar no comeco e no fim, em multiplos da largura"),
+    cap: z.enum(["butt", "round", "square"]).optional(),
+    fill: Color.optional().describe("fecha o caminho e preenche com esta cor"),
+    stroke: z.boolean().optional().describe("com fill: false tira o traco (so a mancha)"),
+  }),
+  label: (p) => `lapis em ${p.image}`,
+  run({ e }, p) {
+    const d = requireDrawing(e.json, p.image);
+    const est = { ...ESTILOS[p.style] };
+    if (p.pressure !== undefined) est.pressao = p.pressure;
+    if (p.min !== undefined) est.minimo = p.min;
+    if (p.curve !== undefined) est.curva = p.curve;
+    if (p.taper) est.afinar = p.taper;
+    // sem pressao nos pontos (mouse), a pressao nao muda nada
+    const temPressao = p.points.some((q) => q[2] !== undefined);
+    const variavel = temPressao && est.pressao > 0;
+    const cru: Amostra[] = p.points.map((q) => [q[0], q[1], q[2] ?? 1, q[3]]);
+    const liso = estabilizar(cru, p.stabilize).map((q): Amostra => [q[0], q[1], variavel ? larguraDaPressao(q[2] ?? 1, est) : 1, q[3]]);
+    const pts = ajustar(liso, p.smooth, { variavel });
+    const fechado = !!p.fill && pts.length > 2;
+    const comTraco = p.stroke !== false || !fechado;
+    const s: DrawShape = { name: freeName(d, p.name ?? (fechado ? "mancha" : "traco")), points: pts, closed: fechado };
+    if (fechado) s.fill = p.fill;
+    if (comTraco) {
+      const tp: [number, number] = fechado ? [0, 0] : [est.afinar[0] * p.width, est.afinar[1] * p.width];
+      s.stroke = { color: p.color ?? "000000ff", width: p.width, join: "round", cap: p.cap ?? "round", taper: tp };
+    }
+    const at = Math.min(p.index ?? d.shapes.length, d.shapes.length);
+    e.insert([...path(p.image), "shapes"], at, cleanShape(s));
+    return { index: at, name: s.name, points: pts.length, from: p.points.length };
   },
 });
 
@@ -448,6 +504,7 @@ defineCommand({
     in: Vec.nullable().optional(),
     out: Vec.nullable().optional(),
     radius: z.number().min(0).nullable().optional(),
+    press: z.number().min(0).max(4).nullable().optional().describe("largura do traco neste ponto, em fracao (o lapis); null tira"),
     insert: z.boolean().optional(),
     remove: z.boolean().optional(),
     smooth: z.boolean().optional(),
@@ -462,7 +519,7 @@ defineCommand({
     if (p.insert) {
       if (p.index > n) throw new Error(`index ${p.index}: o contorno tem ${n} pontos`);
       if (p.x === undefined || p.y === undefined) throw new Error("ponto novo precisa de x e y");
-      ct.points.splice(p.index, 0, cleanPoint({ x: p.x, y: p.y, in: p.in, out: p.out, radius: p.radius }));
+      ct.points.splice(p.index, 0, cleanPoint({ x: p.x, y: p.y, in: p.in, out: p.out, radius: p.radius, press: p.press }));
     } else {
       if (p.index >= n) throw new Error(`index ${p.index}: o contorno tem ${n} pontos (0 a ${n - 1})`);
       if (p.remove) {
@@ -480,6 +537,8 @@ defineCommand({
         else if (p.out) q.out = p.out;
         if (p.radius === null) delete q.radius;
         else if (p.radius !== undefined) q.radius = p.radius;
+        if (p.press === null) delete q.press;
+        else if (p.press !== undefined) q.press = p.press;
         if (p.smooth === false) {
           delete q.in;
           delete q.out;
@@ -761,6 +820,9 @@ function imageToMeshWorld(uvPx: Pt[], world: Pt[], tris: number[], q: Pt): Pt {
 }
 
 // o que falta para a peca mostrar o desenho inteiro: a imagem crescer e/ou a malha estender
+// a caixa das formas visiveis com o traco (pixels da imagem), ou null
+export const caixaDasFormas = (d: Drawing) => drawnBox(d);
+
 export function coverNeeded(json: any, image: string): { grow: boolean; meshes: string[] } {
   const d = drawingsOf(json)[image];
   if (!d) return { grow: false, meshes: [] };
@@ -785,6 +847,39 @@ export function coverNeeded(json: any, image: string): { grow: boolean; meshes: 
 }
 
 defineCommand({
+  name: "paint.set",
+  group: "drawing",
+  summary:
+    "Pintura (raster): registra o estado dos pixels de uma imagem desenhada. Os pixels ficam fora do documento (um PNG na pasta <personagem>-pinturas, ao lado; no editor, na memoria): aqui so entra `rev`, o nome do estado, para cada pincelada ser um passo de desfazer. rev null tira a pintura. O editor chama ao fim de cada pincelada do Atelie; por fora, grave o PNG (do tamanho da imagem) e chame com um rev novo.",
+  params: z.object({ image: Image, rev: z.string().min(1).max(40).nullable().describe("nome do estado dos pixels; null tira a pintura") }),
+  label: (p) => (p.rev ? `pintura em ${p.image}` : `${p.image} sem pintura`),
+  run({ e }, p) {
+    const d = requireDrawing(e.json, p.image);
+    const antes = d.raster?.rev ?? null;
+    if (p.rev) e.set(["drawings", p.image, "raster"], { rev: p.rev });
+    else if (d.raster) e.set(["drawings", p.image, "raster"], undefined);
+    return { image: p.image, rev: p.rev, before: antes };
+  },
+});
+
+defineCommand({
+  name: "paint.grow",
+  group: "drawing",
+  summary:
+    "Pintura (raster): a imagem cresce left/top/right/bottom pixels para cada lado (as formas e os pixels andam junto e as partes ficam no mesmo lugar da tela) e passa ao estado `rev` dos pixels, ja do tamanho novo. O editor chama quando a pincelada ou o laco passam da borda; por fora, grave antes o PNG do tamanho novo.",
+  params: z.object({ image: Image, left: z.number().int().min(0).default(0), top: z.number().int().min(0).default(0), right: z.number().int().min(0).default(0), bottom: z.number().int().min(0).default(0), rev: z.string().min(1).max(40) }),
+  label: (p) => `${p.image} cresce`,
+  run({ e, run }, p) {
+    const d = requireDrawing(e.json, p.image);
+    const antes = d.raster?.rev ?? null;
+    resize(e, run, p.image, d.width + p.left + p.right, d.height + p.top + p.bottom, p.left, p.top);
+    e.set(["drawings", p.image, "raster"], { rev: p.rev });
+    const n = requireDrawing(e.json, p.image);
+    return { image: p.image, width: n.width, height: n.height, rev: p.rev, before: antes };
+  },
+});
+
+defineCommand({
   name: "draw.cover",
   group: "drawing",
   summary:
@@ -795,7 +890,8 @@ defineCommand({
     const d0 = requireDrawing(e.json, p.image);
     let grown: number[] | null = null;
     const b = drawnBox(d0);
-    if (b && (b[0] < -0.5 || b[1] < -0.5 || b[2] > d0.width + 0.5 || b[3] > d0.height + 0.5)) {
+    // com pintura a imagem nao cresce (os pixels tem o tamanho dela): a forma de fora fica cortada
+    if (!d0.raster && b && (b[0] < -0.5 || b[1] < -0.5 || b[2] > d0.width + 0.5 || b[3] > d0.height + 0.5)) {
       const x0 = Math.floor(Math.min(0, b[0] - p.margin)),
         y0 = Math.floor(Math.min(0, b[1] - p.margin)),
         x1 = Math.ceil(Math.max(d0.width, b[2] + p.margin)),

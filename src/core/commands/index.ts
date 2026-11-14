@@ -27,6 +27,7 @@ import "./roles.ts";
 import "./instances.ts";
 import "./laco.ts";
 import "./desenho.ts";
+import "./quadros.ts";
 import "./googly.ts";
 import "./filme.ts";
 

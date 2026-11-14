@@ -6,6 +6,7 @@
   import { stopDrawEdit } from "./drawedit.ts";
   import { contours, drawingsOf, shapeBounds, type DrawShape } from "../core/desenho.ts";
   import { parseAtlas } from "../core/atlas-text.ts";
+  import { ESTILOS } from "../core/lapis.ts";
 
   let box = $state<HTMLDivElement>();
   $effect(() => {
@@ -118,11 +119,34 @@
     </div>
     <div class="tools">
       <button class:on={de.tool === "select"} onclick={() => ((de.tool = "select"), (de.pen = null))} title="Selecionar e mover (V)">↖ Selecionar</button>
+      <button class:on={de.tool === "pencil"} onclick={() => ((de.tool = "pencil"), (de.pen = null))} title="Lápis (L): desenhar à mão livre, com a pressão da mesa">✏️ Lápis</button>
+      <button class:on={de.tool === "eraser"} onclick={() => ((de.tool = "eraser"), (de.pen = null))} title="Borracha (E): apaga o traço inteiro por onde passa">🧽</button>
       <button class:on={de.tool === "pen"} onclick={() => (de.tool = "pen")} title="Caneta (P): clique faz canto, arrastar faz curva">✒️ Caneta</button>
       <button class:on={de.tool === "rect"} onclick={() => ((de.tool = "rect"), (de.pen = null))} title="Retângulo (R)">▭</button>
       <button class:on={de.tool === "ellipse"} onclick={() => ((de.tool = "ellipse"), (de.pen = null))} title="Elipse (O)">◯</button>
       <button class:on={de.hole} disabled={de.shape === null && !de.hole} onclick={() => ((de.hole = !de.hole), (de.pen = null), de.tool === "select" && (de.tool = "pen"))} title="Modo furo: a caneta, o retângulo e a elipse furam a forma escolhida (Esc sai)">⊘ Furo</button>
     </div>
+    {#if de.tool === "pencil"}
+      {@const l = app.lapis}
+      <div class="secao">Lápis <span class="dim">(o Ateliê, tecla 8, abre a tela limpa)</span></div>
+      <div class="grade">
+        <span class="rot">estilo</span>
+        <select value={l.estilo} onchange={(e) => ((l.estilo = (e.target as HTMLSelectElement).value), app.guardarLapis())}>
+          {#each Object.entries(ESTILOS) as [id, e]}<option value={id}>{e.rotulo}</option>{/each}
+        </select>
+        <span class="rot">cor</span>
+        <div class="cor">
+          <input type="color" value={rgb(l.color)} oninput={(e) => ((l.color = (e.target as HTMLInputElement).value.slice(1) + "ff"), app.guardarLapis())} />
+          <label class="ck"><input type="checkbox" checked={l.mancha} onchange={(e) => ((l.mancha = (e.target as HTMLInputElement).checked), app.guardarLapis())} /> mancha</label>
+        </div>
+        <span class="rot">tamanho</span>
+        <input type="number" min="0.5" max="200" step="0.5" value={l.width} onchange={(e) => +(e.target as HTMLInputElement).value > 0 && ((l.width = +(e.target as HTMLInputElement).value), app.guardarLapis())} />
+        <span class="rot" title="A ponta segue a caneta com atraso: some o tremor">estabilizar</span>
+        <input type="range" min="0" max="1" step="0.01" value={l.estabilizar} oninput={(e) => ((l.estabilizar = +(e.target as HTMLInputElement).value), app.guardarLapis())} />
+        <span class="rot" title="O quanto a curva pode se afastar do que a mão fez">liso</span>
+        <input type="range" min="0.2" max="8" step="0.1" value={l.suavizar} oninput={(e) => ((l.suavizar = +(e.target as HTMLInputElement).value), app.guardarLapis())} />
+      </div>
+    {/if}
     <div class="secao">Formas <span class="dim">(a de cima fica na frente)</span></div>
     <div class="formas">
       {#each ordem as { s, i } (i + s.name)}

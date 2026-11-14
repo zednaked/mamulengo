@@ -123,6 +123,7 @@
     <div class="pop">
       <!-- svelte-ignore a11y_autofocus -->
       <input placeholder="procurar ({app.assets.length} {app.assets.length === 1 ? 'personagem' : 'personagens'})" bind:value={q} autofocus />
+      {#if !app.spectator}<button class="novo" onclick={() => ((open = false), (app.novoAberto = true))} title="Um personagem em branco, só com o osso raiz, para desenhar e animar do zero">＋ Novo em branco…</button>{/if}
       {#if NAVEGADOR}
         <div class="pastas">
           {#if temEscolherPasta}<button onclick={abrirPasta}>Abrir pasta do computador…</button>{/if}
@@ -147,7 +148,7 @@
         </div>
       {/if}
       <div class="list">
-        {#if app.assetsLidos && !app.assets.length && NAVEGADOR}<div class="dim vazio">Nenhum personagem nas pastas abertas. Abra uma pasta com arquivos .boneco.</div>{:else if app.assetsLidos && !app.assets.length}<div class="dim vazio">Nenhum personagem em {app.roots.join(", ")}. Arraste um PSD para a janela, ou abra o editor com MAMULENGO_ROOTS apontando para as suas pastas.</div>{/if}
+        {#if app.assetsLidos && !app.assets.length && NAVEGADOR}<div class="dim vazio">Nenhum personagem nas pastas abertas. Abra uma pasta com arquivos .boneco.</div>{:else if app.assetsLidos && !app.assets.length}<div class="dim vazio">Nenhum personagem em {app.roots.join(", ")}. Crie um em branco (＋ Novo em branco), arraste um PSD para a janela, ou abra o editor com MAMULENGO_ROOTS apontando para as suas pastas.</div>{/if}
         {#each groups as [proj, list]}
           <div class="proj">
             <span>{proj}</span>
@@ -163,6 +164,11 @@
 </div>
 
 <style>
+  .novo {
+    text-align: left;
+    color: var(--accent);
+    font-weight: 600;
+  }
   .pastas {
     display: flex;
     flex-direction: column;
