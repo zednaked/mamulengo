@@ -38,6 +38,7 @@ import { listarEfeitos, porEfeito } from "./efeitos.ts";
 import { bonecoNovo, nomeDeBoneco } from "../src/boneco/spine.ts";
 import { pintorWs } from "./pintor.ts";
 import { interpolar, pastaDoRife } from "./rife.ts";
+import { preparar as prepararTutorial, recomecar as recomecarTutorial } from "./tutorial.ts";
 
 export const BRIDGE_PATH = "/__mamulengo";
 const EXPORTS = join(homedir(), ".cache", "mamulengo", "exports");
@@ -188,6 +189,15 @@ export function mamulengo(opts: { roots: string[] }): Plugin {
             gravarBonecoArquivo(arquivo, bonecoNovo(nome), false);
             cache = null;
             return send(200, { boneco: arquivo });
+          }
+          // tutorial de rig e IK (server/tutorial.ts): as cenas precisam estar dentro das raizes
+          if (url.pathname === "/api/tutorial" || (url.pathname === "/api/tutorial/recomecar" && req.method === "POST")) {
+            const b = url.pathname === "/api/tutorial" ? null : await json();
+            const cenas = b ? recomecarTutorial(b.id || undefined, b.trilha || undefined).map((boneco) => ({ boneco })) : prepararTutorial();
+            const fora = cenas.find((c) => !inside(c.boneco));
+            if (fora) return send(400, { error: `as cenas do tutorial ficam em ${dirname(dirname(fora.boneco))}, fora das pastas do projeto (MAMULENGO_ROOTS)` });
+            cache = null;
+            return send(200, { cenas });
           }
           // intermediarios do Atelie: o RIFE (server/rife.ts) entre dois quadros
           if (url.pathname === "/api/rife" && req.method === "GET") return send(200, { disponivel: !!pastaDoRife() });

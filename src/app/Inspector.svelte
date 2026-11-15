@@ -673,6 +673,7 @@
       .filter((c: any) => c.bone === b || c.target === b || c.source === b || c.bones?.includes(b))
       .map((c: any) => ({ name: c.name, type: c.type, strength: c.strength ?? 100, mix: c.mix ?? c.mixRotate ?? 1, target: c.target as string | undefined, bones: (c.bones ?? []) as string[], raw: c, index: (app.doc!.json.constraints ?? []).indexOf(c) }));
   });
+  const nomesOssos = $derived((app.version, (app.doc?.json.bones ?? []).map((b: any) => b.name as string)));
   const totalCons = $derived((app.version, app.doc?.json.constraints?.length ?? 0));
 
   // renomear luz e emissor de particulas (dois cliques no nome)
@@ -950,6 +951,9 @@
                     {#each alvosPossiveis(c.bones) as n}<option value={n}>{n}</option>{/each}
                   </select>
                 </label>
+                {#if c.bones.length === 2}
+                  <button class="dobra-ik" onclick={() => conSet(c.name, { bendPositive: !(c.raw.bendPositive ?? true) }, `dobra de ${c.name}`)} title="Troca o lado para onde a junta do meio ({c.bones[1]}) dobra: joelho para a frente ou para trás, cotovelo para dentro ou para fora. A ponta continua no alvo">⇄ dobra</button>
+                {/if}
               {/if}
               <label class="slider" title="quanto vale (0..1)">mix <input type="range" min="0" max="1" step="0.05" value={c.mix} onchange={(e) => app.run({ cmd: "constraint.set", args: { name: c.name, props: { mix: +(e.target as HTMLInputElement).value } } }, `mix ${c.name}`)} /></label>
             {/if}
@@ -1049,6 +1053,12 @@
             <label class="mini-campo">{rot}<input type="number" step={passo} value={+(imagemNoOsso as any)[k].toFixed(2)} onchange={(e) => setImagem(k as string, +(e.target as HTMLInputElement).value)} /></label>
           {/each}
         </div>
+      {/if}
+      {#if !animando}
+        <label for="slot-osso" title="O osso que carrega esta camada: quando ele gira ou anda, a imagem vai junto. Trocar mantém a imagem no mesmo lugar da tela">preso no osso</label>
+        <select id="slot-osso" value={slot.bone} onchange={(e) => slotSet({ bone: (e.target as HTMLSelectElement).value })}>
+          {#each nomesOssos as n}<option value={n}>{n}</option>{/each}
+        </select>
       {/if}
       <label for="slot-mistura">mistura</label>
       <select id="slot-mistura" value={slot.blend ?? "normal"} onchange={(e) => slotSet({ blend: (e.target as HTMLSelectElement).value })}>
@@ -1633,6 +1643,10 @@
     grid-template-columns: 70px 1fr;
     gap: 6px 8px;
     align-items: center;
+  }
+  .dobra-ik {
+    font-size: 11px;
+    padding: 1px 6px;
   }
   .alvo-ik {
     display: flex;

@@ -22,6 +22,7 @@
     "test": "tsx tests/features.ts",
     "test:corpus": "tsx tests/corpus.ts",
     "test:imagens": "tsx tests/imagens-reduzidas.ts",
+    "test:tutorial": "tsx tools/tutorial-teste.ts",
     "parity": "tsx tools/parity.ts",
     "kit": "tsx tools/acceptance-kit.ts",
     "compare": "tsx tools/compare-anim.ts",

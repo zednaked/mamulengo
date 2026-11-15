@@ -17,6 +17,7 @@
   import GodotCheck from "./app/GodotCheck.svelte";
   import Onboarding from "./app/Onboarding.svelte";
   import Guia from "./app/Guia.svelte";
+  import Tutorial from "./app/Tutorial.svelte";
   import Novo from "./app/Novo.svelte";
   import Atalhos from "./app/Atalhos.svelte";
   import PsdImport from "./app/PsdImport.svelte";
@@ -388,6 +389,7 @@
     {/if}
     <div class="spacer"></div>
     <button class="help guia-bt" title="Guia das ferramentas: como usar cada uma, passo a passo (F1)" onclick={() => (app.guia = app.doc ? "lapis" : "comecar")}>📖 <span class="rot">Guia</span></button>
+    {#if !app.spectator && !NAVEGADOR}<button class="help guia-bt" class:on={app.tutorial} title="Tutorial de rig e IK: cenas para completar, conferidas na hora (dá para recomeçar)" onclick={() => (app.tutorial = !app.tutorial)}>🎓 <span class="rot">Tutorial</span></button>{/if}
     <button class="help" title="Atalhos do teclado (tecla ?)" onclick={() => (atalhos = true)}>?</button>
     <div class="agent" class:on={app.agentConnected} title={app.agentConnected ? "Claude conectado: ele esta operando este editor" : "Claude: nenhuma instancia conectada a este editor"}>🤖{#if app.agentConnected}<span class="pontinho"></span>{/if}</div>
     {#if app.narration.text}<button class="talk" class:off={!app.showNarration} onclick={toggleNarration} title="Mostrar ou esconder a legenda com o que o Claude diz">💬</button>{/if}
@@ -449,6 +451,7 @@
   {#if !app.spectator}<Onboarding bind:open={guide} />{/if}
   <Atalhos bind:open={atalhos} guia={() => (app.guia = "comecar")} />
   <Guia atalhos={() => (atalhos = true)} />
+  {#if !app.spectator && !NAVEGADOR}<Tutorial />{/if}
   {#if !app.spectator}<Novo />{/if}
   {#if app.showNarration && app.narration.text && now - app.narration.at < 20000}
     <div class="caption">🤖 {app.narration.text.length > 280 ? app.narration.text.slice(0, 280) + "…" : app.narration.text}</div>
@@ -654,6 +657,21 @@
     width: 32px;
     border-radius: 50%;
     font-weight: 700;
+  }
+  /* com o rotulo, o botao cresce (no compacto o rotulo some e ele volta a ser redondo) */
+  .help.guia-bt {
+    width: auto;
+    min-width: 32px;
+    padding: 0 10px;
+    border-radius: 16px;
+    white-space: nowrap;
+  }
+  .compacto .help.guia-bt {
+    padding: 0;
+    width: 32px;
+  }
+  .help.guia-bt.on {
+    outline: 2px solid var(--accent, #ffb400);
   }
   .agent {
     font-size: 12px;

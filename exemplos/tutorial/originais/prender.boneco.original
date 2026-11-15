@@ -1,0 +1,566 @@
+{
+ "boneco": 0,
+ "nome": "prender",
+ "paginas": [
+  {
+   "arquivo": "tutorial.png",
+   "tamanho": [
+    2048,
+    448
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "tronco",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    180,
+    300
+   ]
+  },
+  {
+   "nome": "cabeca",
+   "pagina": 0,
+   "ret": [
+    184,
+    0,
+    208,
+    220
+   ]
+  },
+  {
+   "nome": "coxa",
+   "pagina": 0,
+   "ret": [
+    396,
+    0,
+    68,
+    208
+   ]
+  },
+  {
+   "nome": "coxa_e",
+   "pagina": 0,
+   "ret": [
+    468,
+    0,
+    68,
+    208
+   ]
+  },
+  {
+   "nome": "canela",
+   "pagina": 0,
+   "ret": [
+    540,
+    0,
+    60,
+    196
+   ]
+  },
+  {
+   "nome": "canela_e",
+   "pagina": 0,
+   "ret": [
+    604,
+    0,
+    60,
+    196
+   ]
+  },
+  {
+   "nome": "braco",
+   "pagina": 0,
+   "ret": [
+    668,
+    0,
+    56,
+    160
+   ]
+  },
+  {
+   "nome": "braco_e",
+   "pagina": 0,
+   "ret": [
+    728,
+    0,
+    56,
+    160
+   ]
+  },
+  {
+   "nome": "antebraco",
+   "pagina": 0,
+   "ret": [
+    788,
+    0,
+    48,
+    148
+   ]
+  },
+  {
+   "nome": "antebraco_e",
+   "pagina": 0,
+   "ret": [
+    840,
+    0,
+    48,
+    148
+   ]
+  },
+  {
+   "nome": "quadril",
+   "pagina": 0,
+   "ret": [
+    892,
+    0,
+    184,
+    100
+   ]
+  },
+  {
+   "nome": "chao",
+   "pagina": 0,
+   "ret": [
+    0,
+    304,
+    1800,
+    80
+   ]
+  },
+  {
+   "nome": "mao",
+   "pagina": 0,
+   "ret": [
+    1888,
+    304,
+    68,
+    68
+   ]
+  },
+  {
+   "nome": "mao_e",
+   "pagina": 0,
+   "ret": [
+    1960,
+    304,
+    68,
+    68
+   ]
+  },
+  {
+   "nome": "pe",
+   "pagina": 0,
+   "ret": [
+    0,
+    388,
+    132,
+    60
+   ]
+  },
+  {
+   "nome": "pe_e",
+   "pagina": 0,
+   "ret": [
+    136,
+    388,
+    132,
+    60
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "x": -450,
+  "y": -20,
+  "largura": 900,
+  "altura": 460
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "quadril",
+   "pai": "root",
+   "y": 196,
+   "cor": "ffb400ff"
+  },
+  {
+   "nome": "tronco",
+   "pai": "quadril",
+   "y": 8,
+   "rotacao": 90,
+   "comprimento": 112
+  },
+  {
+   "nome": "cabeca",
+   "pai": "tronco",
+   "x": 114,
+   "comprimento": 90
+  },
+  {
+   "nome": "coxa_e",
+   "pai": "quadril",
+   "x": -12,
+   "y": -6,
+   "rotacao": -83.211,
+   "comprimento": 84.593
+  },
+  {
+   "nome": "canela_e",
+   "pai": "coxa_e",
+   "x": 84.593,
+   "rotacao": -15.115,
+   "comprimento": 82.873
+  },
+  {
+   "nome": "pe_e",
+   "pai": "canela_e",
+   "x": 82.873,
+   "rotacao": 90.326,
+   "comprimento": 34
+  },
+  {
+   "nome": "braco_e",
+   "pai": "tronco",
+   "x": 100,
+   "y": 18,
+   "rotacao": -194.931,
+   "comprimento": 62.097
+  },
+  {
+   "nome": "antebraco_e",
+   "pai": "braco_e",
+   "x": 62.097,
+   "rotacao": 35.255,
+   "comprimento": 57.585
+  },
+  {
+   "nome": "mao_e",
+   "pai": "antebraco_e",
+   "x": 57.585,
+   "comprimento": 14
+  },
+  {
+   "nome": "coxa",
+   "pai": "quadril",
+   "x": 4,
+   "y": -6,
+   "rotacao": -81.87,
+   "comprimento": 84.853
+  },
+  {
+   "nome": "canela",
+   "pai": "coxa",
+   "x": 84.853,
+   "rotacao": -17.819,
+   "comprimento": 83.187
+  },
+  {
+   "nome": "pe",
+   "pai": "canela",
+   "x": 83.187,
+   "rotacao": 91.689,
+   "comprimento": 34
+  },
+  {
+   "nome": "braco",
+   "pai": "tronco",
+   "x": 100,
+   "y": -4,
+   "rotacao": -161.565,
+   "comprimento": 63.246
+  },
+  {
+   "nome": "antebraco",
+   "pai": "braco",
+   "x": 63.246,
+   "rotacao": 50.194,
+   "comprimento": 49.396
+  },
+  {
+   "nome": "mao",
+   "pai": "antebraco",
+   "x": 49.396,
+   "comprimento": 14
+  }
+ ],
+ "slots": [
+  {
+   "nome": "chao",
+   "osso": "root",
+   "parte": "chao"
+  },
+  {
+   "nome": "braco_e",
+   "osso": "braco_e",
+   "parte": "braco_e"
+  },
+  {
+   "nome": "antebraco_e",
+   "osso": "antebraco_e",
+   "parte": "antebraco_e"
+  },
+  {
+   "nome": "mao_e",
+   "osso": "mao_e",
+   "parte": "mao_e"
+  },
+  {
+   "nome": "coxa_e",
+   "osso": "coxa_e",
+   "parte": "coxa_e"
+  },
+  {
+   "nome": "canela_e",
+   "osso": "canela_e",
+   "parte": "canela_e"
+  },
+  {
+   "nome": "pe_e",
+   "osso": "pe_e",
+   "parte": "pe_e"
+  },
+  {
+   "nome": "tronco",
+   "osso": "tronco",
+   "parte": "tronco"
+  },
+  {
+   "nome": "cabeca",
+   "osso": "cabeca",
+   "parte": "cabeca"
+  },
+  {
+   "nome": "coxa",
+   "osso": "coxa",
+   "parte": "coxa"
+  },
+  {
+   "nome": "canela",
+   "osso": "canela",
+   "parte": "canela"
+  },
+  {
+   "nome": "pe",
+   "osso": "pe",
+   "parte": "pe"
+  },
+  {
+   "nome": "quadril",
+   "osso": "quadril",
+   "parte": "quadril"
+  },
+  {
+   "nome": "braco",
+   "osso": "root",
+   "parte": "braco"
+  },
+  {
+   "nome": "antebraco",
+   "osso": "root",
+   "parte": "antebraco"
+  },
+  {
+   "nome": "mao",
+   "osso": "root",
+   "parte": "mao"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "chao": {
+     "chao": {
+      "x": 0,
+      "y": -14,
+      "largura": 900,
+      "altura": 40
+     }
+    },
+    "braco_e": {
+     "braco_e": {
+      "x": 31.048,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 28,
+      "altura": 80
+     }
+    },
+    "antebraco_e": {
+     "antebraco_e": {
+      "x": 28.792,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 24,
+      "altura": 74
+     }
+    },
+    "mao_e": {
+     "mao_e": {
+      "x": 0,
+      "y": 0,
+      "rotacao": 69.677,
+      "largura": 34,
+      "altura": 34
+     }
+    },
+    "coxa_e": {
+     "coxa_e": {
+      "x": 42.297,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 34,
+      "altura": 104
+     }
+    },
+    "canela_e": {
+     "canela_e": {
+      "x": 41.437,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 30,
+      "altura": 98
+     }
+    },
+    "pe_e": {
+     "pe_e": {
+      "x": 23.317,
+      "y": -7.831,
+      "rotacao": 8,
+      "largura": 66,
+      "altura": 30
+     }
+    },
+    "tronco": {
+     "tronco": {
+      "x": 66,
+      "y": 0,
+      "rotacao": -90,
+      "largura": 90,
+      "altura": 150
+     }
+    },
+    "cabeca": {
+     "cabeca": {
+      "x": 50,
+      "y": -4,
+      "rotacao": -90,
+      "largura": 104,
+      "altura": 110
+     }
+    },
+    "coxa": {
+     "coxa": {
+      "x": 42.426,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 34,
+      "altura": 104
+     }
+    },
+    "canela": {
+     "canela": {
+      "x": 41.593,
+      "y": 0,
+      "rotacao": 90,
+      "largura": 30,
+      "altura": 98
+     }
+    },
+    "pe": {
+     "pe": {
+      "x": 23.317,
+      "y": -7.831,
+      "rotacao": 8,
+      "largura": 66,
+      "altura": 30
+     }
+    },
+    "quadril": {
+     "quadril": {
+      "x": -2,
+      "y": -2,
+      "largura": 92,
+      "altura": 50
+     }
+    },
+    "braco": {
+     "braco": {
+      "x": 14,
+      "y": 274,
+      "rotacao": 18.435,
+      "largura": 28,
+      "altura": 80
+     }
+    },
+    "antebraco": {
+     "antebraco": {
+      "x": 47,
+      "y": 235,
+      "rotacao": 68.629,
+      "largura": 24,
+      "altura": 74
+     }
+    },
+    "mao": {
+     "mao": {
+      "x": 70,
+      "y": 226,
+      "largura": 34,
+      "altura": 34
+     }
+    }
+   }
+  }
+ ],
+ "animacoes": {
+  "acenar": {
+   "ossos": {
+    "braco": {
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.4,
+       "valor": 70
+      },
+      {
+       "tempo": 0.8,
+       "valor": 0
+      }
+     ]
+    },
+    "antebraco": {
+     "girar": [
+      {
+       "valor": 0
+      },
+      {
+       "tempo": 0.2,
+       "valor": 40
+      },
+      {
+       "tempo": 0.4,
+       "valor": 60
+      },
+      {
+       "tempo": 0.6,
+       "valor": 20
+      },
+      {
+       "tempo": 0.8,
+       "valor": 0
+      }
+     ]
+    }
+   }
+  }
+ }
+}

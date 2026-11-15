@@ -37,3 +37,4 @@ dist-navegador
 /.tmp-coelho/
 pintor/Cargo.toml
 pintor/Cargo.lock
+exemplos/tutorial/cenas/

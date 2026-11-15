@@ -7,6 +7,8 @@ Not covered by this license:
   Kenney (kenney.nl); see
   tests/assets/LICENSES.md. The art in exemplos/jogo (jogo_*.webp) comes from Kenney's
   Jumper Pack, UI Pack (with the Kenney Future font) and Particle Pack, also CC0 1.0.
+  The monster in exemplos/tutorial (monstro.png) is from Kenney's Monster Builder Pack, CC0 1.0, like
+  exemplos/monstros; the tutorial's other art (tutorial.png, the puppet Tico) is drawn by its generator, CC0 1.0.
 - The letters in exemplos/vinheta (letra.png and vinheta.png) are rendered from the
   Noto Sans font, under the SIL Open Font License 1.1 (fonts.google.com/noto). The
   puppet and the rest of that example are drawn by its generator, under this license.

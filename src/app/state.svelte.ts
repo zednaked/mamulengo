@@ -364,6 +364,8 @@ class AppState {
   pinturas = new Pinturas();
   // o guia das ferramentas aberto num assunto (src/app/Guia.svelte) e o dialogo do personagem novo
   guia = $state<string | null>(null);
+  // o painel do tutorial de rig e IK (src/app/Tutorial.svelte)
+  tutorial = $state(false);
   novoAberto = $state(false);
   // a tela vista em varios tamanhos de janela lado a lado (src/app/LadoALado.svelte)
   ladoALado = $state(false);

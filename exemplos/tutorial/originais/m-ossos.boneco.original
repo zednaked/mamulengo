@@ -1,0 +1,388 @@
+{
+ "boneco": 0,
+ "nome": "m-ossos",
+ "paginas": [
+  {
+   "arquivo": "monstro.png",
+   "tamanho": [
+    2048,
+    446
+   ]
+  }
+ ],
+ "imagens": [
+  {
+   "nome": "braco_e",
+   "pagina": 0,
+   "ret": [
+    0,
+    0,
+    196,
+    362
+   ]
+  },
+  {
+   "nome": "braco_d",
+   "pagina": 0,
+   "ret": [
+    200,
+    0,
+    196,
+    362
+   ]
+  },
+  {
+   "nome": "corpo",
+   "pagina": 0,
+   "ret": [
+    400,
+    0,
+    330,
+    330
+   ]
+  },
+  {
+   "nome": "perna_e",
+   "pagina": 0,
+   "ret": [
+    734,
+    0,
+    110,
+    298
+   ]
+  },
+  {
+   "nome": "perna_d",
+   "pagina": 0,
+   "ret": [
+    848,
+    0,
+    110,
+    298
+   ]
+  },
+  {
+   "nome": "olho",
+   "pagina": 0,
+   "ret": [
+    962,
+    0,
+    128,
+    138
+   ]
+  },
+  {
+   "nome": "orelha_e",
+   "pagina": 0,
+   "ret": [
+    1094,
+    0,
+    108,
+    108
+   ]
+  },
+  {
+   "nome": "orelha_d",
+   "pagina": 0,
+   "ret": [
+    1206,
+    0,
+    108,
+    108
+   ]
+  },
+  {
+   "nome": "nariz",
+   "pagina": 0,
+   "ret": [
+    1318,
+    0,
+    108,
+    96
+   ]
+  },
+  {
+   "nome": "chao",
+   "pagina": 0,
+   "ret": [
+    0,
+    366,
+    1800,
+    80
+   ]
+  },
+  {
+   "nome": "boca",
+   "pagina": 0,
+   "ret": [
+    1804,
+    366,
+    132,
+    52
+   ]
+  },
+  {
+   "nome": "junta",
+   "pagina": 0,
+   "ret": [
+    1940,
+    366,
+    52,
+    52
+   ]
+  }
+ ],
+ "esqueleto": {
+  "versao_spine": "4.3.23",
+  "x": -450,
+  "y": -20,
+  "largura": 900,
+  "altura": 460
+ },
+ "ossos": [
+  {
+   "nome": "root"
+  },
+  {
+   "nome": "quadril",
+   "pai": "root",
+   "y": 135,
+   "cor": "ffb400ff"
+  },
+  {
+   "nome": "corpo",
+   "pai": "quadril",
+   "y": -10,
+   "rotacao": 90,
+   "comprimento": 82
+  },
+  {
+   "nome": "coxa_e",
+   "pai": "quadril",
+   "x": -40,
+   "rotacao": -101.514,
+   "comprimento": 55.109
+  },
+  {
+   "nome": "canela_e",
+   "pai": "coxa_e",
+   "x": 55.109,
+   "rotacao": 24.906,
+   "comprimento": 43.174
+  }
+ ],
+ "slots": [
+  {
+   "nome": "chao",
+   "osso": "root",
+   "parte": "chao"
+  },
+  {
+   "nome": "perna_e",
+   "osso": "coxa_e",
+   "parte": "perna_e"
+  },
+  {
+   "nome": "perna_d",
+   "osso": "quadril",
+   "parte": "perna_d"
+  },
+  {
+   "nome": "braco_e",
+   "osso": "corpo",
+   "parte": "braco_e"
+  },
+  {
+   "nome": "orelha_e",
+   "osso": "corpo",
+   "parte": "orelha_e"
+  },
+  {
+   "nome": "braco_d",
+   "osso": "corpo",
+   "parte": "braco_d"
+  },
+  {
+   "nome": "orelha_d",
+   "osso": "corpo",
+   "parte": "orelha_d"
+  },
+  {
+   "nome": "corpo",
+   "osso": "corpo",
+   "parte": "corpo"
+  },
+  {
+   "nome": "olho_e",
+   "osso": "corpo",
+   "parte": "olho"
+  },
+  {
+   "nome": "olho_d",
+   "osso": "corpo",
+   "parte": "olho"
+  },
+  {
+   "nome": "nariz",
+   "osso": "corpo",
+   "parte": "nariz"
+  },
+  {
+   "nome": "boca",
+   "osso": "corpo",
+   "parte": "boca"
+  },
+  {
+   "nome": "guia_quadril",
+   "osso": "root",
+   "parte": "junta"
+  },
+  {
+   "nome": "guia_joelho",
+   "osso": "root",
+   "parte": "junta"
+  },
+  {
+   "nome": "guia_tornozelo",
+   "osso": "root",
+   "parte": "junta"
+  }
+ ],
+ "skins": [
+  {
+   "nome": "default",
+   "partes": {
+    "chao": {
+     "chao": {
+      "x": 0,
+      "y": -8,
+      "largura": 450,
+      "altura": 20
+     }
+    },
+    "perna_e": {
+     "perna_e": {
+      "x": 61.578,
+      "y": 0.807,
+      "rotacao": 101.514,
+      "largura": 55,
+      "altura": 149
+     }
+    },
+    "perna_d": {
+     "perna_d": {
+      "x": 51.5,
+      "y": -60.5,
+      "largura": 55,
+      "altura": 149
+     }
+    },
+    "braco_e": {
+     "braco_e": {
+      "x": 13.5,
+      "y": 90.5,
+      "rotacao": -90,
+      "largura": 98,
+      "altura": 181
+     }
+    },
+    "orelha_e": {
+     "orelha_e": {
+      "x": 168,
+      "y": 74,
+      "rotacao": -90,
+      "largura": 51.3,
+      "altura": 51.3
+     }
+    },
+    "braco_d": {
+     "braco_d": {
+      "x": 13.5,
+      "y": -90.5,
+      "rotacao": -90,
+      "largura": 98,
+      "altura": 181
+     }
+    },
+    "orelha_d": {
+     "orelha_d": {
+      "x": 168,
+      "y": -74,
+      "rotacao": -90,
+      "largura": 51.3,
+      "altura": 51.3
+     }
+    },
+    "corpo": {
+     "corpo": {
+      "x": 82.5,
+      "y": 0,
+      "rotacao": -90,
+      "largura": 165,
+      "altura": 165
+     }
+    },
+    "olho_e": {
+     "olho": {
+      "x": 168,
+      "y": 74,
+      "rotacao": -90,
+      "largura": 39.68,
+      "altura": 42.78
+     }
+    },
+    "olho_d": {
+     "olho": {
+      "x": 168,
+      "y": -74,
+      "rotacao": -90,
+      "largura": 39.68,
+      "altura": 42.78
+     }
+    },
+    "nariz": {
+     "nariz": {
+      "x": 91,
+      "y": 0,
+      "rotacao": -90,
+      "largura": 43.2,
+      "altura": 38.4
+     }
+    },
+    "boca": {
+     "boca": {
+      "x": 50,
+      "y": 0,
+      "rotacao": -90,
+      "largura": 39.6,
+      "altura": 15.6
+     }
+    },
+    "guia_quadril": {
+     "junta": {
+      "x": 40,
+      "y": 135,
+      "largura": 20.8,
+      "altura": 20.8
+     }
+    },
+    "guia_joelho": {
+     "junta": {
+      "x": 51,
+      "y": 81,
+      "largura": 20.8,
+      "altura": 20.8
+     }
+    },
+    "guia_tornozelo": {
+     "junta": {
+      "x": 41,
+      "y": 39,
+      "largura": 20.8,
+      "altura": 20.8
+     }
+    }
+   }
+  }
+ ]
+}
