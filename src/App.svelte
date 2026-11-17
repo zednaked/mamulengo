@@ -23,7 +23,6 @@
   import PsdImport from "./app/PsdImport.svelte";
   import { connectBridge } from "./bridge/client.ts";
   import { deleteVertex, stopMeshEdit } from "./app/meshedit.ts";
-  import { abrirDesenhar } from "./app/drawedit.ts";
   import { abrirAtelie } from "./app/atelie.ts";
   import Atelie from "./app/Atelie.svelte";
 
@@ -295,8 +294,8 @@
     else if (!mod && e.key === "4") app.tool = "deform";
     else if (!mod && e.key === "5") (app.tool = "bone"), (app.mode = "setup");
     else if (!mod && (e.key === "6" || e.key === "h")) app.tool = "pan";
-    else if (!mod && e.key === "7") abrirDesenhar();
-    else if (!mod && e.key === "8") abrirAtelie();
+    // 7 (o antigo Desenhar) e 8: a mesma entrada; o que abre vem do modo e da escolha (N-030)
+    else if (!mod && (e.key === "7" || e.key === "8")) abrirAtelie();
     else if (!mod && e.key === "[") app.brushRadius = Math.max(15, app.brushRadius / 1.2);
     else if (!mod && e.key === "]") app.brushRadius = Math.min(250, app.brushRadius * 1.2);
     else if (app.meshEdit && (e.key === "Delete" || e.key === "Backspace")) {
@@ -349,8 +348,7 @@
       <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 <span class="rot">Deformar</span></button>
       <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animações">🦴 <span class="rot">Osso</span></button>
       <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a câmera arrastando (6 ou H). Também: botão do meio ou direito, ou segurar Espaço">✋ <span class="rot">Câmera</span></button>
-      <button class:on={!!app.drawEdit} onclick={() => abrirDesenhar()} title="Desenhar em vetor, como no Figma (7): na peça escolhida (uma imagem em PNG vira desenho), ou uma peça nova no osso escolhido. Dois cliques numa peça desenhada também abrem">✒️ <span class="rot">Desenhar</span></button>
-      <button class:on={!!app.atelie} onclick={() => abrirAtelie()} title="Ateliê (8): tela limpa para desenhar à mão livre e animar quadro a quadro por cima da animação de ossos">🎨 <span class="rot">Ateliê</span></button>
+      <button class:on={!!app.atelie} onclick={() => abrirAtelie()} title="Ateliê (7 ou 8): desenhar e animar quadro a quadro na tela limpa. Na peça escolhida desenha nela (uma imagem do atlas vira pintura); na Pose base, só um osso escolhido ganha uma peça nova; animando, os quadros por cima da animação de ossos. Dois cliques numa peça desenhada também abrem">🎨 <span class="rot">Ateliê</span></button>
 
     </div>
     <div class="seg">

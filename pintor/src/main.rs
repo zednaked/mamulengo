@@ -1,4 +1,4 @@
-//! O pintor do Mamulengo: uma sessao do ProCraft sem janela, comandada pela entrada padrao.
+//! O pintor do Mamulengo: uma sessao do motor de pincel (procraft-core) sem janela, comandada pela entrada padrao.
 //!
 //! Mensagens nos dois sentidos: [u32 tamanho do JSON][u32 tamanho do binario][JSON][binario],
 //! em little-endian. O JSON do pedido tem `op` e `id`; a resposta repete o `id`. O binario e
@@ -37,7 +37,7 @@ fn reto(premul: &[u8]) -> Vec<u8> {
 }
 
 impl Pintor {
-    // a biblioteca de pinceis do arquivo (so leitura; o ProCraft guarda a ultima lida no processo,
+    // a biblioteca de pinceis do arquivo (so leitura; o motor guarda a ultima lida no processo,
     // entao so a primeira folha paga a leitura)
     fn abrir(w: u32, h: u32, biblioteca: Option<&str>, inicial: &[u8]) -> Result<Pintor, String> {
         let s = CanvasSession::new(w, h);

@@ -9,6 +9,8 @@ import sharp from "sharp";
 import { AnimationState, AnimationStateData, AtlasAttachmentLoader, Physics, Skeleton, SkeletonJson, TextureAtlas } from "@esotericsoftware/spine-core";
 import { createAsset } from "../server/assets.ts";
 import { parseAtlas } from "../src/core/atlas-text.ts";
+import { FOLGA_MIN, FOLHA_MAX, crescimento, folgaDaPincelada } from "../src/core/folha.ts";
+import { contextoDoAtelie } from "../src/core/entrada-atelie.ts";
 import { Document } from "../src/core/document.ts";
 import { executeAsync, type AssetProvider } from "../src/core/commands/index.ts";
 import { decodeDrawOrder, encodeDrawOrder } from "../src/core/commands/organize.ts";
@@ -719,6 +721,191 @@ runtimeOk("constraints");
     for (let i = 0; i < a1.length; i++) erro += Math.abs(a1[i] - a0[i]);
     erro /= a1.length * 255;
     check(tr.colors[0] === "ffd166" && tr.colors.includes("222222") && tr.shapes === 3 && tr.points < 30 && erro < 0.02, `desenho: draw.trace vetoriza a cabeca em ${tr.shapes} formas e ${tr.points} pontos (${tr.colors.join(", ")}), erro medio ${(erro * 100).toFixed(2)}%`);
+    // pintar uma imagem do atlas (N-024): draw.from_region faz dela um desenho com pintura, no mesmo
+    // lugar e do mesmo tamanho; os pixels da imagem viram o PNG da pintura e a pagina sai igual (o
+    // composite do sharp arredonda 1 nivel em borda semitransparente)
+    {
+      const { usesOfImage: usesOfImageT } = await import("../src/core/psd.ts");
+      const desSlot = await import("../src/core/commands/desenho.ts");
+      // a cabeca em duas partes: as duas passam ao desenho
+      for (const sl of doc.json.slots.filter((x: any) => !usesOfImageT(doc.json, "cabeca").some((u: any) => u.slot === x.name)).slice(0, 2 - usesOfImageT(doc.json, "cabeca").length))
+        await run("attachment.region", { slot: sl.name, name: "cabeca" });
+      const usosCab = usesOfImageT(doc.json, "cabeca");
+      const semCab = () => JSON.stringify(doc.json.skins.map((x: any) => Object.entries<any>(x.attachments ?? {}).map(([sl, m]: any) => [sl, Object.entries<any>(m).filter(([n, a]: any) => (a.path ?? a.name ?? n) !== "cabeca" && (a.path ?? a.name ?? n) !== "cabeca_p")])));
+      const slotCab = usosCab[0].slot;
+      const attCab = usosCab[0].name;
+      const sk0 = doc.json.skins.findIndex((x: any) => x.name === usosCab[0].skin);
+      const antesA = structuredClone(doc.json.skins[sk0].attachments[slotCab][attCab]);
+      const outros = semCab();
+      const jAntes = JSON.stringify(doc.json);
+      const h0 = doc.history().length;
+      let recusouT = false;
+      try {
+        await run("draw.from_region", { slot: "t.desenho", rev: "x" });
+      } catch {
+        recusouT = true;
+      }
+      const fr = await run("draw.from_region", { slot: slotCab, attachment: attCab, rev: "r0" });
+      const dp = doc.json.drawings[fr.drawing];
+      const depoisA = doc.json.skins[sk0].attachments[slotCab][attCab];
+      const mesmoLugar = ["x", "y", "rotation", "scaleX", "scaleY", "width", "height"].every((k) => antesA[k] === depoisA[k]);
+      const rg = assets.region("cabeca")!;
+      const achou = desSlot.drawingOfSlot(doc.json, slotCab, attCab);
+      // a pagina dos desenhos com o PNG da cabeca como pintura: o recorte e a imagem, pixel a pixel
+      const dirP = mkdtempSync(join(tmpdir(), "mamulengo-pint-"));
+      mkdirSync(join(dirP, des.pinturasPasta("t.atlas")));
+      await sharp(join(dir, "boneco", "images", "cabeca.png")).png().toFile(join(dirP, des.pinturasPasta("t.atlas"), des.pinturaArquivo(fr.drawing)));
+      const { gravarPaginaDesenhos } = await import("../server/desenhos.ts");
+      const pg = await gravarPaginaDesenhos(doc.json.drawings, atlasText, "t.atlas", dirP);
+      const lr = des.layoutDrawings(doc.json.drawings)!.regions.find((x: any) => x.name === fr.drawing)!;
+      const recorte = await sharp(join(dirP, pg.pagina!)).extract({ left: lr.x, top: lr.y, width: lr.w, height: lr.h }).ensureAlpha().raw().toBuffer();
+      const orig = (await assets.image("cabeca"))!;
+      let difP = 0;
+      for (let i = 0; i < orig.data.length; i += 4) {
+        if (orig.data[i + 3] === 0 && recorte[i + 3] === 0) continue;
+        for (let c = 0; c < 4; c++) difP = Math.max(difP, Math.abs(orig.data[i + c] - recorte[i + c]));
+      }
+      rmSync(dirP, { recursive: true, force: true });
+      // salvar e reabrir (.boneco): a pintura continua
+      const spB = await import("../src/boneco/spine.ts");
+      const reaberto = spB.exportarSpine(spB.importarSpine(structuredClone(doc.json), pg.atlas, "t")).json;
+      const umPasso = doc.history().length === h0 + 1;
+      doc.undo();
+      const desfez = JSON.stringify(doc.json) === jAntes;
+      doc.redo();
+      check(
+        recusouT &&
+          !!achou &&
+          achou.image === fr.drawing &&
+          fr.drawing === "cabeca_p" &&
+          dp.width === rg.width &&
+          dp.height === rg.height &&
+          dp.hd === 1 &&
+          doc.json.drawings[fr.drawing]?.raster?.rev === "r0" &&
+          !fr.warning &&
+          mesmoLugar &&
+          depoisA.path === fr.drawing &&
+          fr.replaced.length === usosCab.filter((u: any) => (u.a.type ?? "region") !== "linkedmesh").length &&
+          fr.replaced.length === 2 &&
+          semCab() === outros &&
+          lr.w === rg.width &&
+          difP <= 1 &&
+          reaberto.drawings?.[fr.drawing]?.raster?.rev === "r0" &&
+          umPasso &&
+          desfez,
+        `desenho: draw.from_region faz de ${slotCab}/${attCab} o desenho ${fr.drawing} ${dp.width}x${dp.height} com pintura, no mesmo lugar (${fr.replaced.join(", ")}); pagina igual a imagem (dif max ${difP}/255), volta do .boneco e desfaz num passo`,
+      );
+    }
+    // cortar e rigar (N-028): draw.carve tira um pedaco da pintura e faz dele peca nova (osso, parte e
+    // desenho) no mesmo lugar da tela, com o pivo no ponto dado; desfaz num passo
+    {
+      const raiz = doc.json.bones[0].name;
+      await run("bone.add", { name: "t.mao", parent: raiz, x: 37, y: -12, rotation: 25, scaleX: 1.5 });
+      await run("draw.create", { image: "t.mao", width: 100, height: 40, hd: 1, slot: "t.mao", bone: "t.mao", x: 8, y: 3, rotation: 10 });
+      await run("paint.set", { image: "t.mao", rev: "m0" });
+      // o ponto (u, v) da imagem no mundo, pela conta do runtime: osso x anexo
+      const noMundo = (slot: string, img: string, u: number, v: number) => {
+        const sl = doc.json.slots.find((x: any) => x.name === slot);
+        const at = doc.json.skins[0].attachments[slot][img];
+        const dd = doc.json.drawings[img];
+        const Wb = boneWorld(skeletonAt(doc.json, null, 0), sl.bone);
+        const r = (at.rotation * Math.PI) / 180;
+        const lx = (u - dd.width / 2) * (at.width / dd.width) * (at.scaleX ?? 1),
+          ly = (dd.height / 2 - v) * (at.height / dd.height) * (at.scaleY ?? 1);
+        const x = at.x + Math.cos(r) * lx - Math.sin(r) * ly,
+          y = at.y + Math.sin(r) * lx + Math.cos(r) * ly;
+        return [Wb.a * x + Wb.b * y + Wb.x, Wb.c * x + Wb.d * y + Wb.y];
+      };
+      const piv = noMundo("t.mao", "t.mao", 60, 20);
+      const meio = noMundo("t.mao", "t.mao", 75, 20);
+      const canto = noMundo("t.mao", "t.mao", 90, 30);
+      const jC = JSON.stringify({ b: doc.json.bones, s: doc.json.slots, d: doc.json.drawings, k: doc.json.skins });
+      const hC = doc.history().length;
+      let recusouAtlas = "";
+      try {
+        const atl = doc.json.slots.find((x: any) => {
+          const a = x.attachment && doc.json.skins[0].attachments[x.name]?.[x.attachment];
+          return a && (a.type ?? "region") === "region" && !doc.json.drawings[a.path ?? x.attachment];
+        });
+        await run("draw.carve", { slot: atl.name, name: "t.x", box: [0, 0, 4, 4], pivot: [0, 0], rev: "a", restRev: "b" });
+      } catch (err: any) {
+        recusouAtlas = String(err.message ?? err);
+      }
+      const cv = await run("draw.carve", { slot: "t.mao", name: "t.dedo", box: [60, 10, 30, 20], pivot: [60, 20], tip: [90, 20], rev: "p1", restRev: "r1" });
+      const bD = doc.json.bones.find((x: any) => x.name === "t.dedo");
+      const wD = boneWorld(skeletonAt(doc.json, null, 0), "t.dedo");
+      const iM = doc.json.slots.findIndex((x: any) => x.name === "t.mao");
+      const dC = noMundo("t.dedo", "t.dedo", 15, 10);
+      const dCanto = noMundo("t.dedo", "t.dedo", 30, 20);
+      const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const tipW = noMundo("t.mao", "t.mao", 90, 20);
+      const pontaOk = Math.abs(Math.atan2(wD.c, wD.a) - Math.atan2(tipW[1] - piv[1], tipW[0] - piv[0])) < 1e-3;
+      const umPassoC = doc.history().length === hC + 1;
+      doc.undo();
+      const desfezC = JSON.stringify({ b: doc.json.bones, s: doc.json.slots, d: doc.json.drawings, k: doc.json.skins }) === jC;
+      doc.redo();
+      check(
+        recusouAtlas.includes("draw.from_region") &&
+          bD?.parent === "t.mao" &&
+          dist([wD.x, wD.y], piv) < 0.5 &&
+          pontaOk &&
+          doc.json.slots[iM + 1]?.name === "t.dedo" &&
+          doc.json.slots[iM + 1].attachment === "t.dedo" &&
+          dist(dC, meio) < 0.5 &&
+          dist(dCanto, canto) < 0.5 &&
+          doc.json.drawings["t.dedo"].width === 30 &&
+          doc.json.drawings["t.dedo"].hd === 1 &&
+          doc.json.drawings["t.dedo"].raster?.rev === "p1" &&
+          doc.json.drawings["t.mao"].raster?.rev === "r1" &&
+          umPassoC &&
+          desfezC,
+        `desenho: draw.carve corta t.dedo de t.mao com o osso no pivo (erro ${dist([wD.x, wD.y], piv).toFixed(3)} px), a parte logo na frente, a peca no mesmo lugar (centro ${dist(dC, meio).toFixed(3)} px, canto ${dist(dCanto, canto).toFixed(3)} px), os dois revs e um passo de desfazer; imagem do atlas pede draw.from_region`,
+      );
+    }
+    // a conta dos pixels do corte (src/core/cortar.ts): sobra dos dois lados da junta, pivo no meio da
+    // fronteira, ponta na tinta mais longe; girar a peca 15 graus no pivo nao abre fresta na junta
+    {
+      const { planoDoCorte } = await import("../src/core/cortar.ts");
+      const Wc = 100,
+        Hc = 40;
+      const px = new Uint8ClampedArray(Wc * Hc * 4);
+      for (let y = 10; y < 30; y++) for (let x = 0; x < 95; x++) px.set([200, 120, 80, 255], (y * Wc + x) * 4);
+      const pc = planoDoCorte(px, Wc, Hc, [[60, 0], [100, 0], [100, 40], [60, 40]], 4)!;
+      const a = (buf: Uint8ClampedArray, w: number, x: number, y: number) => buf[(y * w + x) * 4 + 3];
+      const [bx, by, bw, bh] = pc.box;
+      // girar a peca no pivo (amostra pelo inverso, vizinho mais perto) e somar com o resto
+      const ang = (15 * Math.PI) / 180;
+      let piorJunta = 255,
+        dentroJunta = 0;
+      for (let y = 10; y < 30; y++)
+        for (let x = 52; x < 68; x++) {
+          const dx = x + 0.5 - pc.pivot[0],
+            dy = y + 0.5 - pc.pivot[1];
+          const ux = Math.floor(pc.pivot[0] + Math.cos(-ang) * dx - Math.sin(-ang) * dy) - bx,
+            uy = Math.floor(pc.pivot[1] + Math.sin(-ang) * dx + Math.cos(-ang) * dy) - by;
+          const ap = ux >= 0 && uy >= 0 && ux < bw && uy < bh ? a(pc.peca, bw, ux, uy) : 0;
+          // so conta onde ha tinta de algum dos dois sem girar, longe das quinas de cima e de baixo
+          if (y < 13 || y > 26) continue;
+          const cob = Math.max(a(pc.resto, Wc, x, y), ap);
+          dentroJunta++;
+          piorJunta = Math.min(piorJunta, cob);
+        }
+      const sobraOk = a(pc.peca, bw, 57 - bx, 20 - by) === 255 && a(pc.resto, Wc, 63, 20) === 255 && a(pc.resto, Wc, 64, 20) === 0 && a(pc.resto, Wc, 50, 20) === 255;
+      check(
+        Math.abs(pc.pivot[0] - 60.5) < 0.6 &&
+          Math.abs(pc.pivot[1] - 20) < 0.6 &&
+          pc.fronteira === 20 &&
+          bx === 56 &&
+          bx + bw === 95 &&
+          by === 10 &&
+          bh === 20 &&
+          pc.tip[0] > 93 &&
+          sobraOk &&
+          piorJunta >= 0.9 * 255 &&
+          dentroJunta > 100,
+        `desenho: corte em peca com sobra de 4 px nos dois lados (peca de ${bx} a ${bx + bw}, resto ate 63), pivo (${pc.pivot.map((v: number) => v.toFixed(1)).join(", ")}), ponta (${pc.tip.join(", ")}); a peca girada 15 graus no pivo cobre a junta com alfa minimo ${piorJunta}/255 em ${dentroJunta} pixels`,
+      );
+    }
     while (doc.history().length > n0) doc.undo();
     check(!doc.json.drawings && !doc.json.slots.some((x: any) => x.name === "t.desenho"), "desenho: desfazer tira a imagem desenhada e a parte");
   }
@@ -2938,6 +3125,31 @@ runtimeOk("remocoes (slot, osso com pesos)");
     ndoc.undo();
     check(dsN()[q3.frame].width === w0 && dsN()[q3.frame].raster.rev === "def456", "paint.grow: desfazer volta o tamanho e o estado");
   }
+  // a pincelada que passa da borda (N-032): a folha cresce com folga de verdade (um quarto do lado,
+  // pelo menos FOLGA_MIN), nao a cada poucos pixels; e respeita o FOLHA_MAX
+  {
+    const f = folgaDaPincelada(100, 100);
+    const c = crescimento(100, 100, [-3, 0, 100, 100], f);
+    check(!!c && c[0] >= 3 + FOLGA_MIN && c[1] === 0 && c[2] === 0 && c[3] === 0, `folha cresce: 3 px fora da esquerda numa folha 100x100 crescem ${c?.[0]} (folga ${f[0]}, minima ${FOLGA_MIN})`);
+    const g = folgaDaPincelada(800, 200);
+    const cg = crescimento(800, 200, [0, 0, 805, 205], g);
+    check(g[0] === 200 && g[1] === 64 && !!cg && cg[2] === 205 && cg[3] === 69, `folha cresce: numa folha 800x200 a folga e um quarto do lado em cada eixo (${g}), crescendo ${cg}`);
+    const cm = crescimento(2000, 100, [0, 0, 2010, 100], folgaDaPincelada(2000, 100));
+    check(!!cm && 2000 + cm[0] + cm[2] === FOLHA_MAX, `folha cresce: perto do maximo para em ${FOLHA_MAX} (${cm})`);
+  }
+  // o Desenhar dentro do Atelie (N-030): uma entrada so, e o que ela abre vem do modo e da selecao
+  {
+    const cs = ["quadros"];
+    const c = (e: any) => contextoDoAtelie({ camadas: cs, ...e });
+    check(c({ mode: "setup", bone: "braco" }) === "nova-peca" && c({ mode: "animate", bone: "braco" }) === "quadro" && c({ mode: "setup" }) === "quadro",
+      "atelie: na Pose base so um osso escolhido abre uma peca nova; animando, ou sem osso, os quadros");
+    check(c({ mode: "setup", slot: "cabeca", bone: "cabeca", desenhada: true }) === "peca" && c({ mode: "animate", slot: "cabeca", bone: "cabeca", desenhada: true }) === "peca",
+      "atelie: uma peca desenhada escolhida abre nela, na Pose base ou animando");
+    check(c({ mode: "setup", slot: "braco", bone: "braco", atlas: true }) === "pintar-imagem" && c({ mode: "animate", slot: "quadros", bone: "root", desenhada: true }) === "quadro",
+      "atelie: a peca do atlas vira pintura; a camada de quadros escolhida abre os quadros");
+    check(c({ mode: "animate", desenhando: "peca" }) === "peca" && c({ mode: "setup", bone: "braco", desenhando: "quadro" }) === "quadro" && c({ mode: "setup", slot: "texto", bone: "braco" }) === "quadro",
+      "atelie: o desenho ja aberto decide; uma parte que nao desenha nao vira peca nova");
+  }
   gravarVirtual(as.skeleton, Buffer.from(ndoc.serialize()));
   const lido = lerBonecoArquivo(arq);
   check(lido.desenhos[q3.frame].pintura.estado === "def456" && JSON.parse(lerVirtual(as.skeleton)!).drawings[q3.frame].raster.rev === "def456", "pintura: o estado vai e volta no .boneco (pintura.estado)");
@@ -2970,6 +3182,28 @@ runtimeOk("remocoes (slot, osso com pesos)");
   const iguais = A.every((v, i) => Math.abs(v - de[i]) <= 1);
   const ts = ib.instantes(3, "sai");
   check(iguais && esp[(16 * W + 15) * 4] === 255 && esp[(16 * W + 31) * 4] === 128 && ts.length === 3 && ts[0] < 0.25 && ts[2] < 0.75 && ib.instantes(1)[0] === 0.5, `intermediarios: mascara e cor espalhada voltam ao RGBA (traco branco inteiro, a cor escorre para fora da borda), curvas ${ts.map((t) => t.toFixed(2)).join(" ")}`);
+}
+
+// o pintor le a biblioteca de pinceis ao subir o servidor (N-029): depois do aquecimento, o "abrir"
+// do Atelie nao paga a leitura (pula sem o pintor compilado ou sem a biblioteca de pinceis)
+{
+  const { Pintor, bibliotecaDePinceis } = await import("../server/pintor.ts");
+  const bib = bibliotecaDePinceis();
+  if (!Pintor.disponivel() || !bib) console.log("pula  pintor: sem o binario ou sem a biblioteca de pinceis");
+  else {
+    const pintor = new Pintor();
+    try {
+      const t0 = Date.now();
+      await pintor.aquecer();
+      const aquece = Date.now() - t0;
+      const t1 = Date.now();
+      const [r] = await pintor.pede({ op: "abrir", folha: "teste", w: 64, h: 64, biblioteca: bib });
+      const abre = Date.now() - t1;
+      check(!r?.erro && abre < 1000, `pintor: aquecido em ${(aquece / 1000).toFixed(1)} s, o abrir do Atelie depois leva ${abre} ms${r?.erro ? ` (${r.erro})` : ""}`);
+    } finally {
+      pintor.parar();
+    }
+  }
 }
 
 // formato: salva e relê; desfazer tudo volta ao inicio

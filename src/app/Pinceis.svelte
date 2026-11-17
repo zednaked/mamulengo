@@ -1,5 +1,5 @@
 <script lang="ts">
-  // O seletor de pinceis da pintura: os conjuntos do ProCraft a esquerda, os pinceis do conjunto
+  // O seletor de pinceis da pintura: os conjuntos da biblioteca a esquerda, os pinceis do conjunto
   // com a amostra de cada um, busca por nome e os usados por ultimo. Vale para a ferramenta em uso
   // (pintar, apagar a tinta ou borrar): cada uma guarda o pincel dela.
   import { app } from "./state.svelte.ts";
@@ -84,7 +84,7 @@
       {/each}
     </div>
   </div>
-  <div class="pe">{p.daBiblioteca ? "Os pincéis são os da sua biblioteca do ProCraft (só leitura: nada muda nela)." : "Pincéis que vêm com o ProCraft (não achei a sua biblioteca em ~/.local/share/procraft)."}</div>
+  <div class="pe">{p.conjuntos.length === 1 && p.conjuntos[0].nome === "ZeD Default Brushes" ? "ZeD Default Brushes: os pincéis que vêm com o Mamulengo. Compatível com bibliotecas de pincéis do ProCraft: aponte MAMULENGO_PINCEIS para o library.json da sua." : p.daBiblioteca ? "Os pincéis da biblioteca em MAMULENGO_PINCEIS (só leitura: nada muda nela)." : "Sem biblioteca de pincéis: só os pincéis básicos do motor."}</div>
 </div>
 
 <style>

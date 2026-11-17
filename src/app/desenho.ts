@@ -112,6 +112,7 @@ export class Desenhos {
   private canvas: OffscreenCanvas | null = null;
   private agendado = 0;
   private recarregar: (() => Promise<void>) | null = null;
+  private trocou: (() => void) | undefined;
   // a pintura de cada desenho, por baixo das formas (src/app/pinturas.ts)
   base: BaseDe | undefined;
   private subindo = 0;
@@ -133,13 +134,22 @@ export class Desenhos {
   }
 
   // as formas mudaram: redesenha no proximo quadro (um arrasto vira um redesenho por quadro)
-  agendar(doc: Document, viewer: Viewer | null, recarregar: () => Promise<void>) {
+  agendar(doc: Document, viewer: Viewer | null, recarregar: () => Promise<void>, trocou?: () => void) {
     this.recarregar = recarregar;
+    this.trocou = trocou;
     if (this.agendado) return;
     this.agendado = requestAnimationFrame(() => {
       this.agendado = 0;
       void this.atualizar(doc, viewer);
     });
+  }
+
+  // aplica ja o que estava agendado (N-032): quando uma folha muda de tamanho, o anexo, a regiao do
+  // atlas e a textura mudam no mesmo quadro, sem esperar o proximo requestAnimationFrame
+  atualizarJa(doc: Document, viewer: Viewer | null) {
+    if (this.agendado) cancelAnimationFrame(this.agendado);
+    this.agendado = 0;
+    return this.atualizar(doc, viewer);
   }
 
   // a pintura de uma imagem mudou (um remendo do pintor): so o retangulo dela e redesenhado, e a
@@ -186,9 +196,16 @@ export class Desenhos {
     this.layout = layout;
     this.canvas = layout ? renderPage(drawings, layout, this.base) : null;
     if (key !== this.key) {
-      // arranjo novo: o atlas muda e o viewer rele tudo
       this.key = key;
-      doc.atlas = { ...doc.atlas, text: atlasWithDrawings(doc.atlas.text, this.page, layout) };
+      const antes = doc.atlas.text;
+      const text = atlasWithDrawings(antes, this.page, layout);
+      doc.atlas = { ...doc.atlas, text };
+      // arranjo novo so da pagina dos desenhos (uma folha cresceu): o viewer troca o atlas com as
+      // texturas que ja tem, no mesmo tique (N-032); senao rele tudo do servidor
+      if (viewer && this.page && this.semDesenhos(text) === this.semDesenhos(antes) && viewer.trocarAtlasDosDesenhos(text, this.page, this.canvas)) {
+        this.trocou?.();
+        return;
+      }
       await this.recarregar?.();
       return;
     }

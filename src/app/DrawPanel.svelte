@@ -4,6 +4,7 @@
   // (raio do canto, canto ou curva). Tudo vira draw.*.
   import { app } from "./state.svelte.ts";
   import { stopDrawEdit } from "./drawedit.ts";
+  import { sairAtelie } from "./atelie.ts";
   import { contours, drawingsOf, shapeBounds, type DrawShape } from "../core/desenho.ts";
   import { parseAtlas } from "../core/atlas-text.ts";
   import { ESTILOS } from "../core/lapis.ts";
@@ -115,7 +116,7 @@
   <div class="dp" bind:this={box}>
     <div class="head">
       <span>✏️ Desenho <b>{de.image}</b> <span class="dim">{d.width} × {d.height} px</span></span>
-      <button class="ok" onclick={stopDrawEdit}>Pronto</button>
+      <button class="ok" onclick={() => (app.atelie ? sairAtelie() : stopDrawEdit())}>Pronto</button>
     </div>
     <div class="tools">
       <button class:on={de.tool === "select"} onclick={() => ((de.tool = "select"), (de.pen = null))} title="Selecionar e mover (V)">↖ Selecionar</button>

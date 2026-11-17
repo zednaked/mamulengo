@@ -10,7 +10,7 @@ import { applySequence, type SequenceParam } from "../app/sequence.ts";
 import { createFromPsd, proposeScreen, updateFromPsd } from "../app/psd.ts";
 import { dropDraft } from "../app/drafts.ts";
 import type { Runtime } from "../render/viewer.ts";
-import { startDrawEdit, stopDrawEdit } from "../app/drawedit.ts";
+import { imagemDoAtlas, pintarImagem, startDrawEdit, stopDrawEdit } from "../app/drawedit.ts";
 import { janelaDe } from "../app/janelas.ts";
 void execute;
 
@@ -286,7 +286,10 @@ const handlers: Record<string, Handler> = {
     // o Desenhar na tela do usuario: a parte desenhada, a ferramenta e a forma/ponto escolhidos
     if (p.draw === null) stopDrawEdit();
     else if (p.draw) {
-      if (app.drawEdit?.slot !== p.draw.slot && !startDrawEdit(p.draw.slot)) throw new Error(`a parte ${p.draw.slot} nao mostra uma imagem desenhada (region com drawings)`);
+      // uma imagem do atlas vira pintura (draw.from_region) e abre, como no botao Pintar
+      if (app.drawEdit?.slot !== p.draw.slot && imagemDoAtlas(p.draw.slot)) {
+        if (!(await pintarImagem(p.draw.slot))) throw new Error(`a imagem de ${p.draw.slot} nao virou pintura`);
+      } else if (app.drawEdit?.slot !== p.draw.slot && !startDrawEdit(p.draw.slot)) throw new Error(`a parte ${p.draw.slot} nao mostra uma imagem desenhada (region com drawings)`);
       const de = app.drawEdit!;
       if (p.draw.tool) de.tool = p.draw.tool;
       if (p.draw.shape !== undefined) de.shape = p.draw.shape;

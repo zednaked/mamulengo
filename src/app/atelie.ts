@@ -4,9 +4,11 @@
 // quadros sao comandos frame.* (src/core/commands/quadros.ts): cada um e um desenho que entra num
 // instante da animacao aberta, por cima (ou por tras) do personagem animado por ossos.
 import { app } from "./state.svelte.ts";
-import { drawDragging, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
+import { drawDragging, imagemDoAtlas, newDrawnPart, pintarImagem, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
+import { contextoDoAtelie, type ContextoDoAtelie } from "../core/entrada-atelie.ts";
 import { camadasDeQuadros, chavesDoSlot, quadroEm, quadrosDoSlot } from "../core/commands/quadros.ts";
 import { drawingsOf, type Drawing } from "../core/desenho.ts";
+import { drawingOfSlot } from "../core/commands/desenho.ts";
 import { corEspalhada, instantes, juntar, mascara, type Curva } from "../core/intermediarios.ts";
 import { drawDrawing } from "./desenho.ts";
 import { NAVEGADOR } from "../navegador/pagina.ts";
@@ -30,13 +32,42 @@ export function chaves() {
   return a?.layer && anim && app.doc ? chavesDoSlot(app.doc.json, anim, a.layer) : [];
 }
 
+// a entrada unica do desenho (as teclas 7 e 8, o botao, os dois cliques na peca, o inspetor): o que
+// abre vem do modo e da selecao (contextoDoAtelie, N-030)
+export function contextoAgora(): ContextoDoAtelie | null {
+  const j = app.doc?.json;
+  if (!j) return null;
+  const de = app.drawEdit;
+  const sel = app.selection.slot;
+  return contextoDoAtelie({
+    mode: app.mode,
+    slot: sel,
+    bone: app.selection.bone,
+    camadas: camadas(),
+    desenhada: !!sel && !!drawingOfSlot(j, sel),
+    atlas: !!sel && !!imagemDoAtlas(sel),
+    desenhando: de ? (de.quadro ? "quadro" : "peca") : null,
+  });
+}
+
 export function abrirAtelie() {
   const v = app.viewer;
   const j = app.doc?.json;
   if (!v || !j) return;
   if (app.atelie) return sairAtelie();
+  const ctx = contextoAgora();
+  const sel = app.selection.slot;
+  // uma peca do atlas escolhida (fora das camadas de quadros): vira pintura e o atelie abre nela
+  if (ctx === "pintar-imagem" && sel) {
+    void pintarImagem(sel).then((ok) => ok && !app.atelie && abrirAtelie());
+    return;
+  }
+  // uma peca desenhada escolhida (fora das camadas de quadros): o atelie abre no desenho dela
+  if (ctx === "peca" && !app.drawEdit && sel) startDrawEdit(sel, undefined, "pencil");
+  // na Pose base, so um osso escolhido: uma peca desenhada nova nele, sem ir para a animacao
+  if (ctx === "nova-peca" && app.selection.bone) newDrawnPart(app.selection.bone, undefined, "pencil");
   // desenhando uma peca: o atelie e so a tela limpa em volta dela
-  const peca = app.drawEdit && !app.drawEdit.quadro;
+  const peca = !!app.drawEdit && !app.drawEdit.quadro;
   let layer: string | null = null;
   if (!peca) {
     const cs = camadas();
@@ -63,7 +94,8 @@ export function sairAtelie() {
   // fora do atelie a tela volta a ficar em pe
   if (app.viewer) app.viewer.cam.rot = 0;
   app.giro = 0;
-  if (app.drawEdit?.quadro) stopDrawEdit();
+  // o desenho fecha junto (o Desenhar nao tem tela propria fora do atelie)
+  if (app.drawEdit) stopDrawEdit();
   app.atelie = null;
 }
 
@@ -399,7 +431,7 @@ export async function intermediarios(n: number, curva: Curva, todos = false): Pr
   return true;
 }
 
-// ---- girar a tela (como no ProCraft): R tocado gira 15 graus no sentido do relogio, Shift+R e F14
+// ---- girar a tela: R tocado gira 15 graus no sentido do relogio, Shift+R e F14
 // voltam (o anel da mesa manda R e F14), R segurado com um arrasto gira livre (Shift: de 15 em 15).
 // O giro e so da vista (cam.rot): o desenho e o arquivo nao mudam.
 

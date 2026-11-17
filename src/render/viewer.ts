@@ -262,6 +262,48 @@ export class Viewer {
     }
   }
 
+  // o arranjo da pagina dos desenhos mudou (uma folha cresceu, nasceu ou sumiu) e o resto do atlas
+  // nao (N-032): o atlas novo reaproveita as texturas das outras paginas (com o pma, o
+  // fix_alpha_border e o filtro de quando vieram do servidor) e so a pagina dos desenhos sobe, do
+  // canvas, tudo no mesmo tique: sem buscar nada e sem quadro com o anexo novo na regiao velha.
+  // false quando nao da (sem atlas, ou uma pagina que nao estava carregada): quem chama recarrega
+  trocarAtlasDosDesenhos(text: string, page: string, canvas: OffscreenCanvas | HTMLCanvasElement | null): boolean {
+    const velho = this.atlas;
+    if (!this.doc || !velho) return false;
+    const atlas = new TextureAtlas(text);
+    const velhas = new Map(velho.pages.map((p) => [p.name, p]));
+    for (const p of atlas.pages) if (p.name !== page && !velhas.get(p.name)?.texture) return false;
+    if (atlas.pages.some((p) => p.name === page) && !canvas) return false;
+    for (const p of atlas.pages) {
+      if (p.name === page) {
+        // o canvas sobe direto (o UNPACK_PREMULTIPLY vale para canvas, nao para ImageBitmap): pma
+        // false no GLTexture quer dizer "premultiplique ao subir", e o desenho sai premultiplicado
+        // (o tipo do spine-webgl pede ImageBitmap ou img; o texImage2D aceita canvas)
+        p.setTexture(new GLTexture(this.ctx, canvas as unknown as ImageBitmap, false, false));
+        this.textureInfo[page] = { origin: "desenho", note: null };
+        continue;
+      }
+      const v = velhas.get(p.name)!;
+      p.minFilter = v.minFilter;
+      p.magFilter = v.magFilter;
+      p.setTexture(v.texture!);
+      // a copia sem premultiplicar (modo godot) segue a textura, que e a mesma
+      const s = this.straight.get(v.texture!);
+      if (s) s.page = p;
+    }
+    // a textura velha da pagina dos desenhos sai (as outras foram reaproveitadas)
+    const antiga = velhas.get(page)?.texture as GLTexture | null | undefined;
+    if (antiga) antiga.dispose();
+    if (this.nucleo && this.runtime === "nucleo" && canvas) {
+      // as outras texturas do nucleo ficam como estao (sem limparTexturas)
+      const gl = this.ctx.gl;
+      this.nucleo.poeTextura(page, canvas, { min: gl.LINEAR, mag: gl.LINEAR });
+    }
+    this.atlas = atlas;
+    this.rebuild();
+    return true;
+  }
+
   // troca so um retangulo da pagina (a pintura ao vivo). So no desenho do Mamulengo: false quando
   // quem desenha e o spine-webgl, e ai a pagina inteira e trocada (trocarPagina)
   remendarPagina(page: string, x: number, y: number, w: number, h: number, rgba: Uint8ClampedArray): boolean {

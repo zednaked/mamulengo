@@ -16,3 +16,8 @@ Not covered by this license:
   renderer. They are under the Spine Runtimes License, not this one, and using
   them requires a Spine license. The core in nucleo/ and the .boneco format do
   not depend on them.
+- pinceis/zed-default-brushes.json (the ZeD Default Brushes pack) is part of Mamulengo, MIT like the
+  rest; its grain textures come from ambientCG and Poly Haven scans, CC0 1.0. The pack uses the
+  ProCraft brush library format, so ProCraft brush libraries can be used too (MAMULENGO_PINCEIS).
+- The painter in pintor/ is built against the brush engine of ProCraft (procraft-core, Apache-2.0),
+  taken at build time from a local clone (tools/pintor.sh); it is not included here.

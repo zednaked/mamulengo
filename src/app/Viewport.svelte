@@ -14,7 +14,7 @@
   import { app } from "./state.svelte.ts";
   import { ajudaFerramenta, passoSeta, beginDrag, beginStroke, cursor, drawGizmo, drawHover, drawLigacoes, drawTools, endDrag, endStroke, hover, leituraArrasto, moveDrag, moveStroke, pickBone, pickPart } from "./interact.ts";
   import { currentMesh, drawMeshEdit, meshDown, meshDragging, meshMove, meshUp, stopMeshEdit } from "./meshedit.ts";
-  import { atelieGarante, giroDown, giroMove, giroUp } from "./atelie.ts";
+  import { abrirAtelie, atelieGarante, giroDown, giroMove, giroUp } from "./atelie.ts";
   import { drawDown, drawDragging, drawDrawEdit, drawHelp, drawKey, drawMove, drawUp, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
   import JanelaBar from "./JanelaBar.svelte";
@@ -597,9 +597,11 @@
     if (!v) return;
     canvas.setPointerCapture(e.pointerId);
     if (e.button === 0 && !space && telaPonteiro(1, e)) return;
-    // no atelie, com o R segurado, o arrasto gira a tela (como no ProCraft)
+    // no atelie, com o R segurado, o arrasto gira a tela
     if (app.atelie && e.button === 0 && giroDown(e.clientX, e.clientY)) return;
-    if (e.button === 1 || e.button === 2 || space || app.tool === "pan") {
+    // o botao lateral da caneta, desenhando no atelie, e o conta-gotas (o pan fica no botao do meio)
+    const lateral = e.button === 2 && e.pointerType === "pen" && !!app.atelie && !!app.drawEdit;
+    if (e.button === 1 || (e.button === 2 && !lateral) || space || app.tool === "pan") {
       panning = { x: e.clientX, y: e.clientY, cx: v.cam.x, cy: v.cam.y };
       return;
     }
@@ -611,7 +613,15 @@
       return;
     }
     // no atelie, desenhar onde nao ha quadro cria o quadro ali
-    if (app.atelie && !app.drawEdit && e.button === 0) atelieGarante();
+    // (vale para qualquer botao: a ponta borracha da caneta, button 5, nao pode cair no girar)
+    if (app.atelie && !app.drawEdit) {
+      if (e.button === 0) atelieGarante();
+      // sem desenho aberto o atelie nao entrega o ponteiro as ferramentas de osso (girar, mover)
+      if (!app.drawEdit) {
+        downAt = null;
+        return;
+      }
+    }
     if (app.drawEdit) {
       if (!drawDown(v, w, { shift: e.shiftKey, alt: e.altKey }, e)) downAt = null;
       return;
@@ -692,7 +702,7 @@
   let dica = $state<{ t: string; x: number; y: number } | null>(null);
   function mostraAlvo(e: PointerEvent) {
     const v = app.viewer;
-    if (!v || !app.doc || app.meshEdit || app.drawEdit || app.mosaicEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
+    if (!v || !app.doc || app.atelie || app.meshEdit || app.drawEdit || app.mosaicEdit || !["move", "rotate", "scale"].includes(app.tool)) return limpaAlvo();
     const w = v.screenToSkel(e.clientX, e.clientY);
     const a = alvoEm(w.x, w.y);
     const igual = a.bone === app.selection.bone && a.slot === app.selection.slot;
@@ -770,15 +780,17 @@
     }
   }
 
-  // dois cliques numa peca desenhada abrem o Desenhar nela (dentro do Desenhar, os dois cliques
-  // sao do ponto: canto <-> curva)
+  // dois cliques numa peca desenhada abrem o Atelie nela (desenhando, os dois cliques sao do ponto:
+  // canto <-> curva)
   function dblclick(e: MouseEvent) {
     const v = app.viewer;
-    if (!v || !app.doc || app.drawEdit || app.meshEdit || app.spectator) return;
+    if (!v || !app.doc || app.drawEdit || app.meshEdit || app.spectator || app.atelie) return;
     const w = v.screenToSkel(e.clientX, e.clientY);
     const pose = v.pose;
     const part = pose ? pickPart(pose, w.x, w.y, (sl) => v.isSlotHidden(sl)) : null;
-    if (part && drawingOfSlot(app.doc.json, part.slot)) startDrawEdit(part.slot);
+    if (!part || !drawingOfSlot(app.doc.json, part.slot)) return;
+    app.select({ slot: part.slot, bone: app.doc.json.slots.find((s: any) => s.name === part.slot)?.bone });
+    abrirAtelie();
   }
 
   // imagem arrastada da paleta: vira uma parte nova (slot + imagem) onde caiu
@@ -946,22 +958,6 @@
       <span class="dim">{c.tipo === "point" ? "clique onde fica o ponto" : `clique os pontos (${c.pontos.length}) · Enter conclui · Backspace tira o último · Esc cancela`}</span>
       {#if c.tipo !== "point"}<button class="ok" onclick={() => app.concluirCaptura()}>Pronto</button>{/if}
       <button onclick={() => (app.captura = null)}>Cancelar</button>
-    </div>
-  {/if}
-  {#if app.drawEdit && !app.atelie}
-    {@const de = app.drawEdit}
-    <div class="meshbar drawbar">
-      <b>✏️ Desenhando {de.image}</b>
-      <span class="ferr">
-        <button class:on={de.tool === "select"} onclick={() => ((de.tool = "select"), (de.pen = null))} title="Selecionar (V)">↖</button>
-        <button class:on={de.tool === "pencil"} onclick={() => ((de.tool = "pencil"), (de.pen = null))} title="Lápis à mão livre (L)">✏️</button>
-        <button class:on={de.tool === "eraser"} onclick={() => ((de.tool = "eraser"), (de.pen = null))} title="Borracha (E)">🧽</button>
-        <button class:on={de.tool === "pen"} onclick={() => (de.tool = "pen")} title="Caneta (P)">✒️</button>
-        <button class:on={de.tool === "rect"} onclick={() => ((de.tool = "rect"), (de.pen = null))} title="Retângulo (R)">▭</button>
-        <button class:on={de.tool === "ellipse"} onclick={() => ((de.tool = "ellipse"), (de.pen = null))} title="Elipse (O)">◯</button>
-        <button class:on={de.hole} disabled={de.shape === null && !de.hole} onclick={() => ((de.hole = !de.hole), (de.pen = null), de.tool === "select" && (de.tool = "pen"))} title="Modo furo: a caneta, o retângulo e a elipse furam a forma escolhida (Esc sai)">⊘</button>
-      </span>
-      <button class="ok" onclick={stopDrawEdit}>Pronto</button>
     </div>
   {/if}
   {#if app.offerMesh}
@@ -1311,17 +1307,6 @@
     border-color: #0c99ff;
     color: #fff;
     font-weight: 600;
-  }
-  .drawbar .ferr {
-    display: flex;
-    gap: 3px;
-  }
-  .drawbar .ferr button {
-    padding: 3px 8px;
-  }
-  .drawbar .ferr button.on {
-    background: #0c99ff44;
-    border-color: #0c99ff;
   }
   .meshbar .ok {
     background: #5ee0d0;

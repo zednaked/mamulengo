@@ -3,7 +3,6 @@
   import { app } from "./state.svelte.ts";
   import { ASSUNTOS, marcarVisto } from "./guia.ts";
   import { abrirAtelie } from "./atelie.ts";
-  import { abrirDesenhar } from "./drawedit.ts";
 
   let { atalhos }: { atalhos: () => void } = $props();
   const assunto = $derived(ASSUNTOS.find((x) => x.id === app.guia) ?? ASSUNTOS[0]);
@@ -20,10 +19,7 @@
     if (acao === "novo") app.novoAberto = true;
     else if (!app.doc) app.toast("Abra ou crie um personagem primeiro (＋ Novo em branco, no seletor lá em cima).");
     else if (acao === "atelie") !app.atelie && abrirAtelie();
-    else if (acao === "desenhar") {
-      if (app.atelie) abrirAtelie();
-      abrirDesenhar();
-    }
+    else if (acao === "desenhar") !app.atelie && abrirAtelie();
   }
   function tecla(e: KeyboardEvent) {
     if (!app.guia) return;

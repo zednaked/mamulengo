@@ -13,7 +13,8 @@
   import DrawPanel from "./DrawPanel.svelte";
   import MosaicPanel from "./MosaicPanel.svelte";
   import { startMosaicEdit } from "./mosaicedit.ts";
-  import { abrirDesenhar, newDrawnPart, startDrawEdit } from "./drawedit.ts";
+  import { newDrawnPart, pintarImagem, vetorizar } from "./drawedit.ts";
+  import { abrirAtelie } from "./atelie.ts";
   import { drawingOfSlot } from "../core/commands/desenho.ts";
   import { EFFECT_NAMES, effectAt, effectFields, fieldsAt } from "../core/model.ts";
 
@@ -862,7 +863,7 @@
     </details>
     <div class="quick">
       <button onclick={quickIk} title="O osso e o pai passam a alcançar um alvo: mova o alvo e o membro dobra sozinho">🎯 Alcançar (IK)</button>
-      <button onclick={() => newDrawnPart(bone.name)} title="Uma peça nova presa a este osso, desenhada com a caneta (vetor, como no Figma)">✒️ Desenhar peça nova</button>
+      <button onclick={() => (newDrawnPart(bone.name), app.drawEdit && !app.atelie && abrirAtelie())} title="Uma peça nova presa a este osso, desenhada com a caneta (vetor, como no Figma), no Ateliê">✒️ Desenhar peça nova</button>
       {#if ehBoneco && bone.parent}<button onclick={() => extrair(bone.name)} title="Leva este osso e o que pende dele (camadas, partes, restrições, animações) para um .boneco novo ao lado deste, e põe no lugar uma instância dele. Salva antes">📦 Extrair para .boneco</button>{/if}
       {#if animando}
         <select value="" onchange={(e) => { acompanhar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Nesta animação, este osso mantém em cada instante a relação que tem com outro na Pose base (a mão que segura os óculos acompanha a cabeça): a cadeia dele gira e vira chave">
@@ -1111,7 +1112,7 @@
         <span></span>
         <div class="mesh">
           {#if app.drawEdit?.slot !== slot.name}
-            <button class="edit" onclick={() => startDrawEdit(slot.name)} title="Mexer nas formas desta imagem com a caneta e a seleção (vai para a Pose base). Atalho: dois cliques na peça">✏️ Desenhar</button>
+            <button class="edit" onclick={() => !app.atelie && abrirAtelie()} title="Desenhar nesta imagem no Ateliê (vai para a Pose base). Atalhos: 7, 8 ou dois cliques na peça">✏️ Desenhar</button>
           {/if}
         </div>
       {/if}
@@ -1127,7 +1128,8 @@
       {#if attKind && !desenho && (attKind.type === "region" || attKind.type === "mesh")}
         <span></span>
         <div class="mesh">
-          <button onclick={() => abrirDesenhar()} title="Transforma esta imagem em desenho vetorial (cada cor vira uma camada de formas com curvas) e abre o Desenhar; Ctrl+Z volta para a imagem">✒️ Vetorizar e desenhar</button>
+          <button onclick={() => vetorizar(slot.name).then((ok) => ok && !app.atelie && abrirAtelie())} title="Transforma esta imagem em desenho vetorial (cada cor vira uma camada de formas com curvas) e abre o Ateliê nela; Ctrl+Z volta para a imagem">✒️ Vetorizar e desenhar</button>
+          <button onclick={() => pintarImagem(slot.name).then((ok) => ok && !app.atelie && abrirAtelie())} title="Pinta por cima desta imagem como ela é (degradê e sombra ficam): vira um desenho com pintura no mesmo lugar, em todas as partes que a usam; Ctrl+Z volta para a imagem">🖌️ Pintar</button>
         </div>
       {/if}
       {#if attKind && !desenho && attKind.type !== "text"}

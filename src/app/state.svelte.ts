@@ -115,17 +115,17 @@ function lerLapis(): Lapis {
   }
 }
 
-// os pinceis da pintura (raster): os do ProCraft, pelo pintor (src/app/pintura.ts). As escolhas
+// os pinceis da pintura (raster): os da biblioteca, pelo pintor (src/app/pintura.ts). As escolhas
 // ficam guardadas no navegador pelos nomes (conjunto, pincel)
 export interface Pincel {
   // falta: o pintor nao foi compilado nesta maquina; ligando: lendo a biblioteca (so na primeira vez)
   estado: "parado" | "ligando" | "pronto" | "falta" | "erro";
   erro: string;
-  // a biblioteca e a do ProCraft instalado (senao, os pinceis que vem com ele)
+  // ha uma biblioteca de pinceis (a padrao, ZeD Default Brushes, ou a de MAMULENGO_PINCEIS)
   daBiblioteca: boolean;
   conjuntos: { nome: string; pinceis: string[] }[];
   escolha: Record<"pintar" | "apagar" | "borrar", [string, string] | null>;
-  // as reguas do ProCraft, 0 a 1
+  // as reguas do pincel, 0 a 1
   tamanho: Record<"pintar" | "apagar" | "borrar", number>;
   opacidade: Record<"pintar" | "apagar" | "borrar", number>;
   recentes: [string, string][];
@@ -573,7 +573,12 @@ class AppState {
       const doc = this.doc;
       // os pixels das pinturas acompanham o estado de cada desenho (desfazer, refazer, copia)
       this.pinturas.sincronizar(doc);
-      this.desenhos.agendar(doc, this.viewer, () => this.reloadAtlas(doc.atlas.text));
+      this.desenhos.agendar(
+        doc,
+        this.viewer,
+        () => this.reloadAtlas(doc.atlas.text),
+        () => this.version++,
+      );
     }
     // rascunho (com folga para nao serializar a cada passo de um arraste)
     clearTimeout(this.draftTimer);

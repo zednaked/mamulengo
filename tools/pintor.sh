@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Compila o pintor (pintor/): o renderer do ProCraft ao lado do editor, para a pintura raster.
-# Usa o clone local do ProCraft: PROCRAFT=/caminho, ou ~/Projetos/procraft-local (o que o
-# procraft-atualizar instala, com as correcoes), ou ~/Projetos/procraft. O binario sai em
+# Compila o pintor (pintor/): o motor de pincel ao lado do editor, para a pintura raster.
+# O motor de pincel e o procraft-core (Apache-2.0), de um clone local do ProCraft:
+# PROCRAFT=/caminho, ou ~/Projetos/procraft-local, ou ~/Projetos/procraft. O binario sai em
 # ~/.cache/mamulengo/pintor/release/mamulengo-pintor (MAMULENGO_PINTOR aponta para outro).
 set -euo pipefail
 aqui="$(cd "$(dirname "$0")/.." && pwd)"

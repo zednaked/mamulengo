@@ -33,7 +33,7 @@ function rodar(a: Buffer, b: Buffer, t: number): Promise<Buffer> {
   const [pa, pb, po] = ["a.png", "b.png", "t.png"].map((n) => join(dir, n));
   writeFileSync(pa, a);
   writeFileSync(pb, b);
-  // -x -z: as duas TTAs (o traco sai mais firme e o giro deixa de ser fusao, medido no ProCraft)
+  // -x -z: as duas TTAs (o traco sai mais firme e o giro deixa de ser fusao, medido)
   const args = ["-0", pa, "-1", pb, "-o", po, "-m", join(pasta, MODELO), "-s", t.toFixed(4), "-x", "-z"];
   if (process.env.MAMULENGO_RIFE_GPU) args.push("-g", process.env.MAMULENGO_RIFE_GPU);
   return new Promise((ok, erro) => {

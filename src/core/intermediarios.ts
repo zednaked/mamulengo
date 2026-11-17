@@ -4,7 +4,7 @@
 // como cor espalhada (a cor da tinta escorre para fora da borda, e o resto e cinza medio), e a volta
 // junta as duas: o alfa da mascara, a cor da outra (sem dividir pelo alfa, que faz franja na borda). O traco do RIFE sai mais macio que o das
 // chaves: o alfa e casado, quantil a quantil, com a mistura das duas chaves em t (o mesmo que a
-// ferramenta de intermediarios do ProCraft faz com o escuro do traco).
+// ferramenta de intermediarios de um app de pintura faz com o escuro do traco).
 
 export const CURVAS = {
   lin: (x: number) => x,

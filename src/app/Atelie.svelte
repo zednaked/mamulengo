@@ -7,10 +7,11 @@
   import { onMount } from "svelte";
   import { app } from "./state.svelte.ts";
   import { agora, camadas, celulaDe, desvirar, fimAqui, intermediarios, teclaGiro, irPara, moverQuadro, novaCamada, novoQuadro, sairAtelie, segurar, segurarEm, sincronizar, tempoDe, tirarQuadro, tocar, vizinho } from "./atelie.ts";
-  import { RASTER, matrizDeTela, tracoVivo } from "./drawedit.ts";
+  import { RASTER, borrachaPara, matrizDeTela, tracoVivo } from "./drawedit.ts";
   import { ligarPintor, prepararFolha, remendos } from "./pintura.ts";
-  import { apagarSelecao, espelhar, pecaSolta, selecao, selecionarTudo, semSelecao, soltar } from "./retoque.ts";
+  import { apagarSelecao, cortarEmPeca, espelhar, pecaSolta, selecao, selecionarTudo, semSelecao, soltar } from "./retoque.ts";
   import Pinceis from "./Pinceis.svelte";
+  import DrawPanel from "./DrawPanel.svelte";
   import { drawDrawing } from "./desenho.ts";
   import { chavesDoSlot, duracao, quadroEm, quadrosDoSlot } from "../core/commands/quadros.ts";
   import { drawingsOf, type Drawing } from "../core/desenho.ts";
@@ -81,10 +82,12 @@
   }
   const tool = $derived(de?.tool ?? a.tool);
 
-  // ---- pintura (raster): o pincel, a borracha de tinta e o borrar usam os pinceis do ProCraft
+  // ---- pintura (raster): o pincel, a borracha de tinta e o borrar usam os pinceis da biblioteca
   const pinta = $derived(RASTER[tool] ?? null);
   const p = $derived(app.pincel);
   let seletor = $state(false);
+  // o painel do Desenhar (formas, estilo, ponto) numa peca: fora do atelie ele mora no inspetor
+  let formas = $state(false);
   // na primeira vez o pintor le a biblioteca de pinceis (demora); a folha do quadro a mostra fica
   // aberta de antemao, para a primeira pincelada nao esperar
   $effect(() => {
@@ -356,12 +359,14 @@
     else if (k === "Enter" && !(de?.pen !== null && de?.pen !== undefined) && !selecao()) tocar();
     // com um laco feito, H espelha (sem laco, H e a mao do editor)
     else if ((k === "h" || k === "H") && selecao()) espelhar(e.shiftKey);
+    // com um laco feito numa peca (nao num quadro), X corta o pedaco em peca nova
+    else if ((k === "x" || k === "X") && selecao() && de?.slot && !de.quadro) cortarEmPeca(de.slot, de.attachment);
     else if (!de && k === "l") a.tool = "pencil";
     else if (!de && k === "b") a.tool = "brush";
     else if (!de && k === "s") a.tool = "smudge";
     else if (!de && k === "g") a.tool = "bucket";
     else if (!de && k === "q") a.tool = "lasso";
-    else if (!de && k === "e") a.tool = RASTER[a.tool] ? "rubber" : "eraser";
+    else if (!de && k === "e") a.tool = borrachaPara(a.tool);
     else return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -398,16 +403,18 @@
   {/if}
   <span class="sep"></span>
   <span class="ferr">
-    <button class:on={tool === "brush"} onclick={() => ferramenta("brush")} title="Pincel (B): pintura em pixels com os pincéis do ProCraft">🖌</button>
+    <button class:on={tool === "brush"} onclick={() => ferramenta("brush")} title="Pincel (B): pintura em pixels com pincéis">🖌</button>
     <button class:on={tool === "smudge"} onclick={() => ferramenta("smudge")} title="Borrar a tinta (S)">👆</button>
     <button class:on={tool === "pencil"} onclick={() => ferramenta("pencil")} title="Lápis vetorial (L): o traço vira uma curva editável">✏️</button>
-    <button class:on={tool === "eraser" || tool === "rubber"} onclick={() => ferramenta(pinta ? "rubber" : "eraser")} title={pinta ? "Borracha de tinta (E): apaga os pixels com um pincel" : "Borracha (E): apaga o traço vetorial inteiro"}>🧽</button>
+    <button class:on={tool === "eraser" || tool === "rubber"} onclick={() => ferramenta(borrachaPara(tool, de?.image))} title={borrachaPara(tool, de?.image) === "rubber" ? "Borracha de tinta (E): apaga os pixels com um pincel" : "Borracha (E): apaga o traço vetorial inteiro"}>🧽</button>
     <button class:on={tool === "bucket"} onclick={() => ferramenta("bucket")} title="Balde (G): enche de cor uma área fechada, por baixo das linhas">🪣</button>
     <button class:on={tool === "lasso"} onclick={() => ferramenta("lasso")} title="Laço (Q): contorne um pedaço para mover, mudar de tamanho, girar ou apagar. T escolhe o quadro inteiro">➰</button>
     <button class:on={tool === "select"} onclick={() => ferramenta("select")} title="Escolher e ajustar formas e pontos (V)">↖</button>
     <button class:on={tool === "pen"} onclick={() => ferramenta("pen")} title="Caneta de pontos (P)">✒️</button>
     <button class:on={tool === "rect"} onclick={() => ferramenta("rect")} title="Retângulo (no Ateliê, R gira a tela)">▭</button>
     <button class:on={tool === "ellipse"} onclick={() => ferramenta("ellipse")} title="Elipse (O)">◯</button>
+    {#if de}<button class="furo" class:on={de.hole} disabled={de.shape === null && !de.hole} onclick={() => ((de.hole = !de.hole), (de.pen = null), tool === "select" && ferramenta("pen"))} title="Modo furo: a caneta, o retângulo e a elipse furam a forma escolhida (Esc sai)">⊘</button>{/if}
+    {#if de && !de.quadro}<button class="formas" class:on={formas} onclick={() => (formas = !formas)} title="As formas da peça (de frente para trás) e o estilo da escolhida: preenchimento, traço, cantos">▤</button>{/if}
   </span>
   <span class="sep"></span>
   <span class="cores">
@@ -424,13 +431,15 @@
   <label class="mesa" title="Mesa de luz: o quanto o personagem aparece por trás do desenho">🎭 <input type="range" min="0" max="1" step="0.05" value={a.boneco} oninput={(e) => (a.boneco = +(e.target as HTMLInputElement).value)} /></label>
 </div>
 
+{#if formas && de && !de.quadro}<div class="painel-formas"><DrawPanel /></div>{/if}
+
 {#if pinta}
   <div class="regua">
     <button class="qual" onclick={() => (seletor = !seletor)} disabled={p.estado !== "pronto"} title="Escolher o pincel desta ferramenta">
       <span class="ic">{pinta === "pintar" ? "🖌" : pinta === "apagar" ? "🧽" : "👆"}</span>
-      <span class="nm">{p.escolha[pinta]?.[1] ?? (pinta === "pintar" ? "escolher" : "o do ProCraft")}</span>
+      <span class="nm">{p.escolha[pinta]?.[1] ?? (pinta === "pintar" ? "escolher" : "o padrão")}</span>
     </button>
-    <label title="Tamanho do pincel ([ e ]): a régua do ProCraft">
+    <label title="Tamanho do pincel ([ e ])">
       <span class="val">{Math.round(p.tamanho[pinta] * 100)}</span>
       <input class="vert" type="range" min="0.01" max="1" step="0.01" value={p.tamanho[pinta]} oninput={(e) => reg("tamanho", +(e.target as HTMLInputElement).value)} />
       <span class="nome">tamanho</span>
@@ -445,12 +454,12 @@
   {#if p.estado !== "pronto"}
     <div class="aviso-pincel" role="status">
       {#if p.estado === "falta"}
-        A pintura com os pincéis do ProCraft roda num programa ao lado do editor instalado, que não está aqui: na pasta do Mamulengo, rode <code>tools/pintor.sh</code> e recarregue (no editor pelo navegador ela ainda não existe). O lápis vetorial (L) funciona sem ele.
+        A pintura com pincéis roda num programa ao lado do editor instalado, que não está aqui: na pasta do Mamulengo, rode <code>tools/pintor.sh</code> e recarregue (no editor pelo navegador ela ainda não existe). O lápis vetorial (L) funciona sem ele.
       {:else if p.estado === "erro"}
         O pintor não ligou: {p.erro}
         <button onclick={() => ((app.pincel.estado = "parado"), void ligarPintor())}>tentar de novo</button>
       {:else}
-        <span class="gira"></span> Carregando os pincéis do ProCraft… Só na primeira vez depois de abrir o editor; com uma biblioteca grande leva uns 30 segundos.
+        <span class="gira"></span> Carregando os pincéis… Só na primeira vez depois de abrir o editor; uma biblioteca grande leva uns 30 segundos.
       {/if}
     </div>
   {/if}
@@ -471,6 +480,7 @@
         <button onclick={() => espelhar(true)} title="Espelha o pedaço de cabeça para baixo (Shift+H)">⇵ virar</button>
         <button onclick={() => soltar()} title="Assenta o pedaço onde está (Enter)">assentar</button>
         <button onclick={() => apagarSelecao()} title="Apaga o que está dentro do laço (Delete)">apagar</button>
+        <button onclick={() => de?.slot && cortarEmPeca(de.slot, de.attachment)} disabled={!de?.slot || !!de?.quadro} title="Corta o pedaço da tinta em peça nova, com osso e parte, no mesmo lugar e com sobra na junta para girar sem fresta (X)">✂ peça</button>
         <button onclick={() => semSelecao()} title="Tira a seleção (Esc)">soltar</button>
       </div>
     {/if}
@@ -745,6 +755,16 @@
     padding: 4px 2px;
     font-size: 11px;
     border-radius: 7px;
+  }
+  .painel-formas {
+    position: absolute;
+    top: 64px;
+    right: 10px;
+    width: 300px;
+    max-width: calc(100% - 20px);
+    max-height: calc(100% - 140px);
+    overflow: auto;
+    z-index: 5;
   }
   .pe {
     left: 96px;

@@ -7,6 +7,9 @@ import { app } from "./state.svelte.ts";
 import { drawingsOf, flatten, shapeBounds, type DrawStroke, type Drawing, type Vec } from "../core/desenho.ts";
 import { drawDrawing } from "./desenho.ts";
 import { remendou } from "./pintura.ts";
+import { crescimento } from "../core/folha.ts";
+import { planoDoCorte } from "../core/cortar.ts";
+import { boneIndex, slotIndex } from "../core/model.ts";
 
 type Ret = [number, number, number, number];
 // afim [a, b, c, d, e, f]: x' = a x + c y + e, y' = b x + d y + f (a ordem do setTransform)
@@ -14,23 +17,7 @@ export type Afim = [number, number, number, number, number, number];
 const leva = (m: Afim, p: Vec): Vec => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
 const gira = (ang: number, v: Vec): Vec => [Math.cos(ang) * v[0] - Math.sin(ang) * v[1], Math.sin(ang) * v[0] + Math.cos(ang) * v[1]];
 
-// o tamanho maximo de uma folha que cresce: o pintor (o ProCraft) devolve a imagem ate 2048 de lado,
-// com a margem que deixa a pincelada passar da borda
-export const FOLHA_MAX = 2048;
-// quanto a folha precisa crescer para caber a caixa [x0, y0, x1, y1] (com folga), ou null
-export function crescimento(w: number, h: number, c: [number, number, number, number], folga = 24): [l: number, t: number, r: number, b: number] | null {
-  let l = c[0] < 0 ? Math.ceil(-c[0] + folga) : 0,
-    t = c[1] < 0 ? Math.ceil(-c[1] + folga) : 0,
-    r = c[2] > w ? Math.ceil(c[2] - w + folga) : 0,
-    b = c[3] > h ? Math.ceil(c[3] - h + folga) : 0;
-  if (!l && !t && !r && !b) return null;
-  // nao passa do maximo: corta o que sobra igualmente dos dois lados
-  const sobraX = w + l + r - FOLHA_MAX,
-    sobraY = h + t + b - FOLHA_MAX;
-  if (sobraX > 0) (l = Math.max(0, l - Math.ceil(sobraX / 2))), (r = Math.max(0, FOLHA_MAX - w - l));
-  if (sobraY > 0) (t = Math.max(0, t - Math.ceil(sobraY / 2))), (b = Math.max(0, FOLHA_MAX - h - t));
-  return l || t || r || b ? [l, t, r, b] : null;
-}
+export { FOLHA_MAX, crescimento } from "../core/folha.ts";
 
 function dentro(pts: Vec[], x: number, y: number): boolean {
   let d = false;
@@ -418,7 +405,9 @@ export function soltar() {
     if (ret) calls.push({ cmd: "paint.set", args: { image: s.image, rev: app.pinturas.registrar(s.image, d, s.antes, ret) } });
   }
   if (calls.length) app.run(calls, "transforma a seleção", s.merge);
-  if (cresce || s.antes) mostra(s.image);
+  // a folha cresceu: o anexo, a regiao do atlas e a textura mudam ja, no mesmo quadro (N-032)
+  if (cresce && app.doc) (remendou(), void app.desenhos.atualizarJa(app.doc, app.viewer));
+  else if (s.antes) mostra(s.image);
   if (s.vetor) ganchos.vetorMudou();
 }
 
@@ -514,6 +503,57 @@ export function apagarSelecao(): boolean {
   if (!calls.length) return false;
   app.run(calls, "apaga a seleção");
   return true;
+}
+
+// ---- cortar e rigar (N-028): o pedaco do laco vira peca nova (osso, parte e desenho), no mesmo
+// lugar, com `sobra` px de tinta dos dois lados da junta (a peca gira sem abrir fresta). A conta dos
+// pixels e src/core/cortar.ts; o comando e o draw.carve, um passo so de desfazer
+
+export const corte = { sobra: 4 };
+
+function nomeDaPeca(json: any, slot: string): string {
+  for (let i = 1; ; i++) {
+    const n = `${slot}_peca${i === 1 ? "" : i}`;
+    if (boneIndex(json, n) < 0 && slotIndex(json, n) < 0 && !drawingsOf(json)[n] && !app.pixels.region(n)) return n;
+  }
+}
+
+// devolve o nome da peca nova, ou null (com o motivo no toast)
+export function cortarEmPeca(slot: string, attachment?: string, sobra = corte.sobra): string | null {
+  soltar();
+  if (!sel || !app.doc) return null;
+  const image = sel.image;
+  const d = desenho(image);
+  if (!d) return null;
+  if (!d.raster || !app.pinturas.tem(image)) {
+    app.toast("O corte leva a pintura: esta peça não tem tinta (as formas se movem com o laço).");
+    return null;
+  }
+  const t = app.pinturas.de(image, d);
+  const antes = t.g.getImageData(0, 0, t.w, t.h);
+  const plano = planoDoCorte(antes.data, t.w, t.h, sel.pontos, sobra);
+  if (!plano) {
+    app.toast("Não há tinta dentro do laço.");
+    return null;
+  }
+  const name = nomeDaPeca(app.doc.json, slot);
+  const rev = app.pinturas.definir(name, plano.peca, plano.box[2], plano.box[3]);
+  t.g.putImageData(new ImageData(new Uint8ClampedArray(plano.resto), t.w, t.h), 0, 0);
+  const restRev = app.pinturas.registrar(image, d, antes, plano.mudou);
+  const r = app.run({ cmd: "draw.carve", args: { slot, attachment, name, box: plano.box, pivot: plano.pivot, tip: plano.tip, rev, restRev } }, "corta em peça");
+  if (!r) {
+    // o comando recusou: a tinta volta
+    t.g.putImageData(antes, 0, 0);
+    t.rev = d.raster.rev;
+    return null;
+  }
+  const w = r[0]?.warning;
+  if (w) app.avisar(`Peça ${name} cortada; ${w}.`);
+  sel = null;
+  laco = null;
+  remendou();
+  void app.desenhos.atualizarJa(app.doc, app.viewer);
+  return name;
 }
 
 // ---- os gestos (pontos em pixels da imagem; k = pixels de tela por pixel da imagem)

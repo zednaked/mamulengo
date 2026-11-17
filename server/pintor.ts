@@ -1,4 +1,4 @@
-// O pintor: o renderer do ProCraft num processo ao lado (pintor/, compilado por tools/pintor.sh),
+// O pintor: o motor de pincel num processo ao lado (pintor/, compilado por tools/pintor.sh),
 // para a pintura raster do Atelie. Aqui fica o processo e a conversa com ele: pedidos em fila, cada
 // um [u32 JSON][u32 binario][JSON][binario] (pintor/src/main.rs). O editor fala com ele pelo
 // WebSocket /api/pintor (server/plugin.ts), uma mensagem binaria por pedido, no mesmo formato sem
@@ -7,12 +7,15 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const PINTOR_BIN = process.env.MAMULENGO_PINTOR ?? join(homedir(), ".cache/mamulengo/pintor/release/mamulengo-pintor");
-// a biblioteca de pinceis: a do ProCraft instalado, se houver (so leitura); sem ela, os pinceis
-// que vem com o ProCraft
+// a biblioteca de pinceis (so leitura): MAMULENGO_PINCEIS, se apontar para uma (o formato e o
+// library.json do ProCraft, entao as bibliotecas dele servem); sem ela, o pacote que vem com o
+// Mamulengo, ZeD Default Brushes (pinceis/zed-default-brushes.json)
+export const PINCEIS_PADRAO = fileURLToPath(new URL("../pinceis/zed-default-brushes.json", import.meta.url));
 export function bibliotecaDePinceis(): string | null {
-  const p = process.env.MAMULENGO_PINCEIS ?? join(homedir(), ".local/share/procraft/brushes/library.json");
+  const p = process.env.MAMULENGO_PINCEIS || PINCEIS_PADRAO;
   return existsSync(p) ? p : null;
 }
 
@@ -73,6 +76,18 @@ export class Pintor {
     });
   }
 
+  // ler a biblioteca de pinceis ja (uns 30 s com uma biblioteca grande), numa folha que fecha em
+  // seguida: o motor guarda a ultima biblioteca lida no processo, e o "abrir" do Atelie depois
+  // sai em meio segundo. Os pedidos que chegarem antes esperam na mesma fila.
+  aquecer(biblioteca: string | null = bibliotecaDePinceis()): Promise<void> {
+    if (!Pintor.disponivel() || !biblioteca) return Promise.resolve();
+    const folha = "aquecer";
+    return this.pede({ op: "abrir", folha, w: 8, h: 8, biblioteca }).then(([r]) => {
+      if (r?.erro) throw new Error(r.erro);
+      return this.pede({ op: "fechar", folha }).then(() => {});
+    });
+  }
+
   parar() {
     const p = this.proc;
     this.proc = null;
@@ -105,11 +120,17 @@ function fecha(j: any, b: Uint8Array): Buffer {
 
 // Cada aba do editor tem a folha dela (o numero da conexao): o editor nao escolhe arquivo nenhum,
 // a biblioteca de pinceis e a do computador (bibliotecaDePinceis). O processo e um so para todas
-// as abas, e a biblioteca e lida uma vez (uns 30 s com uma biblioteca grande).
+// as abas, e a biblioteca e lida uma vez (uns 30 s com uma biblioteca grande): o processo sobe
+// junto com o servidor e ja le a biblioteca, para o Atelie nao esperar por ela ao abrir.
 export async function pintorWs(server: { httpServer: any }) {
   const { WebSocketServer } = await import("ws");
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1 << 28 });
   const pintor = new Pintor();
+  const t0 = Date.now();
+  pintor.aquecer().then(
+    () => Pintor.disponivel() && bibliotecaDePinceis() && console.log(`[pintor] pinceis lidos em ${((Date.now() - t0) / 1000).toFixed(1)} s`),
+    (e) => console.warn(`[pintor] a biblioteca de pinceis nao abriu: ${e?.message ?? e}`),
+  );
   let n = 0;
   server.httpServer?.on("close", () => {
     for (const c of wss.clients) c.terminate();

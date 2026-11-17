@@ -5,7 +5,8 @@
 import { z } from "zod";
 import { defineCommand } from "./registry.ts";
 import type { Editor } from "../document.ts";
-import { slotIndex, skins } from "../model.ts";
+import { boneIndex, slotIndex, skins } from "../model.ts";
+import { apply, boneWorld, skeletonAt } from "../pose.ts";
 import { usesOfImage } from "../psd.ts";
 import { meshView } from "./meshedit.ts";
 import { pointInPolygon, type Pt } from "../geometry.ts";
@@ -710,6 +711,134 @@ defineCommand({
     const r = assets?.region(p.image);
     const warn = r && (Math.abs(r.width - d.width) > 1e-6 || Math.abs(r.height - d.height) > 1e-6) ? `o desenho tem ${d.width}x${d.height} e a imagem ${r.width}x${r.height}: as partes mostram o desenho esticado no lugar da imagem` : null;
     return { replaced: out, ...(warn ? { warning: warn } : {}) };
+  },
+});
+
+// primeiro nome livre para o desenho que vem de uma imagem do atlas: <image>_p, <image>_p2...
+export function nomeDePintura(json: any, image: string, region?: (n: string) => unknown): string {
+  for (let i = 1; ; i++) {
+    const n = `${image}_p${i === 1 ? "" : i}`;
+    if (!drawingsOf(json)[n] && !region?.(n)) return n;
+  }
+}
+
+defineCommand({
+  name: "draw.from_region",
+  group: "drawing",
+  summary:
+    "Transforma a imagem do atlas de uma parte (region ou malha) num desenho com pintura (raster), para pintar por cima no Atelie sem perder degrade e sombra: cria o desenho do tamanho da imagem (hd 1, pixel por pixel), poe no lugar da imagem em todas as partes e skins (draw.replace, sem sair do lugar) e registra o estado rev dos pixels (paint.set). Os pixels quem chama fornece, como no paint.set: o PNG da imagem (do tamanho dela) na pasta <personagem>-pinturas, ou no editor a memoria das pinturas. drawing padrao: <image>_p (o primeiro livre). Um passo so de desfazer.",
+  params: z.object({
+    slot: z.string(),
+    attachment: z.string().optional().describe("anexo da parte (padrao: o que ela mostra na Pose base)"),
+    drawing: z.string().optional().describe("nome do desenho novo (padrao <image>_p)"),
+    rev: z.string().min(1).max(40).describe("nome do estado dos pixels (o PNG ja gravado)"),
+  }),
+  label: (p) => `pintar a imagem de ${p.slot}`,
+  run({ e, run, assets }, p) {
+    const s = (e.json.slots ?? []).find((x: any) => x.name === p.slot);
+    if (!s) throw new Error(`a parte ${p.slot} nao existe`);
+    const att = p.attachment ?? s.attachment;
+    if (!att) throw new Error(`a parte ${p.slot} nao mostra nada: diga o attachment`);
+    let a: any = null;
+    for (const sk of skins(e.json)) a ??= sk.attachments?.[p.slot]?.[att] ?? null;
+    if (!a) throw new Error(`a parte ${p.slot} nao tem o anexo ${att}`);
+    const t = a.type ?? "region";
+    if (t === "linkedmesh") throw new Error(`${att} e uma malha ligada (linkedmesh): pinte a malha de origem (${a.parent ?? "?"})`);
+    if (t !== "region" && t !== "mesh") throw new Error(`${att} e um anexo ${t}, nao uma imagem`);
+    const image = a.path ?? a.name ?? att;
+    if (drawingsOf(e.json)[image]) throw new Error(`${image} ja e um desenho: abra no Atelie direto`);
+    const r = assets?.region(image);
+    if (!r) throw new Error(`a imagem ${image} nao esta no atlas`);
+    const drawing = p.drawing ?? nomeDePintura(e.json, image, (n) => assets?.region(n));
+    run("draw.create", { image: drawing, width: r.width, height: r.height, hd: 1 });
+    const rep = run("draw.replace", { image, drawing });
+    run("paint.set", { image: drawing, rev: p.rev });
+    const ligadas = usesOfImage(e.json, image).filter((u) => (u.a.type ?? "region") === "linkedmesh").map((u) => `${u.slot}/${u.name}`);
+    const avisos = [rep.warning, ligadas.length ? `malhas ligadas continuam na imagem velha: ${ligadas.join(", ")}` : null].filter(Boolean);
+    return { drawing, image, width: r.width, height: r.height, replaced: rep.replaced, ...(avisos.length ? { warning: avisos.join("; ") } : {}) };
+  },
+});
+
+// pixel (u, v) de uma imagem desenhada (y para baixo) -> mundo, pelo anexo region que a mostra e
+// pelo osso da parte, na Pose base. Tambem devolve a direcao dos eixos x e y da imagem (y para cima) no
+// mundo, por pixel da imagem
+export function imagemParaMundo(json: any, bone: string, a: any, d: { width: number; height: number }) {
+  const W = boneWorld(skeletonAt(json, null, 0), bone);
+  const r = ((a.rotation ?? 0) * Math.PI) / 180;
+  const kx = ((a.width ?? d.width) / d.width) * (a.scaleX ?? 1),
+    ky = ((a.height ?? d.height) / d.height) * (a.scaleY ?? 1);
+  const cs = Math.cos(r),
+    sn = Math.sin(r);
+  // local ao osso: centro da imagem em (x, y), eixos girados por rotation
+  const local = (u: number, v: number): [number, number] => {
+    const lx = (u - d.width / 2) * kx,
+      ly = (d.height / 2 - v) * ky;
+    return [(a.x ?? 0) + cs * lx - sn * ly, (a.y ?? 0) + sn * lx + cs * ly];
+  };
+  const lin = (vx: number, vy: number): [number, number] => [W.a * vx + W.b * vy, W.c * vx + W.d * vy];
+  return {
+    ponto: (u: number, v: number) => apply(W, ...local(u, v)) as [number, number],
+    ex: lin(cs * kx, sn * kx),
+    ey: lin(-sn * ky, cs * ky),
+  };
+}
+
+defineCommand({
+  name: "draw.carve",
+  group: "drawing",
+  summary:
+    "Corta um pedaco de uma pintura (desenho com raster) e faz dele uma peca nova, no mesmo lugar da tela: osso novo (name) filho do osso da parte, com a base em pivot e a ponta em tip; parte nova (name) logo na frente da original; desenho novo (name) do tamanho de box, com o mesmo hd. box [x, y, w, h], pivot e tip em pixels da imagem original (y para baixo). Os pixels quem chama fornece, como no paint.set: rev e o estado da peca nova (w x h) e restRev o da original com o buraco (no Atelie, o botao tesoura do laco faz os dois com sobra na junta). Imagem do atlas: rode draw.from_region antes. So o anexo region; as formas vetoriais ficam na original. Um passo so de desfazer.",
+  params: z.object({
+    slot: z.string(),
+    attachment: z.string().optional().describe("anexo da parte (padrao: o que ela mostra na Pose base)"),
+    name: z.string().min(1).describe("nome do osso, da parte e do desenho novos"),
+    box: z.tuple([z.number(), z.number(), z.number().positive(), z.number().positive()]).describe("[x, y, w, h] da peca nova em pixels da imagem original"),
+    pivot: Vec.describe("base do osso novo (a junta), em pixels da imagem original"),
+    tip: Vec.optional().describe("ponta do osso novo, em pixels da imagem original"),
+    rev: z.string().min(1).max(40).describe("estado dos pixels da peca nova (do tamanho de box)"),
+    restRev: z.string().min(1).max(40).describe("estado dos pixels da original com o buraco"),
+  }),
+  label: (p) => `corta ${p.name} de ${p.slot}`,
+  run({ e, run, assets }, p) {
+    const s = (e.json.slots ?? []).find((x: any) => x.name === p.slot);
+    if (!s) throw new Error(`a parte ${p.slot} nao existe`);
+    const att = p.attachment ?? s.attachment;
+    if (!att) throw new Error(`a parte ${p.slot} nao mostra nada: diga o attachment`);
+    let a: any = null;
+    for (const sk of skins(e.json)) a ??= sk.attachments?.[p.slot]?.[att] ?? null;
+    if (!a) throw new Error(`a parte ${p.slot} nao tem o anexo ${att}`);
+    const t = a.type ?? "region";
+    const image = a.path ?? a.name ?? att;
+    const d = drawingsOf(e.json)[image];
+    if (!d) {
+      if (assets?.region(image) || t === "region" || t === "mesh") throw new Error(`${image} e uma imagem do atlas: rode draw.from_region na parte ${p.slot} antes (vira pintura) e corte depois`);
+      throw new Error(`${att} e um anexo ${t}, nao uma imagem`);
+    }
+    if (t !== "region") throw new Error(`${att} e um anexo ${t}: por enquanto so se corta de um anexo region`);
+    if (!d.raster) throw new Error(`${image} nao tem pintura (raster): o corte leva pixels; formas vetoriais se movem com o laco`);
+    if (boneIndex(e.json, p.name) >= 0 || slotIndex(e.json, p.name) >= 0 || drawingsOf(e.json)[p.name] || assets?.region(p.name))
+      throw new Error(`ja existe osso, parte ou imagem com o nome ${p.name}`);
+    const [bx, by, bw, bh] = p.box;
+    const m = imagemParaMundo(e.json, s.bone, a, d);
+    const at = m.ponto(p.pivot[0], p.pivot[1]);
+    const ponta = p.tip && Math.hypot(p.tip[0] - p.pivot[0], p.tip[1] - p.pivot[1]) > 1e-6 ? m.ponto(p.tip[0], p.tip[1]) : undefined;
+    run("bone.add", { name: p.name, parent: s.bone, at, ...(ponta ? { toward: ponta } : {}) });
+    run("slot.add", { name: p.name, bone: p.name, above: p.slot });
+    run("draw.create", { image: p.name, width: round(bw), height: round(bh), hd: d.hd ?? 2 });
+    // a peca nova no mundo com a mesma escala, giro e espelho da original
+    const sx = Math.hypot(m.ex[0], m.ex[1]);
+    const sy = (m.ex[0] * m.ey[1] - m.ex[1] * m.ey[0]) / (sx || 1);
+    const center = m.ponto(bx + bw / 2, by + bh / 2);
+    const rotation = (Math.atan2(m.ex[1], m.ex[0]) * 180) / Math.PI;
+    run("attachment.region", { slot: p.name, name: p.name, width: round(bw), height: round(bh), world: { center, rotation, scale: [sx, sy] } });
+    run("slot.set", { slot: p.name, attachment: p.name });
+    run("paint.set", { image: p.name, rev: p.rev });
+    run("paint.set", { image, rev: p.restRev });
+    const avisos: string[] = [];
+    if (d.shapes.some((f: any) => !f.hidden)) avisos.push(`as formas vetoriais de ${image} ficaram na original (o corte leva so a pintura)`);
+    const outras = usesOfImage(e.json, image).filter((u) => !(u.slot === p.slot && u.name === att)).map((u) => `${u.slot}/${u.name}`);
+    if (outras.length) avisos.push(`outras partes usam ${image} e passam a mostrar o buraco: ${outras.join(", ")}`);
+    return { bone: p.name, slot: p.name, drawing: p.name, image, pivot: at.map(round), ...(avisos.length ? { warning: avisos.join("; ") } : {}) };
   },
 });
 

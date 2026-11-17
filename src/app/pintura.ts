@@ -1,10 +1,11 @@
-// A pintura (raster) do Atelie: a conversa com o pintor (server/pintor.ts, o renderer do ProCraft
+// A pintura (raster) do Atelie: a conversa com o pintor (server/pintor.ts, o motor de pincel
 // num processo ao lado, que recebe as amostras da caneta e devolve o retangulo que mudou) e a
 // pincelada em andamento. Os pixels e o desfazer ficam em src/app/pinturas.ts.
 import { app } from "./state.svelte.ts";
 import { drawingsOf, type Drawing } from "../core/desenho.ts";
 import { NAVEGADOR } from "../navegador/pagina.ts";
 import { FOLHA_MAX, contornoDaSelecao, crescimento, deslocarSelecao, selecao } from "./retoque.ts";
+import { folgaDaPincelada } from "../core/folha.ts";
 
 // ---- a conversa com o pintor
 
@@ -163,7 +164,7 @@ export function previaDoPincel(conjunto: string, pincel: string, w = 220, h = 56
 async function garantirFolha(image: string, d: Drawing) {
   const t = app.pinturas.de(image, d);
   if (folha && folha.image === image && folha.rev === t.rev && folha.w === t.w && folha.h === t.h) return;
-  // o pintor so devolve a imagem ate FOLHA_MAX de lado (o ProCraft le no maximo 2048): a margem
+  // o pintor so devolve a imagem ate FOLHA_MAX de lado (o motor le no maximo 2048): a margem
   // encolhe quando a imagem cresce
   const pad = Math.max(0, Math.min(MARGEM, Math.floor((FOLHA_MAX - Math.max(t.w, t.h)) / 2)));
   const W = t.w + pad * 2,
@@ -303,7 +304,7 @@ function fechar(v: Viva) {
   if (!d || !v.antes || v.falhou) return;
   const rf = v.retFolha;
   const P = v.pad;
-  const cresce = rf && P ? crescimento(d.width, d.height, [rf[0] - P, rf[1] - P, rf[0] - P + rf[2], rf[1] - P + rf[3]], 16) : null;
+  const cresce = rf && P ? crescimento(d.width, d.height, [rf[0] - P, rf[1] - P, rf[0] - P + rf[2], rf[1] - P + rf[3]], folgaDaPincelada(d.width, d.height)) : null;
   if (cresce && rf) return void crescerComPincelada(v, d, cresce.map((x) => Math.min(P, x)) as [number, number, number, number], rf);
   if (!v.ret) return;
   const rev = app.pinturas.registrar(v.image, d, v.antes, v.ret);
@@ -343,7 +344,9 @@ function crescerComPincelada(v: Viva, d: Drawing, [l, tp, r, b]: [number, number
       `${nome} (a folha cresce)`,
     );
     nRemendos++;
-    if (app.doc) app.desenhos.pintar(app.doc, app.viewer, v.image);
+    // a folha mudou de tamanho: o anexo, a regiao do atlas e a textura mudam ja, no mesmo quadro
+    // (N-032; o agendado esperaria o proximo quadro, com o anexo grande na regiao velha)
+    if (app.doc) void app.desenhos.atualizarJa(app.doc, app.viewer);
   }).catch((e) => app.toast(`A pincelada passou da borda e a folha não cresceu: ${e?.message ?? e}`));
 }
 
