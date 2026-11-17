@@ -553,6 +553,15 @@ export function cortarEmPeca(slot: string, attachment?: string, sobra = corte.so
   laco = null;
   remendou();
   void app.desenhos.atualizarJa(app.doc, app.viewer);
+  // a peca nova (osso e parte) fica escolhida: o "Alcançar (IK)" do inspetor esta a um clique
+  // (N-028, parte 2)
+  app.select({ slot: name, bone: name });
+  // a peca nasce visivel: um nome que ja foi escondido no olho (cortou, escondeu, desfez e cortou de
+  // novo) nao pode herdar o escondido, senao so aparece o buraco na original
+  if (app.hidden.bones.includes(name) || app.hidden.slots.includes(name)) {
+    app.hidden = { bones: app.hidden.bones.filter((x) => x !== name), slots: app.hidden.slots.filter((x) => x !== name) };
+    app.applyHidden();
+  }
   return name;
 }
 

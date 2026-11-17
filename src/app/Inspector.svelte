@@ -4,6 +4,7 @@
   import NoveFatias from "./NoveFatias.svelte";
   import Papel from "./Papel.svelte";
   import { untrack } from "svelte";
+  import { planoDoAlcance } from "../core/alcance.ts";
   import { parseAtlas } from "../core/atlas-text.ts";
   import { app } from "./state.svelte.ts";
   import { slotWorldBox } from "./interact.ts";
@@ -638,30 +639,17 @@
   });
   let relTo = $state("");
 
-  // IK em um clique: o osso selecionado e o pai passam a alcancar um alvo na ponta
+  // IK em um clique: o alvo nasce na ponta do osso selecionado e ele (com o pai, se o pai nao for a
+  // raiz) passa a alcanca-lo; a conta e src/core/alcance.ts
   function quickIk() {
     if (!bone || !app.doc) return;
-    const b = app.doc.json.bones.find((x: any) => x.name === bone.name);
-    const parent = app.doc.json.bones.find((x: any) => x.name === b?.parent);
-    if (!parent?.parent) return app.toast("Alcançar precisa de um osso com pai (por exemplo, o antebraço preso ao braço).");
-    const sk = app.viewer?.pose?.findBone(bone.name);
-    if (!sk) return;
-    const len = b.length || 20;
-    // ponta do osso no mundo (visual, y para cima)
-    let tx = sk.worldX + sk.a * len,
-      ty = sk.worldY + sk.c * len;
-    if (app.viewer?.flip) ty = -ty;
-    const target = `${bone.name}_alvo`;
-    const root = app.doc.json.bones[0].name;
-    const ok = app.run(
-      [
-        { cmd: "bone.add", args: { name: target, parent: root, at: [tx, ty], color: "ff3f00ff" } },
-        { cmd: "ik.create", args: { name: `${bone.name}_ik`, bones: [parent.name, bone.name], target } },
-      ],
-      `IK em ${parent.name} + ${bone.name}`,
-    );
-    if (ok) app.avisar(`Alcançar pronto: mova o osso ${target} (vermelho, na ponta) e ${parent.name} e ${bone.name} dobram sozinhos.`);
-    app.select({ bone: target });
+    const plano = planoDoAlcance(app.doc.json, bone.name);
+    if (typeof plano === "string") return app.toast(plano);
+    const ok = app.run(plano.comandos, plano.rotulo);
+    if (!ok) return;
+    const quem = plano.ossos.length === 2 ? `${plano.ossos[0]} e ${plano.ossos[1]} dobram sozinhos` : `${plano.ossos[0]} aponta para ele`;
+    app.avisar(`Alcançar pronto: mova o osso ${plano.alvo} (vermelho, na ponta) e ${quem}.`);
+    app.select({ bone: plano.alvo });
     app.tool = "move";
   }
 
@@ -862,7 +850,7 @@
     </div>
     </details>
     <div class="quick">
-      <button onclick={quickIk} title="O osso e o pai passam a alcançar um alvo: mova o alvo e o membro dobra sozinho">🎯 Alcançar (IK)</button>
+      <button onclick={quickIk} title="Um alvo nasce na ponta do osso e ele (com o pai, se o pai não for a raiz) passa a alcançá-lo: mova o alvo e o membro dobra sozinho">🎯 Alcançar (IK)</button>
       <button onclick={() => (newDrawnPart(bone.name), app.drawEdit && !app.atelie && abrirAtelie())} title="Uma peça nova presa a este osso, desenhada com a caneta (vetor, como no Figma), no Ateliê">✒️ Desenhar peça nova</button>
       {#if ehBoneco && bone.parent}<button onclick={() => extrair(bone.name)} title="Leva este osso e o que pende dele (camadas, partes, restrições, animações) para um .boneco novo ao lado deste, e põe no lugar uma instância dele. Salva antes">📦 Extrair para .boneco</button>{/if}
       {#if animando}

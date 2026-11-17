@@ -615,6 +615,8 @@
     // no atelie, desenhar onde nao ha quadro cria o quadro ali
     // (vale para qualquer botao: a ponta borracha da caneta, button 5, nao pode cair no girar)
     if (app.atelie && !app.drawEdit) {
+      // atelie de peca sem desenho aberto: o clique escolhe a peca sob a ponta e reabre nela
+      if (e.button === 0 && !app.atelie.layer) select(w.x, w.y);
       if (e.button === 0) atelieGarante();
       // sem desenho aberto o atelie nao entrega o ponteiro as ferramentas de osso (girar, mover)
       if (!app.drawEdit) {

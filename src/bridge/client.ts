@@ -233,6 +233,10 @@ const handlers: Record<string, Handler> = {
       // o Desenhar aberto na tela (imagem, ferramenta, forma e ponto escolhidos, caminho da caneta)
       draw: app.drawEdit ? { ...app.drawEdit } : null,
       runtimeError: v?.error ?? null,
+      // o que esta escondido no olho e o estado do Atelie (para conferir a tela dele de fora)
+      hidden: { bones: [...app.hidden.bones], slots: [...app.hidden.slots], viewerBones: v ? [...v.hiddenBones] : [], viewerSlots: v ? [...v.hiddenSlots] : [] },
+      atelie: app.atelie ? { layer: app.atelie.layer, tool: app.atelie.tool } : null,
+      mode: app.mode,
       // a referencia (imagem ou video); no video, o quadro do instante da regua (0 = o primeiro) e as medidas
       reference: app.referencia ? referenciaEstado(app.referencia, v?.view.time ?? 0) : null,
       history: app.doc?.history().slice(-15) ?? [],

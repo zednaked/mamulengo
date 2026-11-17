@@ -3,7 +3,7 @@
 // quadro ao desenhar no vazio, e as operacoes da tira (novo, copia, tirar, fim, segurar). Os
 // quadros sao comandos frame.* (src/core/commands/quadros.ts): cada um e um desenho que entra num
 // instante da animacao aberta, por cima (ou por tras) do personagem animado por ossos.
-import { app } from "./state.svelte.ts";
+import { app, type DrawEdit } from "./state.svelte.ts";
 import { drawDragging, imagemDoAtlas, newDrawnPart, pintarImagem, startDrawEdit, stopDrawEdit } from "./drawedit.ts";
 import { contextoDoAtelie, type ContextoDoAtelie } from "../core/entrada-atelie.ts";
 import { camadasDeQuadros, chavesDoSlot, quadroEm, quadrosDoSlot } from "../core/commands/quadros.ts";
@@ -38,7 +38,10 @@ export function contextoAgora(): ContextoDoAtelie | null {
   const j = app.doc?.json;
   if (!j) return null;
   const de = app.drawEdit;
-  const sel = app.selection.slot;
+  // so o osso escolhido (o clique na peca escolhe o osso dela): se ele tem uma peca so com imagem,
+  // o Atelie abre nela, e nao no quadro a quadro
+  const sel = app.selection.slot ?? pecaUnicaDoOsso(j, app.selection.bone);
+  if (sel && !app.selection.slot) app.select({ ...app.selection, slot: sel });
   return contextoDoAtelie({
     mode: app.mode,
     slot: sel,
@@ -48,6 +51,13 @@ export function contextoAgora(): ContextoDoAtelie | null {
     atlas: !!sel && !!imagemDoAtlas(sel),
     desenhando: de ? (de.quadro ? "quadro" : "peca") : null,
   });
+}
+
+function pecaUnicaDoOsso(j: any, bone: string | null | undefined): string | null {
+  if (!bone) return null;
+  const cam = camadas();
+  const ss = (j.slots ?? []).filter((x: any) => x.bone === bone && !cam.includes(x.name) && x.attachment);
+  return ss.length === 1 ? ss[0].name : null;
 }
 
 export function abrirAtelie() {
@@ -190,6 +200,16 @@ export function novoQuadro(copia = false): boolean {
 export function atelieGarante() {
   const a = app.atelie;
   if (!a || app.drawEdit || app.viewer?.view.playing) return;
+  // atelie de peca (sem camada de quadros) que ficou sem desenho aberto (desfez, tirou a escolha):
+  // reabre na peca escolhida, com qualquer ferramenta (o laco tambem), em vez de criar um quadro
+  if (!a.layer) {
+    const sel = app.selection.slot;
+    const ctx = contextoAgora();
+    const tool = a.tool as DrawEdit["tool"];
+    if (sel && ctx === "peca") startDrawEdit(sel, undefined, tool);
+    else if (sel && ctx === "pintar-imagem") void pintarImagem(sel);
+    return;
+  }
   if (a.tool !== "pencil" && a.tool !== "pen" && a.tool !== "rect" && a.tool !== "ellipse" && a.tool !== "brush" && a.tool !== "bucket") return;
   novoQuadro(false);
 }

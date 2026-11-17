@@ -890,12 +890,12 @@ runtimeOk("constraints");
           dentroJunta++;
           piorJunta = Math.min(piorJunta, cob);
         }
-      const sobraOk = a(pc.peca, bw, 57 - bx, 20 - by) === 255 && a(pc.resto, Wc, 63, 20) === 255 && a(pc.resto, Wc, 64, 20) === 0 && a(pc.resto, Wc, 50, 20) === 255;
+      const sobraOk = a(pc.peca, bw, 57 - bx, 20 - by) === 255 && a(pc.peca, bw, 54 - bx, 20 - by) > 0 && a(pc.peca, bw, 54 - bx, 20 - by) < 255 && a(pc.peca, bw, 53 - bx, 20 - by) < a(pc.peca, bw, 54 - bx, 20 - by) && a(pc.resto, Wc, 59, 20) === 255 && a(pc.resto, Wc, 60, 20) === 0 && a(pc.resto, Wc, 50, 20) === 255;
       check(
         Math.abs(pc.pivot[0] - 60.5) < 0.6 &&
           Math.abs(pc.pivot[1] - 20) < 0.6 &&
           pc.fronteira === 20 &&
-          bx === 56 &&
+          bx === 52 &&
           bx + bw === 95 &&
           by === 10 &&
           bh === 20 &&
@@ -903,7 +903,16 @@ runtimeOk("constraints");
           sobraOk &&
           piorJunta >= 0.9 * 255 &&
           dentroJunta > 100,
-        `desenho: corte em peca com sobra de 4 px nos dois lados (peca de ${bx} a ${bx + bw}, resto ate 63), pivo (${pc.pivot.map((v: number) => v.toFixed(1)).join(", ")}), ponta (${pc.tip.join(", ")}); a peca girada 15 graus no pivo cobre a junta com alfa minimo ${piorJunta}/255 em ${dentroJunta} pixels`,
+        `desenho: corte em peca: a original cortada na linha do laco (resto ate 59), a peca opaca 4 px para fora e sumindo ate 8 (peca de ${bx} a ${bx + bw}), pivo (${pc.pivot.map((v: number) => v.toFixed(1)).join(", ")}), ponta (${pc.tip.join(", ")}); a peca girada 15 graus no pivo cobre a junta com alfa minimo ${piorJunta}/255 em ${dentroJunta} pixels`,
+      );
+      // o laco que corta a ponta de um dedo pelos lados e por cima (um "U" de fronteira): o pivo fica
+      // na junta (em cima, onde o dedo continua), nao no meio do pedaco
+      const pu = new Uint8ClampedArray(Wc * 100 * 4);
+      for (let y = 0; y < 100; y++) for (let x = 40; x < 60; x++) pu.set([200, 120, 80, 255], (y * Wc + x) * 4);
+      const pcu = planoDoCorte(pu, Wc, 100, [[44, 70], [56, 70], [56, 100], [44, 100]], 4)!;
+      check(
+        Math.abs(pcu.pivot[0] - 50) < 1 && Math.abs(pcu.pivot[1] - 70.5) < 1.5 && pcu.tip[1] > 95,
+        `desenho: corte da ponta com o laco cruzando os lados (fronteira em U): pivo na junta (${pcu.pivot.map((v: number) => v.toFixed(1)).join(", ")}), ponta (${pcu.tip.join(", ")})`,
       );
     }
     while (doc.history().length > n0) doc.undo();
@@ -3136,6 +3145,66 @@ runtimeOk("remocoes (slot, osso com pesos)");
     check(g[0] === 200 && g[1] === 64 && !!cg && cg[2] === 205 && cg[3] === 69, `folha cresce: numa folha 800x200 a folga e um quarto do lado em cada eixo (${g}), crescendo ${cg}`);
     const cm = crescimento(2000, 100, [0, 0, 2010, 100], folgaDaPincelada(2000, 100));
     check(!!cm && 2000 + cm[0] + cm[2] === FOLHA_MAX, `folha cresce: perto do maximo para em ${FOLHA_MAX} (${cm})`);
+  }
+  // IK em um clique (N-028, parte 2): o "Alcançar (IK)" pela conta de src/core/alcance.ts. Numa cadeia
+  // cortada mao > f1 > f2 > f3, liga so os 2 da ponta e o alvo nasce na ponta de f3; puxar o alvo
+  // dobra f2 e f3 e f1 fica; com o pai na raiz (peca presa ao root e um corte so), IK de 1 osso
+  {
+    const { planoDoAlcance } = await import("../src/core/alcance.ts");
+    const mk = (bones: any[]) => new Document({ skeleton: { spine: "4.2.00" }, bones, slots: [], skins: [{ name: "default", attachments: {} }], animations: {} } as any, { text: "", pages: {} });
+    const A = mk([
+      { name: "root" },
+      { name: "mao", parent: "root", length: 60 },
+      { name: "f1", parent: "mao", x: 60, length: 30 },
+      { name: "f2", parent: "f1", x: 30, length: 30 },
+      { name: "f3", parent: "f2", x: 30, length: 30 },
+    ]);
+    const W = (d: any, n: string) => boneWorld(skeletonAt(d.json, null, 0), n);
+    const f1Antes = W(A, "f1");
+    const pa = planoDoAlcance(A.json, "f3");
+    const okA = typeof pa !== "string" && (await executeAsync(A, pa.comandos as any, pa.rotulo, undefined, {}, assets)).length === 2;
+    const ikA = (A.json.constraints ?? []).find((c: any) => c.type === "ik");
+    const alvo = A.json.bones.find((b: any) => b.name === "f3_alvo");
+    const wa = W(A, "f3_alvo");
+    const erroAlvo = Math.hypot(wa.x - 150, wa.y - 0);
+    // puxa o alvo (-25, +15) numa copia e confere a cadeia
+    const M = mk(structuredClone(A.json.bones));
+    M.json.constraints = structuredClone(A.json.constraints);
+    const am = M.json.bones.find((b: any) => b.name === "f3_alvo");
+    am.x = (am.x ?? 0) - 25;
+    am.y = (am.y ?? 0) + 15;
+    const f1 = W(M, "f1"),
+      f3 = W(M, "f3"),
+      len3 = 30;
+    const pontaF3: [number, number] = [f3.x + f3.a * len3, f3.y + f3.c * len3];
+    const wam = W(M, "f3_alvo");
+    const erroPonta = Math.hypot(pontaF3[0] - wam.x, pontaF3[1] - wam.y);
+    const f1Fica = Math.hypot(f1.x - f1Antes.x, f1.y - f1Antes.y) < 1e-6 && Math.abs(f1.a - f1Antes.a) < 1e-6;
+    const semNaN = ["f1", "f2", "f3"].every((n) => { const w = W(M, n); return Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.a); });
+    A.undo();
+    const desfez = !A.json.bones.some((b: any) => b.name === "f3_alvo") && !(A.json.constraints ?? []).length;
+    // pai na raiz: IK de 1 osso, sem recusar
+    const B = mk([{ name: "root" }, { name: "dedo", parent: "root", x: 60, length: 30 }]);
+    const pb = planoDoAlcance(B.json, "dedo");
+    const okB = typeof pb !== "string" && (await executeAsync(B, pb.comandos as any, pb.rotulo, undefined, {}, assets)).length === 2;
+    const ikB = (B.json.constraints ?? []).find((c: any) => c.type === "ik");
+    const wb = W(B, "dedo_alvo");
+    check(
+      okA &&
+        JSON.stringify(ikA?.bones) === '["f2","f3"]' &&
+        ikA?.target === "f3_alvo" &&
+        alvo?.parent === "root" &&
+        erroAlvo < 0.01 &&
+        f1Fica &&
+        erroPonta < 0.5 &&
+        semNaN &&
+        desfez &&
+        okB &&
+        JSON.stringify(ikB?.bones) === '["dedo"]' &&
+        Math.hypot(wb.x - 90, wb.y) < 0.01 &&
+        planoDoAlcance(B.json, "root") !== null && typeof planoDoAlcance(B.json, "root") === "string",
+      `alcance: f3 de mao>f1>f2>f3 liga ${JSON.stringify(ikA?.bones)} com o alvo na ponta (erro ${erroAlvo.toFixed(4)} px); puxando o alvo (-25, +15) f1 fica e a ponta de f3 chega a ${erroPonta.toFixed(3)} px; o desfazer tira alvo e IK; com o pai na raiz a IK e de 1 osso ${JSON.stringify(ikB?.bones)}`,
+    );
   }
   // o Desenhar dentro do Atelie (N-030): uma entrada so, e o que ela abre vem do modo e da selecao
   {
