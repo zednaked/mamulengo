@@ -188,7 +188,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .row {
     display: flex;
@@ -202,7 +202,7 @@
     color: var(--dim);
   }
   .small {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .field {
     line-height: 1.4;
@@ -244,7 +244,7 @@
     flex-wrap: wrap;
   }
   .rule code {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .mark {
     width: 12px;
@@ -255,7 +255,7 @@
   }
   .mini {
     padding: 0 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .go {
     background: var(--accent);
@@ -266,7 +266,7 @@
     width: 100%;
     min-height: 360px;
     font-family: ui-monospace, monospace;
-    font-size: 12px;
+    font-size: var(--fs-p);
     background: var(--bg, #15131b);
     color: inherit;
     border: 1px solid var(--line);

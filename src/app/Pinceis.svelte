@@ -109,7 +109,7 @@
     box-shadow: 0 16px 50px #000b;
     backdrop-filter: blur(10px);
     overflow: hidden;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .cab {
     display: flex;
@@ -148,7 +148,7 @@
     display: flex;
     justify-content: space-between;
     gap: 6px;
-    font-size: 12.5px;
+    font-size: var(--fs-p);
   }
   nav button.tem {
     color: var(--accent);
@@ -198,13 +198,13 @@
   }
   .de {
     color: var(--dim);
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .vazio,
   .pe {
     color: var(--dim);
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .pe {
     border-top: 1px solid var(--line);

@@ -174,7 +174,7 @@
     margin: 6px 0;
     padding: 6px 0;
     border-top: 1px solid #ffffff14;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .secao {
     color: #9aa0b4;
@@ -207,7 +207,7 @@
     width: 90px;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .previa canvas {
     display: block;

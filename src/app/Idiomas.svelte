@@ -129,7 +129,7 @@
     border: 1px solid #333;
     border-radius: 6px;
     padding: 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .topo {
     display: flex;
@@ -163,7 +163,7 @@
   }
   td input {
     width: 110px;
-    font-size: 11px;
+    font-size: var(--fs-p);
     background: transparent;
     border: none;
     color: inherit;
@@ -175,7 +175,7 @@
     background: #f0b04033;
   }
   button {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 1px 6px;
   }
   .cod {
@@ -190,6 +190,6 @@
     color: #889;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
 </style>

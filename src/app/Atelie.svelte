@@ -585,7 +585,7 @@
     border: 1px solid var(--line);
     border-radius: 12px;
     backdrop-filter: blur(8px);
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .topo {
     top: 10px;
@@ -683,7 +683,7 @@
     font-size: 20px;
   }
   .qual .nm {
-    font-size: 10.5px;
+    font-size: var(--fs-p);
     line-height: 1.15;
     text-align: center;
     overflow: hidden;
@@ -706,7 +706,7 @@
     background: #1b1822f0;
     border: 1px solid var(--accent2);
     border-radius: 12px;
-    font-size: 13px;
+    font-size: var(--fs-m);
     line-height: 1.4;
   }
   .gira {
@@ -737,7 +737,7 @@
   }
   .regua .nome {
     color: var(--dim);
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .vert {
     writing-mode: vertical-lr;
@@ -753,7 +753,7 @@
   }
   .estilos button {
     padding: 4px 2px;
-    font-size: 11px;
+    font-size: var(--fs-p);
     border-radius: 7px;
   }
   .painel-formas {

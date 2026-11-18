@@ -1,10 +1,12 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import Ancora from "./Ancora.svelte";
   import Texto from "./Texto.svelte";
   import NoveFatias from "./NoveFatias.svelte";
   import Papel from "./Papel.svelte";
   import { untrack } from "svelte";
   import { planoDoAlcance } from "../core/alcance.ts";
+  import { rolesOf } from "../core/papeis.ts";
   import { parseAtlas } from "../core/atlas-text.ts";
   import { app } from "./state.svelte.ts";
   import { slotWorldBox } from "./interact.ts";
@@ -26,6 +28,10 @@
     { k: "scaleX", label: "escala x", step: 0.01 },
     { k: "scaleY", label: "escala y", step: 0.01 },
   ] as const;
+
+  // o que vem logo abaixo do nome da parte (os movimentos prontos): antes ficava acima e o nome
+  // do osso escolhido sumia para baixo, fora da tela no notebook
+  let { children }: { children?: Snippet } = $props();
 
   // valores mostrados: pose atual (com a animacao aplicada) com uma animacao aberta, setup na Pose base
   const bone = $derived.by(() => {
@@ -789,6 +795,23 @@
   const CTYPE: Record<string, string> = { physics: "balanco", ik: "IK (alcance)", transform: "copia", path: "caminho", slider: "slider" };
 
   let fineOpen = $state(false);
+  // "No jogo" (papel e ancora) num personagem: recolhido, lembrado no navegador. Numa tela os
+  // dois ficam abertos no alto, como antes
+  const ehTela = $derived(!!(app.doc?.json as any)?.screen);
+  let noJogoAberto = $state(false);
+  try {
+    noJogoAberto = localStorage.getItem("mamulengo.noJogo") === "1";
+  } catch {}
+  const papelDoOsso = $derived.by(() => {
+    app.version;
+    const json = app.doc?.json as any;
+    if (!json || !bone) return null;
+    try {
+      return rolesOf(json).find((r) => r.bone === bone.name)?.type ?? null;
+    } catch {
+      return null;
+    }
+  });
   let scrub: { k: string; x: number; v: number; step: number; merge: string } | null = null;
   let seq = 0;
 
@@ -837,8 +860,8 @@
       </label>
     {/if}
     <div class="dim small">pai: {bone.parent ?? "(raiz)"} · {app.mode === "animate" && app.play.animation ? `chave em ${app.play.time.toFixed(2)}s` : "pose de montagem"}</div>
-    {#if (app.doc?.json as any)?.screen}<Ancora osso={bone.name} />{/if}
-    {#if ehBoneco || (app.doc?.json as any)?.screen || (app.doc?.json as any)?.roles}<Papel osso={bone.name} />{/if}
+    {#if children}<div class="logo-abaixo">{@render children()}</div>{/if}
+    {#if ehTela}<Ancora osso={bone.name} /><Papel osso={bone.name} />{/if}
     <details class="fine" open={fineOpen} ontoggle={(e) => (fineOpen = (e.target as HTMLDetailsElement).open)}>
       <summary>ajuste fino</summary>
     <div class="fields">
@@ -996,13 +1019,20 @@
     {#if ehBoneco && !animando}
       <div class="linha-texto"><button onclick={novoTexto} title="uma parte de texto (com tradução) numa camada nova presa a este osso">+ texto</button></div>
     {/if}
-    {#if ehBoneco && !(app.doc?.json as any)?.screen}
-      <Ancora osso={bone.name} />
+    {#if !ehTela && (ehBoneco || (app.doc?.json as any)?.roles)}
+      <details class="no-jogo" open={noJogoAberto} ontoggle={(e) => { noJogoAberto = (e.target as HTMLDetailsElement).open; try { localStorage.setItem("mamulengo.noJogo", noJogoAberto ? "1" : "0"); } catch {} }}>
+        <summary title="Papel no jogo (botão, toque, texto do código) e âncora na tela, para quando este boneco entra numa tela de jogo">No jogo{#if papelDoOsso}<span class="dim"> · {papelDoOsso === "button" ? "botão" : papelDoOsso === "touch" ? "toque" : papelDoOsso === "text" ? "texto" : papelDoOsso}</span>{/if}</summary>
+        {#if noJogoAberto}
+          <Papel osso={bone.name} />
+          {#if ehBoneco}<Ancora osso={bone.name} />{/if}
+        {/if}
+      </details>
     {/if}
   {:else}
     <div class="dim">Clique numa parte do personagem para escolher.</div>
   {/if}
 
+  {#if !bone && slot && children}{@render children()}{/if}
   {#if slot}
     <div class="title slot">
       <span class="ico">🖼</span>
@@ -1409,7 +1439,7 @@
     min-width: 0;
   }
   .order.rel button {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 2px 6px;
   }
   .order {
@@ -1438,7 +1468,7 @@
     grid-column: 1 / -1;
   }
   .relevo-b {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 2px 6px;
     margin-left: 6px;
   }
@@ -1448,7 +1478,7 @@
     gap: 3px;
   }
   .presets button {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 3px 6px;
   }
   .efeitos {
@@ -1513,7 +1543,7 @@
     background: #1a1820;
     padding: 5px 8px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .con > .alvo-ik,
   .con > .slider {
@@ -1562,12 +1592,12 @@
   .fine summary {
     cursor: pointer;
     color: var(--dim);
-    font-size: 12px;
+    font-size: var(--fs-p);
     margin-bottom: 6px;
   }
   .title {
     font-weight: 600;
-    font-size: 15px;
+    font-size: var(--fs-g);
     display: flex;
     gap: 6px;
     align-items: center;
@@ -1576,7 +1606,7 @@
     display: flex;
     gap: 4px;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--accent2);
   }
   .nome-t {
@@ -1599,7 +1629,7 @@
     border: none;
     padding: 2px 5px;
     opacity: 0.55;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .lixo:hover {
     opacity: 1;
@@ -1622,11 +1652,24 @@
   .imagem-linha .lixo {
     margin-left: 0;
   }
+  .no-jogo {
+    margin-top: 10px;
+    border-top: 1px solid #ffffff14;
+    padding-top: 6px;
+  }
+  .no-jogo summary {
+    cursor: pointer;
+    font-size: var(--fs-p);
+    color: var(--dim);
+  }
+  .logo-abaixo {
+    margin-top: 8px;
+  }
   .title.slot {
     margin-top: 10px;
   }
   .small {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .fields {
     display: grid;
@@ -1635,14 +1678,14 @@
     align-items: center;
   }
   .dobra-ik {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 1px 6px;
   }
   .alvo-ik {
     display: flex;
     gap: 4px;
     align-items: center;
-    font-size: 11px;
+    font-size: var(--fs-p);
     cursor: default;
   }
   .alvo-ik select {
@@ -1656,7 +1699,7 @@
   .mini-campo {
     display: flex;
     flex-direction: column;
-    font-size: 11px;
+    font-size: var(--fs-p);
     cursor: default;
   }
   .mini-campo input {
@@ -1666,7 +1709,7 @@
   label,
   .rotulo {
     color: var(--dim);
-    font-size: 12px;
+    font-size: var(--fs-p);
     cursor: ew-resize;
     user-select: none;
   }
@@ -1675,6 +1718,6 @@
     width: 100%;
   }
   .ico {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
 </style>

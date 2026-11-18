@@ -113,7 +113,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .row {
     display: flex;
@@ -127,7 +127,7 @@
     color: var(--dim);
   }
   .small {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   textarea,
   input {
@@ -160,19 +160,19 @@
     line-height: 1.35;
   }
   .reply {
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: #d6d0e0;
     padding-left: 8px;
     border-left: 2px solid var(--line);
   }
   .where {
     padding: 0 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--accent);
   }
   .mini {
     padding: 1px 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .mini.sel {
     border-color: var(--accent);
@@ -181,7 +181,7 @@
   }
   .ri {
     padding: 3px 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .go {
     background: var(--accent);

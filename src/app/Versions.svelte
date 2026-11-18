@@ -171,13 +171,13 @@
   }
   .arquivo .tit {
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .arquivo .linha {
     display: flex;
     gap: 6px;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--fs-p);
     flex-wrap: wrap;
   }
   .arquivo .linha > span {
@@ -192,7 +192,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     overflow: auto;
   }
   .mark {
@@ -215,7 +215,7 @@
     color: var(--dim);
   }
   .small {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .v {
     border: 1px solid var(--line);
@@ -229,7 +229,7 @@
     border-color: var(--accent);
   }
   .name {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .changes {
     all: unset;
@@ -239,7 +239,7 @@
   }
   .mini {
     padding: 1px 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .warn {
     background: #e05561;

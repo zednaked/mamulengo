@@ -170,7 +170,7 @@
     gap: 4px;
     align-items: center;
     margin-bottom: 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .skins select,
   .ren-skin {
@@ -179,7 +179,7 @@
   }
   .skins button {
     padding: 2px 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .layers {
     display: flex;
@@ -192,7 +192,7 @@
     width: 100%;
   }
   .hint {
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .hint.fundo {
@@ -222,10 +222,16 @@
     width: 24px;
     background: none;
     border: none;
-    font-size: 12px;
-    opacity: 0.35;
+    font-size: var(--fs-p);
+    opacity: 0;
   }
+  /* o olho so aparece passando o mouse na linha (ou com o teclado); escondido, fica sempre a
+     vista. Uma coluna de olhos apagados em toda linha era ruido */
   .line:hover .eye,
+  .eye:focus-visible {
+    opacity: 0.6;
+  }
+  .eye:hover,
   .eye.shut {
     opacity: 1;
   }
@@ -271,7 +277,7 @@
     min-width: 0;
   }
   .name {
-    font-size: 13px;
+    font-size: var(--fs-m);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -280,7 +286,7 @@
     align-items: center;
   }
   .sub {
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--dim);
     white-space: nowrap;
     overflow: hidden;

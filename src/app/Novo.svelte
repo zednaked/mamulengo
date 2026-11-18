@@ -123,7 +123,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   label span {
     color: var(--dim);
@@ -135,11 +135,11 @@
   }
   input:not([type]),
   select {
-    font-size: 15px;
+    font-size: var(--fs-g);
     padding: 7px 9px;
   }
   .onde {
-    font-size: 12px;
+    font-size: var(--fs-p);
     min-height: 32px;
     word-break: break-all;
   }

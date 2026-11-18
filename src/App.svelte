@@ -43,11 +43,16 @@
   const mq = window.matchMedia(PEQUENA);
   let compacto = $state(mq.matches);
   mq.addEventListener("change", (e) => (compacto = e.matches));
-  // os botoes de exibicao viram o menu "ver" antes: com eles a barra do topo nao cabe em 1920
-  const mqVer = window.matchMedia("(max-width: 2000px)");
-  let menuVer = $state(mqVer.matches);
-  mqVer.addEventListener("change", (e) => (menuVer = e.matches));
+  // os botoes de exibicao ficam sempre no menu "ver": abertos na barra, ela quebrava em duas
+  // linhas ate em 2560 (a segunda quase vazia, roubando altura do desenho)
   let verAberto = $state(false);
+  // a aba Atividade so existe no compacto: ao sair dele, volta para Mexer
+  $effect(() => {
+    if (!compacto && app.rightTab === "atividade") app.rightTab = "edit";
+  });
+  // na Pose base (ou sem personagem) a timeline nao tem regua nem chaves: o painel de baixo
+  // fica na altura das abas e do aviso, e o desenho ganha o resto
+  const semAnimacao = $derived(!app.play.animation);
 
   // tamanhos dos paineis (arrastar as alças; clique duplo volta ao padrao), guardados no navegador
   const LAYOUT0 = { left: 240, right: 280, foot: 220, act: 110 };
@@ -325,7 +330,7 @@
   class:sem-pe={recolhe.foot}
   class:atelie={!!app.atelie}
   style:grid-template-columns="{recolhe.left ? 0 : layout.left}px minmax(0, 1fr) {recolhe.right ? 0 : layout.right}px"
-  style:grid-template-rows="auto minmax(0, 1fr) {recolhe.foot ? 0 : layout.foot}px"
+  style:grid-template-rows="auto minmax(0, 1fr) {recolhe.foot ? '0' : semAnimacao ? `fit-content(${layout.foot}px)` : `${layout.foot}px`}"
 >
   <header>
     <div class="brand"><img src={import.meta.env.BASE_URL + "favicon.svg"} alt="" /> <span class="nome">Mamulengo</span></div>
@@ -348,24 +353,30 @@
       <button class:on={app.tool === "deform"} onclick={() => (app.tool = "deform")} title="Deformar a imagem (4)">🖌 <span class="rot">Deformar</span></button>
       <button class:on={app.tool === "bone"} onclick={() => ((app.tool = "bone"), (app.mode = "setup"))} title="Criar osso arrastando (5). Leva para a Pose base: osso novo vale para todas as animações">🦴 <span class="rot">Osso</span></button>
       <button class:on={app.tool === "pan"} onclick={() => (app.tool = "pan")} title="Mover a câmera arrastando (6 ou H). Também: botão do meio ou direito, ou segurar Espaço">✋ <span class="rot">Câmera</span></button>
-      <button class:on={!!app.atelie} onclick={() => abrirAtelie()} title="Ateliê (7 ou 8): desenhar e animar quadro a quadro na tela limpa. Na peça escolhida desenha nela (uma imagem do atlas vira pintura); na Pose base, só um osso escolhido ganha uma peça nova; animando, os quadros por cima da animação de ossos. Dois cliques numa peça desenhada também abrem">🎨 <span class="rot">Ateliê</span></button>
 
+    </div>
+    <!-- o Atelie e um modo (tela limpa, quadro a quadro), nao uma ferramenta de arrastar: fica a parte -->
+    <div class="seg atelie-bt">
+      <button class:on={!!app.atelie} onclick={() => abrirAtelie()} title="Ateliê (7 ou 8): desenhar e animar quadro a quadro na tela limpa. Na peça escolhida desenha nela (uma imagem do atlas vira pintura); na Pose base, só um osso escolhido ganha uma peça nova; animando, os quadros por cima da animação de ossos. Dois cliques numa peça desenhada também abrem">🎨 <span class="rot">Ateliê</span></button>
     </div>
     <div class="seg">
       <button disabled={!canUndo} onclick={() => app.undo()} title="Desfazer (Ctrl+Z)">↶</button>
       <button disabled={!canRedo} onclick={() => app.redo()} title="Refazer (Ctrl+Shift+Z)">↷</button>
     </div>
     {#snippet botoesVer()}
-      <button class:on={showBones} onclick={() => (showBones = !showBones)}>ossos</button>
-      <button class:on={showMeshes && numMalhas > 0} disabled={!!app.doc && numMalhas === 0} onclick={() => (showMeshes = !showMeshes)} title={app.doc && numMalhas === 0 ? "Este personagem não tem malhas: todas as peças são imagens retangulares. Para deformar uma peça, selecione e use Deixar deformável no inspetor" : "Mostra o contorno e os triângulos das malhas"}>malhas{app.doc ? ` (${numMalhas})` : ""}</button>
-      <button class:on={app.onion} onclick={() => (app.onion = !app.onion)} title="Fantasmas dos quadros vizinhos (pausado)">cebola</button>
-      <button onclick={() => app.viewer?.frameAll()} title="Enquadrar (F)">enquadrar</button>
-      <button class:on={app.pixel > 0} disabled={app.runtime !== "nucleo"} onclick={() => app.usarPixel(app.pixel > 0 ? 0 : 1)} title="Pixel perfeito: desenha o personagem na resolução da arte (1 pixel da textura por unidade) e amplia sem suavizar, como um jogo de pixel art; posições e giros ficam presos na grade. Liga sozinho quando todas as páginas usam o filtro Nearest">pixel</button>
+      <!-- no menu: o que liga e desliga (com ✓), quem desenha, e as acoes -->
+      <button class="liga" class:on={showBones} onclick={() => (showBones = !showBones)}><span class="marca">{showBones ? "✓" : ""}</span>ossos</button>
+      <button class="liga" class:on={showMeshes && numMalhas > 0} disabled={!!app.doc && numMalhas === 0} onclick={() => (showMeshes = !showMeshes)} title={app.doc && numMalhas === 0 ? "Este personagem não tem malhas: todas as peças são imagens retangulares. Para deformar uma peça, selecione e use Deixar deformável no inspetor" : "Mostra o contorno e os triângulos das malhas"}><span class="marca">{showMeshes && numMalhas > 0 ? "✓" : ""}</span>malhas{app.doc ? ` (${numMalhas})` : ""}</button>
+      <button class="liga" class:on={app.onion} onclick={() => (app.onion = !app.onion)} title="Fantasmas dos quadros vizinhos (pausado)"><span class="marca">{app.onion ? "✓" : ""}</span>cebola</button>
+      <button class="liga" class:on={app.pixel > 0} disabled={app.runtime !== "nucleo"} onclick={() => app.usarPixel(app.pixel > 0 ? 0 : 1)} title="Pixel perfeito: desenha o personagem na resolução da arte (1 pixel da textura por unidade) e amplia sem suavizar, como um jogo de pixel art; posições e giros ficam presos na grade. Liga sozinho quando todas as páginas usam o filtro Nearest"><span class="marca">{app.pixel > 0 ? "✓" : ""}</span>pixel</button>
+      <hr class="sep-ver" />
       <select class="runtime" value={app.runtime} onchange={(e) => app.setRuntime((e.currentTarget as HTMLSelectElement).value as any)} title="Quem desenha o personagem aqui. Mamulengo: o núcleo próprio, com efeitos, luzes e partículas, igual ao jogo com o addon. Como o Spine: o desenho do editor do Spine. Como o spine-godot: o plugin oficial do Spine no Godot, com as diferenças medidas (docs/PARIDADE.md)">
         <option value="godot">desenho: como o spine-godot</option>
         <option value="spine">desenho: como o Spine</option>
         <option value="nucleo">desenho: Mamulengo</option>
       </select>
+      <hr class="sep-ver" />
+      <button onclick={() => app.viewer?.frameAll()} title="Enquadrar (F)">enquadrar <kbd>F</kbd></button>
       <!-- comparar com o Godot de verdade precisa do executavel dele: so no editor instalado -->
       {#if !NAVEGADOR}<GodotCheck />{/if}
       <label class="botao" title="por uma imagem de referência por cima do personagem (pose, proporção, encaixe)">
@@ -373,18 +384,14 @@
         <input type="file" accept="image/*,video/mp4,video/quicktime" hidden onchange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) app.porReferencia(URL.createObjectURL(f), f.type.startsWith("video/")).catch((err) => app.toast(String(err?.message ?? err))); (e.currentTarget as HTMLInputElement).value = ""; }} />
       </label>
     {/snippet}
-    {#if compacto || menuVer}
-      <div class="menu-ver">
-        <button class:on={verAberto} onclick={() => (verAberto = !verAberto)} title="Ossos, malhas, cebola, enquadrar, desenho, Godot, referência">ver ▾</button>
-        {#if verAberto}
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div class="fundo-menu" onclick={() => (verAberto = false)}></div>
-          <div class="seg pop-ver">{@render botoesVer()}</div>
-        {/if}
-      </div>
-    {:else}
-      <div class="seg">{@render botoesVer()}</div>
-    {/if}
+    <div class="menu-ver">
+      <button class:on={verAberto} onclick={() => (verAberto = !verAberto)} title="Ossos, malhas, cebola, enquadrar, desenho, Godot, referência">ver ▾</button>
+      {#if verAberto}
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div class="fundo-menu" onclick={() => (verAberto = false)}></div>
+        <div class="seg pop-ver">{@render botoesVer()}</div>
+      {/if}
+    </div>
     <div class="spacer"></div>
     <button class="help guia-bt" title="Guia das ferramentas: como usar cada uma, passo a passo (F1)" onclick={() => (app.guia = app.doc ? "lapis" : "comecar")}>📖 <span class="rot">Guia</span></button>
     {#if !app.spectator && !NAVEGADOR}<button class="help guia-bt" class:on={app.tutorial} title="Tutorial de rig e IK: cenas para completar, conferidas na hora (dá para recomeçar)" onclick={() => (app.tutorial = !app.tutorial)}>🎓 <span class="rot">Tutorial</span></button>{/if}
@@ -427,22 +434,26 @@
       <button class:on={app.rightTab === "notas"} onclick={() => (app.rightTab = "notas")} title="Anotações da equipe e do Claude neste personagem"
         >Notas{#if app.notes.some((n) => n.estado === "aberta")}<span class="fails notes">{app.notes.filter((n) => n.estado === "aberta").length}</span>{/if}</button
       >
+      <!-- no notebook a Atividade e uma aba: embaixo do inspetor ela tirava a altura dele -->
+      {#if compacto}<button class="aba-act" class:on={app.rightTab === "atividade"} onclick={() => (app.rightTab = "atividade")} title="Atividade: o que você e o Claude fizeram">🕘</button>{/if}
     </div>
     <div class="scroll" class:hidden={app.rightTab !== "edit"}>
-      {#if !app.meshEdit}<Recipes />{/if}
-      <Inspector />
+      <Inspector>{#if !app.meshEdit}<Recipes />{/if}</Inspector>
     </div>
     <div class="scroll" class:hidden={app.rightTab !== "ficha"}><Ficha /></div>
     <div class="scroll" class:hidden={app.rightTab !== "notas"}><Notes /></div>
+    {#if compacto}<div class="scroll" class:hidden={app.rightTab !== "atividade"}><Activity /></div>{/if}
+    {#if !compacto}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="sep" class:fechada={recolhe.act} title={recolhe.act ? "" : "Arraste para mudar a altura da Atividade (clique duplo: padrão)"} onpointerdown={(e) => !recolhe.act && resize(e, "act", -1, "y")} ondblclick={() => !recolhe.act && resetSize("act")}>
       <button class="abre-act" onpointerdown={(e) => e.stopPropagation()} onclick={() => alterna("act")} aria-expanded={!recolhe.act} title={recolhe.act ? "Mostrar a Atividade: o que você e o Claude fizeram" : "Recolher a Atividade"}>{recolhe.act ? "▸" : "▾"} Atividade</button>
     </div>
     {#if !recolhe.act}<div class="act-box" style:height="{layout.act}px"><Activity /></div>{/if}
+    {/if}
   </aside>
   <footer class="panel">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="grip row top-edge" title="Arraste para mudar a altura da timeline (clique duplo: padrão)" onpointerdown={(e) => resize(e, "foot", -1, "y")} ondblclick={() => resetSize("foot")}></div>
+    <div class="grip row top-edge" class:hidden={semAnimacao} title="Arraste para mudar a altura da timeline (clique duplo: padrão)" onpointerdown={(e) => resize(e, "foot", -1, "y")} ondblclick={() => resetSize("foot")}></div>
     <Timeline />
   </footer>
 
@@ -516,7 +527,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    font-size: 13px;
+    font-size: var(--fs-m);
     color: #7fd8ff;
     border: 1px solid #7fd8ff;
     border-radius: 8px;
@@ -548,11 +559,13 @@
   .compacto {
     gap: 5px;
     padding: 5px;
+    /* no notebook a tela ja tem escala (1.6): o texto pequeno fica em 11, senao as abas cortam */
+    --fs-p: 11px;
   }
   .compacto header {
     flex-wrap: nowrap;
     gap: 6px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .compacto header :global(.picker) {
     min-width: 0;
@@ -584,6 +597,72 @@
   .pop-ver :global(label) {
     text-align: left;
   }
+  /* no menu tudo com a mesma cara: sem borda, o ligado pela marca ✓ (antes o fundo rosa do
+     ligado e a borda do botao do Godot misturavam estilos) */
+  .pop-ver :global(button),
+  .pop-ver :global(label) {
+    border: none;
+    background: none;
+    padding: 5px 10px 5px calc(6px + 1.3em);
+    border-radius: 6px;
+  }
+  .pop-ver :global(button:hover:not(:disabled)),
+  .pop-ver :global(label:hover) {
+    background: #ffffff12;
+  }
+  /* a regra do compacto (header button) passava por cima do recuo */
+  .compacto header .pop-ver :global(button),
+  .compacto header .pop-ver :global(label) {
+    padding: 5px 10px 5px calc(6px + 1.3em);
+  }
+  .pop-ver button.liga,
+  .compacto header .pop-ver button.liga {
+    padding-left: 6px;
+  }
+  .pop-ver button.liga.on {
+    background: none;
+  }
+  .pop-ver button.liga.on:hover {
+    background: #ffffff12;
+  }
+  .marca {
+    display: inline-block;
+    width: 1.3em;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .pop-ver kbd {
+    float: right;
+    margin-left: 14px;
+    font-size: var(--fs-p);
+    opacity: 0.55;
+    font-family: inherit;
+  }
+  .sep-ver {
+    border: none;
+    border-top: 1px solid #ffffff1a;
+    margin: 3px 4px;
+  }
+  /* larguras medias (entre o compacto e uns 1850 px): a barra cabe numa linha tirando os
+     textos que menos fazem falta, nesta ordem: o nome, Guia e Tutorial, as ferramentas */
+  @media (max-width: 1850px) {
+    .brand .nome,
+    header .guia-bt .rot {
+      display: none;
+    }
+    header :global(.picker > button) {
+      max-width: 220px;
+    }
+  }
+  @media (max-width: 1650px) {
+    header .rot {
+      display: none;
+    }
+    .tools button,
+    .atelie-bt button {
+      font-size: var(--fs-g);
+    }
+  }
   .compacto header > * {
     flex-shrink: 0;
   }
@@ -594,8 +673,9 @@
   .compacto .rot {
     display: none;
   }
-  .compacto .tools button {
-    font-size: 15px;
+  .compacto .tools button,
+  .compacto .atelie-bt button {
+    font-size: var(--fs-g);
     padding: 4px 9px;
   }
   .compacto .seg button,
@@ -644,8 +724,9 @@
     color: inherit;
     font: inherit;
   }
-  .tools button {
-    font-size: 15px;
+  .tools button,
+  .atelie-bt button {
+    font-size: var(--fs-g);
     padding: 6px 12px;
   }
   .spacer {
@@ -672,7 +753,7 @@
     outline: 2px solid var(--accent, #ffb400);
   }
   .agent {
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
     padding: 4px 10px;
     border-radius: 999px;
@@ -794,14 +875,14 @@
     border-radius: 9px;
     padding: 0 6px;
     margin-left: 5px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .spect {
     padding: 6px 12px;
     border-radius: 8px;
     background: #2a2140;
     color: #c9b6ff;
-    font-size: 13px;
+    font-size: var(--fs-m);
     white-space: nowrap;
   }
   .talk.off {
@@ -809,7 +890,7 @@
   }
   .follow {
     white-space: nowrap;
-    font-size: 12px;
+    font-size: var(--fs-p);
     opacity: 0.6;
   }
   .follow.on {
@@ -828,7 +909,7 @@
     background: rgba(20, 16, 30, 0.88);
     border: 1px solid #4a3a6a;
     color: #eee6ff;
-    font-size: 15px;
+    font-size: var(--fs-g);
     line-height: 1.4;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     pointer-events: none;
@@ -858,21 +939,25 @@
     border: none;
     background: none;
     padding: 4px 2px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .compacto .tabs button {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .tabs button.on {
     background: var(--panel2);
   }
+  .tabs button.aba-act {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+  }
   .sep {
     cursor: row-resize;
     user-select: none;
-    font-size: 11px;
+    font-size: var(--fs-p);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--dim);

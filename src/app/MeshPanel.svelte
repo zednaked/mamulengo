@@ -118,13 +118,13 @@
   }
   .tabs button {
     flex: 1;
-    font-size: 15px;
+    font-size: var(--fs-g);
     padding: 8px 6px;
   }
   .help {
     margin: 0;
     padding-left: 18px;
-    font-size: 13px;
+    font-size: var(--fs-m);
     line-height: 1.5;
   }
   .pink {
@@ -135,7 +135,7 @@
   }
   kbd {
     font: inherit;
-    font-size: 11px;
+    font-size: var(--fs-p);
     background: var(--panel2);
     border: 1px solid var(--line);
     border-radius: 4px;
@@ -145,7 +145,7 @@
     display: flex;
     gap: 6px;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--fs-m);
     cursor: pointer;
   }
   .check input {
@@ -155,7 +155,7 @@
   .done {
     width: 100%;
     padding: 9px;
-    font-size: 15px;
+    font-size: var(--fs-g);
   }
   .done {
     background: #5ee0d0;
@@ -164,7 +164,7 @@
     font-weight: 600;
   }
   .lbl {
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .bones {
     display: flex;
@@ -187,7 +187,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .row input {
@@ -200,7 +200,7 @@
     display: flex;
     gap: 6px;
     align-items: center;
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .ramp {
@@ -210,6 +210,6 @@
     background: linear-gradient(90deg, rgb(41, 56, 158), rgb(38, 204, 140) 35%, rgb(255, 217, 51) 70%, rgb(255, 56, 51));
   }
   .small {
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
 </style>

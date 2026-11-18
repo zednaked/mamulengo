@@ -240,7 +240,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .row {
@@ -256,12 +256,12 @@
     color: #fff;
   }
   .small {
-    font-size: 12px;
+    font-size: var(--fs-p);
     line-height: 1.4;
   }
   .busy,
   .done {
-    font-size: 15px;
+    font-size: var(--fs-g);
   }
   .summary {
     margin: 0;
@@ -269,7 +269,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .warn {
     color: var(--accent2);
@@ -279,7 +279,7 @@
     align-items: center;
     gap: 6px;
     color: var(--text, inherit);
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .prop {
     list-style: none;
@@ -290,7 +290,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .prop li {
     display: flex;
@@ -311,16 +311,16 @@
     color: inherit;
   }
   .prop select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .why {
     width: 100%;
     color: var(--dim);
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .err {
     color: var(--err);
     white-space: pre-wrap;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
 </style>

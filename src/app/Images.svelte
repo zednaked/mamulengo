@@ -104,7 +104,7 @@
     min-width: 0;
   }
   .hint {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .grid {
     display: grid;
@@ -131,7 +131,7 @@
     pointer-events: none;
   }
   .cell span {
-    font-size: 11px;
+    font-size: var(--fs-p);
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;

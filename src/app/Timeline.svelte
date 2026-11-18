@@ -56,6 +56,15 @@
       app.avisar(`Cópia de ${a} criada: ${to} (duplo clique no nome renomeia).`);
     }
   }
+  // menu ⋯ da aba ativa (fixo na tela: a fila de abas rola e cortaria um menu dentro dela)
+  let menuAnim = $state<{ a: string; x: number; bottom: number } | null>(null);
+  let apagarArmado = $state(false);
+  function abrirMenuAnim(a: string, el: HTMLElement) {
+    if (menuAnim?.a === a) return void (menuAnim = null);
+    const r = el.getBoundingClientRect();
+    apagarArmado = false;
+    menuAnim = { a, x: Math.min(r.left, window.innerWidth - 230), bottom: window.innerHeight - r.top + 4 };
+  }
   // sem dialogo do navegador: segundo clique em 3s confirma
   function remove(a: string) {
     if (Date.now() - armedDelete > 3000) {
@@ -71,6 +80,35 @@
     app.version;
     return Object.keys(app.doc?.json.animations ?? {});
   });
+  // muitas animacoes: lista com busca, agrupada pelo prefixo antes da barra ("jogar/normal")
+  const MUITAS = 12;
+  const muitas = $derived(anims.length > MUITAS);
+  let lista = $state<{ x: number; bottom: number } | null>(null);
+  let busca = $state("");
+  const filtradas = $derived.by(() => {
+    const f = busca.trim().toLowerCase();
+    return f ? anims.filter((a) => a.toLowerCase().includes(f)) : anims;
+  });
+  const grupos = $derived.by(() => {
+    const m = new Map<string, string[]>();
+    for (const a of filtradas) {
+      const i = a.indexOf("/");
+      const g = i > 0 ? a.slice(0, i) : "";
+      m.set(g, [...(m.get(g) ?? []), a]);
+    }
+    // soltas (sem grupo) primeiro, depois os grupos na ordem em que aparecem
+    return [...m.entries()].sort((x, y) => (x[0] === "" ? -1 : y[0] === "" ? 1 : 0));
+  });
+  function abrirLista(el: HTMLElement) {
+    if (lista) return void (lista = null);
+    const r = el.getBoundingClientRect();
+    busca = "";
+    lista = { x: Math.min(r.left, window.innerWidth - 300), bottom: window.innerHeight - r.top + 4 };
+  }
+  function escolher(a: string) {
+    lista = null;
+    app.viewer?.setAnimation(a);
+  }
 
   // --- linhas
 
@@ -147,11 +185,15 @@
     const tls = collect(a);
     // no detalhe de uma parte, a primeira linha diz qual (antes so "tudo", sem dizer onde se estava)
     const nomeParte = app.selection.slot ?? app.selection.bone;
-    const out: Row[] = [{ id: "all", label: detail && nomeParte ? nomeParte : "tudo", color: "#9a93a8", cells: merged(tls), kind: "all" }];
     const { bone, slot } = app.selection;
+    const daParte = (tl: Tl) => (tl.bone && tl.bone === bone) || (tl.slot && tl.slot === slot);
+    // a linha com o nome da parte junta so as chaves dela (antes juntava a animacao inteira e
+    // parecia que o osso tinha chave em todo quadro)
+    const resumo = detail && nomeParte ? tls.filter(daParte) : tls;
+    const out: Row[] = [{ id: "all", label: detail && nomeParte ? nomeParte : "tudo", color: "#9a93a8", cells: merged(resumo), kind: "all" }];
     if (bone || slot) {
       for (const tl of tls) {
-        if (!((tl.bone && tl.bone === bone) || (tl.slot && tl.slot === slot))) continue;
+        if (!daParte(tl)) continue;
         const cells = tl.keys.map((k: any, i: number): Cell => ({ time: k.time ?? 0, refs: [refOf(tl, k)], curve: k.curve === "stepped" ? "stepped" : k.curve ? "bezier" : undefined, next: tl.keys[i + 1]?.time }));
         const id = tl.target?.deform ? `d:${tl.target.deform.slot}:${tl.target.deform.attachment}:${tl.timeline}` : `${tl.part}:${tl.timeline}`;
         out.push({ id, label: tl.label, color: COLORS[tl.timeline] ?? "#bbb", cells, kind: "detail", target: tl.target, timeline: tl.timeline });
@@ -662,6 +704,8 @@
   // interrompida no meio. O scrub cobre a sequencia inteira; as chaves sao da primeira.
   const emenda = $derived(app.play.seq);
   const others = $derived(anims.filter((a) => a !== app.play.animation));
+  // menu ⋯ (so na tela pequena) com fechar o laco, vai e volta e emendar
+  let lacoAberto = $state(false);
   // mix que o jogo usaria (-data.tres), para mostrar ao lado
   const gameMix = $derived(app.play.animation && emenda ? app.mixFor(app.play.animation, emenda.next) : null);
   function setSeq(patch: Partial<{ next: string | null; mix: number; at: number | null; loop: boolean }>) {
@@ -691,6 +735,16 @@
 <div class="tl" bind:this={tlEl} onpointerup={(e) => (e.target as HTMLElement).closest?.("button")?.blur()}>
   <div class="anims">
     {#if app.doc}<button class="base" class:on={!app.play.animation} onclick={() => (app.mode = "setup")} title="Pose base: o boneco parado, de onde toda animação parte. Mexer aqui muda todas as animações">Pose base</button>{/if}
+    {#if muitas}
+      <!-- muitas animacoes (telas de jogo tem dezenas): um botao com a atual abre a lista com busca -->
+      {#if renaming && renaming === app.play.animation}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="ren" bind:value={renameTo} onkeydown={(e) => (e.key === "Enter" ? rename() : e.key === "Escape" && (renaming = null))} onblur={rename} autofocus />
+      {:else}
+        <button class="escolhe-anim" class:on={!!app.play.animation} title="Escolher a animação ({anims.length}). Digite para filtrar" onclick={(e) => abrirLista(e.currentTarget as HTMLElement)}>{app.play.animation ?? "animações"} <span class="dim">▾ {anims.length}</span></button>
+        {#if app.play.animation}<button class="mini" class:on={menuAnim?.a === app.play.animation} title="Duplicar, renomear ou apagar {app.play.animation}" onclick={(e) => abrirMenuAnim(app.play.animation!, e.currentTarget as HTMLElement)}>⋯</button>{/if}
+      {/if}
+    {:else}
     {#each anims as a}
       {#if renaming === a}
         <!-- svelte-ignore a11y_autofocus -->
@@ -699,10 +753,11 @@
         <button class:on={a === app.play.animation} onclick={() => app.viewer?.setAnimation(a)} ondblclick={() => ((renaming = a), (renameTo = a))} title="duplo clique renomeia">{a}</button>
       {/if}
       {#if a === app.play.animation && renaming !== a}
-        <button class="mini" title="Duplicar animação" onclick={() => duplicate(a)}>⧉</button>
-        <button class="mini del" title="Apagar animação (clique duas vezes)" onclick={() => remove(a)}>🗑</button>
+        <!-- duplicar, renomear e apagar num menu: o apagar ficava colado na aba, a um clique errado -->
+        <button class="mini" class:on={menuAnim?.a === a} title="Duplicar, renomear ou apagar {a}" onclick={(e) => abrirMenuAnim(a, e.currentTarget as HTMLElement)}>⋯</button>
       {/if}
     {/each}
+    {/if}
     {#if creating}
       <!-- svelte-ignore a11y_autofocus -->
       <input placeholder="nome da animação" bind:value={newName} onkeydown={(e) => (e.key === "Enter" ? createAnim() : e.key === "Escape" && ((creating = false), (newName = "")))} onblur={() => !newName.trim() && (creating = false)} autofocus />
@@ -712,6 +767,34 @@
     {/if}
   </div>
 
+  {#if lista}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="fundo-menu-anim" onclick={() => (lista = null)}></div>
+    <div class="lista-anim" style:left="{lista.x}px" style:bottom="{lista.bottom}px">
+      <!-- svelte-ignore a11y_autofocus -->
+      <input placeholder="procurar animação" bind:value={busca} autofocus onkeydown={(e) => { if (e.key === "Escape") lista = null; else if (e.key === "Enter" && filtradas[0]) escolher(filtradas[0]); }} />
+      <div class="itens">
+        {#each grupos as [g, as] (g)}
+          {#if g}<div class="grupo">{g}</div>{/if}
+          {#each as as a (a)}
+            <button class:on={a === app.play.animation} class:dentro={!!g} onclick={() => escolher(a)}>{g ? a.slice(g.length + 1) : a}</button>
+          {/each}
+        {:else}
+          <div class="dim vazio">nenhuma com “{busca}”</div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+  {#if menuAnim}
+    {@const a = menuAnim.a}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="fundo-menu-anim" onclick={() => (menuAnim = null)}></div>
+    <div class="menu-anim" style:left="{menuAnim.x}px" style:bottom="{menuAnim.bottom}px">
+      <button onclick={() => { menuAnim = null; duplicate(a); }}>⧉ duplicar</button>
+      <button onclick={() => { menuAnim = null; renaming = a; renameTo = a; }}>✎ renomear <span class="dim">(2 cliques no nome)</span></button>
+      <button class="del" class:armado={apagarArmado} onclick={() => { if (apagarArmado) { menuAnim = null; apagarArmado = false; armedDelete = Date.now(); remove(a); } else apagarArmado = true; }}>🗑 {apagarArmado ? `apagar ${a} de vez?` : "apagar…"}</button>
+    </div>
+  {/if}
   {#if app.doc && !app.play.animation}
     <div class="base-note">
       <b>Pose base</b>: o que você mexer aqui (posição, giro, tamanho, imagens, malhas, ossos novos) muda o boneco em <b>todas</b> as animações. Para animar, escolha uma animação acima.
@@ -733,14 +816,21 @@
       <option value={1}>1x</option>
       <option value={2}>2x</option>
     </select>
-    <span class="time" title="Instante atual, quadro (a {FPS} por segundo) e duração. Setas: quadro anterior ou próximo. Shift+setas: chave anterior ou próxima. Home/End: início ou fim">{app.play.time.toFixed(2)}s <span class="dim">quadro {frame} · de {app.play.duration.toFixed(2)}s</span></span>
+    <span class="time" title="Instante atual, quadro (a {FPS} por segundo) e duração. Setas: quadro anterior ou próximo. Shift+setas: chave anterior ou próxima. Home/End: início ou fim">{app.play.time.toFixed(2)}s <span class="dim"><span class="longo">quadro{" "}</span>{frame}<span class="longo">{" "}· de {app.play.duration.toFixed(2)}s</span><span class="curto">/{Math.round(app.play.duration * FPS)}</span></span></span>
     {#if app.play.animation && app.play.duration === 0}<span class="dim empty-hint">sem chaves ainda: escolha o instante na régua e mexa uma parte</span>{/if}
     {#if app.play.animation && app.play.duration > 0}
-      <span class="laco">
-        <button class="mini" title="Fechar o laço: copia a primeira chave de cada parte para depois da última, e a repetição emenda sem pulo" onclick={fecharLaco}>⥁<span class="rot"> fechar o laço</span></button>
-        <button class="mini" title="Vai e volta: acrescenta a volta (as chaves de trás para a frente, com as curvas espelhadas); a animação dobra de duração. Vale também no jogo" onclick={vaiEVolta}>⇄<span class="rot"> vai e volta</span></button>
+      <!-- na tela pequena estes tres ficam num menu (⋯): soltos, a barra quebrava em mais uma linha -->
+      <span class="laco" class:aberto={lacoAberto}>
+        <button class="mini abre-laco" class:on={lacoAberto} title="Fechar o laço, vai e volta, emendar" onclick={() => (lacoAberto = !lacoAberto)}>⋯</button>
+        {#if lacoAberto}
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="fundo-laco" onclick={() => (lacoAberto = false)}></div>
+        {/if}
+        <span class="itens-laco">
+        <button class="mini" title="Fechar o laço: copia a primeira chave de cada parte para depois da última, e a repetição emenda sem pulo" onclick={() => ((lacoAberto = false), fecharLaco())}>⥁<span class="rot"> fechar o laço</span></button>
+        <button class="mini" title="Vai e volta: acrescenta a volta (as chaves de trás para a frente, com as curvas espelhadas); a animação dobra de duração. Vale também no jogo" onclick={() => ((lacoAberto = false), vaiEVolta())}>⇄<span class="rot"> vai e volta</span></button>
         {#if others.length}
-          <select class="mini" value="" onchange={(e) => { emendar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Emendar sem salto: esta animação termina (ou começa) na pose em que outra começa, para o jogo tocar uma depois da outra">
+          <select class="mini" value="" onchange={(e) => { lacoAberto = false; emendar((e.target as HTMLSelectElement).value); (e.target as HTMLSelectElement).value = ""; }} title="Emendar sem salto: esta animação termina (ou começa) na pose em que outra começa, para o jogo tocar uma depois da outra">
             <option value="">⇆ emendar…</option>
             {#each others as o}
               <option value="fim|{o}">terminar como {o} começa</option>
@@ -748,6 +838,7 @@
             {/each}
           </select>
         {/if}
+        </span>
       </span>
     {/if}
   </div>
@@ -963,7 +1054,7 @@
     display: inline-flex;
     gap: 4px;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .ev-nome input {
     width: 110px;
@@ -995,15 +1086,24 @@
     border: 1px solid #e08a2e;
     border-radius: 6px;
     color: #f3d3ad;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .hidden {
     display: none !important;
   }
+  /* muitas animacoes (uma tela de jogo tem dezenas): no maximo duas linhas de abas, que rolam;
+     o aviso e a regua ficam com o resto */
   .anims {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
+    flex-shrink: 0;
+    max-height: 76px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .base-note {
+    flex-shrink: 0;
   }
   .anims button {
     border-radius: 999px;
@@ -1025,10 +1125,104 @@
   .zoom .mini {
     min-width: 26px;
   }
+  .fundo-menu-anim {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+  }
+  .lista-anim {
+    position: fixed;
+    z-index: 41;
+    width: 290px;
+    max-height: min(480px, 70vh);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    background: var(--panel);
+    border: 1px solid #ffffff1a;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px #0008;
+  }
+  .lista-anim input {
+    width: 100%;
+  }
+  .lista-anim .itens {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-height: 0;
+  }
+  .lista-anim .grupo {
+    margin-top: 6px;
+    padding: 2px 8px;
+    font-size: var(--fs-p);
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .lista-anim button {
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  .lista-anim button.dentro {
+    padding-left: 18px;
+  }
+  .lista-anim button:hover {
+    background: #ffffff12;
+  }
+  .lista-anim button.on {
+    background: var(--accent);
+    color: white;
+  }
+  .lista-anim .vazio {
+    padding: 8px;
+  }
+  .escolhe-anim.on .dim {
+    color: inherit;
+    opacity: 0.75;
+  }
+  .escolhe-anim {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .menu-anim {
+    position: fixed;
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    min-width: 210px;
+    background: var(--panel);
+    border: 1px solid #ffffff1a;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px #0008;
+  }
+  .menu-anim button {
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  .menu-anim button:hover {
+    background: #ffffff12;
+  }
+  .menu-anim .del.armado {
+    background: #b0283c;
+    color: white;
+  }
   .anims .mini {
     padding: 4px 7px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .ren {
     width: 140px;
@@ -1049,7 +1243,7 @@
     grid-template-rows: auto auto minmax(0, 1fr);
     gap: 5px 10px;
     align-items: start;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   :global(.compacto) .tl > .base-note {
     grid-column: 1 / -1;
@@ -1096,7 +1290,7 @@
   :global(.compacto) .play {
     width: 36px;
     height: 28px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .play {
     width: 46px;
@@ -1119,14 +1313,14 @@
     height: 14px;
   }
   .empty-hint {
-    font-size: 12px;
+    font-size: var(--fs-p);
     white-space: nowrap;
   }
   /* largura fixa: tocando, o texto muda a cada quadro e empurrava a barra (o menu de emendar
      aberto andava junto e saia cortado) */
   .time {
     font-variant-numeric: tabular-nums;
-    font-size: 15px;
+    font-size: var(--fs-g);
     width: 17em;
     flex: none;
     white-space: nowrap;
@@ -1145,9 +1339,57 @@
     display: flex;
     gap: 4px;
   }
-  .laco {
+  .laco,
+  .itens-laco {
     display: inline-flex;
     gap: 4px;
+  }
+  .laco {
+    position: relative;
+  }
+  .abre-laco,
+  .fundo-laco,
+  .time .curto {
+    display: none;
+  }
+  /* tela pequena: o tempo encurta (0.43s 13/60) e o laco vira menu */
+  :global(.compacto) .time {
+    width: 7.5em;
+  }
+  :global(.compacto) .time .longo {
+    display: none;
+  }
+  :global(.compacto) .time .curto {
+    display: inline;
+  }
+  :global(.compacto) .abre-laco {
+    display: inline-block;
+  }
+  :global(.compacto) .itens-laco {
+    display: none;
+  }
+  :global(.compacto) .laco.aberto .itens-laco {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 41;
+    padding: 4px;
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px #0008;
+    min-width: 190px;
+  }
+  :global(.compacto) .laco.aberto .itens-laco > * {
+    text-align: left;
+  }
+  :global(.compacto) .fundo-laco {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
   }
   .barras {
     display: flex;
@@ -1173,7 +1415,7 @@
   }
   .mini {
     padding: 4px 9px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .mini.on {
     border-color: var(--accent);
@@ -1197,7 +1439,7 @@
   }
   .export .moldura {
     width: 100%;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .export .moldura summary {
@@ -1215,7 +1457,7 @@
   }
   .export .aviso {
     width: 100%;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .export .baixar {
     color: var(--ok);
@@ -1237,7 +1479,7 @@
     background: var(--accent);
   }
   .export label {
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
     display: flex;
     gap: 4px;
@@ -1254,7 +1496,7 @@
   }
   .export .done {
     width: 100%;
-    font-size: 12px;
+    font-size: var(--fs-p);
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -1300,7 +1542,7 @@
     align-items: center;
     gap: 4px;
     padding: 3px 7px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .del {
     color: var(--err);
@@ -1328,11 +1570,11 @@
     align-items: center;
     justify-content: flex-end;
     padding-right: 8px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .back {
     padding: 1px 8px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .note-mark {
     position: absolute;
@@ -1368,7 +1610,7 @@
     width: 100%;
     height: 24px;
     line-height: 24px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     text-align: right;
     padding: 0 10px 0 0;
     white-space: nowrap;
@@ -1385,7 +1627,7 @@
     text-decoration: underline;
   }
   .hint {
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--dim);
     padding: 4px 10px;
     text-align: right;
@@ -1512,7 +1754,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .seqctl .num {
     width: 58px;
@@ -1544,7 +1786,7 @@
     position: absolute;
     left: 6px;
     top: 1px;
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: #ff9fcf;
     white-space: nowrap;
   }

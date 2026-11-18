@@ -11,6 +11,11 @@
   --ok: #5ee0a0;
   --err: #ff6b6b;
   --radius: 10px;
+  /* tres tamanhos de texto para a interface toda: pequeno (rotulos, dicas, metadados), medio
+     (o texto dos paineis) e grande (ferramentas, titulos). 9 e 10 px so em contadores e na regua */
+  --fs-p: 12px;
+  --fs-m: 13px;
+  --fs-g: 15px;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   color: var(--text);

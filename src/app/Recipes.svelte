@@ -126,7 +126,7 @@
     margin-bottom: 10px;
   }
   .head {
-    font-size: 11px;
+    font-size: var(--fs-p);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--accent2);
@@ -154,6 +154,6 @@
   .grid button {
     text-align: left;
     padding: 7px 8px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
 </style>

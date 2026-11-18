@@ -199,6 +199,6 @@
   }
   .dim {
     color: #889;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
 </style>

@@ -71,7 +71,7 @@
   }
   .topo b {
     flex: 1;
-    font-size: 15px;
+    font-size: var(--fs-g);
   }
   .grupos {
     display: grid;
@@ -79,7 +79,7 @@
     gap: 14px 24px;
   }
   .titulo {
-    font-size: 11px;
+    font-size: var(--fs-p);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--accent2);
@@ -89,13 +89,13 @@
     display: flex;
     gap: 10px;
     align-items: baseline;
-    font-size: 13px;
+    font-size: var(--fs-m);
     padding: 2px 0;
   }
   kbd {
     flex: 0 0 120px;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--text);
     background: var(--bg);
     border: 1px solid var(--line);

@@ -130,7 +130,7 @@
     margin: 6px 0;
     padding: 6px 0;
     border-top: 1px solid #ffffff14;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .secao {
     color: #9aa0b4;
@@ -149,7 +149,7 @@
   textarea {
     width: 100%;
     box-sizing: border-box;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .trad {
     display: grid;
@@ -165,7 +165,7 @@
   .trad input {
     width: 100%;
     min-width: 0;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .cod {
     color: #9aa0b4;
@@ -182,11 +182,11 @@
     width: 48px;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   button {
     padding: 1px 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   button.on {
     background: #2b6cb0;

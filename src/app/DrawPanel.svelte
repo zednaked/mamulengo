@@ -317,14 +317,14 @@
   .tools button {
     flex: 1;
     padding: 7px 4px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .on {
     background: #0c99ff33;
     border-color: #0c99ff;
   }
   .secao {
-    font-size: 12px;
+    font-size: var(--fs-p);
     font-weight: 600;
     margin-top: 4px;
   }
@@ -353,7 +353,7 @@
     border: none;
     text-align: left;
     padding: 4px;
-    font-size: 13px;
+    font-size: var(--fs-m);
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -372,7 +372,7 @@
     background: none;
     border: none;
     padding: 2px 5px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     opacity: 0.6;
   }
   .mini:hover {
@@ -383,7 +383,7 @@
     min-width: 0;
   }
   .vazio {
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 4px;
   }
   .grade {
@@ -391,7 +391,7 @@
     grid-template-columns: auto 1fr;
     gap: 6px 8px;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .ck {
     display: flex;
@@ -401,7 +401,7 @@
   }
   .rot {
     color: var(--dim);
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .cor {
     display: flex;
@@ -422,7 +422,7 @@
   }
   .seg button {
     flex: 1;
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 4px 2px;
   }
   .furos {
@@ -442,7 +442,7 @@
     opacity: 1;
   }
   .num {
-    font-size: 12px;
+    font-size: var(--fs-p);
     width: 34px;
     text-align: right;
   }

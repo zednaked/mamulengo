@@ -103,7 +103,7 @@
     overflow: auto;
   }
   .cab {
-    font-size: 11px;
+    font-size: var(--fs-p);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--accent2);
@@ -118,7 +118,7 @@
     border: none;
     border-radius: 8px;
     padding: 7px 8px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   nav button.on {
     background: var(--accent);
@@ -135,7 +135,7 @@
   }
   .leve {
     color: var(--dim);
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   section {
     position: relative;
@@ -175,7 +175,7 @@
     display: flex;
     flex-direction: column;
     gap: 9px;
-    font-size: 14.5px;
+    font-size: var(--fs-g);
     line-height: 1.45;
     color: #d6d0e0;
   }
@@ -188,7 +188,7 @@
     flex-wrap: wrap;
     gap: 6px 14px;
     margin-top: 14px;
-    font-size: 12.5px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .t {
@@ -198,7 +198,7 @@
   }
   kbd {
     font: inherit;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--text);
     background: var(--bg);
     border: 1px solid var(--line);
@@ -211,7 +211,7 @@
     border-left: 3px solid var(--accent2);
     background: #ffffff0a;
     border-radius: 0 8px 8px 0;
-    font-size: 13px;
+    font-size: var(--fs-m);
     color: var(--dim);
   }
   .nav {

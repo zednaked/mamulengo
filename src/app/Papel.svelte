@@ -147,12 +147,12 @@
     border-top: 1px solid #ffffff14;
   }
   .secao {
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: #9aa0b4;
     margin-bottom: 2px;
   }
   .small {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .dim {
     color: #9aa0b4;
@@ -176,7 +176,7 @@
   }
   .codigo {
     font-family: ui-monospace, monospace;
-    font-size: 10.5px;
+    font-size: var(--fs-p);
     color: #7fd4ff;
     margin: 2px 0 4px;
     word-break: break-all;
@@ -185,10 +185,10 @@
     width: 52px;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .pequeno {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 1px 6px;
   }
 </style>

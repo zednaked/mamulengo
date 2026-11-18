@@ -100,12 +100,12 @@
     border-top: 1px solid #ffffff14;
   }
   .secao {
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: #9aa0b4;
     margin-bottom: 2px;
   }
   .small {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .dim {
     color: #9aa0b4;
@@ -125,7 +125,7 @@
     width: 22px;
     height: 20px;
     padding: 0;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .col {
     display: flex;
@@ -133,7 +133,7 @@
     gap: 3px;
   }
   .col button {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 1px 6px;
   }
   button.on {
@@ -144,6 +144,6 @@
     width: 56px;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
 </style>

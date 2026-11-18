@@ -89,13 +89,13 @@
         data-bone={n.name}
         class:sel={app.selection.bone === n.name}
         class:sobre={sobre === n.name && arrastando !== n.name}
-        style:padding-left="{6 + n.depth * 14}px"
+        style:padding-left="calc(6px + {n.depth} * var(--passo-arvore))"
         ondragover={(e) => arrastando && (e.preventDefault(), (sobre = n.name))}
         ondragleave={() => sobre === n.name && (sobre = null)}
         ondrop={(e) => (e.preventDefault(), soltar(n.name))}
       >
-        {#each n.trilhas as t, k}{#if t}<span class="trilha" style:left="{6 + (k + 1) * 14 - 6}px"></span>{/if}{/each}
-        {#if n.depth > 0}<span class="ramo" class:ultimo={n.ultimo} style:left="{6 + n.depth * 14 - 6}px"></span>{/if}
+        {#each n.trilhas as t, k}{#if t}<span class="trilha" style:left="calc({k + 1} * var(--passo-arvore))"></span>{/if}{/each}
+        {#if n.depth > 0}<span class="ramo" class:ultimo={n.ultimo} style:left="calc({n.depth} * var(--passo-arvore))"></span>{/if}
         {#if n.kids}
           <button class="tw" onclick={() => (collapsed[n.name] = !collapsed[n.name])}>{collapsed[n.name] ? "▸" : "▾"}</button>
         {:else}
@@ -108,10 +108,10 @@
           draggable={n.depth > 0}
           ondragstart={(e) => ((arrastando = n.name), e.dataTransfer?.setData("text/plain", n.name))}
           ondragend={() => (arrastando = sobre = null)}
-          title={n.parent ? `filho de ${n.parent} · arraste sobre outro osso (na Pose base) para trocar o pai` : "a raiz do esqueleto"}
+          title={n.parent ? `${n.name}, filho de ${n.parent} · arraste sobre outro osso (na Pose base) para trocar o pai` : "a raiz do esqueleto"}
         >
-          <span class="ico">🦴</span>{n.name}
-          {#if n.animated}<span class="dot" title="animado nesta animação"></span>{/if}
+          <span class="ico">🦴</span><span class="txt">{n.name}</span>
+          {#if n.animated}<span class="dot" title="tem chaves em {app.play.animation ?? 'esta animação'}: a linha dele aparece na timeline"></span>{/if}
         </button>
         <button class="eye" class:shut={app.hidden.bones.includes(n.name)} onclick={() => app.toggleHidden("bones", n.name)} title={app.hidden.bones.includes(n.name) ? "mostrar este osso (e o que pende dele)" : "esconder este osso e o que pende dele (so na tela)"}>{app.hidden.bones.includes(n.name) ? "◡" : "👁"}</button>
       </div>
@@ -121,6 +121,8 @@
 
 <style>
   .tree {
+    /* recuo por nivel; no notebook menor (o painel e estreito e os nomes cortavam) */
+    --passo-arvore: 14px;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -137,17 +139,29 @@
   }
   .all {
     white-space: nowrap;
-    font-size: 11px;
+    font-size: var(--fs-p);
     color: var(--accent);
   }
+  /* o olho fica por cima do fim da linha (so aparece no mouse): o nome usa a largura toda */
   .eye {
-    flex: none;
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 24px;
     text-align: center;
-    font-size: 12px;
-    opacity: 0.35;
+    background: var(--panel);
+    border-radius: 6px;
+    font-size: var(--fs-p);
+    opacity: 0;
   }
+  /* o olho so aparece passando o mouse na linha (ou com o teclado); escondido, fica sempre a
+     vista. Uma coluna de olhos apagados em toda linha era ruido */
   .bone:hover .eye,
+  .eye:focus-visible {
+    opacity: 0.6;
+  }
+  .eye:hover,
   .eye.shut {
     opacity: 1;
   }
@@ -158,7 +172,7 @@
   .list {
     overflow: auto;
     flex: 1;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .bone {
     display: flex;
@@ -209,10 +223,16 @@
     width: 18px;
     color: var(--dim);
     flex: none;
-    font-size: 11px;
+    font-size: var(--fs-p);
+  }
+  .txt {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .name {
     flex: 1;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -221,7 +241,7 @@
     gap: 5px;
   }
   .ico {
-    font-size: 11px;
+    font-size: var(--fs-p);
     opacity: 0.7;
   }
   .dot {
@@ -230,5 +250,8 @@
     border-radius: 50%;
     background: var(--accent);
     flex: none;
+  }
+  :global(.compacto) .tree {
+    --passo-arvore: 10px;
   }
 </style>

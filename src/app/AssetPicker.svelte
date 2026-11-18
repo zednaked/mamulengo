@@ -184,7 +184,7 @@
   }
   .vazio {
     padding: 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     white-space: normal;
   }
   .picker {
@@ -229,14 +229,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 11px;
+    font-size: var(--fs-p);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--accent2);
     margin: 8px 4px 4px;
   }
   .proj .mini {
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 0 6px;
     text-transform: none;
     letter-spacing: 0;
@@ -258,7 +258,7 @@
     background: #3a2433;
   }
   .res {
-    font-size: 11px;
+    font-size: var(--fs-p);
     margin-left: 10px;
     white-space: nowrap;
     overflow: hidden;

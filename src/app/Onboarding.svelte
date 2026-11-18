@@ -87,7 +87,7 @@
     box-shadow: 0 20px 60px #000c;
   }
   .hello {
-    font-size: 15px;
+    font-size: var(--fs-g);
     color: var(--dim);
   }
   .hello b {
@@ -109,7 +109,7 @@
     margin-bottom: 6px;
   }
   .text {
-    font-size: 15px;
+    font-size: var(--fs-g);
     line-height: 1.45;
     color: #d6d0e0;
   }

@@ -866,6 +866,22 @@ export class Viewer {
   // render fora da tela com tamanho exato (comparacao com o Godot, snapshots)
   fixed: { w: number; h: number } | null = null;
 
+  // a area do mundo que a pessoa escolheu ver (pelo enquadrar, roda ou arrasto). Quando o
+  // canvas muda de tamanho (painel abre ou fecha, janela muda), o zoom se ajusta para essa
+  // area continuar inteira na tela; fechar o painel de novo volta ao zoom de antes.
+  private vista: { w: number; h: number; zoom: number; cw: number; ch: number } | null = null;
+  private mantemVista(cw: number, ch: number) {
+    if (!cw || !ch) return;
+    const v = this.vista;
+    if (v && (cw !== v.cw || ch !== v.ch) && this.cam.zoom === v.zoom) {
+      this.cam.zoom = Math.min(cw / v.w, ch / v.h);
+      this.vista = { ...v, zoom: this.cam.zoom, cw, ch };
+      return;
+    }
+    // zoom mudou por outra via (ou primeiro quadro): esta passa a ser a area escolhida
+    if (!v || this.cam.zoom !== v.zoom || cw !== v.cw || ch !== v.ch) this.vista = { w: cw / this.cam.zoom, h: ch / this.cam.zoom, zoom: this.cam.zoom, cw, ch };
+  }
+
   draw() {
     const { scene, canvas } = this;
     const dpr = this.fixed ? 1 : window.devicePixelRatio || 1;
@@ -875,6 +891,7 @@ export class Viewer {
       canvas.width = w;
       canvas.height = h;
     }
+    if (!this.fixed) this.mantemVista(canvas.clientWidth, canvas.clientHeight);
     const gl = this.ctx.gl;
     gl.viewport(0, 0, w, h);
     const [r, g, b] = this.view.background;

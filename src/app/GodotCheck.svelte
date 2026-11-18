@@ -97,7 +97,7 @@
     flex: 1;
   }
   figcaption {
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
     margin-bottom: 4px;
   }

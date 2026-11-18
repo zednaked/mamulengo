@@ -238,7 +238,7 @@
     border-radius: 10px;
     box-shadow: 0 10px 30px #0008;
     z-index: 150;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   header {
     display: flex;
@@ -258,7 +258,7 @@
   }
   .conta {
     opacity: 0.7;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .x {
     padding: 0 6px;
@@ -272,7 +272,7 @@
   }
   .trilhas button {
     flex: 1;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .trilhas button.on {
     outline: 2px solid var(--accent, #ffb400);
@@ -288,7 +288,7 @@
     height: 26px;
     padding: 0;
     border-radius: 50%;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .bola.feita {
     background: #2e7d4f;
@@ -303,7 +303,7 @@
   }
   h3 {
     margin: 6px 0 4px;
-    font-size: 15px;
+    font-size: var(--fs-g);
   }
   .ic {
     margin-right: 6px;
@@ -325,12 +325,12 @@
   }
   .dica {
     opacity: 0.85;
-    font-size: 12px;
+    font-size: var(--fs-p);
     margin: 6px 0;
   }
   .dim {
     opacity: 0.65;
-    font-size: 12px;
+    font-size: var(--fs-p);
     margin: 4px 0;
   }
   .erro {
@@ -379,7 +379,7 @@
     gap: 6px;
     align-items: center;
     padding: 0 10px 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .todas span {
     flex: 1;
@@ -388,7 +388,7 @@
     background: none;
     border: none;
     opacity: 0.7;
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 0;
     text-decoration: underline;
   }

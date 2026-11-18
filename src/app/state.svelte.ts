@@ -1156,7 +1156,7 @@ class AppState {
   ficha = $state<{ path: string; text: string | null } | null>(null);
   // regras da ficha falhando na animacao aberta (o painel confere; o topo mostra)
   fichaFails = $state(0);
-  rightTab = $state<"edit" | "ficha" | "notas">("edit");
+  rightTab = $state<"edit" | "ficha" | "notas" | "atividade">("edit");
 
   async loadFicha() {
     if (!this.asset) return;

@@ -31,7 +31,7 @@
     flex-direction: column;
     gap: 3px;
     overflow-y: auto;
-    font-size: 12px;
+    font-size: var(--fs-p);
     min-height: 0;
     flex: 1;
   }

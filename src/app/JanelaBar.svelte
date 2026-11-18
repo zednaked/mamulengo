@@ -37,6 +37,14 @@
     app.usarIdioma(idiomas[(i + d + idiomas.length) % idiomas.length]);
   }
 
+  // num personagem (sem `screen`) a fila de tamanhos fica recolhida num botao: aberta sempre,
+  // ela cobria o alto do desenho sem uso. Numa tela, ou com uma janela escolhida, fica aberta
+  let abrir = $state(false);
+  const ehTela = $derived.by(() => {
+    app.version;
+    return !!(app.doc?.json as any)?.screen;
+  });
+
   let livre = $state({ w: 1280, h: 800 });
   let abertoLivre = $state(false);
 
@@ -69,6 +77,10 @@
 <svelte:window onkeydown={tecla} />
 
 <div class="janelas" title="A tela vista numa janela de outro tamanho: os ossos ancorados (inspetor do osso, Âncora na tela) vão para o lugar. Alt+0 a 5 troca, Alt+L lado a lado, Alt+` tira">
+  {#if !(ehTela || abrir || app.janela || app.ladoALado || abertoLivre)}
+  <button class="abrir" onclick={() => (abrir = true)} title="Ver numa janela de outro tamanho (celular, tablet, desktop). Alt+0 a 5 também">▭ janela ▾</button>
+  {:else}
+  {#if !ehTela}<button class="abrir" onclick={() => { abrir = false; abertoLivre = false; app.ladoALado = false; usar(null); }} title="recolher (e voltar ao desenho sem janela)">▸</button>{/if}
   <span class="rot">janela</span>
   <button class:on={!app.janela} onclick={() => usar(null)} title="sem janela (Alt+`)">—</button>
   <button class:on={app.janela?.nome === "arte"} onclick={() => usar("arte")} title="o tamanho da arte base (Alt+0)">arte</button>
@@ -83,6 +95,7 @@
   <span class="sep"></span>
   <button class:on={app.ladoALado} onclick={() => (app.ladoALado = !app.ladoALado)} title="todos os tamanhos lado a lado (Alt+L); clique num para usá-lo">lado a lado</button>
   {#if app.janela}<span class="dim">{app.janela.w}×{app.janela.h}</span>{/if}
+  {/if}
   {#if idiomas.length || temTextos}
     <span class="sep"></span>
     <span class="rot">idioma</span>
@@ -110,7 +123,7 @@
     border: 1px solid #333;
     border-radius: 6px;
     padding: 3px 5px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .rot {
     color: #9aa;
@@ -118,7 +131,7 @@
   }
   button {
     padding: 1px 6px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   button.on {
     background: #2b6cb0;
@@ -126,7 +139,7 @@
   }
   input {
     width: 52px;
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .sep {
     width: 6px;
@@ -136,7 +149,7 @@
     margin-left: 3px;
   }
   select {
-    font-size: 11px;
+    font-size: var(--fs-p);
   }
   .aviso {
     color: #f0b040;

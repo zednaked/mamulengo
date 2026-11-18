@@ -1024,7 +1024,7 @@
     background: rgba(24, 20, 34, 0.85);
     padding: 4px 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .refbar input {
     width: 80px;
@@ -1060,7 +1060,7 @@
     background: #e08a2e;
     color: #1d1b22;
     font-weight: 700;
-    font-size: 11px;
+    font-size: var(--fs-p);
     letter-spacing: 0.06em;
     padding: 2px 8px;
     border-radius: 4px;
@@ -1073,7 +1073,7 @@
     place-items: center;
     z-index: 7;
     background: #16141b99;
-    font-size: 15px;
+    font-size: var(--fs-g);
     pointer-events: none;
   }
   .leitura {
@@ -1084,7 +1084,7 @@
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 2px 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -1095,7 +1095,7 @@
     right: 8px;
     z-index: 5;
     pointer-events: none;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
     background: #1a1820cc;
     border-radius: 6px;
@@ -1115,7 +1115,7 @@
     background: #2a2533;
     color: #b8f5c8;
     border: 1px solid #b8f5c866;
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 3px 12px;
     border-radius: 6px;
     cursor: pointer;
@@ -1128,7 +1128,7 @@
     background: #2a2533;
     color: #7fd4ff;
     border: 1px solid #7fd4ff66;
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 3px 12px;
     border-radius: 6px;
     cursor: pointer;
@@ -1144,7 +1144,7 @@
     z-index: 6;
     background: #000b;
     color: #e8eaf2;
-    font-size: 12px;
+    font-size: var(--fs-p);
     padding: 6px 10px;
     border-radius: 8px;
     display: flex;
@@ -1187,7 +1187,7 @@
     border: 1px solid #ffffff22;
     border-radius: 8px;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: var(--fs-p);
   }
   .posebar .ok {
     background: #ff3d8b;
@@ -1201,7 +1201,7 @@
     background: #2a2533;
     color: #ffd27a;
     border: 1px solid #ffd27a66;
-    font-size: 11px;
+    font-size: var(--fs-p);
     padding: 2px 8px;
     border-radius: 4px;
     cursor: pointer;
@@ -1232,7 +1232,7 @@
     color: #ffd0d0;
     padding: 8px 12px;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .aviso-nucleo {
     position: absolute;
@@ -1243,7 +1243,7 @@
     color: #1d1a24;
     padding: 6px 10px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     display: flex;
     gap: 8px;
     align-items: center;
@@ -1269,7 +1269,7 @@
     background: #1a1820cc;
     padding: 6px 10px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: var(--fs-p);
     color: var(--dim);
   }
   .offer {
@@ -1298,7 +1298,7 @@
     gap: 10px;
     align-items: center;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: var(--fs-m);
   }
   .drawbar {
     background: #121c26dd;
