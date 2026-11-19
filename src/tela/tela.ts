@@ -130,6 +130,8 @@ export function textoDoBoneco(N: any, bytes: Uint8Array, arquivo: string): strin
   }
 }
 const IDIOMAS_RTL = /^(ar|he|fa|ur|ps|sd|ug|yi|dv|ckb)(_|-|$)/;
+// o mesmo valor de antes (numero, texto ou lista de numeros): os setters da tela so sujam a arvore quando algo muda
+const igual = (a: unknown, b: unknown) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i]));
 
 const VS = `#version 300 es
 in vec2 pos; in vec2 uv; in vec4 cor;
@@ -163,6 +165,10 @@ export class Tela {
   private bonecos = new Map<ElementoTela, Boneco>();
   private atlas: WebGLTexture;
   private pedacos = new Map<ElementoTela, Pedaco>();
+  // o mesmo desenho e um pedaco so: dois textos (ou caixas) com o mesmo conteudo, a mesma aparencia e a mesma escala
+  // usam a mesma imagem do atlas. Uma lista que troca o conteudo das linhas (rolagem, ordem nova) volta a usar o que ja
+  // esta no atlas em vez de desenhar e subir de novo
+  private porConteudo = new Map<string, Pedaco>();
   private prateleira = { x: 0, y: 0, h: 0 };
   private rasc = document.createElement("canvas");
   private porNome = new Map<string, ElementoTela>();
@@ -367,6 +373,8 @@ export class Tela {
     if (e) this.pedacos.delete(e);
   }
   mostrar(no: string, sim: boolean) {
+    // o mesmo de antes nao suja a arvore (o jogo chama a cada quadro, e cada sujeira recalcula todos os elementos)
+    if (!!this.nos[no]?.oculto === !sim) return;
     (this.nos[no] ??= {}).oculto = !sim;
     this.sujo = true;
   }
@@ -376,6 +384,7 @@ export class Tela {
   // a cor (modulate) de um no, herdada pelos filhos; "ffffffff" desfaz. Em numeros pode passar de 1,
   // como o modulate do Godot (para desfazer a cor de um pai)
   cor(no: string, rrggbbaa: string | number[]) {
+    if (this.nos[no] && igual(this.nos[no].cor, rrggbbaa)) return;
     (this.nos[no] ??= {}).cor = rrggbbaa;
     this.sujo = true;
   }
@@ -632,7 +641,9 @@ export class Tela {
     const pai = (i > 0 && this.nos[nome.slice(0, i)]?.xf) || ([1, 0, 0, 1, 0, 0] as Xf);
     const local: Xf = [escala[0], 0, 0, escala[1], pos[0] + pivo[0] - escala[0] * pivo[0], pos[1] + pivo[1] - escala[1] * pivo[1]];
     // a diferenca para o layout: aplicada a tudo o que esta embaixo
-    n.mover = mult(mult(pai, local), inversa(n.xf));
+    const mover = mult(mult(pai, local), inversa(n.xf));
+    if (igual(n.mover, mover)) return;
+    n.mover = mover;
     this.sujo = true;
   }
   // ---- layouts: entre o da captura (t = 0) e outro estado (t = 1), cada numero em linha reta. porNo da
@@ -731,6 +742,7 @@ export class Tela {
   }
   // recorta o que esta embaixo de um no a um retangulo da tela (clip_contents); null tira
   recortar(nome: string, ret: number[] | null) {
+    if (this.nos[nome] && igual(this.nos[nome].recorte, ret ?? undefined)) return;
     (this.nos[nome] ??= {}).recorte = ret ?? undefined;
     this.sujo = true;
   }
@@ -738,15 +750,16 @@ export class Tela {
   // layout da captura (null tira)
   transformar(nome: string, xf: Xf | null) {
     const n = this.nos[nome];
-    if (!n) return;
+    if (!n || igual(n.mover, xf ?? undefined)) return;
     n.mover = xf ?? undefined;
     this.sujo = true;
   }
   // desloca um no (e o que esta embaixo) na tela, alem do layout
   deslocar(nome: string, dx: number, dy: number) {
     const n = this.nos[nome];
-    if (!n) return;
-    n.mover = dx || dy ? [1, 0, 0, 1, dx, dy] : undefined;
+    const mover: Xf | undefined = dx || dy ? [1, 0, 0, 1, dx, dy] : undefined;
+    if (!n || igual(n.mover, mover)) return;
+    n.mover = mover;
     this.sujo = true;
   }
 
@@ -763,8 +776,9 @@ export class Tela {
   z(nome: string, z: number) {
     const n = this.nos[nome];
     if (!n) return;
-    const i = nome.lastIndexOf("/");
-    n.zNovo = (this.nos[nome.slice(0, i)]?.z ?? 0) + z;
+    const i = nome.lastIndexOf("/"), zNovo = (this.nos[nome.slice(0, i)]?.z ?? 0) + z;
+    if (n.zNovo === zNovo) return;
+    n.zNovo = zNovo;
     this.sujo = true;
   }
 
@@ -854,10 +868,10 @@ export class Tela {
   }
   set lingua(i: string) {
     this.idioma = i;
-    this.pedacos.clear();
+    this.limparPedacos();
     // a escrita nova chega e o texto se refaz com ela
     const faltam = Object.keys(this.dados.fontes).filter((n) => this.fonteServe(n) && !this.fontesProntas.has(n));
-    if (faltam.length) Promise.all(faltam.map((n) => this.carregarFonte(n))).then(() => this.pedacos.clear());
+    if (faltam.length) Promise.all(faltam.map((n) => this.carregarFonte(n))).then(() => this.limparPedacos());
   }
 
   // ---- desenho: a tela inteira cabendo em w x h pixels, no meio
@@ -978,6 +992,8 @@ export class Tela {
     if (e.tipo !== "texto" && e.tipo !== "caixa") return;
     const folga = e.tipo === "texto" ? Math.ceil(Math.max(e.contorno?.[0] ?? 0, e.sombra?.[3] ?? 0) + Math.abs(e.sombra?.[1] ?? 0) + Math.abs(e.sombra?.[2] ?? 0) + e.tamanho * 0.3) : Math.ceil(Math.max(0, ...(e.estilo.expandir ?? [0])) + 2);
     const pedido = k;
+    const chave = this.chaveDoDesenho(e, k), ja = this.porConteudo.get(chave);
+    if (ja) return this.pedacos.set(e, ja), ja;
     // maior que o atlas (uma faixa de ponta a ponta): feita numa escala menor, o desenho estica
     k = Math.min(k, (ATLAS - 4) / (e.ret[2] + 2 * folga), (ATLAS - 4) / (e.ret[3] + 2 * folga));
     const w = Math.ceil((e.ret[2] + 2 * folga) * k),
@@ -995,8 +1011,8 @@ export class Tela {
     // a prateleira: cabe na linha, senao desce; o atlas cheio recomeca (os outros remontam)
     const s = this.prateleira;
     if (s.x + w + 2 > ATLAS) (s.x = 0), (s.y += s.h), (s.h = 0);
-    if (s.y + h + 2 > ATLAS) (s.x = 0), (s.y = 0), (s.h = 0), this.pedacos.clear();
-    const p: Pedaco = { x: s.x + 1, y: s.y + 1, w, h, k, folga, chave: "", pedido };
+    if (s.y + h + 2 > ATLAS) (s.x = 0), (s.y = 0), (s.h = 0), this.limparPedacos();
+    const p: Pedaco = { x: s.x + 1, y: s.y + 1, w, h, k, folga, chave, pedido };
     const [ux, uy] = [s.x, s.y];
     s.x += w + 2;
     s.h = Math.max(s.h, h + 2);
@@ -1006,7 +1022,20 @@ export class Tela {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, ux, uy, gl.RGBA, gl.UNSIGNED_BYTE, cv);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.pedacos.set(e, p);
+    this.porConteudo.set(chave, p);
     return p;
+  }
+  // tudo o que muda a imagem de um texto ou de uma caixa no atlas (o lugar na tela nao entra: ret[0] e ret[1] so
+  // posicionam o desenho)
+  private chaveDoDesenho(e: Extract<ElementoTela, { tipo: "texto" | "caixa" }>, k: number) {
+    if (e.tipo === "caixa") return JSON.stringify(["c", k, e.ret[2], e.ret[3], e.estilo]);
+    const rtl = IDIOMAS_RTL.test(this.idioma);
+    return JSON.stringify(["t", k, e.ret[2], e.ret[3], this.textoDe(e), e.fontes, e.tamanho, rtl, e.quebra, e.alinhar, e.contorno, e.sombra, e.cor_fonte, this.ajusteTexto]);
+  }
+  // o atlas recomeca (cheio, idioma novo, fonte que chegou): todo texto e caixa se redesenha
+  private limparPedacos() {
+    this.pedacos.clear();
+    this.porConteudo.clear();
   }
 
   // como o Label do Godot: linhas de ascendente + descendente, alinhamento inteiro, sombra, contorno
