@@ -24,9 +24,7 @@ and adds what Spine does not have: per-part effects, particles and 2.5D turns.
 ```
 466 of 466 playback scripts match the reference runtime every frame, events too
 20 characters posed in 0.043 ms a frame (native), about 5x faster than the runtime it replaces
-102 of 102 production Spine 4.3 projects round-trip through .boneco unchanged
-a slot game on staging runs on the core: 1 wasm instead of 3
-GPU objects created per frame in that game: 160 before, 0.3 now
+Spine 4.3 projects round-trip through .boneco unchanged
 dragging a key on an 8.6 s character in the editor: 13 ms a step (it was 51)
 ```
 
@@ -149,8 +147,7 @@ and Godot (`BonecoSprite`). Exporting to Spine drops them, with a warning.
   pivot, the containers, label sizes from the font metrics) and `src/tela` draws it
   in one WebGL2 pass, for the exact window size, rebuilding when the window turns.
   Variants per aspect ratio do what Godot's stretch cannot (a centered column on
-  desktop). A production game ported this way loads 7x less before its first screen
-  than its Godot export. [docs/BACKEND.md](docs/BACKEND.md).
+  desktop).
 
 ![A small game: the bunny jumps on its island to catch floating coins, a mission checks itself off and the pause dims the screen](exemplos/coelho/coelho.gif)
 
@@ -271,11 +268,10 @@ Art: [Toon Characters](https://kenney.nl/assets/toon-characters-1) and
 One JSON file per character: skeleton, atlas regions, animations, the transition
 times the game uses, page compression for the game and the brief. Field names
 are in Portuguese and every one of them maps both ways to Spine 4.3, so a
-`.boneco` exports back to the exact JSON and atlas it came from (102 of 102
-production projects, at a median 1.05x the size). For shipping, the same file can be
+`.boneco` exports back to the exact JSON and atlas it came from (at a median 1.05x the size). For shipping, the same file can be
 stored in binary: about 5 times smaller and 1.6 times faster to load, with the pose byte
-for byte the same. Where the two runtimes the
-games used disagreed (multiply ignoring alpha, physics gravity flipping sign),
+for byte the same. Where the two reference
+runtimes disagree (multiply ignoring alpha, physics gravity flipping sign),
 the format says which one it means. Spec: [docs/FORMATO.md](docs/FORMATO.md).
 
 ```sh
@@ -335,20 +331,7 @@ characters, a click that switches animation and the events on screen:
 - a **GDExtension** (Linux, Windows and macOS) for the editor, F5 and headless CI with
   the stock Godot.
 
-`BonecoSprite` keeps one mesh per batch and only rewrites vertices each frame.
-In a slot game with 17 animated characters, on staging, the engine module replaced
-the official plugin: one wasm instead of three, a 51 MB export instead of 64 MB,
-the first frame in 3.4 s instead of 6.7 s. Those times were measured with an
-earlier build of the module; the core's module ships the same 38.6 MB wasm and the
-same compressed download, and natively it is now cheaper per frame (0.54 ms for
-the 17 characters, against 0.63 ms). In the browser, with both at 120 fps, it uses
-about 3 points more of the main thread than that earlier build (it was 6 to 8
-before a profiling pass on drawing and clipping), and on a CPU slowed 4x the
-frames over 25 ms are the same. Keeping the meshes took the GPU objects created
-per frame from 160 to 0.3, and pieces that do not move send nothing. Out of 153 frames compared pixel by
-pixel against the previous renderer, 142 are identical; the other 11 come from
-flipbooks one step apart (4 above 1% of pixels, 7 below 0.5%), and where checked,
-the core is the one that matches the reference.
+`BonecoSprite` keeps one mesh per batch and only rewrites vertices each frame. Pieces that do not move send nothing.
 
 ```sh
 nucleo/godot/compilar.sh linux    # GDExtension (also windows, macos), as the CI does
@@ -448,13 +431,8 @@ differences the editor reproduces: [docs/PARIDADE.md](docs/PARIDADE.md).
 
 Working: the editor (drawing, posing and measuring through the core in the
 "nucleo" mode), the MCP server, the agent bench, `.boneco` with effects and
-particles, the core with its Godot module and GDExtension. A slot game runs on
-staging with the engine module, and its `.boneco` build, all on the core, passes
-its tests. The core is the editor's default mode for every project, the binary
-`.boneco` is done and the editor opens from a link, nothing to install. A first
-production web game runs entirely on the Mamulengo runtime, its screens generated
-from the Godot project at deploy time; on a mid-range phone profile it is ready
-about nine times sooner than its Godot export.
+particles, the core with its Godot module and GDExtension. The core is the editor's default mode for every project, the binary
+`.boneco` is done and the editor opens from a link, nothing to install.
 
 **Layout mode (screens without Godot):** a screen is a `.boneco` built in the
 editor. Bones anchor to the window (corners, edges, center, stretch), text parts
@@ -465,7 +443,7 @@ in already proposed as a screen ([docs/LAYOUT-PSD.md](docs/LAYOUT-PSD.md)). The
 screen writes a manifest, and the game logic is written against it by name
 (`tela.botao("jogar").aoTocar(...)`): see [exemplos/coelho](exemplos/coelho).
 Next: copies made at play time (lists), moving a bone from code, fixed-margin
-anchors, and a first production game converted this way. Plan:
+anchors. Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License

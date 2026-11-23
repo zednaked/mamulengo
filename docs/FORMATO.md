@@ -287,8 +287,8 @@ arte que aparece bem menor que o tamanho dela não serrilhar (algarismos pequeno
 (`src/tela/tela-boneco.ts`) segue os dois pelo `mm_info`. Os mipmaps misturam regiões vizinhas nos
 níveis pequenos: ponha numa página `MipMap` só o que precisa, com folga entre as regiões.
 
-**Medido** (nos 24 personagens de dois jogos de produção, com malhas com pesos, física e 76
-animações num deles): 2.245 KB de texto viram 413 KB (5,4 vezes menos); com gzip, 154 contra
+**Medido** (em 24 personagens com malhas com pesos, física e 76
+animações): 2.245 KB de texto viram 413 KB (5,4 vezes menos); com gzip, 154 contra
 123 KB; com brotli, 106 contra 98,5 KB; a carga até o modelo, 10,5 contra 6,4 ms. Nos 17 dos
 testes e exemplos, 1.741 KB viram 394 KB e a carga cai de 6,5 para 3,5 ms (com brotli o
 binário sai 7% maior que o texto ali: arquivos pequenos, em que o texto repete muito).

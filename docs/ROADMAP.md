@@ -11,9 +11,7 @@ O que está aberto, em ordem de prioridade.
 
 Feito agora: a interface de jogo web sem o Godot (docs/BACKEND.md "A cena do Mamulengo"). `src/cena`
 lê o `.tscn`, calcula os `Control` como o Godot 4 e `src/tela` desenha em WebGL2 no tamanho exato
-da janela, com variantes por proporção, estados de layout interpolados e bonecos com trilhas. Um
-jogo de produção portado assim (1310 de 1330 nós iguais ao Godot) baixa 7x menos até a primeira
-tela e fica pronto 5x mais rápido em 4G que o export do Godot.
+da janela, com variantes por proporção, estados de layout interpolados e bonecos com trilhas.
 
 Feito há pouco: o editor revisado com testes acompanhados (Mover numa junta dobra o membro, Alt
 solta, Ctrl ajusta a imagem no osso, setas em passos, linha de ajuda da ferramenta, árvore com

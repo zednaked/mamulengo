@@ -6,7 +6,7 @@ Um código só, em C++17 sem dependências, em `nucleo/`: vira wasm no editor e 
 Godot.
 
 É escrito a partir deste documento e conferido contra um oráculo (`tools/oraculo.ts`), que
-dá os números do runtime que os jogos usam hoje. Quem escreve o núcleo não lê o código desse
+dá os números do runtime de referência (spine-godot). Quem escreve o núcleo não lê o código desse
 runtime; lê este documento e compara números. Onde este
 texto e o oráculo discordarem, o oráculo manda e o texto é corrigido.
 
@@ -1263,7 +1263,7 @@ acima dela, menos a do topo, passam a manter o bit de segurar que tinham (o orá
 segura a animação de baixo por mais um quadro (90 graus de diferença num osso sintético).
 
 **Regra de mistura do spine-godot** _(descrito a partir da leitura do runtime de referência, 2026-11-09)_ (`Estado::mix_spine_godot`, desligada por padrão). O binário
-do spine-godot que os jogos usam hoje é um 4.3 mais antigo que o oráculo e decide quem já anima
+do spine-godot de referência é um 4.3 mais antigo que o oráculo e decide quem já anima
 cada propriedade **por entrada**, não por trilha: na conta dos modos, uma propriedade que uma
 entrada **mais antiga** (da mesma trilha ou de outra) já anima é `SEGUINTE` com a mistura
 `Substitui` (`Soma` se a entrada soma), também na trilha 0, onde o 4.3 atual usa `Primeira`; só
@@ -1366,7 +1366,7 @@ jogos tratar os dois igual. O que o nó acrescenta ao núcleo:
   outro. O comando de malha do item também fica (só é refeito quando a malha é refeita, a
   textura muda ou o item é de ajuste ou de blend que lê a tela); os índices crus iguais aos do
   quadro anterior não são renumerados; das posições e das cores e uvs só vai o que mudou, e
-  peça parada não custa nada. Numa bancada com 7 personagens de um jogo de produção
+  peça parada não custa nada. Numa bancada com 7 personagens
   o desenho ficou mais barato que o do nó C++ antigo.
 - **Tela** (seção "Tela"): `window` (Vector2, a janela em pixels; zero é a arte base) e
   `fit_window` (a janela é a da viewport a cada quadro, e o nó fica com a escala da vista e o canto

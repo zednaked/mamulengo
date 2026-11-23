@@ -25,9 +25,7 @@ parte, partículas e giro em 2,5D.
 ```
 466 de 466 roteiros batem com o runtime de referência em todo quadro, eventos também
 20 personagens posados em 0,043 ms por quadro (nativo), cerca de 5x mais rápido que o runtime que ele substitui
-102 de 102 projetos Spine 4.3 de produção vão e voltam pelo .boneco sem mudar nada
-um jogo de slot em staging roda no núcleo: 1 wasm em vez de 3
-objetos de GPU criados por quadro nesse jogo: 160 antes, 0,3 agora
+Projetos Spine 4.3 vão e voltam pelo .boneco sem mudar nada
 arrastar uma chave num personagem de 8,6 s no editor: 13 ms por passo (eram 51)
 ```
 
@@ -148,8 +146,7 @@ Godot (`BonecoSprite`). A exportação para o Spine tira, com aviso.
   crescimento, pivô, os containers, o tamanho dos textos pelas medidas da fonte) e
   `src/tela` desenha num passo WebGL2, no tamanho exato da janela, remontando quando
   ela gira. Variantes por proporção fazem o que o esticar do Godot não faz (uma
-  coluna centrada no desktop). Um jogo de produção portado assim baixa 7x menos até
-  a primeira tela que o export do Godot. [docs/BACKEND.md](docs/BACKEND.md).
+  coluna centrada no desktop). [docs/BACKEND.md](docs/BACKEND.md).
 
 ![Um joguinho: o coelho pula na ilha para pegar moedas que passam flutuando, uma missão marca sozinha e a pausa escurece a tela](exemplos/coelho/coelho.gif)
 
@@ -271,9 +268,8 @@ Arte: [Toon Characters](https://kenney.nl/assets/toon-characters-1) e
 Um JSON por personagem: esqueleto, regiões do atlas, animações, os tempos de
 emenda que o jogo usa, a compressão das páginas no jogo e a ficha. Os campos são
 em português e cada um tem ida e volta com o Spine 4.3, então um `.boneco`
-exporta de volta exatamente o JSON e o atlas de onde veio (102 de 102 projetos de
-produção, com mediana de 1,05x o tamanho). Onde os dois runtimes que os jogos
-usavam discordavam (multiply ignorando o alfa, gravidade da física com sinal
+exporta de volta exatamente o JSON e o atlas de onde veio (com mediana de 1,05x o tamanho). Onde os dois runtimes de
+referência discordam (multiply ignorando o alfa, gravidade da física com sinal
 trocado), o formato diz qual vale. Para entregar ao jogo, o mesmo arquivo pode ir
 em binário: cerca de 5 vezes menor e 1,6 vez mais rápido de carregar, com a pose
 igual byte a byte. Especificação: [docs/FORMATO.md](docs/FORMATO.md).
@@ -332,19 +328,7 @@ três personagens CC0, um clique que troca a animação e os eventos na tela:
   Godot oficial.
 
 O `BonecoSprite` guarda uma malha por lote e só regrava os vértices a cada
-quadro. Num jogo de slot com 17 personagens animados, em staging, o módulo do motor
-substituiu o plugin oficial: um wasm em vez de três, export de 51 MB em vez de 64
-MB, primeiro quadro em 3,4 s em vez de 6,7 s. Esses tempos foram medidos com uma
-versão anterior do módulo; o do núcleo sai com o mesmo wasm de 38,6 MB e o mesmo
-download comprimido, e no nativo agora custa menos por quadro (0,54 ms para os 17
-personagens, contra 0,63 ms). No navegador, com os dois a 120 fps, ele ocupa cerca
-de 3 pontos a mais da thread principal que aquela versão (eram 6 a 8 antes de um
-perfil do desenho e do recorte), e com a CPU 4x mais lenta os quadros acima de
-25 ms empatam. Guardar as malhas levou os objetos de GPU criados por quadro de 160
-para 0,3, e peça parada não envia nada. De 153 quadros comparados pixel a pixel com o renderizador
-anterior, 142 são iguais; os outros 11 vêm de flipbooks um passo adiante (4 acima
-de 1% dos pixels, 7 abaixo de 0,5%), e onde foi conferido, é o núcleo que bate com
-a referência.
+quadro. Peça parada não envia nada.
 
 ```sh
 nucleo/godot/compilar.sh linux    # GDExtension (também windows, macos), como o CI faz
@@ -443,13 +427,9 @@ diferenças de motor que o editor reproduz: [docs/PARIDADE.md](docs/PARIDADE.md)
 
 Funcionando: o editor (desenho, pose e medidas pelo núcleo no modo "núcleo"), o
 servidor MCP, a bancada de agentes, o `.boneco` com efeitos e partículas, o
-núcleo com o módulo e a GDExtension do Godot. Um jogo de slot roda em staging com
-o módulo do motor, e a versão `.boneco` dele, toda no núcleo, passa nos testes.
+núcleo com o módulo e a GDExtension do Godot.
 O núcleo é o modo padrão do editor para todo projeto, o `.boneco` binário está
-pronto e o editor abre por um link, sem instalar. Um primeiro jogo web de
-produção roda inteiro no runtime do Mamulengo, com as telas geradas do projeto do
-Godot no deploy; num perfil de celular médio ele fica pronto umas nove vezes
-antes que o export do Godot.
+pronto e o editor abre por um link, sem instalar.
 
 **Modo de layout (telas sem Godot):** uma tela é um `.boneco` montado no editor.
 Os ossos se prendem à janela (cantos, bordas, centro, esticar), as partes de
@@ -460,8 +440,7 @@ pelo código). Um PSD em camadas já chega proposto como tela
 ([docs/LAYOUT-PSD.md](docs/LAYOUT-PSD.md)). A tela grava um manifesto, e a lógica
 do jogo é escrita sobre ele pelos nomes (`tela.botao("jogar").aoTocar(...)`): veja
 [exemplos/coelho](exemplos/coelho). Próximos: cópias em tempo de jogo (listas),
-mover um osso pelo código, âncora com margem fixa e um primeiro jogo de produção
-convertido por esse caminho. Plano: [docs/ROADMAP.md](docs/ROADMAP.md).
+mover um osso pelo código, âncora com margem fixa. Plano: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licença
 

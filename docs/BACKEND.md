@@ -1,6 +1,6 @@
 # Backend: o Mamulengo como runtime de jogo web
 
-**Meta:** o Godot é a baseline. Tudo o que os jogos daqui usam nele tem de existir no Mamulengo e
+**Meta:** o Godot é a baseline. Tudo o que um jogo web costuma usar nele tem de existir no Mamulengo e
 ser melhor em algum eixo medido (peso, carga, quadro no celular, determinismo, o agente operar).
 O alvo principal é a web, com integração JS, compilado.
 
@@ -58,20 +58,6 @@ como código numa linguagem específica.
 | exportar | um template por plataforma | uma página HTML só; GDExtension para o Godot | PWA instalável, celular (Capacitor ou igual) |
 | ferramenta | editor do Godot | editor web, MCP, agente que joga e mede | ok: aqui ganhamos |
 
-## O que os jogos de produção usam (inventário de 2026-11-09)
-
-Um levantamento só de leitura de 21 jogos web feitos no Godot (o relatório com os nomes fica fora do
-repositório) mostrou:
-- **interface é o grosso:** os nós mais usados são `Label` (971), `TextureRect` (911), `Control`
-  (737), `Button` e `TouchScreenButton` (789), `Panel`, `AspectRatioContainer` e os containers;
-- **todos traduzem** (13 arquivos de tradução cada) e todos usam a mesma base comum de código (um
-  addon): portada uma vez, serve a todos;
-- **animação:** Spine (que já portamos), `AnimationPlayer` (~105) e alguns jogos inteiros animados
-  com `Polygon2D` e `Bone2D` (1.326 polígonos);
-- **lógica:** de 1.200 a 6.500 linhas de GDScript por jogo;
-- **peso na web:** 55 a 100 MB por jogo (o `side.wasm` de 44 MB, o `index.wasm` de 1,5 a 38 MB, o
-  `.pck` de 7 a 15 MB); o motor do Mamulengo cabe em menos de 1 MB.
-
 ## A tela (2026-11-09)
 
 `src/tela/tela.ts`: a interface como dados (`.tela.json`), desenhada num passo WebGL2 só. Cada
@@ -115,8 +101,6 @@ sem rodar o Godot:
   medido: no desktop, o jogo numa coluna centrada com o fundo e as barras de ponta a ponta, em vez de
   esticar.
 
-Conferido contra o Godot no primeiro jogo de produção portado: 1310 de 1330 nós no mesmo lugar
-(até 0,5 px) em 7 proporções; telas e transições com 2 a 6% de pixels diferentes (letras a 1 px).
 
 **O que a tela ganhou no caminho:** nós com estado herdado (mostrar, cor, mover, recorte, z),
 clonar e remover nó (as cópias acompanham a janela nova), estados de layout somados, boneco com
@@ -222,22 +206,6 @@ Chromium sem tela, em pt e ar num celular e em pt e hi num desktop (70 conferên
 (`exemplos/coelho/capturas/jogo`) e, com `--video`, a rodada em WebM e GIF. O que a API não deu e foi
 acrescentado, e o que ficou para depois: docs/ROADMAP.md, seção 10, "o joguinho do coelho".
 
-## O primeiro jogo de produção portado (2026-11-09)
-
-Um jogo com interface pesada, 12 idiomas e Spine, portado inteiro: a lógica em
-TypeScript, a tela gerada do projeto do Godot no próprio deploy, dentro do shell web do estúdio sem
-mudar o shell. Contra o export do Godot:
-
-| medida | Godot | Mamulengo |
-|---|---|---|
-| pacote | 63,5 MB | 10,8 MB |
-| baixado até a primeira tela | 23,4 MB | 3,2 MB |
-| pronto em 4G 10 Mbit/s com CPU 4x lenta | 35,2 s | 6,8 s |
-| deploy no CI (gerar, empacotar, testar, publicar) | 6m08s | 2m31s |
-
-O mesmo projeto do Godot continua sendo a fonte: o workflow escolhe o motor, e voltar ao Godot é
-rodar o deploy com o outro. Falta medir a fluidez no celular.
-
 ## O motor no jogo: um pacote baixado, não uma cópia (2026-11-12)
 
 O jogo não leva o motor dentro do repositório dele. Cada versão do motor sai como um `.tgz` numa
@@ -269,7 +237,7 @@ Para soltar uma versão: compilar o núcleo para a web, `node tools/motor-pacote
 
 ## Ordem
 
-Portar os jogos de produção dirige a ordem:
+A ordem:
 1. ~~**Layout:** a tela em dados e o layout dos `Control` do Godot~~ (feito: `src/tela`, `src/cena`).
 2. **Editor de layout:** abrir a cena, mover, ancorar, textos e idiomas, ver em vários tamanhos, e
    sair em `.tscn` (para o Godot) ou direto para a tela.
@@ -277,7 +245,7 @@ Portar os jogos de produção dirige a ordem:
    na hora já existem).
 4. **Importador do resto da cena do Godot:** `Sprite2D`, `AnimatedSprite2D`, `Polygon2D` com
    `Bone2D`, `AnimationPlayer` virando animação.
-5. **A lógica:** a base comum do estúdio portada uma vez (já existe para o primeiro jogo); regras e
+5. **A lógica:** regras e
    eventos em dados, mais o escape de script.
 6. **Som ao vivo, fases e telas, salvar, PWA instalável.**
 7. **Medida contra o Godot em cada jogo portado:** peso, tempo de carga e quadro no celular.

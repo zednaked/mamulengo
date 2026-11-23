@@ -117,7 +117,7 @@ const server = new McpServer(
   { name: "mamulengo", version: "0.1.0" },
   {
     instructions: [
-      "Mamulengo: editor de animacao Spine 4.3 para os jogos Godot. O documento e o proprio .spine-json que o jogo carrega.",
+      "Mamulengo: editor de animacao Spine 4.3 para jogos Godot. O documento e o proprio .spine-json que o jogo carrega.",
       "Fluxo: mamulengo_assets -> mamulengo_open -> mamulengo_run (comandos) -> mamulengo_look (veja o resultado) -> mamulengo_save.",
       "mamulengo_help lista os comandos; mamulengo_help {name} mostra o schema de um. Use query.* para entender o esqueleto antes de editar.",
       "mamulengo_run executa um lote como uma unica acao de desfazer; se uma chamada falha, nada do lote fica.",
